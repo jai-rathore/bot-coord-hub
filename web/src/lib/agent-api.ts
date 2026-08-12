@@ -6,17 +6,12 @@
  * Clerk UI and Bearer/MCP paths share one coherent implementation.
  */
 
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   confirms,
   intentProposals,
-  links,
-  sessionMessages,
-  sessions,
-  users,
   type Confirm,
-  type User,
 } from "@/db/schema";
 import {
   findDedupeHits,
@@ -254,7 +249,14 @@ export async function createGuestTask(
     ok: true,
     ...(await createScopedGuestTask({
       organizer: auth.user,
-      ...body,
+      taskType: body.taskType,
+      title: body.title,
+      description: body.description,
+      config: body.config,
+      targetEmail: body.targetEmail,
+      expiresInMinutes: body.expiresInMinutes,
+      maxResponses: body.maxResponses,
+      sessionId: body.sessionId,
       origin: baseUrl ?? "",
       actor: { kind: "agent", apiKeyId: auth.apiKey.id },
     })),

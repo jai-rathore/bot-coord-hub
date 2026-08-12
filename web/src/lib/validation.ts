@@ -40,7 +40,7 @@ export function boundedText(
 
 export function assertPayloadSize(
   value: unknown,
-  maxBytes = LIMITS.payloadBytes,
+  maxBytes: number = LIMITS.payloadBytes,
   field = "payload",
 ): void {
   let serialized: string;

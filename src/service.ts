@@ -421,7 +421,7 @@ export function revokeLink(
     linkId: link.linkId,
   });
   persistStore(data);
-  return { linkId: link.linkId, status: link.status as const, revokedAt: now };
+  return { linkId: link.linkId, status: "revoked" as const, revokedAt: now };
 }
 
 export function listLinks(auth: Auth, userId?: string, baseUrl = "") {

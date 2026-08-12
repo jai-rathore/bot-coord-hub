@@ -70,6 +70,7 @@ async function main() {
       linkId: session.linkId,
       status: session.status,
       payload: session.payload,
+      idempotencyKey: null,
       createdAt: new Date(session.createdAt),
       updatedAt: new Date(session.updatedAt),
     },

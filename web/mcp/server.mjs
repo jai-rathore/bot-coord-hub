@@ -17,6 +17,9 @@ import { createInterface } from "node:readline";
 const BASE = (process.env.HONEYMATCHA_BASE_URL || "").replace(/\/$/, "");
 const KEY = process.env.HONEYMATCHA_API_KEY || "";
 
+// Legacy fallback manifest retained for offline debugging; production clients
+// load the canonical remote manifest.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const TOOLS = [
   {
     name: "whoami",
@@ -203,6 +206,7 @@ async function remoteMcp(method, params = {}) {
   return data.result;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function callTool(name, args = {}) {
   switch (name) {
     case "whoami":

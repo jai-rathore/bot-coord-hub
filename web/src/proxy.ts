@@ -1,8 +1,6 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { getDiscoveryDocument, prefersJson } from "@/lib/discovery";
-
-const isProtectedRoute = createRouteMatcher(["/app(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
   // Agent discovery on homepage without breaking human HTML.
@@ -27,7 +25,10 @@ export default clerkMiddleware(async (auth, req) => {
     });
   }
 
-  if (isProtectedRoute(req)) {
+  if (
+    req.nextUrl.pathname === "/app" ||
+    req.nextUrl.pathname.startsWith("/app/")
+  ) {
     await auth.protect();
   }
 });

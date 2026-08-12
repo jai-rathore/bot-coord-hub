@@ -42,15 +42,16 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
     const stored = window.sessionStorage.getItem(tokenStorageKey(publicId));
     const resolved = fragment.startsWith("gt_") ? fragment : stored;
     if (!resolved) {
-      setError("This private response link is missing its capability.");
-      setStatus("error");
+      queueMicrotask(() => {
+        setError("This private response link is missing its capability.");
+        setStatus("error");
+      });
       return;
     }
     if (fragment) {
       window.sessionStorage.setItem(tokenStorageKey(publicId), resolved);
       window.history.replaceState(null, "", window.location.pathname);
     }
-    setToken(resolved);
     let cancelled = false;
     void fetch(`/api/guest/tasks/${encodeURIComponent(publicId)}`, {
       headers: { Authorization: `Guest ${resolved}` },
@@ -59,6 +60,7 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Could not open request");
         if (!cancelled) {
+          setToken(resolved);
           setTask(data.task);
           setStatus("ready");
         }

@@ -90,16 +90,14 @@ function nextState(
   }
 
   if (TERMINAL.includes(current) && type !== "meeting.cancel") {
-    if (!(current === "confirmed" && type === "meeting.cancel")) {
-      return {
-        state: current,
-        sideEffects: [],
-        error: err(
-          "illegal_transition",
-          `Cannot apply ${type} in terminal state ${current}`
-        ),
-      };
-    }
+    return {
+      state: current,
+      sideEffects: [],
+      error: err(
+        "illegal_transition",
+        `Cannot apply ${type} in terminal state ${current}`
+      ),
+    };
   }
 
   switch (type) {

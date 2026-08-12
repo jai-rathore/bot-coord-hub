@@ -25,7 +25,8 @@ export async function POST(request: Request) {
       {
         ok: true,
         ...(await startAgentPairing({
-          ...body,
+          agentName: body.agentName,
+          requestedScopes: body.requestedScopes,
           origin: requestBaseUrl(request),
         })),
       },

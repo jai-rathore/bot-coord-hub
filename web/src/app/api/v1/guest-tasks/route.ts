@@ -44,7 +44,14 @@ export async function POST(request: Request) {
     }>(request);
     const result = await createGuestTask({
       organizer: auth.user,
-      ...body,
+      taskType: body.taskType,
+      title: body.title,
+      description: body.description,
+      config: body.config,
+      targetEmail: body.targetEmail,
+      expiresInMinutes: body.expiresInMinutes,
+      maxResponses: body.maxResponses,
+      sessionId: body.sessionId,
       origin: requestBaseUrl(request),
       actor: { kind: "agent", apiKeyId: auth.apiKey.id },
     });

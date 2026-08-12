@@ -19,6 +19,8 @@ import {
   slotWithinAllAllowedHours,
 } from "./policy";
 import { parseScheduleWindow } from "./validation";
+import { mockCalendarAllowed } from "./calendar";
+import { buildOAuthState, parseOAuthState } from "./google-oauth";
 
 test("default paired agents cannot approve for a human", () => {
   assert.equal(DEFAULT_AGENT_SCOPES.includes("approvals:write"), false);
@@ -107,6 +109,13 @@ test("integration credentials use authenticated encryption", () => {
   assert.equal(encrypted.includes("refresh-token-value"), false);
 });
 
+test("Google OAuth state is signed and bound to the browser nonce", () => {
+  process.env.OAUTH_STATE_SECRET = "test-oauth-state-secret";
+  const generated = buildOAuthState("user-123");
+  assert.equal(parseOAuthState(generated.state, generated.nonce), "user-123");
+  assert.equal(parseOAuthState(generated.state, "wrong-nonce"), null);
+});
+
 test("A2A card advertises the v1 interface and scoped auth", () => {
   const card = getAgentCard("https://honeymatcha.io");
   assert.equal(card.supportedInterfaces[0]?.protocolVersion, "1.0");
@@ -115,4 +124,10 @@ test("A2A card advertises the v1 interface and scoped auth", () => {
     "https://honeymatcha.io/api/a2a",
   );
   assert.ok(card.skills.some((skill) => skill.id === "guest-task"));
+});
+
+test("production never enables a simulated calendar by default", () => {
+  assert.equal(mockCalendarAllowed("production", undefined), false);
+  assert.equal(mockCalendarAllowed("production", "true"), true);
+  assert.equal(mockCalendarAllowed("development", undefined), true);
 });
