@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { postgresConnectionOptions } from "./connection";
 import * as schema from "./schema";
 
 const globalForDb = globalThis as unknown as {
@@ -13,7 +14,12 @@ function createClient() {
       "DATABASE_URL is not set. Add it to .env.local (see .env.example).",
     );
   }
-  return postgres(url, { prepare: false, max: 10 });
+  const { url: connectionUrl, ssl } = postgresConnectionOptions(url);
+  return postgres(connectionUrl, {
+    prepare: false,
+    max: 10,
+    ...(ssl ? { ssl } : {}),
+  });
 }
 
 export function getDb() {
