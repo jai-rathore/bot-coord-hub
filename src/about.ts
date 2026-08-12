@@ -81,6 +81,10 @@ export function renderAboutHtml(): string {
     .hero-band {
       position: relative;
       overflow: hidden;
+      min-height: 100svh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
       background:
         radial-gradient(900px 420px at 12% 0%, rgba(111, 154, 124, 0.38) 0%, transparent 55%),
         radial-gradient(720px 380px at 92% 10%, rgba(232, 210, 154, 0.58) 0%, transparent 52%),
@@ -122,9 +126,8 @@ export function renderAboutHtml(): string {
       color: transparent;
     }
     .hero {
-      padding: 0.35rem 0 0;
+      padding: 0 0 clamp(2.75rem, 7vh, 4.5rem);
       position: relative;
-      min-height: min(62vh, 28rem);
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
