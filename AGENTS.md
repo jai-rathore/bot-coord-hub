@@ -24,8 +24,13 @@ and the `scripts` blocks of each `package.json`).
 - Config lives in `web/.env.local` (gitignored — recreate if missing, see `web/.env.example`).
 - **Clerk keys are required just to boot.** Placeholder `pk_test_...`/`sk_test_...` keys let the
   server start and serve all public pages + the Bearer-auth `/api/v1/*` agent API. But with fake
-  keys every browser HTML navigation 307-redirects to Clerk's `dev-browser-missing` handshake, so
-  **real Clerk test keys are required for in-browser use and human sign-in** (`/app/**`).
+  keys every browser HTML navigation 307-redirects to Clerk's `dev-browser-missing` handshake.
+- **Human sign-in on localhost needs Clerk _development_ keys (`pk_test_`/`sk_test_`).** With real
+  keys the public pages render in the browser and `/app/**` correctly redirects to `/sign-in`.
+  However, **production keys (`pk_live_`/`sk_live_`) are rejected on `localhost`** — ClerkJS throws
+  "Production Keys are only allowed for domain 'honeymatcha.io'" and the sign-in widget renders
+  blank. Use a Clerk _development_ instance's keys (which allow localhost) to test human sign-in
+  and the signed-in dashboard locally.
 - **Migration gotcha:** `drizzle-kit migrate` (`npm run db:migrate`) fails silently here (spinner,
   exit 1, no tables created). Apply migrations with the drizzle-orm migrator instead — a short node
   script calling `migrate(db, { migrationsFolder: './drizzle' })` from `drizzle-orm/postgres-js/migrator`
