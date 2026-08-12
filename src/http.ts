@@ -10,6 +10,12 @@ export async function readJson(req: IncomingMessage): Promise<unknown> {
   return JSON.parse(raw) as unknown;
 }
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+} as const;
+
 export function sendJson(
   res: ServerResponse,
   status: number,
@@ -18,11 +24,21 @@ export function sendJson(
   const payload = JSON.stringify(body, null, 2);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    ...CORS_HEADERS,
   });
   res.end(payload);
+}
+
+export function sendHtml(
+  res: ServerResponse,
+  status: number,
+  html: string
+): void {
+  res.writeHead(status, {
+    "Content-Type": "text/html; charset=utf-8",
+    ...CORS_HEADERS,
+  });
+  res.end(html);
 }
 
 export function sendError(

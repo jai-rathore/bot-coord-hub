@@ -63,6 +63,7 @@ curl -s -X POST http://localhost:8787/v1/agent/schedule \
 
 | Method | Path | Notes |
 |--------|------|-------|
+| GET | / | public about page (HTML; JSON if Accept: application/json) |
 | GET | /health | public |
 | POST | /v1/links/invite | pending link |
 | POST | /v1/links/accept | activate |
