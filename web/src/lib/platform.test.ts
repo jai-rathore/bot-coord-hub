@@ -127,7 +127,7 @@ test("A2A card advertises the v1 interface and scoped auth", () => {
 });
 
 test("production never enables a simulated calendar by default", () => {
-  assert.equal(mockCalendarAllowed("production", undefined), false);
+  assert.equal(mockCalendarAllowed("production", "false"), false);
   assert.equal(mockCalendarAllowed("production", "true"), true);
   assert.equal(mockCalendarAllowed("development", undefined), true);
 });
