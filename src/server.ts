@@ -3,8 +3,9 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { ABOUT_JSON, prefersJson, renderAboutHtml } from "./about.js";
 import { authenticate } from "./auth.js";
-import { getQuery, readJson, sendError, sendJson } from "./http.js";
+import { getQuery, readJson, sendError, sendHtml, sendJson } from "./http.js";
 import { loadStore } from "./store.js";
 import {
   HttpError,
@@ -57,6 +58,17 @@ async function handle(
   }
 
   try {
+    // Public about / landing (no auth)
+    if (method === "GET" && path === "/") {
+      const accept = req.headers.accept;
+      if (prefersJson(typeof accept === "string" ? accept : undefined)) {
+        sendJson(res, 200, ABOUT_JSON);
+        return;
+      }
+      sendHtml(res, 200, renderAboutHtml());
+      return;
+    }
+
     // Public
     if (method === "GET" && path === "/health") {
       sendJson(res, 200, getHealth());
@@ -198,6 +210,7 @@ export function startServer(port = DEFAULT_PORT): ReturnType<typeof createServer
 
   server.listen(port, "0.0.0.0", () => {
     console.log(`bot-coord-hub listening on http://0.0.0.0:${port}`);
+    console.log(`about: GET /`);
     console.log(`health: GET /health`);
     console.log(`seed keys: bc_jai_dev_key, bc_rishav_dev_key`);
   });
