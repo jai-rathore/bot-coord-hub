@@ -22,7 +22,10 @@ export function IntentsRegistry({
   canPropose,
 }: {
   initialItems: Array<
-    Omit<IntentRegistryItem, "createdAt"> & { createdAt: string }
+    Omit<IntentRegistryItem, "createdAt" | "triagedAt"> & {
+      createdAt: string;
+      triagedAt: string | null;
+    }
   >;
   canPropose: boolean;
 }) {
@@ -125,6 +128,18 @@ export function IntentsRegistry({
                 </div>
                 {item.description && (
                   <p className="mt-1 text-sm text-muted">{item.description}</p>
+                )}
+                {item.status === "pending" && item.triageReason && (
+                  <p className="mt-1 text-sm text-ink">
+                    <span className="font-medium text-matcha-deep">
+                      Triage
+                      {item.triageRecommendation
+                        ? ` (${item.triageRecommendation.replace("_", " ")})`
+                        : ""}
+                      :{" "}
+                    </span>
+                    {item.triageReason}
+                  </p>
                 )}
                 {item.rejectionReason && (
                   <p className="mt-1 text-sm text-danger">

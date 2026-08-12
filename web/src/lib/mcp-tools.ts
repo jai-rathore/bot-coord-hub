@@ -128,7 +128,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   },
   {
     name: "list_intents",
-    description: "List intent registry entries (live / pending / rejected).",
+    description: "List live intents available for agent discovery.",
     inputSchema: {
       type: "object",
       properties: {

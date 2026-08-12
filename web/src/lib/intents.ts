@@ -11,6 +11,10 @@ export type IntentRegistryItem = {
   description: string | null;
   status: "pending" | "live" | "rejected";
   rejectionReason: string | null;
+  triageRecommendation: "publish" | "reject" | "needs_review" | null;
+  triageReason: string | null;
+  triagedAt: Date | null;
+  proposedByUserId: string | null;
   createdAt: Date;
 };
 
@@ -31,7 +35,11 @@ export async function listRegistryIntents(
       name: t.name,
       description: t.description,
       status: t.status,
-      rejectionReason: null,
+      rejectionReason: null as string | null,
+      triageRecommendation: null as IntentRegistryItem["triageRecommendation"],
+      triageReason: null as string | null,
+      triagedAt: null as Date | null,
+      proposedByUserId: null as string | null,
       createdAt: t.createdAt,
     })),
     ...proposals.map((p) => ({
@@ -42,16 +50,34 @@ export async function listRegistryIntents(
       description: p.description,
       status: p.status,
       rejectionReason: p.rejectionReason,
+      triageRecommendation: p.triageRecommendation,
+      triageReason: p.triageReason,
+      triagedAt: p.triagedAt,
+      proposedByUserId: p.proposedByUserId,
       createdAt: p.createdAt,
     })),
   ];
 
+  // Prefer canonical intent_types when a published proposal shares a slug.
+  const bySlug = new Map<string, IntentRegistryItem>();
+  for (const item of items) {
+    const existing = bySlug.get(item.slug);
+    if (!existing) {
+      bySlug.set(item.slug, item);
+      continue;
+    }
+    if (existing.source === "proposal" && item.source === "type") {
+      bySlug.set(item.slug, item);
+    }
+  }
+  const deduped = [...bySlug.values()];
+
   const filtered = q
-    ? items.filter((item) => {
+    ? deduped.filter((item) => {
         const hay = `${item.name} ${item.slug} ${item.description ?? ""}`.toLowerCase();
         return hay.includes(q.toLowerCase());
       })
-    : items;
+    : deduped;
 
   const statusOrder = { live: 0, pending: 1, rejected: 2 } as const;
   return filtered.sort((a, b) => {

@@ -113,8 +113,11 @@ Optional: keep the existing hub (`src/`) as a separate Render service until the 
 ## Schema overview
 
 - `users` — Clerk user sync
-- `api_keys` — hashed agent secrets
+- `api_keys` — hashed agent secrets (revoke sets `revoked_at`; auth rejects immediately)
 - `links` — mutual peer links (`pair_link_id`, open invites allowed)
 - `sessions` / `session_messages` — coordination boards
-- `intent_types` / `intent_proposals` — registry (`pending` \| `live` \| `rejected`)
+- `intent_types` / `intent_proposals` — registry (`pending` \| `live` \| `rejected`); proposals carry triage recommendation/reason
 - `confirms` — human confirmation queue (`pending` \| `approved` \| `denied`)
+- `audit_logs` — append-only (key create/revoke, invite accept, confirm decisions, intent publish/reject/triage)
+
+Agent surface `/api/v1/*` is lightly rate-limited (IP + key). Intent triage worker: `POST /api/v1/intents/triage` with `TRIAGE_SECRET`. Publish gate UI: `/app/intents`.

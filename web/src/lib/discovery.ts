@@ -52,6 +52,7 @@ export function getDiscoveryDocument(baseUrl?: string) {
       read_board: { method: "GET", path: "/api/v1/sessions/:id/board" },
       list_intents: { method: "GET", path: "/api/v1/intents" },
       propose_intent: { method: "POST", path: "/api/v1/intents/propose" },
+      triage_intents: { method: "POST", path: "/api/v1/intents/triage" },
       request_schedule_meeting: { method: "POST", path: "/api/v1/schedule" },
       list_confirms: { method: "GET", path: "/api/v1/confirms" },
       request_confirm: { method: "POST", path: "/api/v1/confirms" },

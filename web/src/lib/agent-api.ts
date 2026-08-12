@@ -257,8 +257,11 @@ export async function postBoardMessage(
   }
 }
 
+/** Agent discovery: live intents only (pending/rejected stay in the human registry). */
 export async function listIntents(query?: string) {
-  const intents = await listRegistryIntents(query);
+  const intents = (await listRegistryIntents(query)).filter(
+    (i) => i.status === "live",
+  );
   return { ok: true, intents };
 }
 
@@ -307,10 +310,11 @@ export async function proposeIntent(
         status: "pending",
         proposedByUserId: auth.user.id,
         proposedByEmail: auth.user.email,
+        triageQueuedAt: new Date(),
       })
       .returning();
 
-    return { ok: true, proposal };
+    return { ok: true, proposal, triage: { queued: true } };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Database error";
     if (message.includes("unique") || message.includes("duplicate")) {

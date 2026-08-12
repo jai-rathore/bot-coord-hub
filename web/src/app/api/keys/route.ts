@@ -1,6 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { apiKeys } from "@/db/schema";
+import { writeAudit } from "@/lib/audit";
 import { generateApiKey } from "@/lib/keys";
 import { ensureCurrentUser } from "@/lib/users";
 
@@ -60,6 +61,14 @@ export async function POST(request: Request) {
       keyPrefix: apiKeys.keyPrefix,
       createdAt: apiKeys.createdAt,
     });
+
+  await writeAudit({
+    actorUserId: user.id,
+    action: "api_key.created",
+    entityType: "api_key",
+    entityId: created.id,
+    metadata: { name: created.name, keyPrefix: created.keyPrefix },
+  });
 
   return Response.json(
     {

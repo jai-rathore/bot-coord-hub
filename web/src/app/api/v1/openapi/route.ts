@@ -13,13 +13,19 @@ export async function GET(request: Request) {
     const path = ep.path.replace(":id", "{id}");
     const method = ep.method.toLowerCase();
     paths[path] ??= {};
+    const publicOp = name === "health" || name === "triage_intents";
     paths[path][method] = {
       operationId: name,
       summary: name,
-      security: name === "health" ? [] : [{ bearerAuth: [] }],
+      security: publicOp
+        ? name === "triage_intents"
+          ? [{ triageSecret: [] }]
+          : []
+        : [{ bearerAuth: [] }],
       responses: {
         "200": { description: "OK" },
         "401": { description: "Unauthorized" },
+        "429": { description: "Rate limited" },
       },
     };
   }
@@ -39,6 +45,12 @@ export async function GET(request: Request) {
           type: "http",
           scheme: "bearer",
           description: "API key from /app/keys (prefix hm_)",
+        },
+        triageSecret: {
+          type: "apiKey",
+          in: "header",
+          name: "X-Triage-Secret",
+          description: "Shared TRIAGE_SECRET for the intent triage worker",
         },
       },
     },
