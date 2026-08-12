@@ -52,8 +52,10 @@ export function SiteHeader() {
   }, []);
 
   return (
-    <header className="relative z-30 flex items-center justify-between gap-2 px-3 py-4 sm:gap-4 sm:px-6">
-      <BrandLink className="min-w-0" />
+    <header className="relative z-30 flex min-w-0 items-center justify-between gap-2 px-3 py-4 sm:gap-4 sm:px-6">
+      <div className="min-w-0">
+        <BrandLink />
+      </div>
       <nav className="flex shrink-0 items-center gap-1.5 text-sm font-medium sm:gap-3">
         <div className="hidden items-center gap-3 sm:flex">
           {SECONDARY_LINKS.map((link) => (

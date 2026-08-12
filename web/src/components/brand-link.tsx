@@ -3,7 +3,10 @@ import Link from "next/link";
 
 type BrandLinkProps = {
   className?: string;
-  /** Show the serif wordmark next to the mark (default true). */
+  /**
+   * Show the serif wordmark next to the mark from `sm` and up (default true).
+   * Below `sm`, only the logo mark is shown (wordmark stays available to AT via sr-only).
+   */
   showWordmark?: boolean;
 };
 
@@ -26,12 +29,13 @@ export function BrandLink({
         priority
       />
       {showWordmark ? (
-        <span className="whitespace-nowrap font-[family-name:var(--font-fraunces)] text-base font-semibold sm:text-lg">
+        <span className="hidden whitespace-nowrap font-[family-name:var(--font-fraunces)] text-lg font-semibold sm:inline">
           HoneyMatcha
         </span>
-      ) : (
-        <span className="sr-only">HoneyMatcha</span>
-      )}
+      ) : null}
+      <span className={showWordmark ? "sr-only sm:hidden" : "sr-only"}>
+        HoneyMatcha
+      </span>
     </Link>
   );
 }
