@@ -114,7 +114,8 @@ Humans connect Google at `/app/settings` (`GOOGLE_CALENDAR_ENABLED`, `GOOGLE_CLI
    npm run db:migrate && npm run db:seed
    ```
 7. Add Clerk env vars (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`).
-8. In Clerk Dashboard, add the Render URL to allowed origins / redirect URLs.
+   Production requires **`pk_live_` / `sk_live_`** and **Custom Google OAuth** in the Clerk Dashboard — see [`docs/CLERK_PRODUCTION.md`](./docs/CLERK_PRODUCTION.md).
+8. In Clerk Dashboard, add the Render URL (and `https://honeymatcha.io`) to allowed origins / redirect URLs.
 9. Filesystem is ephemeral — use Postgres, not local files.
 
 Optional: keep the existing hub (`src/`) as a separate Render service until the product API fully replaces it.

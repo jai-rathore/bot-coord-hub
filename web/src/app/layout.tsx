@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Fraunces, Sora } from "next/font/google";
+import { clerkAppearance, clerkLocalization } from "@/lib/clerk-appearance";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -32,7 +33,12 @@ export default function RootLayout({
       className={`${fraunces.variable} ${sora.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
-        <ClerkProvider>{children}</ClerkProvider>
+        <ClerkProvider
+          appearance={clerkAppearance}
+          localization={clerkLocalization}
+        >
+          {children}
+        </ClerkProvider>
       </body>
     </html>
   );
