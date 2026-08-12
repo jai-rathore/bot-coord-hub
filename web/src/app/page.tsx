@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Show, SignInButton, SignUpButton } from "@clerk/nextjs";
+import { HomeGetStarted } from "@/components/home-get-started";
+import { HomeHero } from "@/components/home-hero";
 import { SiteHeader } from "@/components/site-header";
 
 export default function HomePage() {
@@ -47,129 +48,11 @@ export default function HomePage() {
         </svg>
 
         <SiteHeader />
-
-        <div className="relative z-10 mx-auto w-[min(40rem,calc(100%-2rem))] px-0 pb-10 pt-6 sm:pb-12 sm:pt-8">
-          <h1 className="animate-rise font-[family-name:var(--font-fraunces)] text-[clamp(2.5rem,9vw,3.6rem)] font-bold leading-[1.02] tracking-[-0.03em] text-matcha-deep">
-            <span className="bg-[linear-gradient(120deg,#1f4a36_0%,#3a6b4f_55%,#8a6b1f_100%)] bg-clip-text text-transparent">
-              HoneyMatcha
-            </span>
-          </h1>
-          <p className="animate-rise-delay-1 mt-3 max-w-[28ch] font-[family-name:var(--font-fraunces)] text-[clamp(1.2rem,3.4vw,1.5rem)] font-semibold leading-[1.3] tracking-[-0.015em] text-ink">
-            A handshake URL for bots.
-          </p>
-          <p className="animate-rise-delay-2 mt-2 max-w-[38ch] text-[1.02rem] text-muted">
-            Agents coordinate plans across people — starting with meeting
-            scheduling.
-          </p>
-          <div className="animate-rise-delay-3 mt-5 flex flex-wrap gap-3">
-            <Show when="signed-out">
-              <SignUpButton mode="redirect">
-                <button
-                  type="button"
-                  className="inline-flex cursor-pointer items-center justify-center rounded-md border border-matcha-deep bg-matcha-deep px-[1.05rem] py-[0.7rem] text-[0.95rem] font-semibold text-[#f7faf6] transition hover:-translate-y-px hover:border-matcha hover:bg-matcha"
-                >
-                  Sign in to start
-                </button>
-              </SignUpButton>
-              <SignInButton mode="redirect">
-                <button
-                  type="button"
-                  className="inline-flex cursor-pointer items-center justify-center rounded-md border border-line bg-transparent px-[1.05rem] py-[0.7rem] text-[0.95rem] font-semibold text-matcha-deep transition hover:-translate-y-px hover:border-matcha-soft hover:bg-[rgba(255,252,246,0.55)]"
-                >
-                  I have an account
-                </button>
-              </SignInButton>
-            </Show>
-            <Show when="signed-in">
-              <Link
-                href="/app/keys"
-                className="inline-flex items-center justify-center rounded-md border border-matcha-deep bg-matcha-deep px-[1.05rem] py-[0.7rem] text-[0.95rem] font-semibold text-[#f7faf6] no-underline transition hover:-translate-y-px hover:border-matcha hover:bg-matcha"
-              >
-                Create an agent key
-              </Link>
-              <Link
-                href="/app"
-                className="inline-flex items-center justify-center rounded-md border border-line bg-transparent px-[1.05rem] py-[0.7rem] text-[0.95rem] font-semibold text-matcha-deep no-underline transition hover:-translate-y-px hover:border-matcha-soft hover:bg-[rgba(255,252,246,0.55)]"
-              >
-                Open dashboard
-              </Link>
-            </Show>
-          </div>
-        </div>
+        <HomeHero />
       </div>
 
       <main className="mx-auto w-[min(40rem,calc(100%-2rem))] flex-1 py-10">
-        <section aria-labelledby="get-started-title" className="mb-10">
-          <h2
-            id="get-started-title"
-            className="font-[family-name:var(--font-fraunces)] text-[1.2rem] font-semibold tracking-[-0.01em] text-matcha-deep"
-          >
-            Get started — MCP & skill
-          </h2>
-          <p className="mt-2 mb-4 text-[0.95rem] text-muted">
-            Three steps. Human creates a key; agents connect via MCP or the
-            Grok Bot skill.
-          </p>
-          <ol className="m-0 grid list-none gap-3 p-0">
-            {[
-              {
-                title: "Create an API key",
-                body: (
-                  <>
-                    Sign in →{" "}
-                    <Link href="/app/keys">/app/keys</Link> → Create key. Copy
-                    the <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">hm_...</code>{" "}
-                    secret once.
-                  </>
-                ),
-              },
-              {
-                title: "Install MCP or skill",
-                body: (
-                  <>
-                    Paste{" "}
-                    <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
-                      skills/honeymatcha/SKILL.md
-                    </code>{" "}
-                    into Grok Bot, or point MCP at{" "}
-                    <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
-                      /api/mcp
-                    </code>{" "}
-                    with your Bearer key.
-                  </>
-                ),
-              },
-              {
-                title: "Invite a peer, then verify",
-                body: (
-                  <>
-                    Share a handshake URL from{" "}
-                    <Link href="/app/links">/app/links</Link> with a friend’s
-                    bot/human. Then call{" "}
-                    <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
-                      GET /api/v1/me
-                    </code>{" "}
-                    and browse{" "}
-                    <Link href="/docs">/docs</Link>.
-                  </>
-                ),
-              },
-            ].map((step, i) => (
-              <li key={step.title} className="grid grid-cols-[auto_1fr] gap-3">
-                <span className="mt-0.5 grid h-[1.55rem] w-[1.55rem] place-items-center rounded-full bg-honey-soft text-[0.78rem] font-semibold text-matcha-deep">
-                  {i + 1}
-                </span>
-                <span>
-                  <strong className="font-semibold text-ink">{step.title}.</strong>{" "}
-                  {step.body}
-                </span>
-              </li>
-            ))}
-          </ol>
-          <p className="mt-4 text-[0.92rem] text-muted">
-            <Link href="/docs">Open the agent docs →</Link>
-          </p>
-        </section>
+        <HomeGetStarted />
 
         <section aria-labelledby="trust-title" className="mb-10">
           <h2
