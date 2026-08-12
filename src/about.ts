@@ -91,13 +91,14 @@ export function renderAboutHtml(): string {
     }
     .hero-art {
       position: absolute;
-      top: -18%;
-      right: -8%;
-      width: min(42rem, 78vw);
+      top: 50%;
+      right: max(-4rem, calc(50% - 28rem));
+      width: min(22rem, 48vw);
       height: auto;
-      max-height: 14rem;
+      max-height: 11.5rem;
+      translate: 0 -42%;
       pointer-events: none;
-      opacity: 0.85;
+      opacity: 0.88;
       animation: drift 12s ease-in-out infinite alternate;
     }
     .wrap {
@@ -347,11 +348,12 @@ export function renderAboutHtml(): string {
         padding-bottom: 2rem;
       }
       .hero-art {
-        top: -22%;
-        right: -18%;
-        width: min(28rem, 92vw);
-        max-height: 11rem;
-        opacity: 0.72;
+        top: 0.35rem;
+        right: -2.5rem;
+        width: min(16rem, 58vw);
+        max-height: 8.5rem;
+        translate: 0 0;
+        opacity: 0.7;
       }
       .lede { font-size: 0.98rem; }
     }
@@ -366,21 +368,21 @@ export function renderAboutHtml(): string {
 </head>
 <body>
   <div class="hero-band">
-    <svg class="hero-art" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <svg class="hero-art" viewBox="360 220 520 280" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       <defs>
         <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="#3a6b4f" stop-opacity="0.28"/>
           <stop offset="100%" stop-color="#c49a3c" stop-opacity="0.18"/>
         </linearGradient>
       </defs>
-      <ellipse cx="980" cy="120" rx="220" ry="160" fill="url(#leaf)"/>
-      <path d="M140 420c90-120 210-170 340-140 110 26 180 90 250 90s150-50 250-40c70 8 140 48 200 110"
-            fill="none" stroke="#3a6b4f" stroke-width="18" stroke-linecap="round" opacity="0.14"/>
-      <path d="M220 470c80-90 180-130 290-105 95 22 155 78 220 78s130-44 220-34"
-            fill="none" stroke="#c49a3c" stroke-width="10" stroke-linecap="round" opacity="0.22"/>
-      <circle cx="470" cy="360" r="54" fill="#3a6b4f" opacity="0.12"/>
-      <circle cx="620" cy="360" r="54" fill="#c49a3c" opacity="0.16"/>
-      <path d="M495 360h100" stroke="#1f4a36" stroke-width="10" stroke-linecap="round" opacity="0.28"/>
+      <ellipse cx="780" cy="250" rx="120" ry="90" fill="url(#leaf)"/>
+      <path d="M380 400c70-70 150-95 230-75 70 18 115 60 165 60s95-32 160-24"
+            fill="none" stroke="#3a6b4f" stroke-width="14" stroke-linecap="round" opacity="0.16"/>
+      <path d="M400 430c60-55 130-78 205-62 65 14 105 52 150 52s90-28 145-20"
+            fill="none" stroke="#c49a3c" stroke-width="8" stroke-linecap="round" opacity="0.24"/>
+      <circle cx="470" cy="360" r="54" fill="#3a6b4f" opacity="0.14"/>
+      <circle cx="620" cy="360" r="54" fill="#c49a3c" opacity="0.18"/>
+      <path d="M495 360h100" stroke="#1f4a36" stroke-width="10" stroke-linecap="round" opacity="0.3"/>
     </svg>
     <div class="wrap">
       <header class="hero">
