@@ -20,7 +20,9 @@ export const clerkAppearance = {
     borderRadius: "0.5rem",
   },
   options: {
-    logoImageUrl: "/favicon.ico",
+    // Absolute production URL so Clerk’s hosted assets resolve the mark
+    // (not the default Next/Vercel favicon). Asset is also at /logo-mark.png.
+    logoImageUrl: "https://honeymatcha.io/logo-mark.png",
     logoLinkUrl: "/",
     logoPlacement: "inside" as const,
     socialButtonsPlacement: "top" as const,

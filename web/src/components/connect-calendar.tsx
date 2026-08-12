@@ -86,7 +86,7 @@ export function ConnectCalendar({
           </p>
           <a
             href="/api/google/start"
-            className="inline-flex rounded-md bg-matcha px-3 py-1.5 text-sm text-white hover:bg-matcha-deep"
+            className="inline-flex items-center justify-center rounded-md border border-matcha-deep bg-matcha-deep px-3 py-1.5 text-sm font-semibold text-[#f7faf6] no-underline transition hover:border-matcha hover:bg-matcha hover:text-[#f7faf6]"
           >
             Connect Google Calendar
           </a>
