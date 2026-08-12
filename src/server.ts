@@ -5,7 +5,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { ABOUT_JSON, prefersJson, renderAboutHtml } from "./about.js";
 import { authenticate } from "./auth.js";
-import { getQuery, readJson, sendError, sendHtml, sendJson } from "./http.js";
+import { FAVICON_SVG } from "./favicon.js";
+import {
+  getQuery,
+  readJson,
+  sendError,
+  sendHtml,
+  sendJson,
+  sendSvg,
+} from "./http.js";
 import { loadStore } from "./store.js";
 import {
   HttpError,
@@ -72,6 +80,15 @@ async function handle(
     // Public
     if (method === "GET" && path === "/health") {
       sendJson(res, 200, getHealth());
+      return;
+    }
+
+    // Public favicon (browsers request without Authorization)
+    if (
+      method === "GET" &&
+      (path === "/favicon.svg" || path === "/favicon.ico")
+    ) {
+      sendSvg(res, 200, FAVICON_SVG);
       return;
     }
 

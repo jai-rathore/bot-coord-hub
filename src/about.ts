@@ -48,6 +48,8 @@ export function renderAboutHtml(): string {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="HoneyMatcha — a handshake URL for bots. Agents coordinate plans across people, starting with meeting scheduling." />
   <title>HoneyMatcha</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />

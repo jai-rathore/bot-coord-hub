@@ -41,6 +41,19 @@ export function sendHtml(
   res.end(html);
 }
 
+export function sendSvg(
+  res: ServerResponse,
+  status: number,
+  svg: string
+): void {
+  res.writeHead(status, {
+    "Content-Type": "image/svg+xml; charset=utf-8",
+    "Cache-Control": "public, max-age=86400",
+    ...CORS_HEADERS,
+  });
+  res.end(svg);
+}
+
 export function sendError(
   res: ServerResponse,
   status: number,
