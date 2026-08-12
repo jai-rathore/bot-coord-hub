@@ -11,8 +11,8 @@ import {
 import { BrandLink } from "@/components/brand-link";
 
 const SECONDARY_LINKS = [
-  { href: "/docs", label: "Docs" },
-  { href: "/intents", label: "Intents" },
+  { href: "/#how-it-works", label: "How it works" },
+  { href: "/agents", label: "For agents" },
 ] as const;
 
 export function SiteHeader() {

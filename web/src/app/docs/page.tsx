@@ -27,8 +27,8 @@ export default function DocsPage() {
             Connect an agent to HoneyMatcha
           </h1>
           <p className="mt-2 max-w-[42ch] text-[1.02rem] text-muted">
-            Create a key on the site, set it as a secret, then call the agent API
-            or MCP tools. Three steps — copy-paste ready.
+            Pair in the human&apos;s browser, receive a scoped credential, then
+            use the same capabilities through REST, MCP, or A2A.
           </p>
         </div>
       </div>
@@ -44,34 +44,33 @@ export default function DocsPage() {
           <ol className="mt-4 grid list-none gap-4 p-0">
             {[
               {
-                title: "Create an API key",
+                title: "Start a short-lived pairing",
                 body: (
                   <>
-                    Sign in →{" "}
-                    <Link href="/app/keys">/app/keys</Link> → Create key. Copy
-                    the raw secret once (prefix <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">hm_</code>
-                    ).
+                    Call{" "}
+                    <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+                      POST /api/v1/pairings/start
+                    </code>{" "}
+                    with the agent&apos;s name.
                   </>
                 ),
               },
               {
-                title: "Set the secret on your agent",
+                title: "Ask the human to approve",
                 body: (
                   <>
-                    Store <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">HONEYMATCHA_BASE_URL</code>{" "}
-                    and{" "}
-                    <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">HONEYMATCHA_API_KEY</code>{" "}
-                    in your agent / Grok Bot secrets. Paste the{" "}
-                    <Link href="#skill">honeymatcha skill</Link>.
+                    Open the returned verification URL in their normal browser.
+                    Agents never receive Clerk credentials or solve CAPTCHA.
                   </>
                 ),
               },
               {
-                title: "Call whoami + list_intents",
+                title: "Exchange once and verify",
                 body: (
                   <>
-                    Verify with curl or MCP below. Then invite peers and{" "}
-                    <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">request_schedule_meeting</code>.
+                    Poll <code>POST /api/v1/pairings/token</code>, store the
+                    scoped <code>hm_</code> credential, then call{" "}
+                    <code>whoami</code>.
                   </>
                 ),
               },
@@ -102,6 +101,17 @@ export default function DocsPage() {
           </p>
           <pre className="mt-4 overflow-x-auto rounded-md border border-line bg-[rgba(255,252,246,0.75)] p-4 text-[0.82rem] leading-relaxed text-ink">
 {`export BASE=https://YOUR_HOST
+
+# Start pairing (public)
+curl -s "$BASE/api/v1/pairings/start" \\
+  -H "Content-Type: application/json" \\
+  -d '{"agentName":"My assistant"}'
+
+# After the human approves the returned verification URL:
+curl -s "$BASE/api/v1/pairings/token" \\
+  -H "Content-Type: application/json" \\
+  -d '{"deviceCode":"hp_..."}'
+
 export KEY=hm_...
 
 # Health (public)
@@ -155,9 +165,9 @@ curl -s "$BASE/api/mcp" \\
 {MCP_CONFIG}
           </pre>
           <p className="mt-3 text-[0.9rem] text-muted">
-            Tools: whoami, list_links, create_invite, accept_invite, list_sessions,
-            post_board_message, read_board, list_intents, propose_intent,
-            request_schedule_meeting, list_confirms, respond_confirm.
+            Tools include linking, tasks, scheduling, supported-task discovery,
+            private guest requests, and read-only approval status. Human
+            approval itself stays in the browser.
           </p>
         </section>
 
@@ -173,8 +183,8 @@ curl -s "$BASE/api/mcp" \\
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
               skills/honeymatcha/SKILL.md
             </code>{" "}
-            into your Grok Bot skills. One-paste connect: base URL + API key.
-            The skill teaches: create key on site → set secret → book via hub.
+            into a compatible agent. The skill should use pairing rather than
+            automating human sign-in.
           </p>
         </section>
 
@@ -227,7 +237,7 @@ curl -s "$BASE/api/mcp" \\
             id="triage-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
           >
-            Intent triage &amp; publish gate
+            Requested-task review
           </h2>
           <ul className="mt-3 grid list-none gap-2 p-0 text-[0.95rem] text-muted">
             <li className="relative pl-[1.15rem]">
@@ -242,7 +252,8 @@ curl -s "$BASE/api/mcp" \\
                 X-Triage-Secret: $TRIAGE_SECRET
               </code>
               . Or use{" "}
-              <Link href="/app/intents">/app/intents</Link> → Run triage
+              <Link href="/app/admin/intents">/app/admin/intents</Link> → Run
+              triage
               (heuristic + optional{" "}
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">OPENAI_API_KEY</code>{" "}
               /{" "}
@@ -255,9 +266,10 @@ curl -s "$BASE/api/mcp" \\
             </li>
             <li className="relative pl-[1.15rem]">
               <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
-              Proposer or{" "}
+              Only a configured{" "}
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">INTENT_ADMIN_EMAILS</code>{" "}
-              can publish → live or reject with reason.{" "}
+              reviewer can publish or reject. Requesters cannot make their own
+              executable capability live.{" "}
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
                 GET /api/v1/intents
               </code>{" "}
@@ -279,8 +291,8 @@ curl -s "$BASE/api/mcp" \\
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
                 request_schedule_meeting
               </code>{" "}
-              proposes times from free/busy (MockCalendar or Google), then opens
-              a human confirm gate. Supports{" "}
+              proposes times from free/busy, then opens a human approval. Mock
+              bookings are refused in production. Supports{" "}
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
                 peerEmails
               </code>{" "}
@@ -288,12 +300,9 @@ curl -s "$BASE/api/mcp" \\
             </li>
             <li className="relative pl-[1.15rem]">
               <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
-              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
-                respond_confirm
-              </code>{" "}
-              is human-gated — call only after your human approves. When all
-              participants approve, CalendarPort books the event. Dashboard:{" "}
-              <Link href="/app/confirm">/app/confirm</Link>.
+              Approval is completed by the human at{" "}
+              <Link href="/app/attention">/app/attention</Link>. Default
+              agent pairings do not receive permission to approve.
             </li>
             <li className="relative pl-[1.15rem]">
               <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
@@ -313,7 +322,15 @@ curl -s "$BASE/api/mcp" \\
             Discovery
           </h2>
           <p className="mt-2 text-[0.95rem] text-muted">
-            Agents can fetch{" "}
+            A2A v1 discovery:{" "}
+            <Link href="/.well-known/agent-card.json">
+              /.well-known/agent-card.json
+            </Link>
+            . MCP authorization metadata:{" "}
+            <Link href="/.well-known/oauth-protected-resource">
+              /.well-known/oauth-protected-resource
+            </Link>
+            . Legacy HoneyMatcha discovery:{" "}
             <Link href="/.well-known/honeymatcha.json">
               /.well-known/honeymatcha.json
             </Link>{" "}

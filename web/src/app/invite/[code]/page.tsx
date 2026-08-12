@@ -35,11 +35,11 @@ export default async function InviteAcceptPage({
       <SiteHeader />
       <main className="mx-auto w-[min(36rem,calc(100%-2rem))] flex-1 py-10">
         <h1 className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.02em] text-matcha-deep">
-          Accept invite
+          Connect on HoneyMatcha
         </h1>
         <p className="mt-2 text-muted">
-          Share this link with a friend’s bot/human — accepting creates a mutual
-          HoneyMatcha link.
+          Accepting lets your agents coordinate plans together. Either person
+          can end the connection at any time.
         </p>
 
         {loadError ? (
@@ -49,7 +49,7 @@ export default async function InviteAcceptPage({
         ) : !invite ? (
           <p className="mt-6 text-sm text-muted">
             This invite is missing, already accepted, or revoked.{" "}
-            <Link href="/app/links">Go to Links</Link>
+            <Link href="/app/people">Go to People</Link>
           </p>
         ) : (
           <div className="mt-6 space-y-4">
@@ -58,14 +58,14 @@ export default async function InviteAcceptPage({
                 From {invite.inviter.name || invite.inviter.email}
               </p>
               <p className="mt-1 text-muted">
-                Scopes: {(invite.link.scopes ?? []).join(", ") || "default"}
+                This connection can be used to coordinate meeting times.
               </p>
               <p className="mt-1 font-mono text-xs text-muted">{inviteCode}</p>
             </div>
 
             <Show when="signed-out">
               <p className="text-sm text-muted">
-                Sign in to accept this invite and form a mutual link.
+                Sign in to accept this private invitation.
               </p>
               <SignInButton mode="redirect">
                 <button
@@ -83,9 +83,10 @@ export default async function InviteAcceptPage({
             <Show when="signed-in">
               {currentUser && currentUser.id === invite.inviter.id ? (
                 <p className="text-sm text-muted">
-                  This is your own invite. Share it with a friend’s bot/human
+                  This is your own invitation. Share it with the person you
+                  addressed it to
                   instead.{" "}
-                  <Link href="/app/links">Back to Links</Link>
+                  <Link href="/app/people">Back to People</Link>
                 </p>
               ) : (
                 <InviteAcceptForm inviteCode={inviteCode} />

@@ -1,105 +1,59 @@
-# Bot Coord Hub — Phase 4
+# HoneyMatcha
 
-Real HTTP hub API that agents call to coordinate across users.
-Cross-user agent DMs do not exist; this hub is the bridge.
+Let your agent handle the back-and-forth.
 
-Protocol adapted from bot-coord-sim. Dogfood: Jai and Rishav.
+HoneyMatcha helps an authorized personal agent coordinate with other people,
+their agents, and invitation-only guests. Humans decide important actions;
+agents use scoped REST, MCP, or A2A capabilities.
 
-## Product web app (`web/`)
+The canonical product is [`web/`](./web).
 
-HoneyMatcha Next.js product (Clerk auth, Postgres/Drizzle, agent API keys, intents registry, `/api/v1/*` agent API, MCP at `/api/mcp`, docs at `/docs`) lives in [`web/`](./web/). See [`web/README.md`](./web/README.md) and [`web/mcp/README.md`](./web/mcp/README.md). Grok Bot skill: [`skills/honeymatcha/SKILL.md`](./skills/honeymatcha/SKILL.md). The Node hub under `src/` remains for now.
+## What it supports
 
-## Quick start
+- Browser-approved agent pairing without automating human login or CAPTCHA
+- Scoped, revocable agent credentials
+- Targeted relationships between known people
+- Scheduling from free/busy with human approval before real booking
+- Private, expiring one-task links for people without accounts
+- User and agent requests for new reviewed task types
+- MCP tools and an A2A v1 Agent Card
 
-cd /workspace/bot-coord-hub
-use package manager to install deps
-run script named dev or start
+## Local development
 
-Listens on port 8787. Health: GET /health
-Persistence: data/store.json
-
-## Seed keys
-
-- `bc_jai_dev_key` maps to usr_jai / agt_jai_cos
-- `bc_rishav_dev_key` maps to usr_rishav / agt_rishav_cos
-- HTTP header: `Authorization: Bearer <key>`
-
-## Hero flow: invite then accept
-
-### 1) Create invite (Jai)
+See [`AGENTS.md`](./AGENTS.md) for Cursor Cloud environment details and
+[`web/README.md`](./web/README.md) for setup, migrations, routes, and scripts.
 
 ```bash
-curl -s -X POST http://localhost:8787/v1/links/invite \
-  -H "Authorization: Bearer bc_jai_dev_key" \
-  -H "Content-Type: application/json" \
-  -d '{"fromUserId":"usr_jai","fromAgentId":"agt_jai_cos","toEmail":"sharmarishav5540@gmail.com","toName":"Rishav","scopes":["schedule_meeting","avail.read_freebusy"]}'
+cd web
+npm install
+npm run db:migrate
+npm run db:seed
+npm run dev
 ```
 
-### 2) Accept invite (Rishav)
+Open `http://localhost:3000`.
 
-Replace INVITE_CODE from step 1.
+## Agent integration
 
-```bash
-curl -s -X POST http://localhost:8787/v1/links/accept \
-  -H "Authorization: Bearer bc_rishav_dev_key" \
-  -H "Content-Type: application/json" \
-  -d '{"inviteCode":"INVITE_CODE","userId":"usr_rishav","agentId":"agt_rishav_cos"}'
-```
+- Human-facing connection guide: `/agents`
+- Developer documentation: `/docs`
+- A2A Agent Card: `/.well-known/agent-card.json`
+- MCP protected-resource metadata: `/.well-known/oauth-protected-resource`
+- Legacy-compatible discovery: `/.well-known/honeymatcha.json`
+- Agent skill: [`skills/honeymatcha/SKILL.md`](./skills/honeymatcha/SKILL.md)
 
-### 3) Schedule (Jai)
+Agents should start at `POST /api/v1/pairings/start`, ask the human to approve
+the returned verification URL in a normal browser, then exchange the device
+code once at `POST /api/v1/pairings/token`.
 
-```bash
-curl -s -X POST http://localhost:8787/v1/agent/schedule \
-  -H "Authorization: Bearer bc_jai_dev_key" \
-  -H "Content-Type: application/json" \
-  -d '{"peerEmail":"sharmarishav5540@gmail.com","durationMinutes":30,"windowStart":"2026-08-17T07:00:00.000-07:00","windowEnd":"2026-08-21T18:00:00.000-07:00","timezone":"America/Los_Angeles","title":"Product sync","notes":"Dogfood Bot Coord"}'
-```
+## Legacy prototype
 
-### 4-6) Negotiate
-
-1. Rishav: GET /v1/agent/pending then post avail.offer free slots (no titles)
-2. Jai: POST /v1/agent/propose with chosen slots
-3. Rishav: POST /v1/agent/respond with action accept
-4. Jai: POST /v1/agent/confirm after human OK unless auto_book
-
-
-## API surface
-
-| Method | Path | Notes |
-|--------|------|-------|
-| GET | / | public HoneyMatcha homepage (HTML; same JSON if Accept: application/json or `#honeymatcha-about`) |
-| GET | /health | public |
-| POST | /v1/links/invite | pending link |
-| POST | /v1/links/accept | activate |
-| POST | /v1/links/revoke | revoke |
-| GET | /v1/links?userId= | list |
-| POST | /v1/sessions | start schedule_meeting |
-| POST | /v1/sessions/:id/messages | envelope or action |
-| GET | /v1/sessions/:id | state + audit |
-| GET | /v1/inbox?agentId= | poll transport |
-| POST | /v1/inbox/:messageId/ack | ack |
-| POST | /v1/agent/schedule | shortcut |
-| POST | /v1/agent/respond | accept/decline/counter |
-| POST | /v1/agent/propose | propose slots |
-| POST | /v1/agent/confirm | confirm meeting |
-| GET | /v1/agent/pending | attention queue |
-| GET | /v1/me | key identity |
-
-## Scripts
-
-- package script: dev
-- package script: start
-- package script: test
-
-## Related docs
-
-- skills/honeymatcha/SKILL.md — HoneyMatcha Grok Bot / agent skill (prefer this)
-- skills/bot-coord-schedule/SKILL.md — legacy hub skill (+ pointer to HoneyMatcha)
-- web/docs (site route `/docs`) — curl + MCP copy-paste
-- DOGFOOD_RISHAV.md — Jai / Rishav playbook
-- INTEGRATION.md — Phase 3 UI + skill install
+The original file-backed prototype remains under `src/` only as historical
+reference. It is not part of the Render Blueprint, must not be deployed, and
+its committed development credentials must never be used.
 
 ## Privacy
 
-Free/busy or free slots only. Never share peer calendar event titles.
-
+Calendar coordination uses free/busy only; peer event titles are never shared.
+Guest links grant access to one targeted task and do not create network
+membership.

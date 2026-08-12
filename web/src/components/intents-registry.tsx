@@ -11,12 +11,6 @@ type DedupeHit = {
   source: string;
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  live: "bg-[rgba(58,107,79,0.12)] text-matcha-deep",
-  pending: "bg-[rgba(196,154,60,0.18)] text-[#6b5420]",
-  rejected: "bg-[rgba(155,59,59,0.1)] text-danger",
-};
-
 export function IntentsRegistry({
   initialItems,
   canPropose,
@@ -33,7 +27,6 @@ export function IntentsRegistry({
   const [pending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -42,21 +35,21 @@ export function IntentsRegistry({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return initialItems;
-    return initialItems.filter((item) =>
+    const supported = initialItems.filter((item) => item.status === "live");
+    if (!q) return supported;
+    return supported.filter((item) =>
       `${item.name} ${item.slug} ${item.description ?? ""}`
         .toLowerCase()
         .includes(q),
     );
   }, [initialItems, query]);
 
-  async function checkDedupe(nextName: string, nextSlug: string) {
+  async function checkDedupe(nextName: string) {
     if (!nextName.trim()) {
       setDedupeHits([]);
       return;
     }
     const params = new URLSearchParams({ name: nextName });
-    if (nextSlug.trim()) params.set("slug", nextSlug);
     const res = await fetch(`/api/intents/dedupe?${params}`);
     if (!res.ok) return;
     const data = await res.json();
@@ -73,7 +66,6 @@ export function IntentsRegistry({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
-        slug: slug || undefined,
         description,
         force,
       }),
@@ -84,9 +76,10 @@ export function IntentsRegistry({
       setError(data.error ?? "Failed to submit proposal");
       return;
     }
-    setSuccess(`Submitted proposal “${data.proposal.name}” (${data.proposal.slug}).`);
+    setSuccess(
+      `Thanks—we recorded “${data.proposal.name}” for product review.`,
+    );
     setName("");
-    setSlug("");
     setDescription("");
     setForce(false);
     setDedupeHits([]);
@@ -96,55 +89,29 @@ export function IntentsRegistry({
   return (
     <div className="space-y-10">
       <label className="grid max-w-md gap-1 text-sm">
-        <span className="font-medium text-ink">Search intents</span>
+        <span className="font-medium text-ink">Search supported tasks</span>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="name, slug, description…"
-          className="rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus:border-matcha"
+          name="task-search"
+          placeholder="For example: scheduling"
+          className="rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
         />
       </label>
 
       <section>
         <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
-          Registry
+          Supported tasks
         </h2>
         {filtered.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">No intents match.</p>
+          <p className="mt-3 text-sm text-muted">No supported tasks match.</p>
         ) : (
           <ul className="mt-4 divide-y divide-line border-t border-b border-line">
             {filtered.map((item) => (
               <li key={`${item.source}-${item.id}`} className="py-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold text-ink">{item.name}</h3>
-                  <span
-                    className={`rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${STATUS_STYLES[item.status]}`}
-                  >
-                    {item.status}
-                  </span>
-                  <code className="rounded bg-code-bg px-1.5 py-0.5 text-xs text-matcha-deep">
-                    {item.slug}
-                  </code>
-                </div>
+                <h3 className="font-semibold text-ink">{item.name}</h3>
                 {item.description && (
                   <p className="mt-1 text-sm text-muted">{item.description}</p>
-                )}
-                {item.status === "pending" && item.triageReason && (
-                  <p className="mt-1 text-sm text-ink">
-                    <span className="font-medium text-matcha-deep">
-                      Triage
-                      {item.triageRecommendation
-                        ? ` (${item.triageRecommendation.replace("_", " ")})`
-                        : ""}
-                      :{" "}
-                    </span>
-                    {item.triageReason}
-                  </p>
-                )}
-                {item.rejectionReason && (
-                  <p className="mt-1 text-sm text-danger">
-                    Rejected: {item.rejectionReason}
-                  </p>
                 )}
               </li>
             ))}
@@ -154,59 +121,54 @@ export function IntentsRegistry({
 
       <section>
         <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
-          Propose an intent
+          Request a new task
         </h2>
         {!canPropose ? (
           <p className="mt-2 text-sm text-muted">
-            Sign in to submit a new intent proposal.
+            Sign in to tell us what you want your agent to handle next.
           </p>
         ) : (
           <form onSubmit={submitProposal} className="mt-4 max-w-lg space-y-3">
             <label className="grid gap-1 text-sm">
-              <span className="font-medium">Name</span>
+              <span className="font-medium">
+                What should your agent handle?
+              </span>
               <input
                 required
                 value={name}
                 onChange={(e) => {
                   const v = e.target.value;
                   setName(v);
-                  void checkDedupe(v, slug);
+                  void checkDedupe(v);
                 }}
-                className="rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus:border-matcha"
+                name="requested-task"
+                placeholder="For example: coordinate an interview panel"
+                className="rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
               />
             </label>
             <label className="grid gap-1 text-sm">
-              <span className="font-medium">Slug (optional)</span>
-              <input
-                value={slug}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSlug(v);
-                  void checkDedupe(name, v);
-                }}
-                placeholder="auto from name"
-                className="rounded-md border border-line bg-white/80 px-3 py-2 font-mono text-sm outline-none focus:border-matcha"
-              />
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-medium">Description</span>
+              <span className="font-medium">
+                What outcome would make this useful?
+              </span>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                className="rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus:border-matcha"
+                name="requested-task-outcome"
+                maxLength={2_000}
+                className="rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
               />
             </label>
 
             {dedupeHits.length > 0 && (
               <div className="rounded-md border border-honey bg-[rgba(232,210,154,0.28)] p-3 text-sm">
                 <p className="font-semibold text-matcha-deep">
-                  Similar intents already exist
+                  Similar tasks already exist
                 </p>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-ink">
                   {dedupeHits.slice(0, 6).map((hit) => (
                     <li key={`${hit.source}-${hit.slug}`}>
-                      <code>{hit.slug}</code> — {hit.name} ({hit.status})
+                      {hit.name}
                     </li>
                   ))}
                 </ul>
@@ -216,7 +178,7 @@ export function IntentsRegistry({
                     checked={force}
                     onChange={(e) => setForce(e.target.checked)}
                   />
-                  Submit anyway (blocked for exact name/slug matches)
+                  My request is meaningfully different
                 </label>
               </div>
             )}
@@ -235,7 +197,7 @@ export function IntentsRegistry({
               disabled={pending}
               className="cursor-pointer rounded-md border border-matcha-deep bg-matcha-deep px-4 py-2 text-sm font-semibold text-[#f7faf6] transition hover:bg-matcha disabled:opacity-60"
             >
-              Submit proposal
+              Request this task
             </button>
           </form>
         )}

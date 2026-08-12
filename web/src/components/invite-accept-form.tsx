@@ -20,7 +20,7 @@ export function InviteAcceptForm({ inviteCode }: { inviteCode: string }) {
       setError(data.error ?? "Failed to accept invite");
       return;
     }
-    startTransition(() => router.push("/app/links"));
+    startTransition(() => router.push("/app/people"));
   }
 
   return (
@@ -31,7 +31,7 @@ export function InviteAcceptForm({ inviteCode }: { inviteCode: string }) {
         onClick={accept}
         className="cursor-pointer rounded-md border border-matcha-deep bg-matcha-deep px-4 py-2 text-sm font-semibold text-[#f7faf6] disabled:opacity-60"
       >
-        Accept and link
+        Accept connection
       </button>
       {error && (
         <p className="text-sm font-medium text-danger" role="alert">

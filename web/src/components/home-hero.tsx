@@ -11,18 +11,18 @@ import {
 const NEXT_ACTIONS = [
   {
     href: "/app",
-    label: "Dashboard",
-    detail: "activity and what’s waiting",
+    label: "Open HoneyMatcha",
+    detail: "see tasks and anything that needs you",
   },
   {
-    href: "/app/keys",
-    label: "Create a key",
-    detail: "copy the hm_… secret once",
+    href: "/agents",
+    label: "Connect your agent",
+    detail: "approve a short-lived pairing in your browser",
   },
   {
-    href: "/app/links",
-    label: "Invite a peer",
-    detail: "share a handshake URL",
+    href: "/app/people",
+    label: "Add someone",
+    detail: "choose who your agent can coordinate with",
   },
   {
     href: "/app/settings",
@@ -41,7 +41,7 @@ function SignedInHero() {
         {name ? `Welcome back, ${name}` : "Welcome back"}
       </p>
       <p className="animate-rise-delay-2 mt-2 max-w-[38ch] text-[1.02rem] text-muted">
-        Next actions to get your agent connected.
+        Your agent handles the back-and-forth. You step in only when needed.
       </p>
       <ul className="animate-rise-delay-3 mt-5 m-0 grid list-none gap-2.5 p-0">
         {NEXT_ACTIONS.map((action) => (
@@ -66,10 +66,10 @@ function SignedInHero() {
       </ul>
       <div className="animate-rise-delay-3 mt-5">
         <Link
-          href="/app/keys"
+          href="/app"
           className="inline-flex items-center justify-center rounded-md border border-matcha-deep bg-matcha-deep px-[1.05rem] py-[0.7rem] text-[0.95rem] font-semibold text-[#f7faf6] no-underline transition hover:-translate-y-px hover:border-matcha hover:bg-matcha hover:text-[#f7faf6]"
         >
-          Create a key
+          Open HoneyMatcha
         </Link>
       </div>
     </>
@@ -80,11 +80,11 @@ function SignedOutHero() {
   return (
     <>
       <p className="animate-rise-delay-1 mt-3 max-w-[28ch] font-[family-name:var(--font-fraunces)] text-[clamp(1.2rem,3.4vw,1.5rem)] font-semibold leading-[1.3] tracking-[-0.015em] text-ink">
-        A handshake URL for bots.
+        Let your agent handle the back-and-forth.
       </p>
       <p className="animate-rise-delay-2 mt-2 max-w-[38ch] text-[1.02rem] text-muted">
-        Agents coordinate plans across people — starting with meeting
-        scheduling.
+        Tell your agent what needs to happen. HoneyMatcha helps it coordinate
+        with other people, their agents, and people without agents.
       </p>
       <div className="animate-rise-delay-3 mt-5 flex flex-wrap gap-3">
         <SignUpButton mode="redirect">
@@ -92,7 +92,7 @@ function SignedOutHero() {
             type="button"
             className="inline-flex cursor-pointer items-center justify-center rounded-md border border-matcha-deep bg-matcha-deep px-[1.05rem] py-[0.7rem] text-[0.95rem] font-semibold text-[#f7faf6] transition hover:-translate-y-px hover:border-matcha hover:bg-matcha"
           >
-            Sign in to start
+            Connect my agent
           </button>
         </SignUpButton>
         <SignInButton mode="redirect">
@@ -100,7 +100,7 @@ function SignedOutHero() {
             type="button"
             className="inline-flex cursor-pointer items-center justify-center rounded-md border border-line bg-transparent px-[1.05rem] py-[0.7rem] text-[0.95rem] font-semibold text-matcha-deep transition hover:-translate-y-px hover:border-matcha-soft hover:bg-[rgba(255,252,246,0.55)]"
           >
-            I have an account
+            Sign in
           </button>
         </SignInButton>
       </div>

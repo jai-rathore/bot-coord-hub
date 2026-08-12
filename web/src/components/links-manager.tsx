@@ -81,26 +81,29 @@ export function LinksManager({ initialLinks }: { initialLinks: PublicLink[] }) {
     <div className="space-y-10">
       <section className="space-y-3">
         <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
-          Create invite link
+          Invite someone
         </h2>
         <p className="max-w-xl text-sm text-muted">
-          Share this link with a friend’s bot/human. They sign in (or their
-          agent uses a Bearer key) and accept to form a mutual peer link.
+          Send a private, expiring invitation to someone you know. After they
+          accept, either person can end the connection at any time.
         </p>
         <form onSubmit={createInvite} className="flex flex-wrap items-end gap-3">
           <label className="grid gap-1 text-sm">
-            <span className="font-medium text-ink">Friend email (optional)</span>
+            <span className="font-medium text-ink">Their email</span>
             <input
               type="email"
+              name="invite-email"
               value={toEmail}
               onChange={(e) => setToEmail(e.target.value)}
               className="min-w-[16rem] rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus:border-matcha"
               placeholder="friend@example.com"
+              required
             />
           </label>
           <label className="grid gap-1 text-sm">
             <span className="font-medium text-ink">Name (optional)</span>
             <input
+              name="invite-name"
               value={toName}
               onChange={(e) => setToName(e.target.value)}
               className="min-w-[12rem] rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus:border-matcha"
@@ -120,7 +123,7 @@ export function LinksManager({ initialLinks }: { initialLinks: PublicLink[] }) {
         {created && (
           <div className="rounded-md border border-honey bg-[rgba(232,210,154,0.35)] p-4">
             <p className="font-semibold text-matcha-deep">
-              Share this link with a friend’s bot/human
+              Share this private invitation
             </p>
             <code className="mt-2 block break-all rounded bg-white/70 px-3 py-2 text-sm text-ink">
               {created.inviteUrl}
@@ -128,6 +131,11 @@ export function LinksManager({ initialLinks }: { initialLinks: PublicLink[] }) {
             <p className="mt-2 font-mono text-xs text-muted">
               Code: {created.inviteCode}
             </p>
+            {created.expiresAt ? (
+              <p className="mt-1 text-xs text-muted">
+                Expires {new Date(created.expiresAt).toLocaleString()}
+              </p>
+            ) : null}
             <button
               type="button"
               onClick={copyInviteUrl}
@@ -141,13 +149,14 @@ export function LinksManager({ initialLinks }: { initialLinks: PublicLink[] }) {
 
       <section className="space-y-3">
         <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
-          Accept an invite
+          Have an invitation code?
         </h2>
         <form onSubmit={acceptInvite} className="flex flex-wrap items-end gap-3">
           <label className="grid gap-1 text-sm">
             <span className="font-medium text-ink">Invite code</span>
             <input
               value={acceptCode}
+              name="invite-code"
               onChange={(e) => setAcceptCode(e.target.value)}
               className="min-w-[14rem] rounded-md border border-line bg-white/80 px-3 py-2 font-mono outline-none focus:border-matcha"
               placeholder="HM-XXXX-XXXX"
@@ -172,7 +181,7 @@ export function LinksManager({ initialLinks }: { initialLinks: PublicLink[] }) {
 
       <section>
         <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
-          Active links
+          Connected
         </h2>
         {active.length === 0 ? (
           <p className="mt-2 text-sm text-muted">No active links yet.</p>
@@ -188,8 +197,8 @@ export function LinksManager({ initialLinks }: { initialLinks: PublicLink[] }) {
                     {link.peer?.name || link.peer?.email || link.toEmail || "Peer"}
                   </p>
                   <p className="text-sm text-muted">
-                    {link.peer?.email ?? link.toEmail ?? "—"} ·{" "}
-                    {(link.scopes ?? []).join(", ") || "no scopes"}
+                    {link.peer?.email ?? link.toEmail ?? "—"} · can coordinate
+                    meetings
                   </p>
                 </div>
                 <button

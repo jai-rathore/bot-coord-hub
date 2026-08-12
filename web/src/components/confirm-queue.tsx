@@ -38,8 +38,8 @@ export function ConfirmQueue({
 
       {initialConfirms.length === 0 ? (
         <p className="text-sm text-muted">
-          No pending confirmations. When an agent needs human OK (for example
-          booking a meeting), it appears here.
+          You&apos;re all caught up. When your agent needs your OK—like
+          confirming a meeting—it appears here.
         </p>
       ) : (
         <ul className="divide-y divide-line border-t border-b border-line">
@@ -49,7 +49,11 @@ export function ConfirmQueue({
               className="flex flex-wrap items-start justify-between gap-4 py-4"
             >
               <div className="max-w-xl">
-                <p className="font-semibold text-ink">{confirm.action}</p>
+                <p className="font-semibold text-ink">
+                  {confirm.action === "book_meeting"
+                    ? "Book this meeting"
+                    : confirm.action.replace(/[_-]+/g, " ")}
+                </p>
                 {confirm.note && (
                   <p className="mt-1 text-sm text-muted">{confirm.note}</p>
                 )}
@@ -57,11 +61,16 @@ export function ConfirmQueue({
                   Session {confirm.session?.intentType ?? confirm.sessionId} ·{" "}
                   {new Date(confirm.createdAt).toLocaleString()}
                 </p>
-                {Object.keys(confirm.metadata ?? {}).length > 0 && (
-                  <pre className="mt-2 overflow-x-auto rounded bg-code-bg p-2 text-xs text-matcha-deep">
-                    {JSON.stringify(confirm.metadata, null, 2)}
-                  </pre>
-                )}
+                {Object.keys(confirm.metadata ?? {}).length > 0 ? (
+                  <details className="mt-3 text-xs text-muted">
+                    <summary className="cursor-pointer font-medium text-matcha-deep">
+                      Technical details
+                    </summary>
+                    <pre className="mt-2 overflow-x-auto rounded bg-code-bg p-2 text-xs text-matcha-deep">
+                      {JSON.stringify(confirm.metadata, null, 2)}
+                    </pre>
+                  </details>
+                ) : null}
               </div>
               <div className="flex gap-2">
                 <button
@@ -78,7 +87,7 @@ export function ConfirmQueue({
                   onClick={() => decide(confirm.id, "denied")}
                   className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-sm font-medium text-danger disabled:opacity-60"
                 >
-                  Deny
+                  Decline
                 </button>
               </div>
             </li>
