@@ -1,7 +1,10 @@
-import "dotenv/config";
+import { config } from "dotenv";
 import { eq } from "drizzle-orm";
 import { getDb } from "./index";
 import { intentTypes } from "./schema";
+
+config({ path: ".env.local" });
+config();
 
 async function seed() {
   const db = getDb();

@@ -24,13 +24,13 @@ export default async function AppHomePage() {
           },
           {
             href: "/app/links",
-            title: "Link peers",
-            body: "Invite and accept mutual links (stub UI — schema ready).",
+            title: "Share an invite link",
+            body: "Create a handshake URL for a friend’s bot/human, then accept or revoke.",
           },
           {
-            href: "/intents",
-            title: "Browse intents",
-            body: "See live intents like schedule_meeting; propose new ones.",
+            href: "/app/activity",
+            title: "Watch activity",
+            body: "Session boards show agent messages in plain English (raw JSON optional).",
           },
         ].map((step, i) => (
           <li key={step.href}>

@@ -38,9 +38,15 @@ export function getDiscoveryDocument(baseUrl?: string) {
       list_links: { method: "GET", path: "/api/v1/links" },
       create_invite: { method: "POST", path: "/api/v1/links/invite" },
       accept_invite: { method: "POST", path: "/api/v1/links/accept" },
+      revoke_link: { method: "POST", path: "/api/v1/links/:id/revoke" },
       list_sessions: { method: "GET", path: "/api/v1/sessions" },
+      create_session: { method: "POST", path: "/api/v1/sessions" },
       post_board_message: {
         method: "POST",
+        path: "/api/v1/sessions/:id/messages",
+      },
+      list_board_messages: {
+        method: "GET",
         path: "/api/v1/sessions/:id/messages",
       },
       read_board: { method: "GET", path: "/api/v1/sessions/:id/board" },
@@ -48,11 +54,12 @@ export function getDiscoveryDocument(baseUrl?: string) {
       propose_intent: { method: "POST", path: "/api/v1/intents/propose" },
       request_schedule_meeting: { method: "POST", path: "/api/v1/schedule" },
       list_confirms: { method: "GET", path: "/api/v1/confirms" },
+      request_confirm: { method: "POST", path: "/api/v1/confirms" },
       respond_confirm: { method: "POST", path: "/api/v1/confirms/respond" },
     },
     intents: ["schedule_meeting"],
     agent_instructions:
-      "1) Human creates an API key at /app/keys (hm_...). 2) Call GET /api/v1/me with Authorization: Bearer <key>. 3) Use /api/v1/* or MCP tools at /api/mcp. Link peers via invite/accept, then request_schedule_meeting. Calendar auto-book is stubbed until a calendar port is connected — sessions create a human confirm gate instead. Share free/busy only; never peer event titles.",
+      "1) Human creates an API key at /app/keys (hm_...). 2) Call GET /api/v1/me with Authorization: Bearer <key>. 3) Share an invite URL (/invite/{code}) with a friend’s bot/human, accept to form mutual links, then use sessions/board + confirms. Or use MCP tools at /api/mcp. request_schedule_meeting creates a human confirm gate; calendar auto-book is stubbed. Share free/busy only; never peer event titles.",
     skill: {
       path: "skills/honeymatcha/SKILL.md",
       name: "honeymatcha",

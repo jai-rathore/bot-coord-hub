@@ -30,6 +30,12 @@ export const sessionStatusEnum = pgEnum("session_status", [
   "cancelled",
 ]);
 
+export const confirmStatusEnum = pgEnum("confirm_status", [
+  "pending",
+  "approved",
+  "denied",
+]);
+
 export const users = pgTable(
   "users",
   {
@@ -82,11 +88,14 @@ export const links = pgTable(
     toUserId: uuid("to_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
-    toEmail: text("to_email").notNull(),
+    /** Optional target email; empty/null means open invite URL anyone signed-in can accept. */
+    toEmail: text("to_email"),
     toName: text("to_name"),
     inviteCode: text("invite_code").notNull(),
     status: linkStatusEnum("status").notNull().default("pending"),
     scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+    /** Points at the reciprocal row once a link is mutual/active. */
+    pairLinkId: uuid("pair_link_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -207,6 +216,8 @@ export const confirms = pgTable(
     action: text("action").notNull(),
     note: text("note"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    status: confirmStatusEnum("status").notNull().default("pending"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -214,10 +225,15 @@ export const confirms = pgTable(
   (t) => [
     index("confirms_session_id_idx").on(t.sessionId),
     index("confirms_user_id_idx").on(t.userId),
+    index("confirms_status_idx").on(t.status),
   ],
 );
 
 export type User = typeof users.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
+export type Link = typeof links.$inferSelect;
+export type Session = typeof sessions.$inferSelect;
+export type SessionMessage = typeof sessionMessages.$inferSelect;
+export type Confirm = typeof confirms.$inferSelect;
 export type IntentType = typeof intentTypes.$inferSelect;
 export type IntentProposal = typeof intentProposals.$inferSelect;

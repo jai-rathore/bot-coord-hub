@@ -1,16 +1,32 @@
 import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
-import { postBoardMessage } from "@/lib/agent-api";
-import { jsonFromAgentError, jsonOk, readJsonBody } from "@/lib/http";
+import { listBoardMessages, postBoardMessage } from "@/lib/agent-api";
+import {
+  jsonFromAgentError,
+  jsonOk,
+  readJsonBody,
+} from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 /**
- * Post a board message.
- * POST /api/v1/sessions/:id/messages — Authorization: Bearer hm_...
- * Body: { kind, body? }
+ * Session board messages.
+ * GET  /api/v1/sessions/:id/messages
+ * POST /api/v1/sessions/:id/messages — { kind, body?, text? }
  */
+export async function GET(request: Request, context: Ctx) {
+  const auth = await authenticateAgent(request);
+  if (!auth) return unauthorizedJson();
+
+  try {
+    const { id } = await context.params;
+    return jsonOk(await listBoardMessages(auth, id));
+  } catch (err) {
+    return jsonFromAgentError(err);
+  }
+}
+
 export async function POST(request: Request, context: Ctx) {
   const auth = await authenticateAgent(request);
   if (!auth) return unauthorizedJson();
@@ -20,6 +36,7 @@ export async function POST(request: Request, context: Ctx) {
     const body = await readJsonBody<{
       kind?: string;
       body?: Record<string, unknown>;
+      text?: string;
     }>(request);
     return jsonOk(await postBoardMessage(auth, id, body), 201);
   } catch (err) {

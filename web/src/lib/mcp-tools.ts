@@ -55,11 +55,15 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "create_invite",
     description:
-      "Create a peer invite link. Share inviteCode out-of-band for the peer agent to accept.",
+      "Create a peer invite handshake URL. Share inviteUrl/inviteCode with a friend’s bot/human so they can accept.",
     inputSchema: {
       type: "object",
       properties: {
-        toEmail: { type: "string", description: "Peer email address" },
+        toEmail: {
+          type: "string",
+          description:
+            "Optional peer email. Omit for an open invite URL anyone signed-in can accept.",
+        },
         toName: { type: "string", description: "Optional peer display name" },
         scopes: {
           type: "array",
@@ -68,7 +72,6 @@ export const MCP_TOOLS: McpToolDef[] = [
             'Optional scopes (default: ["schedule_meeting","avail.read_freebusy"])',
         },
       },
-      required: ["toEmail"],
     },
   },
   {

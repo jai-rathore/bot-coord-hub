@@ -140,18 +140,16 @@ export default function HomePage() {
                 ),
               },
               {
-                title: "Verify whoami + list_intents",
+                title: "Invite a peer, then verify",
                 body: (
                   <>
-                    Call{" "}
+                    Share a handshake URL from{" "}
+                    <Link href="/app/links">/app/links</Link> with a friend’s
+                    bot/human. Then call{" "}
                     <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
                       GET /api/v1/me
                     </code>{" "}
-                    then{" "}
-                    <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
-                      GET /api/v1/intents
-                    </code>
-                    . Full copy-paste on{" "}
+                    and browse{" "}
                     <Link href="/docs">/docs</Link>.
                   </>
                 ),
