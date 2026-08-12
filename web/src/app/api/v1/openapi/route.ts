@@ -8,6 +8,22 @@ export async function GET(request: Request) {
   const base = requestBaseUrl(request);
   const discovery = getDiscoveryDocument(base);
 
+  const paths: Record<string, Record<string, unknown>> = {};
+  for (const [name, ep] of Object.entries(discovery.endpoints)) {
+    const path = ep.path.replace(":id", "{id}");
+    const method = ep.method.toLowerCase();
+    paths[path] ??= {};
+    paths[path][method] = {
+      operationId: name,
+      summary: name,
+      security: name === "health" ? [] : [{ bearerAuth: [] }],
+      responses: {
+        "200": { description: "OK" },
+        "401": { description: "Unauthorized" },
+      },
+    };
+  }
+
   return Response.json({
     openapi: "3.1.0",
     info: {
@@ -27,26 +43,7 @@ export async function GET(request: Request) {
       },
     },
     security: [{ bearerAuth: [] }],
-    paths: Object.fromEntries(
-      Object.entries(discovery.endpoints).map(([name, ep]) => {
-        const path = ep.path.replace(":id", "{id}");
-        const method = ep.method.toLowerCase();
-        return [
-          path,
-          {
-            [method]: {
-              operationId: name,
-              summary: name,
-              security: name === "health" ? [] : [{ bearerAuth: [] }],
-              responses: {
-                "200": { description: "OK" },
-                "401": { description: "Unauthorized" },
-              },
-            },
-          },
-        ];
-      }),
-    ),
+    paths,
     "x-honeymatcha": discovery,
   });
 }
