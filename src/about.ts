@@ -83,23 +83,21 @@ export function renderAboutHtml(): string {
     .hero-band {
       position: relative;
       overflow: hidden;
-      min-height: 100svh;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
       background:
-        radial-gradient(900px 420px at 12% 0%, rgba(111, 154, 124, 0.38) 0%, transparent 55%),
-        radial-gradient(720px 380px at 92% 10%, rgba(232, 210, 154, 0.58) 0%, transparent 52%),
+        radial-gradient(620px 280px at 10% -10%, rgba(111, 154, 124, 0.34) 0%, transparent 58%),
+        radial-gradient(480px 240px at 96% 0%, rgba(232, 210, 154, 0.52) 0%, transparent 55%),
         linear-gradient(165deg, #f8fbf7 0%, var(--bg) 48%, #f0ebe0 100%);
       border-bottom: 1px solid rgba(213, 224, 214, 0.85);
     }
     .hero-art {
       position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
+      top: -18%;
+      right: -8%;
+      width: min(42rem, 78vw);
+      height: auto;
+      max-height: 14rem;
       pointer-events: none;
-      opacity: 0.9;
+      opacity: 0.85;
       animation: drift 12s ease-in-out infinite alternate;
     }
     .wrap {
@@ -109,12 +107,15 @@ export function renderAboutHtml(): string {
       position: relative;
       z-index: 1;
     }
-    .hero-band .wrap { padding-bottom: 2.35rem; }
+    .hero-band .wrap {
+      padding-top: 2.5rem;
+      padding-bottom: 2.5rem;
+    }
     .brand {
       font-family: "Fraunces", Georgia, serif;
       font-optical-sizing: auto;
       font-weight: 700;
-      font-size: clamp(2.75rem, 10vw, 4rem);
+      font-size: clamp(2.5rem, 9vw, 3.6rem);
       letter-spacing: -0.03em;
       line-height: 1.02;
       margin: 0;
@@ -128,24 +129,21 @@ export function renderAboutHtml(): string {
       color: transparent;
     }
     .hero {
-      padding: 0 0 clamp(2.75rem, 7vh, 4.5rem);
+      padding: 0;
       position: relative;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
     }
     .headline {
       font-family: "Fraunces", Georgia, serif;
       font-weight: 600;
-      font-size: clamp(1.25rem, 3.6vw, 1.55rem);
+      font-size: clamp(1.2rem, 3.4vw, 1.5rem);
       line-height: 1.3;
       letter-spacing: -0.015em;
-      margin: 1rem 0 0.65rem;
+      margin: 0.7rem 0 0.5rem;
       max-width: 28ch;
       animation: rise 0.75s ease 0.08s both;
     }
     .lede {
-      margin: 0 0 1.35rem;
+      margin: 0 0 1.15rem;
       color: var(--muted);
       font-size: 1.02rem;
       max-width: 38ch;
@@ -343,6 +341,20 @@ export function renderAboutHtml(): string {
       from { transform: translate3d(0, 0, 0) scale(1); }
       to { transform: translate3d(-1.5%, 1.2%, 0) scale(1.03); }
     }
+    @media (max-width: 40rem) {
+      .hero-band .wrap {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+      }
+      .hero-art {
+        top: -22%;
+        right: -18%;
+        width: min(28rem, 92vw);
+        max-height: 11rem;
+        opacity: 0.72;
+      }
+      .lede { font-size: 0.98rem; }
+    }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
       *, *::before, *::after {
@@ -354,7 +366,7 @@ export function renderAboutHtml(): string {
 </head>
 <body>
   <div class="hero-band">
-    <svg class="hero-art" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <svg class="hero-art" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       <defs>
         <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="#3a6b4f" stop-opacity="0.28"/>
