@@ -63,7 +63,7 @@ curl -s -X POST http://localhost:8787/v1/agent/schedule \
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET | / | public about page (HTML; JSON if Accept: application/json) |
+| GET | / | public HoneyMatcha homepage (HTML; same JSON if Accept: application/json or `#honeymatcha-about`) |
 | GET | /health | public |
 | POST | /v1/links/invite | pending link |
 | POST | /v1/links/accept | activate |
