@@ -26,8 +26,8 @@ jobs:
 
     env:
       DATABASE_URL: postgres://honeymatcha:honeymatcha@127.0.0.1:5432/honeymatcha
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
-      CLERK_SECRET_KEY: sk_test_placeholder
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
+      CLERK_SECRET_KEY: sk_test_00000000000000000000000000000000
       GUEST_TOKEN_PEPPER: ci-guest-token-pepper
       TOKEN_ENCRYPTION_KEY: ci-token-encryption-key
       OAUTH_STATE_SECRET: ci-oauth-state-secret
