@@ -1,0 +1,91 @@
+name: HoneyMatcha CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: honeymatcha
+          POSTGRES_PASSWORD: honeymatcha
+          POSTGRES_DB: honeymatcha
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://honeymatcha:honeymatcha@127.0.0.1:5432/honeymatcha
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
+      CLERK_SECRET_KEY: sk_test_placeholder
+      GUEST_TOKEN_PEPPER: ci-guest-token-pepper
+      TOKEN_ENCRYPTION_KEY: ci-token-encryption-key
+      OAUTH_STATE_SECRET: ci-oauth-state-secret
+      GOOGLE_CALENDAR_ENABLED: "false"
+      ALLOW_MOCK_CALENDAR: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      - name: Install legacy reference dependencies
+        run: npm ci
+
+      - name: Verify retired legacy reference
+        run: npm test && npx tsc --noEmit
+
+      - name: Install HoneyMatcha dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Apply and verify database schema
+        working-directory: web
+        run: |
+          npm run db:migrate
+          npm run db:seed
+          npm run db:preflight
+
+      - name: Unit, lint, and build
+        working-directory: web
+        run: |
+          npm test
+          npm run lint
+          npm run build
+
+      - name: Start production server
+        working-directory: web
+        run: |
+          npm run start > /tmp/honeymatcha-next.log 2>&1 &
+          echo $! > /tmp/honeymatcha-next.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/api/v1/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/honeymatcha-next.log
+          exit 1
+
+      - name: Database and API integration
+        working-directory: web
+        run: |
+          npm run test:e2e-lib
+          npm run test:e2e-api
+          npm run test:e2e-platform
