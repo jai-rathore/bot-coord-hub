@@ -46,11 +46,13 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run start` | Start production server (`0.0.0.0:$PORT` via Next) |
 | `npm run db:generate` | Generate Drizzle migrations from schema |
 | `npm run db:migrate` | Apply migrations |
+| `npm run db:preflight` | Verify schema, secrets, calendar safety, and seed |
 | `npm run db:seed` | Seed `intent_types` with `schedule_meeting` (live) |
 | `npm run db:studio` | Drizzle Studio |
 | `npm run mcp` | Stdio MCP server (`mcp/server.mjs`) |
 | `npm run test:e2e-lib` | DB/lib smoke for invite → activity → confirm |
 | `npm run test:e2e-api` | Bearer API smoke against a running server |
+| `npm run test:e2e-platform` | Pairing + guest + A2A integration smoke |
 
 ## Product surface
 
@@ -135,7 +137,9 @@ Humans connect Google at `/app/settings` (`GOOGLE_CALENDAR_ENABLED`, `GOOGLE_CLI
    The Drizzle/`postgres.js` client enables SSL (`sslmode=require`) for non-local hosts so the External URL works.
 6. After the first deploy (or when schema changes), run migrate + seed from a shell that can reach Postgres, e.g. Render Shell / one-off job:
    ```bash
-   npm run db:migrate && npm run db:seed
+   npm run db:migrate
+   npm run db:seed
+   PREFLIGHT_PRODUCTION=true npm run db:preflight
    ```
 7. Add Clerk env vars (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`).
    Production requires **`pk_live_` / `sk_live_`** and **Custom Google OAuth** in the Clerk Dashboard — see [`docs/CLERK_PRODUCTION.md`](./docs/CLERK_PRODUCTION.md).
