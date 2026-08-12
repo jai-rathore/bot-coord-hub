@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { LINK_SCOPES } from "@/lib/scopes";
 
 export function generateInviteCode(): string {
   const part = () =>
@@ -24,7 +25,4 @@ export function requestOrigin(request: Request): string {
   return `${proto}://${host}`;
 }
 
-export const DEFAULT_LINK_SCOPES = [
-  "schedule_meeting",
-  "avail.read_freebusy",
-] as const;
+export const DEFAULT_LINK_SCOPES = LINK_SCOPES;

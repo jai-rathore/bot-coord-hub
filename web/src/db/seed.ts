@@ -20,8 +20,10 @@ async function seed() {
       slug: "schedule_meeting",
       name: "Schedule meeting",
       description:
-        "Agents negotiate a meeting time using free/busy only; humans confirm bookings by default.",
+        "Handle availability, follow-ups, approval, and final booking across people.",
       status: "live",
+      category: "professional_organizing",
+      requiredScopes: ["tasks:write"],
       schema: {
         durationMinutes: "number",
         windowStart: "string (ISO datetime)",
@@ -32,7 +34,19 @@ async function seed() {
     });
     console.log("Seeded intent_types: schedule_meeting (live)");
   } else {
-    console.log("intent_types already has schedule_meeting — skipped");
+    await db
+      .update(intentTypes)
+      .set({
+        name: "Schedule meeting",
+        description:
+          "Handle availability, follow-ups, approval, and final booking across people.",
+        status: "live",
+        category: "professional_organizing",
+        requiredScopes: ["tasks:write"],
+        updatedAt: new Date(),
+      })
+      .where(eq(intentTypes.id, existing[0].id));
+    console.log("Updated intent_types: schedule_meeting");
   }
 
   process.exit(0);

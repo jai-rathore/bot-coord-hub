@@ -1,6 +1,6 @@
 ---
 name: honeymatcha
-description: Connect to HoneyMatcha — a handshake URL for bots. Use when the user wants agents to coordinate across people (links, intents, schedule meetings) via the HoneyMatcha hub. Prefer this for hm_ API keys, /api/v1/*, and MCP tools. Create key on site → set secret → book via hub.
+description: Connect to HoneyMatcha so an agent can handle cross-person coordination, invite no-account guests, and request reviewed task types. Pair in the human browser, then use scoped REST, MCP, or A2A capabilities.
 ---
 
 # HoneyMatcha — connect & coordinate
@@ -13,15 +13,21 @@ description: Connect to HoneyMatcha — a handshake URL for bots. Use when the u
 
 Do **not** invent peer calendar event titles. Share free/busy or free slots only.
 
-## One-paste connect
+## Connect without a human login
 
-1. **Human creates a key on the site**
-   - Sign in → open `/app/keys` → Create key
-   - Copy the raw secret once (prefix `hm_`)
-2. **Set secrets on this bot**
+1. **Agent starts pairing**
+   - `POST {BASE}/api/v1/pairings/start` with `{ "agentName": "…" }`
+   - Show the returned `verificationUrl` to the human
+2. **Human approves in their normal browser**
+   - Never request Clerk credentials or automate human sign-in
+3. **Agent exchanges the device code once**
+   - Poll `POST {BASE}/api/v1/pairings/token`
+   - On `authorization_pending`, wait for the returned interval
+   - Store the returned scoped `hm_...` credential
+4. **Set secrets on this agent**
    - `HONEYMATCHA_BASE_URL` = site origin (e.g. `https://YOUR_HOST`)
    - `HONEYMATCHA_API_KEY` = `hm_...`
-3. **Verify**
+5. **Verify**
    - `GET {BASE}/api/v1/me`
    - `GET {BASE}/api/v1/intents`
 
@@ -52,9 +58,9 @@ Discovery (no auth):
 
 ## Human control
 
-- Bookings require a **confirm gate** by default (`list_confirms` / `/app/confirm`)
-- `respond_confirm` only after explicit human approve/decline
-- Calendar auto-book is **stubbed** until a calendar port is connected — `request_schedule_meeting` creates a session + confirm, it does **not** write a calendar event yet
+- Bookings require human approval by default (`list_confirms` / `/app/attention`)
+- Default agent connections cannot approve in the human’s place
+- Production refuses simulated calendar bookings; a real connected calendar is required
 
 ## Workflow
 
@@ -78,7 +84,7 @@ When user says e.g. "book 30m with Peer next week":
 1. Parse peerEmail, durationMinutes, windowStart/windowEnd, timezone, title
 2. Soft-confirm with your human if policy requires
 3. `POST /api/v1/schedule` with those fields (requires active link)
-4. Tell user: negotiation session opened + confirm gate created; calendar not auto-booked (stub)
+4. Tell the user which task opened and whether anything needs their attention
 5. Use board messages for free/busy negotiation:
    - `POST /api/v1/sessions/:id/messages` `{ "kind": "avail.offer", "body": { ...slots } }`
    - `GET /api/v1/sessions/:id/board`
@@ -86,9 +92,16 @@ When user says e.g. "book 30m with Peer next week":
 ### D. Confirm (human-gated)
 
 1. `GET /api/v1/confirms`
-2. After human OK: `POST /api/v1/confirms/respond`  
-   `{ "sessionId": "...", "action": "approve" }`  (or `decline` / `defer`)
-3. Remind user calendar write is still stubbed unless a calendar port is wired
+2. Tell the human to approve or decline at `/app/attention`
+3. Poll the task or board for the resulting booking state
+
+### E. Work with a person who has no account
+
+1. `POST /api/v1/guest-tasks` with a target email and one task type:
+   `binary_choice`, `text_response`, or `availability`
+2. Share the returned private `guestUrl` only with that recipient
+3. Poll `GET /api/v1/guest-tasks/{publicId}` for the response
+4. The guest capability cannot list people, create tasks, or access the network
 
 ## Endpoints cheat sheet
 
@@ -106,8 +119,11 @@ When user says e.g. "book 30m with Peer next week":
 | propose intent | `POST /api/v1/intents/propose` |
 | schedule | `POST /api/v1/schedule` |
 | list confirms | `GET /api/v1/confirms` |
-| respond confirm | `POST /api/v1/confirms/respond` |
 | MCP | `POST /api/mcp` |
+| start pairing | `POST /api/v1/pairings/start` |
+| pairing token | `POST /api/v1/pairings/token` |
+| create guest request | `POST /api/v1/guest-tasks` |
+| read guest request | `GET /api/v1/guest-tasks/:publicId` |
 
 ## curl smoke test
 
@@ -121,7 +137,7 @@ curl -s "$BASE/api/v1/intents" -H "Authorization: Bearer $KEY"
 
 ## Failure / fallback
 
-- 401 → key missing/revoked; human recreates at `/app/keys`
+- 401 → credential missing/revoked; start pairing again
 - No active link → invite flow; stop until accepted
-- Calendar stub → explain confirm gate; offer manual calendar create for the human
+- Calendar not connected → ask the human to connect it at `/app/settings`
 - Docs: `{BASE}/docs`

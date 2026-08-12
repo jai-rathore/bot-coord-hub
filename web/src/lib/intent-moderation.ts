@@ -18,13 +18,10 @@ export function isIntentAdmin(user: User): boolean {
   return admins.includes(user.email.toLowerCase());
 }
 
-/** Admin (INTENT_ADMIN_EMAILS) or the original proposer. */
+/** Publishing executable task types is restricted to configured admins. */
 export function canModerateProposal(user: User, proposal: IntentProposal): boolean {
-  if (isIntentAdmin(user)) return true;
-  if (proposal.proposedByUserId && proposal.proposedByUserId === user.id) {
-    return true;
-  }
-  return false;
+  void proposal;
+  return isIntentAdmin(user);
 }
 
 export async function listPendingProposalsForModeration() {

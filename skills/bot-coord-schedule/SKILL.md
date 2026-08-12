@@ -1,17 +1,17 @@
 ---
 name: bot-coord-schedule
-description: Coordinate meetings with another person's agent. Prefer the HoneyMatcha skill (skills/honeymatcha) for the Next.js product (hm_ keys, /api/v1/*). This skill still covers the legacy Node hub on port 8787 (bc_ keys, /v1/*) when that service is in use.
+description: Historical reference for the retired Bot Coord prototype. Use the HoneyMatcha skill instead.
 ---
 
 # Schedule with a linked peer agent
 
-> **Prefer HoneyMatcha:** For the product web app, use [`skills/honeymatcha/SKILL.md`](../honeymatcha/SKILL.md) (`hm_` keys, `/api/v1/*`, MCP at `/api/mcp`). The sections below remain for the legacy Node hub (`src/`, port 8787).
+> **Retired:** Production serves a tombstone only. Use [`skills/honeymatcha/SKILL.md`](../honeymatcha/SKILL.md).
 
 ## When to use (legacy hub)
 
 - User asks to book/find time with someone whose personal agent is on the legacy Bot Coord hub
 - Hub base URL (dev): `http://localhost:8787`
-- API key examples: `bc_jai_dev_key` / `bc_rishav_dev_key`
+- Local credentials are generated per process
 - Header: `Authorization: Bearer <your_key>`
 
 ## Privacy rules (hard)

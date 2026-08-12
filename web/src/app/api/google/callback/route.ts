@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
 import { writeAudit } from "@/lib/audit";
@@ -19,10 +20,20 @@ export async function GET(request: Request) {
   const oauthError = url.searchParams.get("error");
 
   const appBase = requestOrigin(request);
+  const redirectAndClear = (url: string) => {
+    const response = NextResponse.redirect(url, 302);
+    response.cookies.set("hm_google_oauth_nonce", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/api/google/callback",
+      maxAge: 0,
+    });
+    return response;
+  };
   const fail = (msg: string) =>
-    Response.redirect(
+    redirectAndClear(
       `${appBase}/app/settings?calendar=error&message=${encodeURIComponent(msg)}`,
-      302,
     );
 
   if (oauthError) {
@@ -32,7 +43,16 @@ export async function GET(request: Request) {
     return fail("Missing code or state");
   }
 
-  const userId = parseOAuthState(state);
+  const nonceCookie = request.headers
+    .get("cookie")
+    ?.split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith("hm_google_oauth_nonce="))
+    ?.slice("hm_google_oauth_nonce=".length);
+  const userId = parseOAuthState(
+    state,
+    nonceCookie ? decodeURIComponent(nonceCookie) : null,
+  );
   if (!userId) {
     return fail("Invalid OAuth state");
   }
@@ -60,7 +80,7 @@ export async function GET(request: Request) {
         email: conn.googleAccountEmail,
       },
     });
-    return Response.redirect(`${appBase}/app/settings?calendar=connected`, 302);
+    return redirectAndClear(`${appBase}/app/settings?calendar=connected`);
   } catch (err) {
     const message = err instanceof Error ? err.message : "OAuth failed";
     return fail(message);

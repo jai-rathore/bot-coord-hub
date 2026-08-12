@@ -35,6 +35,8 @@ import {
 import { runScheduleMeeting } from "@/lib/schedule-meeting";
 import type { AllowedHours } from "@/db/schema";
 import { writeAudit } from "@/lib/audit";
+import { assertAgentScope } from "@/lib/scopes";
+import { boundedText } from "@/lib/validation";
 import {
   createSessionForUser,
   getSessionForUser,
@@ -48,6 +50,12 @@ import {
   listConfirmsForUser,
   requestConfirm as requestConfirmForUser,
 } from "@/lib/confirms";
+import {
+  createGuestTask as createScopedGuestTask,
+  getGuestTaskForOrganizer,
+  listGuestTasksForOrganizer,
+  revokeGuestTask as revokeScopedGuestTask,
+} from "@/lib/guest-tasks";
 
 import { AgentApiError } from "@/lib/agent-errors";
 export { AgentApiError } from "@/lib/agent-errors";
@@ -79,12 +87,15 @@ export async function whoami(auth: AgentAuth) {
       id: auth.apiKey.id,
       name: auth.apiKey.name,
       keyPrefix: auth.apiKey.keyPrefix,
+      scopes: auth.apiKey.scopes,
+      expiresAt: auth.apiKey.expiresAt,
       lastUsedAt: auth.apiKey.lastUsedAt,
     },
   };
 }
 
 export async function listLinks(auth: AgentAuth, baseUrl?: string) {
+  assertAgentScope(auth, "people:read");
   try {
     const rows = await listLinksForUser(auth.user, baseUrl ?? "");
     return { ok: true, links: rows };
@@ -102,9 +113,11 @@ export async function createInvite(
     confirmRequired?: boolean;
     timezone?: string | null;
     allowedHours?: AllowedHours | null;
+    expiresInHours?: number;
   },
   baseUrl?: string,
 ) {
+  assertAgentScope(auth, "people:write");
   try {
     const link = await createInviteLink({
       fromUser: auth.user,
@@ -114,10 +127,13 @@ export async function createInvite(
       confirmRequired: body.confirmRequired,
       timezone: body.timezone,
       allowedHours: body.allowedHours,
+      expiresInHours: body.expiresInHours,
       origin: baseUrl ?? "",
     });
     await writeAudit({
       actorUserId: auth.user.id,
+      actorApiKeyId: auth.apiKey.id,
+      actorKind: "agent",
       action: "link.invite",
       entityType: "link",
       entityId: link.id,
@@ -127,7 +143,7 @@ export async function createInvite(
       ok: true,
       link,
       message:
-        "Share this link with a friend’s bot/human so they can accept and form a mutual link.",
+        "Share this private, expiring invitation with the addressed person.",
     };
   } catch (err) {
     rethrowAsAgentError(err);
@@ -144,6 +160,7 @@ export async function patchLinkPolicy(
   },
   baseUrl?: string,
 ) {
+  assertAgentScope(auth, "people:write");
   try {
     const link = await updateLinkPolicyForUser({
       user: auth.user,
@@ -155,6 +172,8 @@ export async function patchLinkPolicy(
     });
     await writeAudit({
       actorUserId: auth.user.id,
+      actorApiKeyId: auth.apiKey.id,
+      actorKind: "agent",
       action: "link.policy_update",
       entityType: "link",
       entityId: linkId,
@@ -171,6 +190,7 @@ export async function acceptInvite(
   body: { inviteCode?: string },
   baseUrl?: string,
 ) {
+  assertAgentScope(auth, "people:write");
   try {
     const result = await acceptInviteLink({
       user: auth.user,
@@ -188,6 +208,7 @@ export async function acceptInvite(
 }
 
 export async function revokeLink(auth: AgentAuth, linkId: string) {
+  assertAgentScope(auth, "people:write");
   try {
     const result = await revokeLinkForUser({ user: auth.user, linkId });
     return { ok: true, ...result };
@@ -197,12 +218,72 @@ export async function revokeLink(auth: AgentAuth, linkId: string) {
 }
 
 export async function listSessions(auth: AgentAuth) {
+  assertAgentScope(auth, "tasks:read");
   try {
     const rows = await listSessionsForUser(auth.user);
     return { ok: true, sessions: rows };
   } catch (err) {
     rethrowAsAgentError(err);
   }
+}
+
+export async function listGuestTasks(auth: AgentAuth) {
+  assertAgentScope(auth, "guest_tasks:read");
+  return {
+    ok: true,
+    tasks: await listGuestTasksForOrganizer(auth.user),
+  };
+}
+
+export async function createGuestTask(
+  auth: AgentAuth,
+  body: {
+    taskType?: string;
+    title?: string;
+    description?: string;
+    config?: Record<string, unknown>;
+    targetEmail?: string;
+    expiresInMinutes?: number;
+    maxResponses?: number;
+    sessionId?: string;
+  },
+  baseUrl?: string,
+) {
+  assertAgentScope(auth, "guest_tasks:write");
+  return {
+    ok: true,
+    ...(await createScopedGuestTask({
+      organizer: auth.user,
+      ...body,
+      origin: baseUrl ?? "",
+      actor: { kind: "agent", apiKeyId: auth.apiKey.id },
+    })),
+  };
+}
+
+export async function readGuestTask(
+  auth: AgentAuth,
+  publicId: string,
+) {
+  assertAgentScope(auth, "guest_tasks:read");
+  return {
+    ok: true,
+    ...(await getGuestTaskForOrganizer(auth.user, publicId)),
+  };
+}
+
+export async function revokeGuestTask(
+  auth: AgentAuth,
+  publicId: string,
+) {
+  assertAgentScope(auth, "guest_tasks:write");
+  return {
+    ok: true,
+    task: await revokeScopedGuestTask(auth.user, publicId, {
+      kind: "agent",
+      apiKeyId: auth.apiKey.id,
+    }),
+  };
 }
 
 export async function createSession(
@@ -212,8 +293,10 @@ export async function createSession(
     peerUserId?: string;
     linkId?: string;
     payload?: Record<string, unknown>;
+    idempotencyKey?: string;
   },
 ) {
+  assertAgentScope(auth, "tasks:write");
   try {
     if (!body.intentType?.trim()) {
       throw new AgentApiError(400, "intentType is required");
@@ -224,6 +307,7 @@ export async function createSession(
       peerUserId: body.peerUserId,
       linkId: body.linkId,
       payload: body.payload,
+      idempotencyKey: body.idempotencyKey,
     });
     return { ok: true, session };
   } catch (err) {
@@ -232,6 +316,7 @@ export async function createSession(
 }
 
 export async function readBoard(auth: AgentAuth, sessionId: string) {
+  assertAgentScope(auth, "tasks:read");
   try {
     const session = await getSessionForUser(sessionId, auth.user.id);
     const messages = await listMessagesForSession(sessionId);
@@ -263,6 +348,7 @@ export async function readBoard(auth: AgentAuth, sessionId: string) {
 }
 
 export async function listBoardMessages(auth: AgentAuth, sessionId: string) {
+  assertAgentScope(auth, "tasks:read");
   try {
     await getSessionForUser(sessionId, auth.user.id);
     const messages = await listMessagesForSession(sessionId);
@@ -277,6 +363,7 @@ export async function postBoardMessage(
   sessionId: string,
   body: { kind?: string; body?: Record<string, unknown>; text?: string },
 ) {
+  assertAgentScope(auth, "tasks:write");
   try {
     const session = await getSessionForUser(sessionId, auth.user.id);
     const messageBody = {
@@ -288,6 +375,8 @@ export async function postBoardMessage(
       sender: auth.user,
       kind: body.kind ?? "note",
       body: messageBody,
+      actorApiKeyId: auth.apiKey.id,
+      actorKind: "agent",
     });
     return { ok: true, message };
   } catch (err) {
@@ -309,9 +398,11 @@ export async function proposeIntent(
     name?: string;
     slug?: string;
     description?: string;
+    category?: string;
     force?: boolean;
   },
 ) {
+  assertAgentScope(auth, "intents:request");
   const name = normalizeIntentName(body.name ?? "");
   if (!name || name.length < 3) {
     throw new AgentApiError(400, "Name must be at least 3 characters");
@@ -320,7 +411,10 @@ export async function proposeIntent(
   if (!slug) {
     throw new AgentApiError(400, "Invalid slug");
   }
-  const description = body.description?.trim() || null;
+  const description =
+    boundedText(body.description, "description", 2_000) ?? null;
+  const category =
+    boundedText(body.category, "category", 60) ?? "coordination";
   const hits = await findDedupeHits(name, slug);
   const exact = isExactDedupeConflict(hits, name, slug);
 
@@ -345,6 +439,7 @@ export async function proposeIntent(
         name,
         slug,
         description,
+        category,
         status: "pending",
         proposedByUserId: auth.user.id,
         proposedByEmail: auth.user.email,
@@ -378,10 +473,15 @@ export async function requestScheduleMeeting(
     timezone?: string;
     title?: string;
     notes?: string;
+    idempotencyKey?: string;
   },
 ) {
+  assertAgentScope(auth, "tasks:write");
   try {
-    return await runScheduleMeeting(auth.user, body);
+    return await runScheduleMeeting(auth.user, body, {
+      apiKeyId: auth.apiKey.id,
+      kind: "agent",
+    });
   } catch (err) {
     rethrowAsAgentError(err);
   }
@@ -391,6 +491,7 @@ export async function listConfirms(
   auth: AgentAuth,
   status?: Confirm["status"],
 ) {
+  assertAgentScope(auth, "approvals:read");
   try {
     const rows = await listConfirmsForUser(auth.user, status);
     return {
@@ -413,6 +514,7 @@ export async function requestConfirm(
     confirmUserId?: string;
   },
 ) {
+  assertAgentScope(auth, "tasks:write");
   try {
     if (!body.sessionId?.trim()) {
       throw new AgentApiError(400, "sessionId is required");
@@ -436,7 +538,8 @@ export async function requestConfirm(
 
 /**
  * respond_confirm — records human decision on a confirm gate.
- * Agents should only call this after the human approved/declined.
+ * Reserved for explicitly privileged legacy integrations. Default pairings do
+ * not receive approvals:write; humans decide at /app/attention.
  * When all schedule_meeting participants approve, books via CalendarPort.
  */
 export async function respondConfirm(
@@ -448,6 +551,7 @@ export async function respondConfirm(
     note?: string;
   },
 ) {
+  assertAgentScope(auth, "approvals:write");
   const action = body.action?.trim().toLowerCase();
   if (!action || !["approve", "decline", "defer"].includes(action)) {
     throw new AgentApiError(
@@ -535,7 +639,7 @@ export async function respondConfirm(
         message: "Deferred. Still awaiting a final human decision.",
       },
       documentation:
-        "respond_confirm is human-gated: call only after your human approved/declined. Dashboard: /app/confirm.",
+        "This credential has explicit approvals:write access. Default agents cannot decide for a human. Dashboard: /app/attention.",
     };
   }
 
@@ -546,6 +650,8 @@ export async function respondConfirm(
       confirmId: confirmRow.id,
       decision,
       note: body.note,
+      actorApiKeyId: auth.apiKey.id,
+      actorKind: "agent",
     });
 
     return {
@@ -562,7 +668,7 @@ export async function respondConfirm(
         status: decision === "approved" ? "recorded" : "cancelled",
       },
       documentation:
-        "respond_confirm is human-gated: call only after your human approved/declined. Dashboard: /app/confirm.",
+        "This credential has explicit approvals:write access. Default agents cannot decide for a human. Dashboard: /app/attention.",
     };
   } catch (err) {
     rethrowAsAgentError(err);

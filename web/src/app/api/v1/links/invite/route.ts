@@ -12,8 +12,7 @@ export const dynamic = "force-dynamic";
 /**
  * Create a peer invite.
  * POST /api/v1/links/invite — Authorization: Bearer hm_...
- * Body: { toEmail?, toName?, scopes?, confirmRequired?, timezone?, allowedHours? }
- * Omit toEmail for an open handshake URL.
+ * Body: { toEmail, toName?, scopes?, confirmRequired?, timezone?, allowedHours? }
  */
 export async function POST(request: Request) {
   const auth = await requireAgent(request);
@@ -24,6 +23,7 @@ export async function POST(request: Request) {
       toEmail?: string;
       toName?: string;
       scopes?: string[];
+      expiresInHours?: number;
       confirmRequired?: boolean;
       timezone?: string | null;
       allowedHours?: {

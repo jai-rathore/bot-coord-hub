@@ -13,6 +13,18 @@ if (!url) {
   process.exit(1);
 }
 const sql = postgres(url, { max: 1 });
+const safeScopes = [
+  "profile:read",
+  "people:read",
+  "people:write",
+  "tasks:read",
+  "tasks:write",
+  "approvals:read",
+  "guest_tasks:read",
+  "guest_tasks:write",
+  "intents:read",
+  "intents:request",
+];
 
 function hashApiKey(rawKey) {
   return createHash("sha256").update(rawKey).digest("hex");
@@ -51,10 +63,10 @@ async function main() {
   const aliceRaw = `hm_${randomBytes(24).toString("base64url")}`;
   const bobRaw = `hm_${randomBytes(24).toString("base64url")}`;
   await sql`
-    insert into api_keys (user_id, name, key_prefix, key_hash)
+    insert into api_keys (user_id, name, key_prefix, key_hash, scopes)
     values
-      (${alice.id}, ${"alice"}, ${aliceRaw.slice(0, 11)}, ${hashApiKey(aliceRaw)}),
-      (${bob.id}, ${"bob"}, ${bobRaw.slice(0, 11)}, ${hashApiKey(bobRaw)})
+      (${alice.id}, ${"alice"}, ${aliceRaw.slice(0, 11)}, ${hashApiKey(aliceRaw)}, ${sql.json(safeScopes)}),
+      (${bob.id}, ${"bob"}, ${bobRaw.slice(0, 11)}, ${hashApiKey(bobRaw)}, ${sql.json(safeScopes)})
   `;
 
   const me = await jsonFetch("/api/v1/me", { token: aliceRaw });
@@ -149,8 +161,15 @@ async function main() {
       note: "Looks good",
     },
   });
-  assert(respond.res.ok, `respond failed: ${JSON.stringify(respond.data)}`);
-  assert(respond.data.confirm.status === "approved", "confirm should be approved");
+  assert(
+    respond.res.status === 403,
+    "default agent must not approve for a human",
+  );
+  await sql`
+    update confirms
+    set status = 'approved', decided_at = now()
+    where id = ${confirm.data.confirm.id}
+  `;
 
   const after = await jsonFetch("/api/v1/confirms?status=pending", {
     token: aliceRaw,

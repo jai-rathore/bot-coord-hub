@@ -1,4 +1,4 @@
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   links,
@@ -13,6 +13,8 @@ import {
   generateInviteCode,
   inviteUrlForCode,
 } from "@/lib/invite";
+import { normalizeLinkScopes } from "@/lib/scopes";
+import { boundedText } from "@/lib/validation";
 
 export type PublicLink = {
   id: string;
@@ -28,6 +30,7 @@ export type PublicLink = {
   confirmRequired: boolean;
   timezone: string | null;
   allowedHours: AllowedHours | null;
+  expiresAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -45,10 +48,17 @@ export async function createInviteLink(opts: {
   confirmRequired?: boolean;
   timezone?: string | null;
   allowedHours?: AllowedHours | null;
+  expiresInHours?: number;
   origin: string;
 }): Promise<PublicLink> {
   const toEmail = normalizeEmail(opts.toEmail);
-  if (toEmail && !toEmail.includes("@")) {
+  if (!toEmail) {
+    throw Object.assign(
+      new Error("A recipient email is required for a private invitation"),
+      { status: 400 },
+    );
+  }
+  if (!toEmail.includes("@")) {
     throw Object.assign(new Error("toEmail must be a valid email"), {
       status: 400,
     });
@@ -57,16 +67,22 @@ export async function createInviteLink(opts: {
     throw Object.assign(new Error("Cannot invite yourself"), { status: 400 });
   }
 
-  const scopes =
-    opts.scopes && opts.scopes.length > 0
-      ? opts.scopes
-      : [...DEFAULT_LINK_SCOPES];
+  const scopes = normalizeLinkScopes(
+    opts.scopes?.length ? opts.scopes : [...DEFAULT_LINK_SCOPES],
+  );
+  const toName =
+    boundedText(opts.toName, "toName", 80) ?? null;
+  const expiresInHours = Math.min(
+    Math.max(Number(opts.expiresInHours ?? 7 * 24), 1),
+    30 * 24,
+  );
+  const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1_000);
 
   const db = getDb();
   const inviteCode = generateInviteCode();
 
   let toUserId: string | null = null;
-  let toName = opts.toName?.trim() || null;
+  let resolvedName = toName;
   if (toEmail) {
     const peer = await db
       .select()
@@ -75,7 +91,7 @@ export async function createInviteLink(opts: {
       .limit(1);
     if (peer[0]) {
       toUserId = peer[0].id;
-      toName = toName || peer[0].name;
+      resolvedName = resolvedName || peer[0].name;
     }
   }
 
@@ -85,13 +101,14 @@ export async function createInviteLink(opts: {
       fromUserId: opts.fromUser.id,
       toUserId,
       toEmail,
-      toName,
+      toName: resolvedName,
       inviteCode,
       status: "pending",
       scopes,
       confirmRequired: opts.confirmRequired ?? true,
       timezone: opts.timezone ?? null,
       allowedHours: opts.allowedHours ?? null,
+      expiresAt,
     })
     .returning();
 
@@ -115,8 +132,11 @@ export async function updateLinkPolicyForUser(opts: {
   if (!link) {
     throw Object.assign(new Error("Link not found"), { status: 404 });
   }
-  if (link.fromUserId !== opts.user.id && link.toUserId !== opts.user.id) {
-    throw Object.assign(new Error("Not a party on this link"), { status: 403 });
+  if (link.fromUserId !== opts.user.id) {
+    throw Object.assign(
+      new Error("Only the person who owns these preferences can change them"),
+      { status: 403 },
+    );
   }
 
   const [updated] = await db
@@ -158,6 +178,11 @@ export async function acceptInviteLink(opts: {
   if (!invite) {
     throw Object.assign(new Error("Invite not found or not pending"), {
       status: 404,
+    });
+  }
+  if (invite.expiresAt && invite.expiresAt <= new Date()) {
+    throw Object.assign(new Error("This invitation has expired"), {
+      status: 410,
     });
   }
   if (invite.fromUserId === opts.user.id) {
@@ -224,9 +249,10 @@ export async function acceptInviteLink(opts: {
       inviteCode: pairCode,
       status: "active",
       scopes: invite.scopes,
-      confirmRequired: invite.confirmRequired,
-      timezone: invite.timezone,
-      allowedHours: invite.allowedHours,
+      confirmRequired: true,
+      timezone: null,
+      allowedHours: null,
+      expiresAt: null,
       updatedAt: now,
     })
     .returning();
@@ -239,6 +265,7 @@ export async function acceptInviteLink(opts: {
       toName: opts.user.name,
       status: "active",
       pairLinkId: pair.id,
+      expiresAt: null,
       updatedAt: now,
     })
     .where(eq(links.id, invite.id))
@@ -383,7 +410,13 @@ export async function getPendingInviteByCode(inviteCode: string) {
     })
     .from(links)
     .innerJoin(users, eq(links.fromUserId, users.id))
-    .where(and(eq(links.inviteCode, inviteCode), eq(links.status, "pending")))
+    .where(
+      and(
+        eq(links.inviteCode, inviteCode),
+        eq(links.status, "pending"),
+        or(isNull(links.expiresAt), gt(links.expiresAt, new Date())),
+      ),
+    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -429,6 +462,7 @@ function toPublicLink(
     confirmRequired: link.confirmRequired,
     timezone: link.timezone,
     allowedHours: link.allowedHours ?? null,
+    expiresAt: link.expiresAt?.toISOString() ?? null,
     createdAt: link.createdAt.toISOString(),
     updatedAt: link.updatedAt.toISOString(),
   };

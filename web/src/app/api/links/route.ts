@@ -29,11 +29,12 @@ export async function POST(request: Request) {
     toEmail?: string;
     toName?: string;
     scopes?: string[];
+    expiresInHours?: number;
   } = {};
   try {
     body = await request.json();
   } catch {
-    // open invite with empty body is ok
+    // Shared validation reports missing required fields.
   }
 
   try {
@@ -42,13 +43,14 @@ export async function POST(request: Request) {
       toEmail: body.toEmail,
       toName: body.toName,
       scopes: body.scopes,
+      expiresInHours: body.expiresInHours,
       origin: requestOrigin(request),
     });
     return Response.json(
       {
         link,
         message:
-          "Share this link with a friend’s bot/human so they can accept and form a mutual link.",
+          "Share this private, expiring invitation with the addressed person.",
       },
       { status: 201 },
     );

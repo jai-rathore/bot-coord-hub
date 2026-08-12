@@ -181,6 +181,28 @@ async function api(path, { method = "GET", body } = {}) {
   return data;
 }
 
+async function remoteMcp(method, params = {}) {
+  if (!BASE || !KEY) {
+    throw new Error(
+      "Set HONEYMATCHA_BASE_URL and HONEYMATCHA_API_KEY before starting the MCP server.",
+    );
+  }
+  const id = `stdio-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const res = await fetch(`${BASE}/api/mcp`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    throw new Error(data.error?.message || data.error || `HTTP ${res.status}`);
+  }
+  return data.result;
+}
+
 async function callTool(name, args = {}) {
   switch (name) {
     case "whoami":
@@ -230,11 +252,11 @@ async function handle(msg) {
       jsonrpc: "2.0",
       id,
       result: {
-        protocolVersion: "2024-11-05",
+        protocolVersion: msg.params?.protocolVersion || "2026-07-28",
         capabilities: { tools: {} },
-        serverInfo: { name: "honeymatcha", version: "0.2.0" },
+        serverInfo: { name: "honeymatcha", version: "0.3.0" },
         instructions:
-          "HoneyMatcha MCP (stdio). Requires HONEYMATCHA_BASE_URL + HONEYMATCHA_API_KEY. Create keys at /app/keys. Calendar auto-book is stubbed.",
+          "HoneyMatcha MCP (stdio). Pair an agent in the human browser, then set HONEYMATCHA_BASE_URL + HONEYMATCHA_API_KEY. Tools are loaded from the remote server.",
       },
     });
   }
@@ -248,15 +270,30 @@ async function handle(msg) {
   }
 
   if (method === "tools/list") {
-    return send({ jsonrpc: "2.0", id, result: { tools: TOOLS } });
+    try {
+      return send({
+        jsonrpc: "2.0",
+        id,
+        result: await remoteMcp("tools/list"),
+      });
+    } catch (err) {
+      return send({
+        jsonrpc: "2.0",
+        id,
+        error: { code: -32603, message: err.message || "Remote MCP failed" },
+      });
+    }
   }
 
   if (method === "tools/call") {
     const name = params?.name;
     const args = params?.arguments ?? {};
     try {
-      const data = await callTool(name, args);
-      return send({ jsonrpc: "2.0", id, result: textResult(data) });
+      const result = await remoteMcp("tools/call", {
+        name,
+        arguments: args,
+      });
+      return send({ jsonrpc: "2.0", id, result });
     } catch (err) {
       return send({
         jsonrpc: "2.0",

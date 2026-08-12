@@ -76,7 +76,7 @@ export class GoogleCalendarPort implements CalendarPort {
           attendees: input.attendeeEmails.map((email) => ({ email })),
           conferenceData: {
             createRequest: {
-              requestId: `hm-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+              requestId: input.requestId,
               conferenceSolutionKey: { type: "hangoutsMeet" },
             },
           },

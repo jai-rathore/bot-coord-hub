@@ -1,6 +1,7 @@
 /**
  * Bot Coord Hub — protocol types (adapted from bot-coord-sim).
  */
+import { randomBytes } from "node:crypto";
 
 export const PROTOCOL_VERSION = 1 as const;
 
@@ -275,6 +276,10 @@ export const IDS = {
   JAI_AGENT: "agt_jai_cos",
   RISHAV_USER: "usr_rishav",
   RISHAV_AGENT: "agt_rishav_cos",
-  JAI_KEY: "bc_jai_dev_key",
-  RISHAV_KEY: "bc_rishav_dev_key",
+  JAI_KEY:
+    process.env.LEGACY_JAI_KEY ??
+    `bc_local_${randomBytes(18).toString("base64url")}`,
+  RISHAV_KEY:
+    process.env.LEGACY_RISHAV_KEY ??
+    `bc_local_${randomBytes(18).toString("base64url")}`,
 } as const;

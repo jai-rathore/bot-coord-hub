@@ -6,6 +6,7 @@ import { apiKeys, users } from "../src/db/schema";
 import { acceptInviteLink, createInviteLink, listLinksForUser, revokeLinkForUser } from "../src/lib/links";
 import { createSessionForUser, listMessagesForSession, postSessionMessage } from "../src/lib/sessions";
 import { decideConfirm, listConfirmsForUser, requestConfirm } from "../src/lib/confirms";
+import { DEFAULT_AGENT_SCOPES } from "../src/lib/scopes";
 
 function hashApiKey(rawKey: string) {
   return createHash("sha256").update(rawKey).digest("hex");
@@ -31,6 +32,7 @@ async function main() {
     name: "alice",
     keyPrefix: aliceRaw.slice(0, 11),
     keyHash: hashApiKey(aliceRaw),
+    scopes: DEFAULT_AGENT_SCOPES,
   });
 
   const origin = "http://localhost:3000";

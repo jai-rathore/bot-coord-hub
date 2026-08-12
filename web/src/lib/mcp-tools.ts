@@ -4,19 +4,23 @@
  */
 
 import type { AgentAuth } from "@/lib/agent-auth";
+import { assertAgentScope } from "@/lib/scopes";
 import {
   acceptInvite,
   AgentApiError,
+  createGuestTask,
   createInvite,
   listConfirms,
+  listGuestTasks,
   listIntents,
   listLinks,
   listSessions,
   postBoardMessage,
   proposeIntent,
+  readGuestTask,
   readBoard,
   requestScheduleMeeting,
-  respondConfirm,
+  revokeGuestTask,
   whoami,
 } from "@/lib/agent-api";
 
@@ -55,14 +59,13 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "create_invite",
     description:
-      "Create a peer invite handshake URL. Share inviteUrl/inviteCode with a friend’s bot/human so they can accept. Optional per-link policies: confirmRequired, timezone, allowedHours.",
+      "Create a targeted, expiring relationship invitation for a known person. Recipient email is required.",
     inputSchema: {
       type: "object",
       properties: {
         toEmail: {
           type: "string",
-          description:
-            "Optional peer email. Omit for an open invite URL anyone signed-in can accept.",
+          description: "Recipient email. Open network invitations are not supported.",
         },
         toName: { type: "string", description: "Optional peer display name" },
         scopes: {
@@ -85,6 +88,7 @@ export const MCP_TOOLS: McpToolDef[] = [
           additionalProperties: true,
         },
       },
+      required: ["toEmail"],
     },
   },
   {
@@ -186,13 +190,17 @@ export const MCP_TOOLS: McpToolDef[] = [
         timezone: { type: "string" },
         title: { type: "string" },
         notes: { type: "string" },
+        idempotencyKey: {
+          type: "string",
+          description: "Stable unique key for safe retries",
+        },
       },
     },
   },
   {
     name: "list_confirms",
     description:
-      "List confirm gates for the authenticated user. Human-gated by default — see /app/confirm.",
+      "List decisions waiting for the human. The human responds at /app/attention.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -200,21 +208,53 @@ export const MCP_TOOLS: McpToolDef[] = [
     },
   },
   {
-    name: "respond_confirm",
+    name: "list_guest_tasks",
     description:
-      "Record a human decision on a confirm gate (approve|decline|defer). Call only after explicit human OK. When all schedule_meeting participants approve, books via CalendarPort (Meet when Google connected).",
+      "List private, invitation-scoped guest requests created by this user.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "create_guest_task",
+    description:
+      "Create a targeted, expiring request for one no-account guest. The returned private URL grants access only to this task.",
     inputSchema: {
       type: "object",
       properties: {
-        confirmId: { type: "string" },
-        sessionId: { type: "string" },
-        action: {
+        taskType: {
           type: "string",
-          enum: ["approve", "decline", "defer"],
+          enum: ["binary_choice", "text_response", "availability"],
         },
-        note: { type: "string" },
+        title: { type: "string" },
+        description: { type: "string" },
+        targetEmail: { type: "string" },
+        config: { type: "object", additionalProperties: true },
+        expiresInMinutes: { type: "number" },
+        maxResponses: { type: "number" },
+        sessionId: { type: "string" },
       },
-      required: ["action"],
+      required: ["taskType", "title", "targetEmail"],
+    },
+  },
+  {
+    name: "read_guest_task",
+    description: "Read one guest request and its responses.",
+    inputSchema: {
+      type: "object",
+      properties: { publicId: { type: "string" } },
+      required: ["publicId"],
+    },
+  },
+  {
+    name: "revoke_guest_task",
+    description: "Revoke an open guest request immediately.",
+    inputSchema: {
+      type: "object",
+      properties: { publicId: { type: "string" } },
+      required: ["publicId"],
     },
   },
 ];
@@ -272,6 +312,7 @@ export async function dispatchMcpTool(
     case "read_board":
       return readBoard(auth, String(args.sessionId ?? ""));
     case "list_intents":
+      assertAgentScope(auth, "intents:read");
       return listIntents(args.q as string | undefined);
     case "propose_intent":
       return proposeIntent(auth, {
@@ -291,16 +332,31 @@ export async function dispatchMcpTool(
         timezone: args.timezone as string | undefined,
         title: args.title as string | undefined,
         notes: args.notes as string | undefined,
+        idempotencyKey: args.idempotencyKey as string | undefined,
       });
     case "list_confirms":
       return listConfirms(auth);
-    case "respond_confirm":
-      return respondConfirm(auth, {
-        confirmId: args.confirmId as string | undefined,
-        sessionId: args.sessionId as string | undefined,
-        action: args.action as string | undefined,
-        note: args.note as string | undefined,
-      });
+    case "list_guest_tasks":
+      return listGuestTasks(auth);
+    case "create_guest_task":
+      return createGuestTask(
+        auth,
+        {
+          taskType: args.taskType as string | undefined,
+          title: args.title as string | undefined,
+          description: args.description as string | undefined,
+          targetEmail: args.targetEmail as string | undefined,
+          config: args.config as Record<string, unknown> | undefined,
+          expiresInMinutes: args.expiresInMinutes as number | undefined,
+          maxResponses: args.maxResponses as number | undefined,
+          sessionId: args.sessionId as string | undefined,
+        },
+        baseUrl,
+      );
+    case "read_guest_task":
+      return readGuestTask(auth, String(args.publicId ?? ""));
+    case "revoke_guest_task":
+      return revokeGuestTask(auth, String(args.publicId ?? ""));
     default:
       throw new AgentApiError(404, `Unknown tool: ${name}`);
   }

@@ -1,8 +1,10 @@
 # HoneyMatcha Web
 
-Next.js (App Router) product app for HoneyMatcha — a handshake URL for bots.
+Next.js product app for HoneyMatcha — let your agent handle the back-and-forth.
 
-Humans sign in with Clerk, create agent API keys, and agents call Bearer-auth APIs. The existing Node hub under repo `src/` remains untouched for now.
+Humans sign in with Clerk and approve short-lived agent pairings. Scoped agents
+coordinate through REST, MCP, or A2A; no-account guests receive one-task
+capabilities. The old Node hub under `src/` is not deployed by the Blueprint.
 
 ## Stack
 
@@ -56,25 +58,47 @@ Open [http://localhost:3000](http://localhost:3000).
 |------|--------|-------|
 | `/` | Public | Marketing homepage (JSON if `Accept: application/json`) |
 | `/docs` | Public | Agent connect docs (curl + MCP) |
+| `/agents` | Public | Agent pairing, MCP, A2A, and task catalog |
+| `/.well-known/agent-card.json` | Public | A2A v1 Agent Card |
 | `/.well-known/honeymatcha.json` | Public | Machine-readable discovery |
 | `/sign-in`, `/sign-up` | Public | Clerk |
-| `/intents` | Public | Registry browse + propose (propose requires sign-in) |
-| `/invite/[code]` | Public / signed-in accept | Handshake URL for a friend’s bot/human |
+| `/agents/tasks` | Public | Supported tasks + signed-in task requests |
+| `/guest/[publicId]` | Public capability | One targeted, expiring guest request |
+| `/invite/[code]` | Public / signed-in accept | Targeted relationship invitation |
 | `/app/**` | Clerk protected | Dashboard shell |
-| `/app/keys` | Auth | Create / list / revoke hashed API keys |
-| `/app/links` | Auth | Create invite URLs, accept codes, revoke mutual links |
+| `/app/tasks` | Auth | Task history + request a new task type |
+| `/app/people` | Auth | Invite, connect, and revoke people |
+| `/app/attention` | Auth | Human-only approvals |
 | `/app/activity` | Auth | Session list + plain-English messages (raw JSON toggle) |
-| `/app/confirm` | Auth | Approve / deny pending confirms |
 | `/app/settings` | Auth | Connect Google Calendar |
 | `/api/google/start` | Auth | Begin Google OAuth |
 | `/api/google/callback` | Public (OAuth) | OAuth redirect |
 | `/api/v1/*` | Bearer API key | Agent API (me, links, sessions, intents, schedule, confirms) |
+| `/api/v1/pairings/*` | Public, short-lived | Device-style agent connection |
+| `/api/v1/guest-tasks/*` | Scoped agent | Create/read/revoke guest capabilities |
+| `/api/guest/tasks/*` | Guest capability | Read/respond to exactly one guest task |
+| `/api/a2a` | Scoped agent | A2A v1 JSON-RPC (`SendMessage`, `GetTask`) |
 | `/api/v1/openapi` | Public | OpenAPI-ish map |
 | `/api/mcp` | Bearer API key | MCP JSON-RPC (`tools/list`, `tools/call`) |
 
 Human helpers also exist under `/api/links`, `/api/sessions`, and `/api/confirms` (Clerk session).
 
-## Agent auth
+## Agent pairing
+
+Agents do not sign into Clerk. Start a pairing, ask the human to approve the
+verification URL in their normal browser, then exchange the device code once:
+
+```bash
+curl -s http://localhost:3000/api/v1/pairings/start \
+  -H "Content-Type: application/json" \
+  -d '{"agentName":"My assistant"}'
+
+curl -s http://localhost:3000/api/v1/pairings/token \
+  -H "Content-Type: application/json" \
+  -d '{"deviceCode":"hp_..."}'
+```
+
+Manual `hm_` credentials remain available as an advanced fallback.
 
 ```bash
 curl -s http://localhost:3000/api/v1/me \
@@ -90,7 +114,7 @@ Raw keys are shown once on create; only SHA-256 hashes are stored. Revoke soft-s
 
 Documented flow: [`docs/SCHEDULE_MEETING.md`](./docs/SCHEDULE_MEETING.md).
 
-`POST /api/v1/schedule` → free/busy propose → human confirm gate → book on all approvals via **CalendarPort** (`MockCalendar` or per-user **Google** with Meet). Supports `peerEmails` for 3+. Per-link policies: `confirmRequired`, `timezone`, `allowedHours`.
+`POST /api/v1/schedule` → free/busy propose → human approval → book on all approvals via per-user **Google** with Meet. MockCalendar is local-only; production fails closed. Supports `peerEmails` for groups. Each principal owns their own relationship policy.
 
 Humans connect Google at `/app/settings` (`GOOGLE_CALENDAR_ENABLED`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`).
 
@@ -130,6 +154,10 @@ Optional: keep the existing hub (`src/`) as a separate Render service until the 
 - `intent_types` / `intent_proposals` — registry (`pending` \| `live` \| `rejected`); proposals carry triage recommendation/reason
 - `confirms` — human confirmation queue (`pending` \| `approved` \| `denied`)
 - `audit_logs` — append-only (key create/revoke, invite accept, confirm decisions, intent publish/reject/triage)
-- `calendar_connections` — per-user Google OAuth tokens
+- `calendar_connections` — per-user encrypted Google OAuth tokens
+- `guest_tasks` / `guest_responses` — invitation-scoped no-account participation
+- `agent_pairings` — expiring, browser-approved agent connections
 
-Agent surface `/api/v1/*` is lightly rate-limited (IP + key). Intent triage worker: `POST /api/v1/intents/triage` with `TRIAGE_SECRET`. Publish gate UI: `/app/intents`.
+Agent and guest surfaces are rate-limited. Intent triage worker:
+`POST /api/v1/intents/triage` with `TRIAGE_SECRET`. Only configured admins can
+publish requested task types at `/app/admin/intents`.

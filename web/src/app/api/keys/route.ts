@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { apiKeys } from "@/db/schema";
 import { writeAudit } from "@/lib/audit";
 import { generateApiKey } from "@/lib/keys";
+import { DEFAULT_AGENT_SCOPES } from "@/lib/scopes";
 import { ensureCurrentUser } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ export async function GET() {
       id: apiKeys.id,
       name: apiKeys.name,
       keyPrefix: apiKeys.keyPrefix,
+      scopes: apiKeys.scopes,
+      expiresAt: apiKeys.expiresAt,
       createdAt: apiKeys.createdAt,
       lastUsedAt: apiKeys.lastUsedAt,
       revokedAt: apiKeys.revokedAt,
@@ -54,11 +57,13 @@ export async function POST(request: Request) {
       name,
       keyPrefix,
       keyHash,
+      scopes: DEFAULT_AGENT_SCOPES,
     })
     .returning({
       id: apiKeys.id,
       name: apiKeys.name,
       keyPrefix: apiKeys.keyPrefix,
+      scopes: apiKeys.scopes,
       createdAt: apiKeys.createdAt,
     });
 
@@ -67,7 +72,11 @@ export async function POST(request: Request) {
     action: "api_key.created",
     entityType: "api_key",
     entityId: created.id,
-    metadata: { name: created.name, keyPrefix: created.keyPrefix },
+    metadata: {
+      name: created.name,
+      keyPrefix: created.keyPrefix,
+      scopes: created.scopes,
+    },
   });
 
   return Response.json(

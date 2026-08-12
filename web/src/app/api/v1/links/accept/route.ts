@@ -1,10 +1,10 @@
-import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
 import { acceptInvite } from "@/lib/agent-api";
 import {
   jsonFromAgentError,
   jsonOk,
   readJsonBody,
   requestBaseUrl,
+  requireAgent,
 } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +15,8 @@ export const dynamic = "force-dynamic";
  * Body: { inviteCode }
  */
 export async function POST(request: Request) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   try {
     const body = await readJsonBody<{ inviteCode?: string }>(request);

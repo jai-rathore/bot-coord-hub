@@ -139,6 +139,8 @@ export async function decideConfirm(opts: {
   confirmId: string;
   decision: "approved" | "denied";
   note?: string | null;
+  actorApiKeyId?: string | null;
+  actorKind?: "user" | "agent";
 }): Promise<PublicConfirm & { calendar?: Record<string, unknown> }> {
   const db = getDb();
   const rows = await db
@@ -169,8 +171,13 @@ export async function decideConfirm(opts: {
       decidedAt: now,
       note: opts.note?.trim() || confirm.note,
     })
-    .where(eq(confirms.id, confirm.id))
+    .where(and(eq(confirms.id, confirm.id), eq(confirms.status, "pending")))
     .returning();
+  if (!updated) {
+    throw Object.assign(new Error("Confirmation was already decided"), {
+      status: 409,
+    });
+  }
 
   const session = await getSessionForUser(confirm.sessionId, opts.user.id);
   const kind =
@@ -190,6 +197,8 @@ export async function decideConfirm(opts: {
         updated.note ? ` — ${updated.note}` : ""
       }`,
     },
+    actorApiKeyId: opts.actorApiKeyId ?? null,
+    actorKind: opts.actorKind ?? "user",
   });
 
   await db
@@ -208,6 +217,8 @@ export async function decideConfirm(opts: {
 
   await writeAudit({
     actorUserId: opts.user.id,
+    actorApiKeyId: opts.actorApiKeyId ?? null,
+    actorKind: opts.actorKind ?? "user",
     action:
       opts.decision === "approved" ? "confirm.approved" : "confirm.denied",
     entityType: "confirm",
@@ -235,6 +246,10 @@ export async function decideConfirm(opts: {
     const booking = await tryBookAfterConfirmApprovals(
       opts.user,
       session.id,
+      {
+        apiKeyId: opts.actorApiKeyId ?? null,
+        kind: opts.actorKind ?? "user",
+      },
     );
     calendar = (booking?.calendar as Record<string, unknown>) ?? {
       status: "awaiting_peer_confirms",

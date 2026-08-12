@@ -9,6 +9,7 @@ type Bucket = {
 };
 
 const buckets = new Map<string, Bucket>();
+let operationsSincePrune = 0;
 
 const DEFAULT_WINDOW_MS = 60_000;
 
@@ -30,6 +31,14 @@ export function rateLimit(
   windowMs = DEFAULT_WINDOW_MS,
 ): RateLimitResult {
   const now = Date.now();
+  operationsSincePrune += 1;
+  if (operationsSincePrune >= 100) {
+    operationsSincePrune = 0;
+    const staleBefore = now - Math.max(windowMs * 5, 5 * 60_000);
+    for (const [bucketKey, bucket] of buckets) {
+      if (bucket.updatedAt < staleBefore) buckets.delete(bucketKey);
+    }
+  }
   const existing = buckets.get(key);
   const refillPerMs = limit / windowMs;
 
@@ -79,6 +88,17 @@ export function agentRateLimitKey(request: Request): string {
   const token = match?.[1] ?? "";
   const keyPart = token ? token.slice(0, 16) : "anon";
   return `v1:${ip}:${keyPart}`;
+}
+
+export function guestRateLimitKey(
+  request: Request,
+  tokenPrefix = "anonymous",
+): string {
+  return `guest:${clientIpFromHeaders(request.headers)}:${tokenPrefix}`;
+}
+
+export function pairingRateLimitKey(request: Request): string {
+  return `pairing:${clientIpFromHeaders(request.headers)}`;
 }
 
 export function rateLimitHeaders(result: RateLimitResult): HeadersInit {

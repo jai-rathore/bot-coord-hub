@@ -1,34 +1,10 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { getDiscoveryDocument, prefersJson } from "@/lib/discovery";
-import {
-  agentRateLimitKey,
-  rateLimit,
-  rateLimitHeaders,
-} from "@/lib/rate-limit";
 
 const isProtectedRoute = createRouteMatcher(["/app(.*)"]);
-const isAgentApi = createRouteMatcher(["/api/v1(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
-  // Light token-bucket rate limit for the whole agent surface (IP + key prefix).
-  if (isAgentApi(req)) {
-    const result = rateLimit(agentRateLimitKey(req));
-    if (!result.ok) {
-      return NextResponse.json(
-        {
-          error: "Rate limit exceeded",
-          code: "rate_limited",
-          retryAfterSec: result.retryAfterSec,
-        },
-        {
-          status: 429,
-          headers: rateLimitHeaders(result),
-        },
-      );
-    }
-  }
-
   // Agent discovery on homepage without breaking human HTML.
   if (
     req.method === "GET" &&

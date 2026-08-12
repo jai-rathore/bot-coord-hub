@@ -43,7 +43,13 @@ export async function requireAgent(
   if (!rate.ok) return rateLimitedJson(rate);
 
   const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  if (!auth) {
+    const base = requestBaseUrl(request);
+    return unauthorizedJson(
+      "Unauthorized",
+      `${base}/.well-known/oauth-protected-resource`,
+    );
+  }
 
   // Stash headers for callers that want to forward them.
   void rateLimitHeaders(rate);

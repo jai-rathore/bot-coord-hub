@@ -20,7 +20,8 @@ export { GoogleCalendarPort } from "./google";
 
 /**
  * Resolve CalendarPort for a user.
- * Google when env enabled + user connected; otherwise MockCalendar.
+ * Google when connected. MockCalendar is allowed only outside production
+ * unless an explicit test-only override is set.
  */
 export async function getCalendarPortForUser(
   userId: string,
@@ -30,6 +31,17 @@ export async function getCalendarPortForUser(
     if (conn?.refreshToken) {
       return new GoogleCalendarPort(conn);
     }
+  }
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.ALLOW_MOCK_CALENDAR !== "true"
+  ) {
+    throw Object.assign(
+      new Error(
+        "A connected calendar is required. HoneyMatcha never simulates production bookings.",
+      ),
+      { status: 409, code: "calendar_not_connected" },
+    );
   }
   return new MockCalendar();
 }
