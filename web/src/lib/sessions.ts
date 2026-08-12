@@ -1,14 +1,22 @@
-import { and, asc, desc, eq, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   links,
   sessionMessages,
+  sessionParticipants,
   sessions,
   users,
   type Session,
   type SessionMessage,
   type User,
 } from "@/db/schema";
+
+export type PublicParticipant = {
+  userId: string;
+  email: string;
+  role: string;
+  voteStatus: string;
+};
 
 export type PublicSession = {
   id: string;
@@ -21,6 +29,8 @@ export type PublicSession = {
   createdAt: string;
   updatedAt: string;
   peer: { id: string; email: string; name: string | null } | null;
+  participants: PublicParticipant[];
+  multiParty: boolean;
 };
 
 export type PublicMessage = {
@@ -93,18 +103,51 @@ export function assertSessionParticipant(session: Session, userId: string) {
   }
 }
 
+async function isSessionParticipant(
+  session: Session,
+  userId: string,
+): Promise<boolean> {
+  if (session.initiatorUserId === userId || session.peerUserId === userId) {
+    return true;
+  }
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(sessionParticipants)
+    .where(
+      and(
+        eq(sessionParticipants.sessionId, session.id),
+        eq(sessionParticipants.userId, userId),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
 export async function listSessionsForUser(
   user: User,
 ): Promise<PublicSession[]> {
   const db = getDb();
+  const partRows = await db
+    .select({ sessionId: sessionParticipants.sessionId })
+    .from(sessionParticipants)
+    .where(eq(sessionParticipants.userId, user.id));
+  const partIds = partRows.map((r) => r.sessionId);
+
   const rows = await db
     .select()
     .from(sessions)
     .where(
-      or(
-        eq(sessions.initiatorUserId, user.id),
-        eq(sessions.peerUserId, user.id),
-      ),
+      partIds.length > 0
+        ? or(
+            eq(sessions.initiatorUserId, user.id),
+            eq(sessions.peerUserId, user.id),
+            inArray(sessions.id, partIds),
+          )
+        : or(
+            eq(sessions.initiatorUserId, user.id),
+            eq(sessions.peerUserId, user.id),
+          ),
     )
     .orderBy(desc(sessions.updatedAt));
 
@@ -121,11 +164,28 @@ export async function listSessionsForUser(
     if (found[0]) peerMap.set(id, found[0]);
   }
 
+  const ids = rows.map((r) => r.id);
+  const allParts =
+    ids.length === 0
+      ? []
+      : await db
+          .select()
+          .from(sessionParticipants)
+          .where(inArray(sessionParticipants.sessionId, ids));
+
   return rows.map((row) => {
     const peerId =
       row.initiatorUserId === user.id ? row.peerUserId : row.initiatorUserId;
     const peer = peerId ? peerMap.get(peerId) ?? null : null;
-    return toPublicSession(row, peer);
+    const participants = allParts
+      .filter((p) => p.sessionId === row.id)
+      .map((p) => ({
+        userId: p.userId,
+        email: p.email,
+        role: p.role,
+        voteStatus: p.voteStatus,
+      }));
+    return toPublicSession(row, peer, participants);
   });
 }
 
@@ -192,7 +252,7 @@ export async function createSessionForUser(opts: {
     peer = found[0] ?? null;
   }
 
-  return toPublicSession(created, peer);
+  return toPublicSession(created, peer, []);
 }
 
 export async function getSessionForUser(
@@ -209,7 +269,11 @@ export async function getSessionForUser(
   if (!session) {
     throw Object.assign(new Error("Session not found"), { status: 404 });
   }
-  assertSessionParticipant(session, userId);
+  if (!(await isSessionParticipant(session, userId))) {
+    throw Object.assign(new Error("Not a participant on this session"), {
+      status: 403,
+    });
+  }
   return session;
 }
 
@@ -258,7 +322,11 @@ export async function postSessionMessage(opts: {
   return toPublicMessage(created);
 }
 
-function toPublicSession(session: Session, peer: User | null): PublicSession {
+function toPublicSession(
+  session: Session,
+  peer: User | null,
+  participants: PublicParticipant[] = [],
+): PublicSession {
   return {
     id: session.id,
     intentType: session.intentType,
@@ -272,6 +340,8 @@ function toPublicSession(session: Session, peer: User | null): PublicSession {
     peer: peer
       ? { id: peer.id, email: peer.email, name: peer.name }
       : null,
+    participants,
+    multiParty: participants.length >= 3,
   };
 }
 

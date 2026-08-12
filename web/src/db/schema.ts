@@ -7,6 +7,7 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  boolean,
 } from "drizzle-orm/pg-core";
 
 export const intentStatusEnum = pgEnum("intent_status", [
@@ -35,6 +36,26 @@ export const confirmStatusEnum = pgEnum("confirm_status", [
   "approved",
   "denied",
 ]);
+
+export const participantRoleEnum = pgEnum("participant_role", [
+  "organizer",
+  "invitee",
+]);
+
+/** Optional working-hours policy on a link. */
+export type AllowedHours = {
+  start: string;
+  end: string;
+  /** 0=Sun … 6=Sat; omit = all days */
+  days?: number[];
+};
+
+export type SessionSlot = {
+  start: string;
+  end: string;
+  timezone: string;
+  rank?: number;
+};
 
 export const users = pgTable(
   "users",
@@ -96,6 +117,12 @@ export const links = pgTable(
     scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
     /** Points at the reciprocal row once a link is mutual/active. */
     pairLinkId: uuid("pair_link_id"),
+    /** When true, schedule_meeting waits for human confirms before booking. */
+    confirmRequired: boolean("confirm_required").notNull().default(true),
+    /** Optional IANA timezone for allowed_hours evaluation. */
+    timezone: text("timezone"),
+    /** Optional working-hours policy JSON. */
+    allowedHours: jsonb("allowed_hours").$type<AllowedHours | null>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -136,6 +163,38 @@ export const sessions = pgTable(
   (t) => [
     index("sessions_initiator_user_id_idx").on(t.initiatorUserId),
     index("sessions_peer_user_id_idx").on(t.peerUserId),
+    index("sessions_status_idx").on(t.status),
+  ],
+);
+
+export const sessionParticipants = pgTable(
+  "session_participants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: participantRoleEnum("role").notNull().default("invitee"),
+    linkId: uuid("link_id").references(() => links.id, {
+      onDelete: "set null",
+    }),
+    /** pending | offered | accepted | declined */
+    voteStatus: text("vote_status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("session_participants_session_user_uidx").on(
+      t.sessionId,
+      t.userId,
+    ),
+    index("session_participants_session_id_idx").on(t.sessionId),
+    index("session_participants_user_id_idx").on(t.userId),
   ],
 );
 
@@ -270,12 +329,45 @@ export const confirms = pgTable(
   ],
 );
 
+/** Per-user Google Calendar OAuth tokens (encrypted-at-rest optional later). */
+export const calendarConnections = pgTable(
+  "calendar_connections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull().default("google"),
+    googleAccountEmail: text("google_account_email"),
+    accessToken: text("access_token").notNull(),
+    refreshToken: text("refresh_token").notNull(),
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    scopes: text("scopes"),
+    calendarId: text("calendar_id").notNull().default("primary"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("calendar_connections_user_provider_uidx").on(
+      t.userId,
+      t.provider,
+    ),
+    index("calendar_connections_user_id_idx").on(t.userId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type Link = typeof links.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type SessionMessage = typeof sessionMessages.$inferSelect;
+export type SessionParticipant = typeof sessionParticipants.$inferSelect;
 export type Confirm = typeof confirms.$inferSelect;
 export type IntentType = typeof intentTypes.$inferSelect;
 export type IntentProposal = typeof intentProposals.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type CalendarConnection = typeof calendarConnections.$inferSelect;

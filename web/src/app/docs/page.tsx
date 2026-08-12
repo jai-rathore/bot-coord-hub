@@ -279,16 +279,20 @@ curl -s "$BASE/api/mcp" \\
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
                 request_schedule_meeting
               </code>{" "}
-              creates a session + human confirm gate. It does{" "}
-              <strong className="font-semibold text-ink">not</strong> auto-book
-              calendar yet (calendar port stub).
+              proposes times from free/busy (MockCalendar or Google), then opens
+              a human confirm gate. Supports{" "}
+              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
+                peerEmails
+              </code>{" "}
+              for 3+ participants.
             </li>
             <li className="relative pl-[1.15rem]">
               <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
                 respond_confirm
               </code>{" "}
-              is human-gated — call only after your human approves. Dashboard:{" "}
+              is human-gated — call only after your human approves. When all
+              participants approve, CalendarPort books the event. Dashboard:{" "}
               <Link href="/app/confirm">/app/confirm</Link>.
             </li>
             <li className="relative pl-[1.15rem]">

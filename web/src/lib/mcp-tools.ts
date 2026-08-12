@@ -55,7 +55,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "create_invite",
     description:
-      "Create a peer invite handshake URL. Share inviteUrl/inviteCode with a friend’s bot/human so they can accept.",
+      "Create a peer invite handshake URL. Share inviteUrl/inviteCode with a friend’s bot/human so they can accept. Optional per-link policies: confirmRequired, timezone, allowedHours.",
     inputSchema: {
       type: "object",
       properties: {
@@ -70,6 +70,19 @@ export const MCP_TOOLS: McpToolDef[] = [
           items: { type: "string" },
           description:
             'Optional scopes (default: ["schedule_meeting","avail.read_freebusy"])',
+        },
+        confirmRequired: {
+          type: "boolean",
+          description: "Require human confirms before booking (default true)",
+        },
+        timezone: {
+          type: "string",
+          description: "IANA timezone for allowedHours evaluation",
+        },
+        allowedHours: {
+          type: "object",
+          description: '{ start: "09:00", end: "17:00", days?: number[] }',
+          additionalProperties: true,
         },
       },
     },
@@ -156,11 +169,16 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "request_schedule_meeting",
     description:
-      "Start a schedule_meeting session with an active peer link and create a human confirm gate. Does NOT auto-book calendar (calendar port stub).",
+      "Start schedule_meeting with linked peers: free/busy propose → human confirm gate → CalendarPort book (Mock or Google + Meet). Use peerEmails for 3+ participants.",
     inputSchema: {
       type: "object",
       properties: {
         peerEmail: { type: "string" },
+        peerEmails: {
+          type: "array",
+          items: { type: "string" },
+          description: "Group coordination — 2+ peer emails (organizer implied)",
+        },
         linkId: { type: "string" },
         durationMinutes: { type: "number" },
         windowStart: { type: "string", description: "ISO datetime" },
@@ -184,7 +202,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "respond_confirm",
     description:
-      "Record a human decision on a confirm gate (approve|decline|defer). Call only after explicit human OK. Does not book calendar.",
+      "Record a human decision on a confirm gate (approve|decline|defer). Call only after explicit human OK. When all schedule_meeting participants approve, books via CalendarPort (Meet when Google connected).",
     inputSchema: {
       type: "object",
       properties: {
@@ -230,6 +248,11 @@ export async function dispatchMcpTool(
           toEmail: args.toEmail as string | undefined,
           toName: args.toName as string | undefined,
           scopes: args.scopes as string[] | undefined,
+          confirmRequired: args.confirmRequired as boolean | undefined,
+          timezone: args.timezone as string | undefined,
+          allowedHours: args.allowedHours as
+            | { start: string; end: string; days?: number[] }
+            | undefined,
         },
         baseUrl,
       );
@@ -260,6 +283,7 @@ export async function dispatchMcpTool(
     case "request_schedule_meeting":
       return requestScheduleMeeting(auth, {
         peerEmail: args.peerEmail as string | undefined,
+        peerEmails: args.peerEmails as string[] | undefined,
         linkId: args.linkId as string | undefined,
         durationMinutes: args.durationMinutes as number | undefined,
         windowStart: args.windowStart as string | undefined,

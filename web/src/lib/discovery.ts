@@ -60,7 +60,7 @@ export function getDiscoveryDocument(baseUrl?: string) {
     },
     intents: ["schedule_meeting"],
     agent_instructions:
-      "1) Human creates an API key at /app/keys (hm_...). 2) Call GET /api/v1/me with Authorization: Bearer <key>. 3) Share an invite URL (/invite/{code}) with a friend’s bot/human, accept to form mutual links, then use sessions/board + confirms. Or use MCP tools at /api/mcp. request_schedule_meeting creates a human confirm gate; calendar auto-book is stubbed. Share free/busy only; never peer event titles.",
+      "1) Human creates an API key at /app/keys (hm_...). 2) Call GET /api/v1/me with Authorization: Bearer <key>. 3) Share an invite URL (/invite/{code}) with a friend’s bot/human, accept to form mutual links, then use sessions/board + confirms. Or use MCP tools at /api/mcp. request_schedule_meeting (peerEmails for 3+) proposes from free/busy, opens a human confirm gate, then books via CalendarPort (Mock or per-user Google + Meet). Humans connect Google at /app/settings. Share free/busy only; never peer event titles. Docs: web/docs/SCHEDULE_MEETING.md.",
     skill: {
       path: "skills/honeymatcha/SKILL.md",
       name: "honeymatcha",

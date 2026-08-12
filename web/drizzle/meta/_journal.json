@@ -22,6 +22,13 @@
       "when": 1786517737872,
       "tag": "0002_intent_triage_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786520000000,
+      "tag": "0003_schedule_calendar",
+      "breakpoints": true
     }
   ]
 }

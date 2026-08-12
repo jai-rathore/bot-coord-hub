@@ -11,6 +11,7 @@ const NAV: Array<{ href: string; label: string; exact?: boolean }> = [
   { href: "/app/activity", label: "Activity" },
   { href: "/app/intents", label: "Intents" },
   { href: "/app/confirm", label: "Confirm" },
+  { href: "/app/settings", label: "Settings" },
 ];
 
 export function AppNav() {
