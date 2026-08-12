@@ -72,16 +72,20 @@ Raw keys are shown once on create; only SHA-256 hashes are stored.
 
 ## Render deploy notes
 
-Do **not** require production deploy for this foundation PR. When ready:
-
-1. Create a **Web Service** from this repo.
+1. Create a **Web Service** from this repo (or use the `honeymatcha-web` entry in root `render.yaml`).
 2. **Root Directory**: `web`
-3. **Build**: `npm install && npm run db:migrate && npm run db:seed && npm run build`
-4. **Start**: `npm run start` (Next binds to `PORT`; Render sets this)
-5. Attach **Render Postgres** and set `DATABASE_URL` to the internal connection string.
-6. Add Clerk env vars (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`).
-7. In Clerk Dashboard, add the Render URL to allowed origins / redirect URLs.
-8. Remember: filesystem is ephemeral — use Postgres, not local files.
+3. **Build**: `npm install && npm run build`  
+   Do **not** migrate/seed during build — the internal `DATABASE_URL` is not reachable from Render’s build environment.
+4. **Start**: `npm run start` (Next binds to `0.0.0.0:$PORT`)
+5. Set `DATABASE_URL` to the **External** Database URL (or Internal at runtime only).  
+   The Drizzle/`postgres.js` client enables SSL (`sslmode=require`) for non-local hosts so the External URL works.
+6. After the first deploy (or when schema changes), run migrate + seed from a shell that can reach Postgres, e.g. Render Shell / one-off job:
+   ```bash
+   npm run db:migrate && npm run db:seed
+   ```
+7. Add Clerk env vars (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`).
+8. In Clerk Dashboard, add the Render URL to allowed origins / redirect URLs.
+9. Filesystem is ephemeral — use Postgres, not local files.
 
 Optional: keep the existing hub (`src/`) as a separate Render service until the product API fully replaces it.
 
