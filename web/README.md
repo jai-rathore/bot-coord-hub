@@ -51,13 +51,16 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Path | Access | Notes |
 |------|--------|-------|
-| `/` | Public | Marketing homepage |
+| `/` | Public | Marketing homepage (JSON if `Accept: application/json`) |
+| `/docs` | Public | Agent connect docs (curl + MCP) |
+| `/.well-known/honeymatcha.json` | Public | Machine-readable discovery |
 | `/sign-in`, `/sign-up` | Public | Clerk |
 | `/intents` | Public | Registry browse + propose (propose requires sign-in) |
 | `/app/**` | Clerk protected | Dashboard shell |
 | `/app/keys` | Auth | Create / list / revoke hashed API keys |
-| `/api/v1/me` | Bearer API key | Agent key health |
-| `/api/v1/links` | Bearer API key | List links (stub) |
+| `/api/v1/*` | Bearer API key | Agent API (me, links, sessions, intents, schedule, confirms) |
+| `/api/v1/openapi` | Public | OpenAPI-ish map |
+| `/api/mcp` | Bearer API key | MCP JSON-RPC (`tools/list`, `tools/call`) |
 
 Stub dashboard pages (Links, Activity, Confirm) have clear TODOs; schema already supports them.
 
@@ -66,9 +69,20 @@ Stub dashboard pages (Links, Activity, Confirm) have clear TODOs; schema already
 ```bash
 curl -s http://localhost:3000/api/v1/me \
   -H "Authorization: Bearer hm_..."
+
+curl -s http://localhost:3000/api/v1/intents \
+  -H "Authorization: Bearer hm_..."
 ```
 
 Raw keys are shown once on create; only SHA-256 hashes are stored.
+
+## MCP
+
+- **HTTP**: `POST /api/mcp` with Bearer `hm_...` (see `/docs`)
+- **Stdio**: `node mcp/server.mjs` with `HONEYMATCHA_BASE_URL` + `HONEYMATCHA_API_KEY` (see [`mcp/README.md`](./mcp/README.md))
+- **Skill**: [`../skills/honeymatcha/SKILL.md`](../skills/honeymatcha/SKILL.md)
+
+`request_schedule_meeting` (`POST /api/v1/schedule`) creates a session + human confirm gate. Calendar auto-book is stubbed until a calendar port is connected.
 
 ## Render deploy notes
 
