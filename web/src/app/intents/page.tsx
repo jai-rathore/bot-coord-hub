@@ -16,6 +16,10 @@ export default async function IntentsPage() {
     description: string | null;
     status: "pending" | "live" | "rejected";
     rejectionReason: string | null;
+    triageRecommendation: "publish" | "reject" | "needs_review" | null;
+    triageReason: string | null;
+    triagedAt: string | null;
+    proposedByUserId: string | null;
     createdAt: string;
   }> = [];
   let dbError: string | null = null;
@@ -24,6 +28,7 @@ export default async function IntentsPage() {
     const rows = await listRegistryIntents();
     items = rows.map((r) => ({
       ...r,
+      triagedAt: r.triagedAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
     }));
   } catch (err) {
@@ -44,8 +49,13 @@ export default async function IntentsPage() {
           Intent registry
         </h1>
         <p className="mt-2 max-w-xl text-muted">
-          Live, pending, and rejected coordination intents. Propose new ones —
-          we warn on name/slug collisions.
+          Live, pending, and rejected coordination intents. Proposals start
+          pending, get a triage note, then a human publishes or rejects.
+          Moderators:{" "}
+          <Link href="/app/intents" className="font-medium text-matcha-deep">
+            /app/intents
+          </Link>
+          .
         </p>
 
         {dbError ? (

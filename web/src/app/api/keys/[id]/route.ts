@@ -1,12 +1,17 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { apiKeys } from "@/db/schema";
+import { writeAudit } from "@/lib/audit";
 import { ensureCurrentUser } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
+/**
+ * Revoke an API key. authenticateAgent filters revoked_at IS NULL on every
+ * request — revoke takes effect immediately (no key cache).
+ */
 export async function DELETE(_request: Request, { params }: Params) {
   const user = await ensureCurrentUser();
   if (!user) {
@@ -26,7 +31,12 @@ export async function DELETE(_request: Request, { params }: Params) {
         isNull(apiKeys.revokedAt),
       ),
     )
-    .returning({ id: apiKeys.id, revokedAt: apiKeys.revokedAt });
+    .returning({
+      id: apiKeys.id,
+      revokedAt: apiKeys.revokedAt,
+      keyPrefix: apiKeys.keyPrefix,
+      name: apiKeys.name,
+    });
 
   if (!updated) {
     return Response.json(
@@ -34,6 +44,14 @@ export async function DELETE(_request: Request, { params }: Params) {
       { status: 404 },
     );
   }
+
+  await writeAudit({
+    actorUserId: user.id,
+    action: "api_key.revoked",
+    entityType: "api_key",
+    entityId: updated.id,
+    metadata: { name: updated.name, keyPrefix: updated.keyPrefix },
+  });
 
   return Response.json({ key: updated });
 }

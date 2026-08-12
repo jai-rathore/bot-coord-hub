@@ -177,6 +177,12 @@ export const intentTypes = pgTable(
   (t) => [uniqueIndex("intent_types_slug_uidx").on(t.slug)],
 );
 
+export const triageRecommendationEnum = pgEnum("triage_recommendation", [
+  "publish",
+  "reject",
+  "needs_review",
+]);
+
 export const intentProposals = pgTable(
   "intent_proposals",
   {
@@ -190,6 +196,17 @@ export const intentProposals = pgTable(
       onDelete: "set null",
     }),
     proposedByEmail: text("proposed_by_email"),
+    /** Set on create — worker claims rows where triaged_at IS NULL. */
+    triageQueuedAt: timestamp("triage_queued_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    triageRecommendation: triageRecommendationEnum("triage_recommendation"),
+    triageReason: text("triage_reason"),
+    triagedAt: timestamp("triaged_at", { withTimezone: true }),
+    decidedByUserId: uuid("decided_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -200,6 +217,30 @@ export const intentProposals = pgTable(
   (t) => [
     uniqueIndex("intent_proposals_slug_uidx").on(t.slug),
     index("intent_proposals_status_idx").on(t.status),
+    index("intent_proposals_triage_queue_idx").on(t.triageQueuedAt, t.triagedAt),
+  ],
+);
+
+/** Append-only audit trail for consequential actions. */
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorUserId: uuid("actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("audit_logs_actor_user_id_idx").on(t.actorUserId),
+    index("audit_logs_entity_idx").on(t.entityType, t.entityId),
+    index("audit_logs_created_at_idx").on(t.createdAt),
   ],
 );
 
@@ -237,3 +278,4 @@ export type SessionMessage = typeof sessionMessages.$inferSelect;
 export type Confirm = typeof confirms.$inferSelect;
 export type IntentType = typeof intentTypes.$inferSelect;
 export type IntentProposal = typeof intentProposals.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;

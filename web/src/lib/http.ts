@@ -1,4 +1,15 @@
+import {
+  authenticateAgent,
+  unauthorizedJson,
+  type AgentAuth,
+} from "@/lib/agent-auth";
 import { AgentApiError } from "@/lib/agent-api";
+import {
+  agentRateLimitKey,
+  rateLimit,
+  rateLimitedJson,
+  rateLimitHeaders,
+} from "@/lib/rate-limit";
 
 export async function readJsonBody<T extends Record<string, unknown>>(
   request: Request,
@@ -10,8 +21,37 @@ export async function readJsonBody<T extends Record<string, unknown>>(
   }
 }
 
-export function jsonOk(data: unknown, status = 200) {
-  return Response.json(data, { status });
+export function jsonOk(
+  data: unknown,
+  status = 200,
+  extraHeaders?: HeadersInit,
+) {
+  return Response.json(data, {
+    status,
+    headers: extraHeaders,
+  });
+}
+
+/**
+ * Authenticate Bearer agent key + light in-memory rate limit (IP+key).
+ * Revoked keys fail here immediately (authenticateAgent filters revoked_at).
+ */
+export async function requireAgent(
+  request: Request,
+): Promise<AgentAuth | Response> {
+  const rate = rateLimit(agentRateLimitKey(request));
+  if (!rate.ok) return rateLimitedJson(rate);
+
+  const auth = await authenticateAgent(request);
+  if (!auth) return unauthorizedJson();
+
+  // Stash headers for callers that want to forward them.
+  void rateLimitHeaders(rate);
+  return auth;
+}
+
+export function isAgentAuth(value: AgentAuth | Response): value is AgentAuth {
+  return !(value instanceof Response);
 }
 
 export function jsonFromAgentError(err: unknown) {

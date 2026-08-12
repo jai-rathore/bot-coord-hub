@@ -178,6 +178,94 @@ curl -s "$BASE/api/mcp" \\
           </p>
         </section>
 
+        <section aria-labelledby="keys-title" className="mb-12" id="key-rotation">
+          <h2
+            id="keys-title"
+            className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
+          >
+            API key rotation
+          </h2>
+          <ol className="mt-4 grid list-none gap-3 p-0 text-[0.95rem] text-muted">
+            <li className="relative pl-[1.15rem]">
+              <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
+              Create a new key at{" "}
+              <Link href="/app/keys">/app/keys</Link> (copy the raw{" "}
+              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">hm_…</code>{" "}
+              secret once).
+            </li>
+            <li className="relative pl-[1.15rem]">
+              <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
+              Update your agent / MCP secrets (
+              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">HONEYMATCHA_API_KEY</code>
+              ) to the new value and verify{" "}
+              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">GET /api/v1/me</code>.
+            </li>
+            <li className="relative pl-[1.15rem]">
+              <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
+              Revoke the old key. Auth checks{" "}
+              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">revoked_at</code>{" "}
+              on every request — revoke takes effect immediately (no key cache).
+            </li>
+            <li className="relative pl-[1.15rem]">
+              <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
+              Create/revoke events are written to the append-only{" "}
+              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">audit_logs</code>{" "}
+              table (also invite accept, confirm decisions, intent publish/reject).
+            </li>
+          </ol>
+          <p className="mt-4 text-[0.95rem] text-muted">
+            Agent routes under{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">/api/v1/*</code>{" "}
+            are lightly rate-limited (token bucket by IP + key prefix; override with{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">AGENT_RATE_LIMIT_PER_MIN</code>
+            ).
+          </p>
+        </section>
+
+        <section aria-labelledby="triage-title" className="mb-12">
+          <h2
+            id="triage-title"
+            className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
+          >
+            Intent triage &amp; publish gate
+          </h2>
+          <ul className="mt-3 grid list-none gap-2 p-0 text-[0.95rem] text-muted">
+            <li className="relative pl-[1.15rem]">
+              <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
+              Proposals start <strong className="font-semibold text-ink">pending</strong> and
+              are enqueued for triage. Worker:{" "}
+              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+                POST /api/v1/intents/triage
+              </code>{" "}
+              with header{" "}
+              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+                X-Triage-Secret: $TRIAGE_SECRET
+              </code>
+              . Or use{" "}
+              <Link href="/app/intents">/app/intents</Link> → Run triage
+              (heuristic + optional{" "}
+              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">OPENAI_API_KEY</code>{" "}
+              /{" "}
+              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">GROK_API_KEY</code>
+              ).
+            </li>
+            <li className="relative pl-[1.15rem]">
+              <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
+              Triage writes a recommendation + reason only — it never auto-publishes.
+            </li>
+            <li className="relative pl-[1.15rem]">
+              <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
+              Proposer or{" "}
+              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">INTENT_ADMIN_EMAILS</code>{" "}
+              can publish → live or reject with reason.{" "}
+              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+                GET /api/v1/intents
+              </code>{" "}
+              returns live intents only.
+            </li>
+          </ul>
+        </section>
+
         <section aria-labelledby="schedule-title" className="mb-12">
           <h2
             id="schedule-title"

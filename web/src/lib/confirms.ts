@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { confirms, sessions, type Confirm, type User } from "@/db/schema";
+import { writeAudit } from "@/lib/audit";
 import { getSessionForUser, postSessionMessage } from "@/lib/sessions";
 
 export type PublicConfirm = {
@@ -175,6 +176,19 @@ export async function decideConfirm(opts: {
       .set({ status: "declined", updatedAt: now })
       .where(eq(sessions.id, session.id));
   }
+
+  await writeAudit({
+    actorUserId: opts.user.id,
+    action:
+      opts.decision === "approved" ? "confirm.approved" : "confirm.denied",
+    entityType: "confirm",
+    entityId: updated.id,
+    metadata: {
+      sessionId: updated.sessionId,
+      action: updated.action,
+      note: updated.note,
+    },
+  });
 
   return toPublicConfirm(updated, {
     ...session,

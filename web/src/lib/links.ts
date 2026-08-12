@@ -1,6 +1,7 @@
 import { and, desc, eq, or } from "drizzle-orm";
 import { getDb } from "@/db";
 import { links, users, type Link, type User } from "@/db/schema";
+import { writeAudit } from "@/lib/audit";
 import {
   DEFAULT_LINK_SCOPES,
   generateInviteCode,
@@ -192,6 +193,19 @@ export async function acceptInviteLink(opts: {
     .where(eq(links.id, pair.id));
 
   const pairWithPairId = { ...pair, pairLinkId: activated.id };
+
+  await writeAudit({
+    actorUserId: opts.user.id,
+    action: "invite.accepted",
+    entityType: "link",
+    entityId: activated.id,
+    metadata: {
+      inviteCode: code,
+      pairLinkId: pair.id,
+      fromUserId: inviter.id,
+      toUserId: opts.user.id,
+    },
+  });
 
   return {
     link: toPublicLink(activated, opts.user, opts.origin, inviter),

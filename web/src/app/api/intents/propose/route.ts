@@ -77,10 +77,14 @@ export async function POST(request: Request) {
         status: "pending",
         proposedByUserId: user.id,
         proposedByEmail: user.email,
+        triageQueuedAt: new Date(),
       })
       .returning();
 
-    return Response.json({ proposal }, { status: 201 });
+    return Response.json(
+      { proposal, triage: { queued: true } },
+      { status: 201 },
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Database error";
     if (message.includes("unique") || message.includes("duplicate")) {
