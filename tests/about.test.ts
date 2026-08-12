@@ -62,4 +62,21 @@ describe("GET / public about", () => {
     const me = await fetch(`${baseUrl}/v1/me`);
     assert.equal(me.status, 401);
   });
+
+  it("serves favicon without auth", async () => {
+    for (const path of ["/favicon.svg", "/favicon.ico"] as const) {
+      const res = await fetch(`${baseUrl}${path}`);
+      assert.equal(res.status, 200, path);
+      const ct = res.headers.get("content-type") ?? "";
+      assert.match(ct, /image\/svg\+xml/, path);
+      const body = await res.text();
+      assert.match(body, /<svg[\s>]/i, path);
+      assert.match(body, /#1f4a36|#3a6b4f|#c49a3c/, path);
+    }
+
+    const html = await (await fetch(`${baseUrl}/`)).text();
+    assert.match(html, /rel="icon"[^>]*href="\/favicon\.svg"/);
+    assert.match(html, /type="image\/svg\+xml"/);
+    assert.match(html, /rel="icon"[^>]*href="\/favicon\.ico"/);
+  });
 });
