@@ -1,10 +1,10 @@
-import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
 import { createInvite } from "@/lib/agent-api";
 import {
   jsonFromAgentError,
   jsonOk,
   readJsonBody,
   requestBaseUrl,
+  requireAgent,
 } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -12,17 +12,25 @@ export const dynamic = "force-dynamic";
 /**
  * Create a peer invite.
  * POST /api/v1/links/invite — Authorization: Bearer hm_...
- * Body: { toEmail?, toName?, scopes? } — omit toEmail for an open handshake URL.
+ * Body: { toEmail?, toName?, scopes?, confirmRequired?, timezone?, allowedHours? }
+ * Omit toEmail for an open handshake URL.
  */
 export async function POST(request: Request) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   try {
     let body: {
       toEmail?: string;
       toName?: string;
       scopes?: string[];
+      confirmRequired?: boolean;
+      timezone?: string | null;
+      allowedHours?: {
+        start: string;
+        end: string;
+        days?: number[];
+      } | null;
     } = {};
     try {
       body = await readJsonBody(request);

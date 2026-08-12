@@ -1,8 +1,15 @@
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { confirms, sessions, type Confirm, type User } from "@/db/schema";
+import {
+  confirms,
+  sessionParticipants,
+  sessions,
+  type Confirm,
+  type User,
+} from "@/db/schema";
 import { writeAudit } from "@/lib/audit";
 import { getSessionForUser, postSessionMessage } from "@/lib/sessions";
+import { tryBookAfterConfirmApprovals } from "@/lib/schedule-meeting";
 
 export type PublicConfirm = {
   id: string;
@@ -49,6 +56,30 @@ export async function listConfirmsForUser(
   return rows.map(({ confirm, session }) => toPublicConfirm(confirm, session));
 }
 
+async function isParticipant(sessionId: string, userId: string) {
+  const db = getDb();
+  const [session] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  if (!session) return false;
+  if (session.initiatorUserId === userId || session.peerUserId === userId) {
+    return true;
+  }
+  const [part] = await db
+    .select()
+    .from(sessionParticipants)
+    .where(
+      and(
+        eq(sessionParticipants.sessionId, sessionId),
+        eq(sessionParticipants.userId, userId),
+      ),
+    )
+    .limit(1);
+  return Boolean(part);
+}
+
 export async function requestConfirm(opts: {
   user: User;
   sessionId: string;
@@ -66,11 +97,7 @@ export async function requestConfirm(opts: {
   const session = await getSessionForUser(opts.sessionId, opts.user.id);
   const confirmUserId = opts.confirmUserId ?? opts.user.id;
 
-  // Confirm target must be a session participant.
-  if (
-    confirmUserId !== session.initiatorUserId &&
-    confirmUserId !== session.peerUserId
-  ) {
+  if (!(await isParticipant(session.id, confirmUserId))) {
     throw Object.assign(
       new Error("confirmUserId must be a session participant"),
       { status: 400 },
@@ -112,7 +139,7 @@ export async function decideConfirm(opts: {
   confirmId: string;
   decision: "approved" | "denied";
   note?: string | null;
-}): Promise<PublicConfirm> {
+}): Promise<PublicConfirm & { calendar?: Record<string, unknown> }> {
   const db = getDb();
   const rows = await db
     .select()
@@ -165,17 +192,19 @@ export async function decideConfirm(opts: {
     },
   });
 
-  if (opts.decision === "approved") {
-    await db
-      .update(sessions)
-      .set({ status: "confirmed", updatedAt: now })
-      .where(eq(sessions.id, session.id));
-  } else {
-    await db
-      .update(sessions)
-      .set({ status: "declined", updatedAt: now })
-      .where(eq(sessions.id, session.id));
-  }
+  await db
+    .update(sessionParticipants)
+    .set({
+      voteStatus: opts.decision === "approved" ? "accepted" : "declined",
+    })
+    .where(
+      and(
+        eq(sessionParticipants.sessionId, session.id),
+        eq(sessionParticipants.userId, opts.user.id),
+      ),
+    );
+
+  let calendar: Record<string, unknown> | undefined;
 
   await writeAudit({
     actorUserId: opts.user.id,
@@ -190,9 +219,45 @@ export async function decideConfirm(opts: {
     },
   });
 
+  if (opts.decision === "denied") {
+    await db
+      .update(sessions)
+      .set({ status: "declined", updatedAt: now })
+      .where(eq(sessions.id, session.id));
+    return {
+      ...toPublicConfirm(updated, { ...session, status: "declined" }),
+      calendar: { status: "cancelled", message: "Meeting declined." },
+    };
+  }
+
+  // approved — for schedule_meeting wait for all; otherwise confirm immediately
+  if (session.intentType === "schedule_meeting") {
+    const booking = await tryBookAfterConfirmApprovals(
+      opts.user,
+      session.id,
+    );
+    calendar = (booking?.calendar as Record<string, unknown>) ?? {
+      status: "awaiting_peer_confirms",
+    };
+    const [fresh] = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, session.id))
+      .limit(1);
+    return {
+      ...toPublicConfirm(updated, fresh ?? session),
+      calendar,
+    };
+  }
+
+  await db
+    .update(sessions)
+    .set({ status: "confirmed", updatedAt: now })
+    .where(eq(sessions.id, session.id));
+
   return toPublicConfirm(updated, {
     ...session,
-    status: opts.decision === "approved" ? "confirmed" : "declined",
+    status: "confirmed",
   });
 }
 

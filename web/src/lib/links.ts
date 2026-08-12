@@ -1,6 +1,12 @@
 import { and, desc, eq, or } from "drizzle-orm";
 import { getDb } from "@/db";
-import { links, users, type Link, type User } from "@/db/schema";
+import {
+  links,
+  users,
+  type AllowedHours,
+  type Link,
+  type User,
+} from "@/db/schema";
 import { writeAudit } from "@/lib/audit";
 import {
   DEFAULT_LINK_SCOPES,
@@ -19,6 +25,9 @@ export type PublicLink = {
   toEmail: string | null;
   toName: string | null;
   pairLinkId: string | null;
+  confirmRequired: boolean;
+  timezone: string | null;
+  allowedHours: AllowedHours | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -33,6 +42,9 @@ export async function createInviteLink(opts: {
   toEmail?: string | null;
   toName?: string | null;
   scopes?: string[];
+  confirmRequired?: boolean;
+  timezone?: string | null;
+  allowedHours?: AllowedHours | null;
   origin: string;
 }): Promise<PublicLink> {
   const toEmail = normalizeEmail(opts.toEmail);
@@ -77,10 +89,52 @@ export async function createInviteLink(opts: {
       inviteCode,
       status: "pending",
       scopes,
+      confirmRequired: opts.confirmRequired ?? true,
+      timezone: opts.timezone ?? null,
+      allowedHours: opts.allowedHours ?? null,
     })
     .returning();
 
   return toPublicLink(created, opts.fromUser, opts.origin, null);
+}
+
+export async function updateLinkPolicyForUser(opts: {
+  user: User;
+  linkId: string;
+  confirmRequired?: boolean;
+  timezone?: string | null;
+  allowedHours?: AllowedHours | null;
+  origin: string;
+}): Promise<PublicLink> {
+  const db = getDb();
+  const [link] = await db
+    .select()
+    .from(links)
+    .where(eq(links.id, opts.linkId))
+    .limit(1);
+  if (!link) {
+    throw Object.assign(new Error("Link not found"), { status: 404 });
+  }
+  if (link.fromUserId !== opts.user.id && link.toUserId !== opts.user.id) {
+    throw Object.assign(new Error("Not a party on this link"), { status: 403 });
+  }
+
+  const [updated] = await db
+    .update(links)
+    .set({
+      ...(opts.confirmRequired !== undefined
+        ? { confirmRequired: opts.confirmRequired }
+        : {}),
+      ...(opts.timezone !== undefined ? { timezone: opts.timezone } : {}),
+      ...(opts.allowedHours !== undefined
+        ? { allowedHours: opts.allowedHours }
+        : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(links.id, opts.linkId))
+    .returning();
+
+  return toPublicLink(updated, opts.user, opts.origin, null);
 }
 
 export async function acceptInviteLink(opts: {
@@ -170,6 +224,9 @@ export async function acceptInviteLink(opts: {
       inviteCode: pairCode,
       status: "active",
       scopes: invite.scopes,
+      confirmRequired: invite.confirmRequired,
+      timezone: invite.timezone,
+      allowedHours: invite.allowedHours,
       updatedAt: now,
     })
     .returning();
@@ -369,6 +426,9 @@ function toPublicLink(
     toEmail: link.toEmail,
     toName: link.toName,
     pairLinkId: link.pairLinkId,
+    confirmRequired: link.confirmRequired,
+    timezone: link.timezone,
+    allowedHours: link.allowedHours ?? null,
     createdAt: link.createdAt.toISOString(),
     updatedAt: link.updatedAt.toISOString(),
   };

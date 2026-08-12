@@ -1,6 +1,10 @@
-import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
 import { respondConfirm } from "@/lib/agent-api";
-import { jsonFromAgentError, jsonOk, readJsonBody } from "@/lib/http";
+import {
+  jsonFromAgentError,
+  jsonOk,
+  readJsonBody,
+  requireAgent,
+} from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -8,10 +12,12 @@ export const dynamic = "force-dynamic";
  * Respond to a confirm gate after human OK.
  * POST /api/v1/confirms/respond — Authorization: Bearer hm_...
  * Body: { action: approve|decline|defer, confirmId?|sessionId?, note? }
+ *
+ * When all participants approve, CalendarPort books the event.
  */
 export async function POST(request: Request) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   try {
     const body = await readJsonBody<{

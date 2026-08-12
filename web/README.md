@@ -65,6 +65,9 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/app/links` | Auth | Create invite URLs, accept codes, revoke mutual links |
 | `/app/activity` | Auth | Session list + plain-English messages (raw JSON toggle) |
 | `/app/confirm` | Auth | Approve / deny pending confirms |
+| `/app/settings` | Auth | Connect Google Calendar |
+| `/api/google/start` | Auth | Begin Google OAuth |
+| `/api/google/callback` | Public (OAuth) | OAuth redirect |
 | `/api/v1/*` | Bearer API key | Agent API (me, links, sessions, intents, schedule, confirms) |
 | `/api/v1/openapi` | Public | OpenAPI-ish map |
 | `/api/mcp` | Bearer API key | MCP JSON-RPC (`tools/list`, `tools/call`) |
@@ -81,15 +84,21 @@ curl -s http://localhost:3000/api/v1/intents \
   -H "Authorization: Bearer hm_..."
 ```
 
-Raw keys are shown once on create; only SHA-256 hashes are stored.
+Raw keys are shown once on create; only SHA-256 hashes are stored. Revoke soft-sets `revoked_at`. Auth updates `last_used_at`. Agent routes are lightly rate-limited.
+
+## schedule_meeting + Google Calendar
+
+Documented flow: [`docs/SCHEDULE_MEETING.md`](./docs/SCHEDULE_MEETING.md).
+
+`POST /api/v1/schedule` → free/busy propose → human confirm gate → book on all approvals via **CalendarPort** (`MockCalendar` or per-user **Google** with Meet). Supports `peerEmails` for 3+. Per-link policies: `confirmRequired`, `timezone`, `allowedHours`.
+
+Humans connect Google at `/app/settings` (`GOOGLE_CALENDAR_ENABLED`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`).
 
 ## MCP
 
 - **HTTP**: `POST /api/mcp` with Bearer `hm_...` (see `/docs`)
 - **Stdio**: `node mcp/server.mjs` with `HONEYMATCHA_BASE_URL` + `HONEYMATCHA_API_KEY` (see [`mcp/README.md`](./mcp/README.md))
 - **Skill**: [`../skills/honeymatcha/SKILL.md`](../skills/honeymatcha/SKILL.md)
-
-`request_schedule_meeting` (`POST /api/v1/schedule`) creates a session + human confirm gate. Calendar auto-book is stubbed until a calendar port is connected.
 
 ## Render deploy notes
 
@@ -114,10 +123,12 @@ Optional: keep the existing hub (`src/`) as a separate Render service until the 
 
 - `users` — Clerk user sync
 - `api_keys` — hashed agent secrets (revoke sets `revoked_at`; auth rejects immediately)
-- `links` — mutual peer links (`pair_link_id`, open invites allowed)
+- `links` — mutual peer links (`pair_link_id`, open invites, `confirm_required` / `timezone` / `allowed_hours`)
 - `sessions` / `session_messages` — coordination boards
+- `session_participants` — multi-party (3+) membership
 - `intent_types` / `intent_proposals` — registry (`pending` \| `live` \| `rejected`); proposals carry triage recommendation/reason
 - `confirms` — human confirmation queue (`pending` \| `approved` \| `denied`)
 - `audit_logs` — append-only (key create/revoke, invite accept, confirm decisions, intent publish/reject/triage)
+- `calendar_connections` — per-user Google OAuth tokens
 
 Agent surface `/api/v1/*` is lightly rate-limited (IP + key). Intent triage worker: `POST /api/v1/intents/triage` with `TRIAGE_SECRET`. Publish gate UI: `/app/intents`.
