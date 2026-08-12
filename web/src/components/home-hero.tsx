@@ -67,7 +67,7 @@ function SignedInHero() {
       <div className="animate-rise-delay-3 mt-5">
         <Link
           href="/app/keys"
-          className="inline-flex items-center justify-center rounded-md border border-matcha-deep bg-matcha-deep px-[1.05rem] py-[0.7rem] text-[0.95rem] font-semibold text-[#f7faf6] no-underline transition hover:-translate-y-px hover:border-matcha hover:bg-matcha"
+          className="inline-flex items-center justify-center rounded-md border border-matcha-deep bg-matcha-deep px-[1.05rem] py-[0.7rem] text-[0.95rem] font-semibold text-[#f7faf6] no-underline transition hover:-translate-y-px hover:border-matcha hover:bg-matcha hover:text-[#f7faf6]"
         >
           Create a key
         </Link>
@@ -110,7 +110,7 @@ function SignedOutHero() {
 
 export function HomeHero() {
   return (
-    <div className="relative z-10 mx-auto w-[min(40rem,calc(100%-2rem))] px-0 pb-10 pt-6 sm:pb-12 sm:pt-8">
+    <div className="relative z-0 mx-auto w-[min(40rem,calc(100%-2rem))] px-0 pb-10 pt-6 sm:pb-12 sm:pt-8">
       <h1 className="animate-rise font-[family-name:var(--font-fraunces)] text-[clamp(2.5rem,9vw,3.6rem)] font-bold leading-[1.02] tracking-[-0.03em] text-matcha-deep">
         <span className="bg-[linear-gradient(120deg,#1f4a36_0%,#3a6b4f_55%,#8a6b1f_100%)] bg-clip-text text-transparent">
           HoneyMatcha

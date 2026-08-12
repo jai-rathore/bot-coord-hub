@@ -8,6 +8,7 @@ import {
   SignUpButton,
   UserButton,
 } from "@clerk/nextjs";
+import { BrandLink } from "@/components/brand-link";
 
 const SECONDARY_LINKS = [
   { href: "/docs", label: "Docs" },
@@ -25,7 +26,7 @@ export function SiteHeader() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMenuOpen(false);
     };
-    const onPointerDown = (event: MouseEvent) => {
+    const onPointerDown = (event: PointerEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) {
         setMenuOpen(false);
       }
@@ -39,14 +40,20 @@ export function SiteHeader() {
     };
   }, [menuOpen]);
 
+  useEffect(() => {
+    // Close the mobile menu when crossing to desktop so items never “leak”
+    // into the hero after a viewport change.
+    const mq = window.matchMedia("(min-width: 640px)");
+    const onChange = () => {
+      if (mq.matches) setMenuOpen(false);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   return (
-    <header className="relative z-10 flex items-center justify-between gap-3 px-4 py-4 sm:gap-4 sm:px-6">
-      <Link
-        href="/"
-        className="font-[family-name:var(--font-fraunces)] text-lg font-semibold text-matcha-deep no-underline"
-      >
-        HoneyMatcha
-      </Link>
+    <header className="relative z-30 flex items-center justify-between gap-3 px-4 py-4 sm:gap-4 sm:px-6">
+      <BrandLink />
       <nav className="flex items-center gap-2 text-sm font-medium sm:gap-3">
         <div className="hidden items-center gap-3 sm:flex">
           {SECONDARY_LINKS.map((link) => (
@@ -97,7 +104,7 @@ export function SiteHeader() {
             <div
               id={menuId}
               role="menu"
-              className="absolute right-0 z-20 mt-2 min-w-[9.5rem] rounded-md border border-line bg-[rgba(255,252,246,0.96)] p-1 shadow-[0_8px_24px_rgba(31,74,54,0.12)] backdrop-blur-sm"
+              className="absolute right-0 z-40 mt-2 min-w-[10.5rem] rounded-md border border-line bg-[rgba(255,252,246,0.98)] p-1 shadow-[0_8px_24px_rgba(31,74,54,0.16)] backdrop-blur-sm"
             >
               {SECONDARY_LINKS.map((link) => (
                 <Link
@@ -135,7 +142,7 @@ export function SiteHeader() {
         <Show when="signed-in">
           <Link
             href="/app"
-            className="rounded-md border border-matcha-deep bg-matcha-deep px-2.5 py-1.5 text-[#f7faf6] no-underline transition hover:border-matcha hover:bg-matcha sm:px-3"
+            className="rounded-md border border-matcha-deep bg-matcha-deep px-2.5 py-1.5 text-[#f7faf6] no-underline transition hover:border-matcha hover:bg-matcha hover:text-[#f7faf6] sm:px-3"
           >
             Dashboard
           </Link>

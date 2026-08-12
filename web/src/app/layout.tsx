@@ -20,6 +20,14 @@ export const metadata: Metadata = {
   title: "HoneyMatcha",
   description:
     "A handshake URL for bots. Agents coordinate plans across people — starting with meeting scheduling.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.png", type: "image/png", sizes: "32x32" },
+      { url: "/logo-mark.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 export default function RootLayout({

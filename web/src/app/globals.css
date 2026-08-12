@@ -53,13 +53,18 @@ body {
   min-height: 100vh;
 }
 
-a {
-  color: var(--matcha);
-  text-underline-offset: 0.15em;
-}
+/* Keep link defaults in @layer base so Tailwind text-* utilities win on CTAs.
+   Unlayered `a { color }` was overriding `text-[#f7faf6]` / `text-white` on
+   primary buttons (Create a key, Connect Google Calendar). */
+@layer base {
+  a {
+    color: var(--matcha);
+    text-underline-offset: 0.15em;
+  }
 
-a:hover {
-  color: var(--matcha-deep);
+  a:hover {
+    color: var(--matcha-deep);
+  }
 }
 
 @keyframes rise {
