@@ -81,7 +81,7 @@ async function handle(
       sendJson(res, 200, {
         inviteCode: code,
         message:
-          "Open this invite in Bot Coord web or POST /v1/links/accept with your API key.",
+          "Open this invite in HoneyMatcha or POST /v1/links/accept with your API key.",
         acceptEndpoint: "/v1/links/accept",
       });
       return;

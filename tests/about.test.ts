@@ -27,10 +27,13 @@ describe("GET / public about", () => {
     const ct = res.headers.get("content-type") ?? "";
     assert.match(ct, /text\/html/);
     const html = await res.text();
-    assert.match(html, /Bot Coord/);
-    assert.match(html, /id="bot-coord-about"/);
+    assert.match(html, /HoneyMatcha/);
+    assert.match(html, /id="honeymatcha-about"/);
     assert.match(html, /bot-coord-hub/);
     assert.match(html, /\/health/);
+    assert.match(html, /For agents/);
+    assert.doesNotMatch(html, /Bot Coord/);
+    assert.doesNotMatch(html, /id="bot-coord-about"/);
   });
 
   it("returns about JSON when Accept: application/json", async () => {
@@ -42,6 +45,12 @@ describe("GET / public about", () => {
     assert.match(ct, /application\/json/);
     const body = (await res.json()) as typeof ABOUT_JSON;
     assert.deepEqual(body, ABOUT_JSON);
+    assert.equal(body.name, "HoneyMatcha");
+    assert.equal(body.protocol, 1);
+    assert.deepEqual(body.intents, ["schedule_meeting"]);
+    assert.equal(typeof body.agent_instructions, "string");
+    assert.ok(body.agent_instructions.length > 0);
+    assert.ok(Array.isArray(body.flows.schedule_meeting));
   });
 
   it("keeps /health public and API routes authenticated", async () => {
