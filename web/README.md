@@ -46,6 +46,9 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run db:migrate` | Apply migrations |
 | `npm run db:seed` | Seed `intent_types` with `schedule_meeting` (live) |
 | `npm run db:studio` | Drizzle Studio |
+| `npm run mcp` | Stdio MCP server (`mcp/server.mjs`) |
+| `npm run test:e2e-lib` | DB/lib smoke for invite → activity → confirm |
+| `npm run test:e2e-api` | Bearer API smoke against a running server |
 
 ## Product surface
 
@@ -56,13 +59,17 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/.well-known/honeymatcha.json` | Public | Machine-readable discovery |
 | `/sign-in`, `/sign-up` | Public | Clerk |
 | `/intents` | Public | Registry browse + propose (propose requires sign-in) |
+| `/invite/[code]` | Public / signed-in accept | Handshake URL for a friend’s bot/human |
 | `/app/**` | Clerk protected | Dashboard shell |
 | `/app/keys` | Auth | Create / list / revoke hashed API keys |
+| `/app/links` | Auth | Create invite URLs, accept codes, revoke mutual links |
+| `/app/activity` | Auth | Session list + plain-English messages (raw JSON toggle) |
+| `/app/confirm` | Auth | Approve / deny pending confirms |
 | `/api/v1/*` | Bearer API key | Agent API (me, links, sessions, intents, schedule, confirms) |
 | `/api/v1/openapi` | Public | OpenAPI-ish map |
 | `/api/mcp` | Bearer API key | MCP JSON-RPC (`tools/list`, `tools/call`) |
 
-Stub dashboard pages (Links, Activity, Confirm) have clear TODOs; schema already supports them.
+Human helpers also exist under `/api/links`, `/api/sessions`, and `/api/confirms` (Clerk session).
 
 ## Agent auth
 
@@ -107,7 +114,7 @@ Optional: keep the existing hub (`src/`) as a separate Render service until the 
 
 - `users` — Clerk user sync
 - `api_keys` — hashed agent secrets
-- `links` — mutual peer links
+- `links` — mutual peer links (`pair_link_id`, open invites allowed)
 - `sessions` / `session_messages` — coordination boards
 - `intent_types` / `intent_proposals` — registry (`pending` \| `live` \| `rejected`)
-- `confirms` — human confirmation audit
+- `confirms` — human confirmation queue (`pending` \| `approved` \| `denied`)

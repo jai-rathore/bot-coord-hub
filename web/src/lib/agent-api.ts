@@ -1,10 +1,12 @@
 /**
  * Shared agent API business logic (Bearer-auth callers).
  * Used by /api/v1/* routes and the MCP tool dispatcher.
+ *
+ * Domain mutations for links/sessions/confirms live in dedicated libs so the
+ * Clerk UI and Bearer/MCP paths share one coherent implementation.
  */
 
 import { and, desc, eq, or } from "drizzle-orm";
-import { randomBytes } from "crypto";
 import { getDb } from "@/db";
 import {
   confirms,
@@ -13,6 +15,7 @@ import {
   sessionMessages,
   sessions,
   users,
+  type Confirm,
   type User,
 } from "@/db/schema";
 import {
@@ -22,6 +25,25 @@ import {
 } from "@/lib/intents";
 import { normalizeIntentName, slugify } from "@/lib/slug";
 import type { AgentAuth } from "@/lib/agent-auth";
+import {
+  acceptInviteLink,
+  createInviteLink,
+  listLinksForUser,
+  revokeLinkForUser,
+} from "@/lib/links";
+import {
+  createSessionForUser,
+  getSessionForUser,
+  listMessagesForSession,
+  listSessionsForUser,
+  messageToPlainEnglish,
+  postSessionMessage,
+} from "@/lib/sessions";
+import {
+  decideConfirm,
+  listConfirmsForUser,
+  requestConfirm as requestConfirmForUser,
+} from "@/lib/confirms";
 
 export class AgentApiError extends Error {
   status: number;
@@ -37,29 +59,19 @@ export class AgentApiError extends Error {
   }
 }
 
-function inviteCode(): string {
-  return randomBytes(9).toString("base64url");
-}
-
-function publicLink(
-  row: typeof links.$inferSelect,
-  baseUrl?: string,
-) {
-  return {
-    id: row.id,
-    fromUserId: row.fromUserId,
-    toUserId: row.toUserId,
-    toEmail: row.toEmail,
-    toName: row.toName,
-    status: row.status,
-    scopes: row.scopes,
-    inviteCode: row.inviteCode,
-    inviteUrl: baseUrl
-      ? `${baseUrl.replace(/\/$/, "")}/app/links?invite=${row.inviteCode}`
-      : undefined,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
+function rethrowAsAgentError(err: unknown): never {
+  if (err instanceof AgentApiError) throw err;
+  const message = err instanceof Error ? err.message : "Request failed";
+  const status =
+    err &&
+    typeof err === "object" &&
+    "status" in err &&
+    typeof (err as { status: unknown }).status === "number"
+      ? (err as { status: number }).status
+      : message.includes("DATABASE_URL")
+        ? 503
+        : 500;
+  throw new AgentApiError(status, message);
 }
 
 export async function whoami(auth: AgentAuth) {
@@ -80,19 +92,12 @@ export async function whoami(auth: AgentAuth) {
 }
 
 export async function listLinks(auth: AgentAuth, baseUrl?: string) {
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(links)
-    .where(
-      or(eq(links.fromUserId, auth.user.id), eq(links.toUserId, auth.user.id)),
-    )
-    .orderBy(desc(links.createdAt));
-
-  return {
-    ok: true,
-    links: rows.map((r) => publicLink(r, baseUrl)),
-  };
+  try {
+    const rows = await listLinksForUser(auth.user, baseUrl ?? "");
+    return { ok: true, links: rows };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
 }
 
 export async function createInvite(
@@ -104,47 +109,23 @@ export async function createInvite(
   },
   baseUrl?: string,
 ) {
-  const toEmail = body.toEmail?.trim().toLowerCase();
-  if (!toEmail || !toEmail.includes("@")) {
-    throw new AgentApiError(400, "toEmail is required");
+  try {
+    const link = await createInviteLink({
+      fromUser: auth.user,
+      toEmail: body.toEmail,
+      toName: body.toName,
+      scopes: body.scopes,
+      origin: baseUrl ?? "",
+    });
+    return {
+      ok: true,
+      link,
+      message:
+        "Share this link with a friend’s bot/human so they can accept and form a mutual link.",
+    };
+  } catch (err) {
+    rethrowAsAgentError(err);
   }
-  if (toEmail === auth.user.email.toLowerCase()) {
-    throw new AgentApiError(400, "Cannot invite yourself");
-  }
-
-  const scopes =
-    body.scopes && body.scopes.length > 0
-      ? body.scopes
-      : ["schedule_meeting", "avail.read_freebusy"];
-
-  const db = getDb();
-
-  // If peer already has an account, attach toUserId eagerly (still pending until accept).
-  const peer = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, toEmail))
-    .limit(1);
-
-  const [created] = await db
-    .insert(links)
-    .values({
-      fromUserId: auth.user.id,
-      toUserId: peer[0]?.id ?? null,
-      toEmail,
-      toName: body.toName?.trim() || peer[0]?.name || null,
-      inviteCode: inviteCode(),
-      status: "pending",
-      scopes,
-    })
-    .returning();
-
-  return {
-    ok: true,
-    link: publicLink(created, baseUrl),
-    message:
-      "Share the inviteCode / inviteUrl out-of-band. Peer accepts with POST /api/v1/links/accept.",
-  };
 }
 
 export async function acceptInvite(
@@ -152,179 +133,128 @@ export async function acceptInvite(
   body: { inviteCode?: string },
   baseUrl?: string,
 ) {
-  const code = body.inviteCode?.trim();
-  if (!code) {
-    throw new AgentApiError(400, "inviteCode is required");
+  try {
+    const result = await acceptInviteLink({
+      user: auth.user,
+      inviteCode: body.inviteCode ?? "",
+      origin: baseUrl ?? "",
+    });
+    return {
+      ok: true,
+      link: result.link,
+      pair: result.pair,
+    };
+  } catch (err) {
+    rethrowAsAgentError(err);
   }
+}
 
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(links)
-    .where(eq(links.inviteCode, code))
-    .limit(1);
-
-  const link = rows[0];
-  if (!link) {
-    throw new AgentApiError(404, "Invite not found");
+export async function revokeLink(auth: AgentAuth, linkId: string) {
+  try {
+    const result = await revokeLinkForUser({ user: auth.user, linkId });
+    return { ok: true, ...result };
+  } catch (err) {
+    rethrowAsAgentError(err);
   }
-  if (link.status === "revoked") {
-    throw new AgentApiError(410, "Invite was revoked");
-  }
-  if (link.status === "active") {
-    throw new AgentApiError(409, "Invite already accepted");
-  }
-  if (link.fromUserId === auth.user.id) {
-    throw new AgentApiError(400, "Cannot accept your own invite");
-  }
-  if (
-    link.toEmail.toLowerCase() !== auth.user.email.toLowerCase() &&
-    link.toUserId &&
-    link.toUserId !== auth.user.id
-  ) {
-    throw new AgentApiError(
-      403,
-      "This invite is addressed to a different email",
-    );
-  }
-
-  const [updated] = await db
-    .update(links)
-    .set({
-      status: "active",
-      toUserId: auth.user.id,
-      toEmail: auth.user.email.toLowerCase(),
-      toName: auth.user.name ?? link.toName,
-      updatedAt: new Date(),
-    })
-    .where(eq(links.id, link.id))
-    .returning();
-
-  return {
-    ok: true,
-    link: publicLink(updated, baseUrl),
-  };
 }
 
 export async function listSessions(auth: AgentAuth) {
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(sessions)
-    .where(
-      or(
-        eq(sessions.initiatorUserId, auth.user.id),
-        eq(sessions.peerUserId, auth.user.id),
-      ),
-    )
-    .orderBy(desc(sessions.createdAt));
-
-  return {
-    ok: true,
-    sessions: rows.map((s) => ({
-      id: s.id,
-      intentType: s.intentType,
-      status: s.status,
-      initiatorUserId: s.initiatorUserId,
-      peerUserId: s.peerUserId,
-      linkId: s.linkId,
-      payload: s.payload,
-      createdAt: s.createdAt,
-      updatedAt: s.updatedAt,
-    })),
-  };
+  try {
+    const rows = await listSessionsForUser(auth.user);
+    return { ok: true, sessions: rows };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
 }
 
-async function getAccessibleSession(auth: AgentAuth, sessionId: string) {
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(sessions)
-    .where(eq(sessions.id, sessionId))
-    .limit(1);
-  const session = rows[0];
-  if (!session) {
-    throw new AgentApiError(404, "Session not found");
+export async function createSession(
+  auth: AgentAuth,
+  body: {
+    intentType?: string;
+    peerUserId?: string;
+    linkId?: string;
+    payload?: Record<string, unknown>;
+  },
+) {
+  try {
+    if (!body.intentType?.trim()) {
+      throw new AgentApiError(400, "intentType is required");
+    }
+    const session = await createSessionForUser({
+      user: auth.user,
+      intentType: body.intentType,
+      peerUserId: body.peerUserId,
+      linkId: body.linkId,
+      payload: body.payload,
+    });
+    return { ok: true, session };
+  } catch (err) {
+    rethrowAsAgentError(err);
   }
-  if (
-    session.initiatorUserId !== auth.user.id &&
-    session.peerUserId !== auth.user.id
-  ) {
-    throw new AgentApiError(403, "Not a participant of this session");
-  }
-  return session;
 }
 
 export async function readBoard(auth: AgentAuth, sessionId: string) {
-  const session = await getAccessibleSession(auth, sessionId);
-  const db = getDb();
-  const messages = await db
-    .select()
-    .from(sessionMessages)
-    .where(eq(sessionMessages.sessionId, session.id))
-    .orderBy(sessionMessages.createdAt);
+  try {
+    const session = await getSessionForUser(sessionId, auth.user.id);
+    const messages = await listMessagesForSession(sessionId);
+    return {
+      ok: true,
+      session: {
+        id: session.id,
+        intentType: session.intentType,
+        status: session.status,
+        payload: session.payload,
+        initiatorUserId: session.initiatorUserId,
+        peerUserId: session.peerUserId,
+        linkId: session.linkId,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+      },
+      messages: messages.map((m) => ({
+        id: m.id,
+        kind: m.kind,
+        body: m.body,
+        senderUserId: m.senderUserId,
+        createdAt: m.createdAt,
+        plainEnglish: m.plainEnglish,
+      })),
+    };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
+}
 
-  return {
-    ok: true,
-    session: {
-      id: session.id,
-      intentType: session.intentType,
-      status: session.status,
-      payload: session.payload,
-      initiatorUserId: session.initiatorUserId,
-      peerUserId: session.peerUserId,
-      linkId: session.linkId,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
-    },
-    messages: messages.map((m) => ({
-      id: m.id,
-      kind: m.kind,
-      body: m.body,
-      senderUserId: m.senderUserId,
-      createdAt: m.createdAt,
-    })),
-  };
+export async function listBoardMessages(auth: AgentAuth, sessionId: string) {
+  try {
+    await getSessionForUser(sessionId, auth.user.id);
+    const messages = await listMessagesForSession(sessionId);
+    return { ok: true, messages };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
 }
 
 export async function postBoardMessage(
   auth: AgentAuth,
   sessionId: string,
-  body: { kind?: string; body?: Record<string, unknown> },
+  body: { kind?: string; body?: Record<string, unknown>; text?: string },
 ) {
-  const session = await getAccessibleSession(auth, sessionId);
-  const kind = (body.kind ?? "message").trim().slice(0, 80);
-  if (!kind) {
-    throw new AgentApiError(400, "kind is required");
-  }
-  const messageBody = body.body ?? {};
-
-  const db = getDb();
-  const [created] = await db
-    .insert(sessionMessages)
-    .values({
-      sessionId: session.id,
-      senderUserId: auth.user.id,
-      kind,
+  try {
+    const session = await getSessionForUser(sessionId, auth.user.id);
+    const messageBody = {
+      ...(body.body ?? {}),
+      ...(body.text ? { text: body.text } : {}),
+    };
+    const message = await postSessionMessage({
+      session,
+      sender: auth.user,
+      kind: body.kind ?? "note",
       body: messageBody,
-    })
-    .returning();
-
-  await db
-    .update(sessions)
-    .set({ updatedAt: new Date() })
-    .where(eq(sessions.id, session.id));
-
-  return {
-    ok: true,
-    message: {
-      id: created.id,
-      kind: created.kind,
-      body: created.body,
-      senderUserId: created.senderUserId,
-      createdAt: created.createdAt,
-    },
-  };
+    });
+    return { ok: true, message };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
 }
 
 export async function listIntents(query?: string) {
@@ -407,10 +337,7 @@ async function findActiveLinkWithPeer(
     if (!link) {
       throw new AgentApiError(404, "Active link not found");
     }
-    if (
-      link.fromUserId !== authUser.id &&
-      link.toUserId !== authUser.id
-    ) {
+    if (link.fromUserId !== authUser.id && link.toUserId !== authUser.id) {
       throw new AgentApiError(403, "Not a party on this link");
     }
     return link;
@@ -431,14 +358,9 @@ async function findActiveLinkWithPeer(
       ),
     );
 
-  const match = rows.find((l) => {
-    if (l.toEmail.toLowerCase() === email) return true;
-    return false;
-  });
-
+  const match = rows.find((l) => l.toEmail?.toLowerCase() === email);
   if (match) return match;
 
-  // Also match when peer is the from side (we are invitee)
   const peerUsers = await db
     .select()
     .from(users)
@@ -520,23 +442,42 @@ export async function requestScheduleMeeting(
     sessionId: session.id,
     senderUserId: auth.user.id,
     kind: "schedule.request",
-    body: payload,
+    body: {
+      ...payload,
+      text: `Requested a ${durationMinutes}m meeting${
+        payload.title ? ` (“${payload.title}”)` : ""
+      }.`,
+    },
   });
 
-  // Human confirm gate — organizer must approve before any booking.
   const [confirm] = await db
     .insert(confirms)
     .values({
       sessionId: session.id,
       userId: auth.user.id,
-      action: "pending",
+      action: "book_meeting",
       note: "Awaiting human confirmation before calendar booking",
+      status: "pending",
       metadata: {
         gate: "schedule_meeting",
         calendarStub: true,
       },
     })
     .returning();
+
+  await db.insert(sessionMessages).values({
+    sessionId: session.id,
+    senderUserId: auth.user.id,
+    kind: "confirm.requested",
+    body: {
+      confirmId: confirm.id,
+      action: confirm.action,
+      note: confirm.note,
+      text: `Confirmation requested: ${confirm.action}${
+        confirm.note ? ` — ${confirm.note}` : ""
+      }`,
+    },
+  });
 
   return {
     ok: true,
@@ -552,6 +493,7 @@ export async function requestScheduleMeeting(
     confirm: {
       id: confirm.id,
       action: confirm.action,
+      status: confirm.status,
       note: confirm.note,
     },
     calendar: payload.calendar,
@@ -563,26 +505,51 @@ export async function requestScheduleMeeting(
   };
 }
 
-export async function listConfirms(auth: AgentAuth) {
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(confirms)
-    .where(eq(confirms.userId, auth.user.id))
-    .orderBy(desc(confirms.createdAt));
+export async function listConfirms(
+  auth: AgentAuth,
+  status?: Confirm["status"],
+) {
+  try {
+    const rows = await listConfirmsForUser(auth.user, status);
+    return {
+      ok: true,
+      confirms: rows,
+      note: "Confirm responses are human-gated by default. Agents may record a decision only after explicit human OK.",
+    };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
+}
 
-  return {
-    ok: true,
-    confirms: rows.map((c) => ({
-      id: c.id,
-      sessionId: c.sessionId,
-      action: c.action,
-      note: c.note,
-      metadata: c.metadata,
-      createdAt: c.createdAt,
-    })),
-    note: "Confirm responses are human-gated by default. Agents may record a decision only after explicit human OK.",
-  };
+export async function requestConfirm(
+  auth: AgentAuth,
+  body: {
+    sessionId?: string;
+    action?: string;
+    note?: string;
+    metadata?: Record<string, unknown>;
+    confirmUserId?: string;
+  },
+) {
+  try {
+    if (!body.sessionId?.trim()) {
+      throw new AgentApiError(400, "sessionId is required");
+    }
+    if (!body.action?.trim()) {
+      throw new AgentApiError(400, "action is required");
+    }
+    const confirm = await requestConfirmForUser({
+      user: auth.user,
+      sessionId: body.sessionId,
+      action: body.action,
+      note: body.note,
+      metadata: body.metadata,
+      confirmUserId: body.confirmUserId,
+    });
+    return { ok: true, confirm };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
 }
 
 /**
@@ -627,7 +594,7 @@ export async function respondConfirm(
         and(
           eq(confirms.sessionId, body.sessionId),
           eq(confirms.userId, auth.user.id),
-          eq(confirms.action, "pending"),
+          eq(confirms.status, "pending"),
         ),
       )
       .orderBy(desc(confirms.createdAt))
@@ -641,63 +608,86 @@ export async function respondConfirm(
   if (confirmRow.userId !== auth.user.id) {
     throw new AgentApiError(403, "Not your confirm gate");
   }
+  if (confirmRow.status !== "pending") {
+    throw new AgentApiError(409, `Confirm already ${confirmRow.status}`);
+  }
 
-  // Insert a new audit row for the decision (keep pending history).
-  const [decision] = await db
-    .insert(confirms)
-    .values({
-      sessionId: confirmRow.sessionId,
-      userId: auth.user.id,
-      action,
-      note:
-        body.note?.trim() ||
-        `Recorded via agent API after human ${action}`,
-      metadata: {
-        priorConfirmId: confirmRow.id,
-        calendarStub: true,
-        humanGated: true,
-      },
-    })
-    .returning();
-
-  // Mark original pending as superseded in note via update
-  if (confirmRow.action === "pending") {
-    await db
+  if (action === "defer") {
+    const note =
+      body.note?.trim() ||
+      confirmRow.note ||
+      "Deferred — still awaiting human decision";
+    const [updated] = await db
       .update(confirms)
-      .set({
-        action: `superseded_by_${action}`,
-        note: confirmRow.note,
-      })
-      .where(eq(confirms.id, confirmRow.id));
+      .set({ note })
+      .where(eq(confirms.id, confirmRow.id))
+      .returning();
+
+    const session = await getSessionForUser(confirmRow.sessionId, auth.user.id);
+    await postSessionMessage({
+      session,
+      sender: auth.user,
+      kind: "confirm.deferred",
+      body: {
+        confirmId: updated.id,
+        action: updated.action,
+        note: updated.note,
+        text: `Deferred: ${updated.action}${
+          updated.note ? ` — ${updated.note}` : ""
+        }`,
+      },
+    });
+
+    return {
+      ok: true,
+      confirm: {
+        id: updated.id,
+        sessionId: updated.sessionId,
+        action: updated.action,
+        status: updated.status,
+        note: updated.note,
+        createdAt: updated.createdAt,
+      },
+      calendar: {
+        status: "stub",
+        message: "Deferred. Still awaiting a final human decision.",
+      },
+      documentation:
+        "respond_confirm is human-gated: call only after your human approved/declined. Dashboard: /app/confirm.",
+    };
   }
 
-  if (action === "approve") {
-    await db
-      .update(sessions)
-      .set({ status: "accepted", updatedAt: new Date() })
-      .where(eq(sessions.id, confirmRow.sessionId));
-  } else if (action === "decline") {
-    await db
-      .update(sessions)
-      .set({ status: "declined", updatedAt: new Date() })
-      .where(eq(sessions.id, confirmRow.sessionId));
-  }
+  try {
+    const decision = action === "approve" ? "approved" : "denied";
+    const confirm = await decideConfirm({
+      user: auth.user,
+      confirmId: confirmRow.id,
+      decision,
+      note: body.note,
+    });
 
-  return {
-    ok: true,
-    confirm: {
-      id: decision.id,
-      sessionId: decision.sessionId,
-      action: decision.action,
-      note: decision.note,
-      createdAt: decision.createdAt,
-    },
-    calendar: {
-      status: "stub",
-      message:
-        "Decision recorded. Calendar booking is not auto-executed (calendar port missing).",
-    },
-    documentation:
-      "respond_confirm is human-gated: call only after your human approved/declined. Dashboard: /app/confirm.",
-  };
+    return {
+      ok: true,
+      confirm: {
+        id: confirm.id,
+        sessionId: confirm.sessionId,
+        action: confirm.action,
+        status: confirm.status,
+        note: confirm.note,
+        createdAt: confirm.createdAt,
+      },
+      calendar: {
+        status: "stub",
+        message:
+          "Decision recorded. Calendar booking is not auto-executed (calendar port missing).",
+      },
+      documentation:
+        "respond_confirm is human-gated: call only after your human approved/declined. Dashboard: /app/confirm.",
+    };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
 }
+
+// Re-export for callers that want plain-English helpers without importing sessions.
+export { messageToPlainEnglish };

@@ -22,7 +22,8 @@ export function jsonFromAgentError(err: unknown) {
     );
   }
   const message = err instanceof Error ? err.message : "Server error";
-  const status = message.includes("DATABASE_URL") ? 503 : 500;
+  const status =
+    errorStatus(err, message.includes("DATABASE_URL") ? 503 : 500);
   return Response.json({ error: message }, { status });
 }
 
@@ -36,4 +37,33 @@ export function requestBaseUrl(request: Request): string {
     request.headers.get("host") ??
     url.host;
   return `${proto}://${host}`;
+}
+
+/** Alias used by Clerk UI routes. */
+export function requestOrigin(request: Request): string {
+  return requestBaseUrl(request);
+}
+
+export function errorStatus(err: unknown, fallback = 500): number {
+  if (
+    err &&
+    typeof err === "object" &&
+    "status" in err &&
+    typeof (err as { status: unknown }).status === "number"
+  ) {
+    return (err as { status: number }).status;
+  }
+  return fallback;
+}
+
+export function errorMessage(err: unknown, fallback = "Request failed"): string {
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
+export function jsonError(err: unknown, fallbackMessage = "Request failed") {
+  return Response.json(
+    { error: errorMessage(err, fallbackMessage) },
+    { status: errorStatus(err) },
+  );
 }
