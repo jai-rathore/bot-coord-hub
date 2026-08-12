@@ -5,6 +5,10 @@ Cross-user agent DMs do not exist; this hub is the bridge.
 
 Protocol adapted from bot-coord-sim. Dogfood: Jai and Rishav.
 
+## Product web app (`web/`)
+
+HoneyMatcha Next.js product foundation (Clerk auth, Postgres/Drizzle, agent API keys, intents registry) lives in [`web/`](./web/). See [`web/README.md`](./web/README.md) for local run and Render notes. The Node hub under `src/` remains for now.
+
 ## Quick start
 
 cd /workspace/bot-coord-hub

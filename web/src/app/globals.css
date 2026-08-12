@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+:root {
+  --matcha-deep: #1f4a36;
+  --matcha: #3a6b4f;
+  --matcha-soft: #6f9a7c;
+  --honey: #c49a3c;
+  --honey-soft: #e8d29a;
+  --ink: #1c2420;
+  --muted: #5a685f;
+  --line: #d5e0d6;
+  --bg: #eef4ef;
+  --panel: rgba(255, 252, 246, 0.72);
+  --code-bg: #e4ede6;
+  --focus: #2f6b4a;
+  --danger: #9b3b3b;
+  --background: #f4f7f3;
+  --foreground: var(--ink);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-matcha-deep: var(--matcha-deep);
+  --color-matcha: var(--matcha);
+  --color-matcha-soft: var(--matcha-soft);
+  --color-honey: var(--honey);
+  --color-honey-soft: var(--honey-soft);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-panel: var(--panel);
+  --color-code-bg: var(--code-bg);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-sora);
+  --font-display: var(--font-fraunces);
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sora), "Segoe UI", sans-serif;
+  line-height: 1.55;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--matcha);
+  text-underline-offset: 0.15em;
+}
+
+a:hover {
+  color: var(--matcha-deep);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-1.5%, 1.2%, 0) scale(1.03);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.7s ease both;
+}
+
+.animate-rise-delay-1 {
+  animation: rise 0.75s ease 0.08s both;
+}
+
+.animate-rise-delay-2 {
+  animation: rise 0.75s ease 0.16s both;
+}
+
+.animate-rise-delay-3 {
+  animation: rise 0.75s ease 0.24s both;
+}
+
+.animate-drift {
+  animation: drift 12s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
