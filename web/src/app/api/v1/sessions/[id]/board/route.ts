@@ -1,19 +1,22 @@
 import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
-import { whoami } from "@/lib/agent-api";
+import { readBoard } from "@/lib/agent-api";
 import { jsonFromAgentError, jsonOk } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
+type Ctx = { params: Promise<{ id: string }> };
+
 /**
- * Agent whoami / key health.
- * GET /api/v1/me — Authorization: Bearer hm_...
+ * Read a session board.
+ * GET /api/v1/sessions/:id/board — Authorization: Bearer hm_...
  */
-export async function GET(request: Request) {
+export async function GET(request: Request, context: Ctx) {
   const auth = await authenticateAgent(request);
   if (!auth) return unauthorizedJson();
 
   try {
-    return jsonOk(await whoami(auth));
+    const { id } = await context.params;
+    return jsonOk(await readBoard(auth, id));
   } catch (err) {
     return jsonFromAgentError(err);
   }

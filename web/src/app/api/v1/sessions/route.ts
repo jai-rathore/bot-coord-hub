@@ -1,19 +1,19 @@
 import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
-import { listLinks } from "@/lib/agent-api";
-import { jsonFromAgentError, jsonOk, requestBaseUrl } from "@/lib/http";
+import { listSessions } from "@/lib/agent-api";
+import { jsonFromAgentError, jsonOk } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
 /**
- * List links for the authenticated agent user.
- * GET /api/v1/links — Authorization: Bearer hm_...
+ * List sessions for the authenticated agent user.
+ * GET /api/v1/sessions — Authorization: Bearer hm_...
  */
 export async function GET(request: Request) {
   const auth = await authenticateAgent(request);
   if (!auth) return unauthorizedJson();
 
   try {
-    return jsonOk(await listLinks(auth, requestBaseUrl(request)));
+    return jsonOk(await listSessions(auth));
   } catch (err) {
     return jsonFromAgentError(err);
   }

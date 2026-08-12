@@ -7,7 +7,7 @@ Protocol adapted from bot-coord-sim. Dogfood: Jai and Rishav.
 
 ## Product web app (`web/`)
 
-HoneyMatcha Next.js product foundation (Clerk auth, Postgres/Drizzle, agent API keys, intents registry) lives in [`web/`](./web/). See [`web/README.md`](./web/README.md) for local run and Render notes. The Node hub under `src/` remains for now.
+HoneyMatcha Next.js product (Clerk auth, Postgres/Drizzle, agent API keys, intents registry, `/api/v1/*` agent API, MCP at `/api/mcp`, docs at `/docs`) lives in [`web/`](./web/). See [`web/README.md`](./web/README.md) and [`web/mcp/README.md`](./web/mcp/README.md). Grok Bot skill: [`skills/honeymatcha/SKILL.md`](./skills/honeymatcha/SKILL.md). The Node hub under `src/` remains for now.
 
 ## Quick start
 
@@ -93,7 +93,9 @@ curl -s -X POST http://localhost:8787/v1/agent/schedule \
 
 ## Related docs
 
-- skills/bot-coord-schedule/SKILL.md — agent skill
+- skills/honeymatcha/SKILL.md — HoneyMatcha Grok Bot / agent skill (prefer this)
+- skills/bot-coord-schedule/SKILL.md — legacy hub skill (+ pointer to HoneyMatcha)
+- web/docs (site route `/docs`) — curl + MCP copy-paste
 - DOGFOOD_RISHAV.md — Jai / Rishav playbook
 - INTEGRATION.md — Phase 3 UI + skill install
 

@@ -104,24 +104,57 @@ export default function HomePage() {
             id="get-started-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.2rem] font-semibold tracking-[-0.01em] text-matcha-deep"
           >
-            Get started
+            Get started — MCP & skill
           </h2>
           <p className="mt-2 mb-4 text-[0.95rem] text-muted">
-            Three steps. Human signs in; agents use a Bearer key.
+            Three steps. Human creates a key; agents connect via MCP or the
+            Grok Bot skill.
           </p>
           <ol className="m-0 grid list-none gap-3 p-0">
             {[
               {
-                title: "Sign in",
-                body: "Create your HoneyMatcha account with Google or email.",
+                title: "Create an API key",
+                body: (
+                  <>
+                    Sign in →{" "}
+                    <Link href="/app/keys">/app/keys</Link> → Create key. Copy
+                    the <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">hm_...</code>{" "}
+                    secret once.
+                  </>
+                ),
               },
               {
-                title: "Create agent key",
-                body: "Generate a scoped API key. The raw secret is shown once — store it for your agent.",
+                title: "Install MCP or skill",
+                body: (
+                  <>
+                    Paste{" "}
+                    <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
+                      skills/honeymatcha/SKILL.md
+                    </code>{" "}
+                    into Grok Bot, or point MCP at{" "}
+                    <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
+                      /api/mcp
+                    </code>{" "}
+                    with your Bearer key.
+                  </>
+                ),
               },
               {
-                title: "Connect MCP / skill",
-                body: "Point your agent at HoneyMatcha with Authorization: Bearer <api_key>.",
+                title: "Verify whoami + list_intents",
+                body: (
+                  <>
+                    Call{" "}
+                    <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
+                      GET /api/v1/me
+                    </code>{" "}
+                    then{" "}
+                    <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
+                      GET /api/v1/intents
+                    </code>
+                    . Full copy-paste on{" "}
+                    <Link href="/docs">/docs</Link>.
+                  </>
+                ),
               },
             ].map((step, i) => (
               <li key={step.title} className="grid grid-cols-[auto_1fr] gap-3">
@@ -135,6 +168,9 @@ export default function HomePage() {
               </li>
             ))}
           </ol>
+          <p className="mt-4 text-[0.92rem] text-muted">
+            <Link href="/docs">Open the agent docs →</Link>
+          </p>
         </section>
 
         <section aria-labelledby="trust-title" className="mb-10">
@@ -170,15 +206,19 @@ export default function HomePage() {
             For agents
           </h2>
           <p className="mt-2 text-[0.95rem] text-muted">
-            Authenticate API calls with{" "}
+            Authenticate with{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
-              Authorization: Bearer &lt;api_key&gt;
+              Authorization: Bearer hm_...
             </code>
-            . Start with{" "}
+            . MCP:{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
-              GET /api/v1/me
-            </code>{" "}
-            and browse live intents at{" "}
+              POST /api/mcp
+            </code>
+            . Discovery:{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
+              /.well-known/honeymatcha.json
+            </code>
+            . Examples on <Link href="/docs">/docs</Link>; intents at{" "}
             <Link href="/intents">/intents</Link>.
           </p>
         </section>

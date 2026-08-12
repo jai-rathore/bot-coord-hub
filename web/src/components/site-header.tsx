@@ -16,6 +16,9 @@ export function SiteHeader() {
         HoneyMatcha
       </Link>
       <nav className="flex items-center gap-3 text-sm font-medium">
+        <Link href="/docs" className="text-muted no-underline hover:text-matcha-deep">
+          Docs
+        </Link>
         <Link href="/intents" className="text-muted no-underline hover:text-matcha-deep">
           Intents
         </Link>
