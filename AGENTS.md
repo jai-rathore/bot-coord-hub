@@ -31,6 +31,14 @@ and the `scripts` blocks of each `package.json`).
   "Production Keys are only allowed for domain 'honeymatcha.io'" and the sign-in widget renders
   blank. Use a Clerk _development_ instance's keys (which allow localhost) to test human sign-in
   and the signed-in dashboard locally.
+- With dev keys, Clerk's **test emails** work for automated sign-in: any address containing
+  `+clerk_test` (e.g. `hmtester+clerk_test@example.com`) with OTP `424242`. Note: the sign-**up**
+  widget's Cloudflare **Turnstile** CAPTCHA fails to load in this headless VM (error `600010`), so
+  create the initial user via Clerk's Backend API (or disable bot protection in the Clerk
+  dashboard); sign-**in** through the browser UI works fine after the user exists.
+- Note: the shell/VM may have OS-level `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`/`CLERK_SECRET_KEY` from
+  injected secrets. Next.js does not override existing OS env with `.env.local`, so `unset` those
+  before `npm run dev` if you want the `.env.local` keys to take effect.
 - **Migration gotcha:** `drizzle-kit migrate` (`npm run db:migrate`) fails silently here (spinner,
   exit 1, no tables created). Apply migrations with the drizzle-orm migrator instead — a short node
   script calling `migrate(db, { migrationsFolder: './drizzle' })` from `drizzle-orm/postgres-js/migrator`
