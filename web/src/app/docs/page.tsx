@@ -311,6 +311,25 @@ curl -s "$BASE/api/mcp" \\
           </ul>
         </section>
 
+        <section aria-labelledby="hiring-title" className="mb-12">
+          <h2
+            id="hiring-title"
+            className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
+          >
+            Hiring compatibility
+          </h2>
+          <p className="mt-2 text-[0.95rem] leading-7 text-muted">
+            Use <code>create_guest_task</code> with{" "}
+            <code>taskType: &quot;hiring_compatibility&quot;</code>, a target
+            email, and employer hard constraints in <code>privateConfig</code>.
+            The candidate submits private constraints through the expiring
+            guest link. HoneyMatcha returns only compatibility by dimension;
+            raw candidate values stay encrypted and are never returned to the
+            organizer. Results require human review and never rank or
+            automatically reject a candidate.
+          </p>
+        </section>
+
         <section
           aria-labelledby="discover-title"
           className="border-t border-line pt-6"

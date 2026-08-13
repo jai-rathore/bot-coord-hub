@@ -47,7 +47,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run db:generate` | Generate Drizzle migrations from schema |
 | `npm run db:migrate` | Apply migrations |
 | `npm run db:preflight` | Verify schema, secrets, calendar safety, and seed |
-| `npm run db:seed` | Seed `intent_types` with `schedule_meeting` (live) |
+| `npm run db:seed` | Seed live scheduling and hiring-compatibility tasks |
 | `npm run db:studio` | Drizzle Studio |
 | `npm run mcp` | Stdio MCP server (`mcp/server.mjs`) |
 | `npm run test:e2e-lib` | DB/lib smoke for invite → activity → confirm |
@@ -119,6 +119,15 @@ Documented flow: [`docs/SCHEDULE_MEETING.md`](./docs/SCHEDULE_MEETING.md).
 `POST /api/v1/schedule` → free/busy propose → human approval → book on all approvals via per-user **Google** with Meet. MockCalendar is local-only; production fails closed. Supports `peerEmails` for groups. Each principal owns their own relationship policy.
 
 Humans connect Google at `/app/settings` (`GOOGLE_CALENDAR_ENABLED`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`).
+
+## hiring_compatibility
+
+Agents create a targeted `hiring_compatibility` guest task with employer hard
+constraints in `privateConfig`. Candidates submit compensation floor, location,
+work mode, sponsorship, timing, and level through the no-account guest page.
+HoneyMatcha returns only `compatible`, `incompatible`, or `human_review` plus
+per-dimension results. Candidate raw values are encrypted and never returned to
+the organizer; the result never ranks or automatically rejects candidates.
 
 ## MCP
 
