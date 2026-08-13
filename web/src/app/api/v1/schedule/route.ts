@@ -1,4 +1,10 @@
-import { requireAgent, jsonFromAgentError, jsonOk, readJsonBody } from "@/lib/http";
+import {
+  requireAgent,
+  jsonFromAgentError,
+  jsonOk,
+  readJsonBody,
+  requestBaseUrl,
+} from "@/lib/http";
 import { requestScheduleMeeting } from "@/lib/agent-api";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +37,7 @@ export async function POST(request: Request) {
         ...body,
         idempotencyKey:
           request.headers.get("idempotency-key") ?? body.idempotencyKey,
+        origin: requestBaseUrl(request),
       }),
       201,
     );

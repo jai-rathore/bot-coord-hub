@@ -33,6 +33,13 @@ import { writeAudit } from "@/lib/audit";
 import { assertAgentScope } from "@/lib/scopes";
 import { boundedText } from "@/lib/validation";
 import {
+  ackInboxItem,
+  countPendingInbox,
+  inboxInstructions,
+  listInboxForUser,
+  registerAgentCallback,
+} from "@/lib/agent-inbox";
+import {
   createSessionForUser,
   getSessionForUser,
   listMessagesForSession,
@@ -71,6 +78,16 @@ function rethrowAsAgentError(err: unknown): never {
 }
 
 export async function whoami(auth: AgentAuth) {
+  let inbox: Awaited<ReturnType<typeof listInboxForUser>> = [];
+  try {
+    inbox = await listInboxForUser(auth.user.id, {
+      pendingOnly: true,
+      limit: 5,
+    });
+  } catch {
+    inbox = [];
+  }
+  const pendingInbox = inbox.length;
   return {
     ok: true,
     user: {
@@ -86,6 +103,11 @@ export async function whoami(auth: AgentAuth) {
       expiresAt: auth.apiKey.expiresAt,
       lastUsedAt: auth.apiKey.lastUsedAt,
     },
+    inbox: {
+      pending: pendingInbox,
+      next: inbox[0] ?? null,
+    },
+    instructions: inboxInstructions(pendingInbox),
   };
 }
 
@@ -216,10 +238,54 @@ export async function listSessions(auth: AgentAuth) {
   assertAgentScope(auth, "tasks:read");
   try {
     const rows = await listSessionsForUser(auth.user);
-    return { ok: true, sessions: rows };
+    const pendingInbox = await countPendingInbox(auth.user.id);
+    return {
+      ok: true,
+      sessions: rows,
+      inbox: {
+        pending: pendingInbox,
+        instructions: inboxInstructions(pendingInbox),
+      },
+    };
   } catch (err) {
     rethrowAsAgentError(err);
   }
+}
+
+export async function listInbox(auth: AgentAuth) {
+  assertAgentScope(auth, "tasks:read");
+  const items = await listInboxForUser(auth.user.id, { pendingOnly: true });
+  return {
+    ok: true,
+    inbox: items,
+    pending: items.length,
+    instructions: inboxInstructions(items.length),
+    next_steps:
+      items.length > 0
+        ? [
+            "Handle each inbox item.",
+            "Call read_board with sessionId.",
+            "Ack the item when you have taken the next step.",
+            "Do not book Google yourself.",
+          ]
+        : ["No inbound work right now. Call get_inbox at the start of every turn."],
+  };
+}
+
+export async function ackInbox(auth: AgentAuth, inboxId: string) {
+  assertAgentScope(auth, "tasks:write");
+  return { ok: true, item: await ackInboxItem({ user: auth.user, inboxId }) };
+}
+
+export async function setAgentCallback(auth: AgentAuth, callbackUrl?: string | null) {
+  assertAgentScope(auth, "profile:read");
+  return {
+    ok: true,
+    ...(await registerAgentCallback({
+      apiKeyId: auth.apiKey.id,
+      callbackUrl: callbackUrl ?? null,
+    })),
+  };
 }
 
 export async function listGuestTasks(auth: AgentAuth) {
@@ -313,7 +379,11 @@ export async function createSession(
       payload: body.payload,
       idempotencyKey: body.idempotencyKey,
     });
-    return { ok: true, session };
+    const notice =
+      session.intentType === "schedule_meeting" && !session.peerUserId
+        ? "This task is not with anyone yet. Call request_schedule_meeting with their email. Do not book a calendar event yourself."
+        : undefined;
+    return { ok: true, session, scheduled: false, booked: false, notice };
   } catch (err) {
     rethrowAsAgentError(err);
   }
@@ -462,8 +532,8 @@ export async function proposeIntent(
 }
 
 /**
- * request_schedule_meeting — free/busy propose → confirm gate → CalendarPort book.
- * Supports peerEmail (pairwise) or peerEmails (3+ group).
+ * request_schedule_meeting — invite if needed, then free/busy, then confirm, then book.
+ * Never claims a meeting is booked until HoneyMatcha actually creates the event.
  */
 export async function requestScheduleMeeting(
   auth: AgentAuth,
@@ -478,6 +548,7 @@ export async function requestScheduleMeeting(
     title?: string;
     notes?: string;
     idempotencyKey?: string;
+    origin?: string;
   },
 ) {
   assertAgentScope(auth, "tasks:write");

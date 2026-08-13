@@ -3,15 +3,18 @@
  * Used by POST /api/mcp (JSON-RPC) and documented for the stdio MCP entry.
  */
 
+import { SCHEDULE_MEETING_TOOL_DESCRIPTION } from "@/lib/schedule-copy";
 import type { AgentAuth } from "@/lib/agent-auth";
 import { assertAgentScope } from "@/lib/scopes";
 import {
   acceptInvite,
+  ackInbox,
   AgentApiError,
   createGuestTask,
   createInvite,
   listConfirms,
   listGuestTasks,
+  listInbox,
   listIntents,
   listLinks,
   listSessions,
@@ -21,6 +24,7 @@ import {
   readBoard,
   requestScheduleMeeting,
   revokeGuestTask,
+  setAgentCallback,
   whoami,
 } from "@/lib/agent-api";
 
@@ -39,11 +43,46 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "whoami",
     description:
-      "Health check for the HoneyMatcha API key. Returns the authenticated user and key metadata.",
+      "Health check. Also returns inbox.pending. If pending > 0, call get_inbox immediately — another person's agent has work for you.",
     inputSchema: {
       type: "object",
       properties: {},
       additionalProperties: false,
+    },
+  },
+  {
+    name: "get_inbox",
+    description:
+      "Call this at the start of every turn. HoneyMatcha reaches you by writing inbound work here when someone else's agent starts a task with your human. Handle each item, then ack_inbox.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "ack_inbox",
+    description: "Mark an inbox item as handled after you have taken the next step.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        inboxId: { type: "string" },
+      },
+      required: ["inboxId"],
+    },
+  },
+  {
+    name: "register_agent_callback",
+    description:
+      "Optional. Register an HTTPS URL HoneyMatcha will POST when you have new inbox work. Most Grok bots cannot receive this; they should poll get_inbox instead.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        callbackUrl: {
+          type: "string",
+          description: "HTTPS URL, or empty to clear",
+        },
+      },
     },
   },
   {
@@ -172,8 +211,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   },
   {
     name: "request_schedule_meeting",
-    description:
-      "Start schedule_meeting with linked peers: free/busy propose → human confirm gate → CalendarPort book (Mock or Google + Meet). Use peerEmails for 3+ participants.",
+    description: SCHEDULE_MEETING_TOOL_DESCRIPTION,
     inputSchema: {
       type: "object",
       properties: {
@@ -290,6 +328,16 @@ export async function dispatchMcpTool(
     case "whoami":
     case "health":
       return whoami(auth);
+    case "get_inbox":
+    case "list_inbox":
+      return listInbox(auth);
+    case "ack_inbox":
+      return ackInbox(auth, String(args.inboxId ?? ""));
+    case "register_agent_callback":
+      return setAgentCallback(
+        auth,
+        typeof args.callbackUrl === "string" ? args.callbackUrl : null,
+      );
     case "list_links":
       return listLinks(auth, baseUrl);
     case "create_invite":
@@ -344,6 +392,7 @@ export async function dispatchMcpTool(
         title: args.title as string | undefined,
         notes: args.notes as string | undefined,
         idempotencyKey: args.idempotencyKey as string | undefined,
+        origin: baseUrl,
       });
     case "list_confirms":
       return listConfirms(auth);

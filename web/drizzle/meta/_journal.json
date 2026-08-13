@@ -43,6 +43,13 @@
       "when": 1786583501592,
       "tag": "0005_solid_captain_universe",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786590000000,
+      "tag": "0006_agent_inbox",
+      "breakpoints": true
     }
   ]
 }

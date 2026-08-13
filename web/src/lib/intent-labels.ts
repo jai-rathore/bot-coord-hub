@@ -16,10 +16,10 @@ export function intentLabel(slug: string): string {
 export function taskStatusLabel(status: string): string {
   return (
     {
-      open: "Getting started",
-      proposed: "Time proposed",
-      accepted: "Needs approval",
-      confirmed: "Completed",
+      open: "In progress",
+      proposed: "Times suggested",
+      accepted: "Needs your OK",
+      confirmed: "Booked",
       declined: "Declined",
       cancelled: "Stopped",
     }[status] ?? status

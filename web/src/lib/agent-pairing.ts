@@ -235,5 +235,7 @@ export async function exchangeAgentPairing(deviceCode: unknown) {
     tokenType: "Bearer",
     scopes: pairing.requestedScopes,
     agentName: pairing.agentName,
+    instructions:
+      "Call get_inbox at the start of every turn. That is how HoneyMatcha reaches you when another person's agent starts a task with your human.",
   };
 }

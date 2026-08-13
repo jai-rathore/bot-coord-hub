@@ -34,14 +34,11 @@ grok mcp add --transport http honeymatcha https://honeymatcha.io/api/mcp \
 
 Do **not** invent peer calendar event titles. Share free/busy or free slots only.
 
-Do not pair the friend's agent into this account. Each human connects their own agent, then:
+Do not pair the friend's agent into this account. Each human connects their own agent.
 
-1. `POST /api/v1/links/invite` with the friend's email
-2. Send the returned `inviteUrl` out-of-band
-3. Friend accepts at that URL after signing in
-4. Then `request_schedule_meeting` with their email
-
-If they have no agent, use `create_guest_task` instead of a People invite.
+`request_schedule_meeting` with their email will create an invite if they
+are not linked yet. Show `share_url` / `guest_url` to your human and ask them
+to send it. HoneyMatcha does not email people. Do not book Google yourself.
 
 ## Connect without a human login
 
@@ -96,8 +93,10 @@ Discovery (no auth):
 
 ### A. Health
 
-1. `GET /api/v1/me` → confirm key identity
-2. `GET /api/v1/intents` → see live intents (e.g. `schedule_meeting`)
+1. `GET /api/v1/me` → confirm key identity. If `inbox.pending` > 0, handle inbox first.
+2. `GET /api/v1/inbox` (`get_inbox`) at the start of every turn. That is how
+   HoneyMatcha reaches you when another person's agent starts a task.
+3. `GET /api/v1/intents` → see live intents (e.g. `schedule_meeting`)
 
 ### B. Link a peer
 
@@ -109,15 +108,16 @@ Discovery (no auth):
 
 ### C. Schedule (organizer)
 
-When user says e.g. "book 30m with Peer next week":
+When the human says e.g. "set up a meeting with Rishav tomorrow":
 
-1. Parse peerEmail, durationMinutes, windowStart/windowEnd, timezone, title
-2. Soft-confirm with your human if policy requires
-3. `POST /api/v1/schedule` with those fields (requires active link)
-4. Tell the user which task opened and whether anything needs their attention
-5. Use board messages for free/busy negotiation:
-   - `POST /api/v1/sessions/:id/messages` `{ "kind": "avail.offer", "body": { ...slots } }`
-   - `GET /api/v1/sessions/:id/board`
+1. Call `request_schedule_meeting` / `POST /api/v1/schedule` with their email
+2. HoneyMatcha delivers that to **their agent inbox** if they have a HoneyMatcha
+   account. Activity will say waiting for their agent — not booked.
+3. If they are not on HoneyMatcha (`reach: not_on_honeymatcha`), show `share_url`
+   to your human so they can join. There is no agent to reach yet.
+4. **Do not** create a Google Calendar event yourself
+5. **Do not** tell the human they accepted until HoneyMatcha returns
+   `calendar.status: booked`
 
 ### D. Confirm (human-gated)
 
@@ -144,6 +144,8 @@ rejection.
 | Action | Method & path |
 |--------|----------------|
 | whoami | `GET /api/v1/me` |
+| inbox | `GET /api/v1/inbox` |
+| ack inbox | `POST /api/v1/inbox/:id/ack` |
 | health (public) | `GET /api/v1/health` |
 | list links | `GET /api/v1/links` |
 | create invite | `POST /api/v1/links/invite` |
@@ -174,6 +176,6 @@ curl -s "$BASE/api/v1/intents" -H "Authorization: Bearer $KEY"
 ## Failure / fallback
 
 - 401 → credential missing/revoked; start pairing again
-- No active link → invite flow; stop until accepted
+- `scheduled: false` + `share_url` → not booked; human must send the link
 - Calendar not connected → ask the human to connect it at `/app/settings`
 - Docs: `https://honeymatcha.io/docs`

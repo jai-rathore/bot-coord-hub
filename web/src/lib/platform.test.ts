@@ -188,10 +188,13 @@ test("connect copy uses the production origin and never asks agents to sign in",
   assert.match(llms, /not a chat app/i);
   assert.match(llms, /pairings\/start/);
   assert.match(llms, /Never sign into Clerk/);
+  assert.match(llms, /get_inbox/);
+  assert.match(llms, /Never create a Google Calendar event yourself/);
 
   const discovery = getDiscoveryDocument("https://honeymatcha.io");
   assert.match(discovery.what, /not a chat app/);
   assert.match(discovery.connect_as_agent, /start pairing immediately/);
   assert.match(discovery.agent_instructions, /Never sign into Clerk/);
+  assert.match(discovery.agent_instructions, /get_inbox/);
   assert.equal(discovery.llms, "https://honeymatcha.io/llms.txt");
 });

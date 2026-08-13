@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { sessionParticipants, sessions } from "@/db/schema";
 import { sessionIdsForUser } from "@/lib/schedule-meeting";
 import { intentLabel, taskStatusLabel } from "@/lib/intent-labels";
+import { voteStatusLabel } from "@/lib/activity-copy";
 import { ensureCurrentUser } from "@/lib/users";
 
 export async function MultiPartyActivity() {
@@ -42,18 +43,23 @@ export async function MultiPartyActivity() {
           .from(sessionParticipants)
           .where(inArray(sessionParticipants.sessionId, ids));
 
-  if (rows.length === 0) {
+  const groupRows = rows.filter((s) => {
+    const participants = parts.filter((p) => p.sessionId === s.id);
+    return participants.length >= 3;
+  });
+
+  if (groupRows.length === 0) {
     return (
       <p className="mt-6 rounded-md border border-dashed border-line bg-[rgba(255,252,246,0.55)] px-4 py-3 text-sm text-muted">
-        No group tasks yet. When your agent coordinates with several people,
-        progress appears here.
+        No group tasks yet. Two-person meetings appear under Tasks above.
+        This section is for coordination with three or more people.
       </p>
     );
   }
 
   return (
     <ul className="mt-6 space-y-4">
-      {rows.map((s) => {
+      {groupRows.map((s) => {
         const participants = parts.filter((p) => p.sessionId === s.id);
         const payload = (s.payload ?? {}) as {
           title?: string;
@@ -66,7 +72,6 @@ export async function MultiPartyActivity() {
           };
           confirmRequired?: boolean;
         };
-        const multi = participants.length >= 3;
         return (
           <li key={s.id} className="border-b border-line/80 pb-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -74,15 +79,20 @@ export async function MultiPartyActivity() {
                 {payload.title || intentLabel(s.intentType)}
               </h2>
               <span className="text-xs uppercase tracking-wide text-muted">
-                {taskStatusLabel(s.status)}
-                {multi ? " · group" : ""}
+                {taskStatusLabel(s.status)} · group
               </span>
             </div>
             <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink">
               {participants.map((p) => (
                 <li key={p.id}>
-                  <span className="text-muted">{p.role}:</span> {p.email}
-                  <span className="text-muted"> ({p.voteStatus})</span>
+                  <span className="text-muted">
+                    {p.role === "organizer" ? "Organizer" : "Invitee"}:
+                  </span>{" "}
+                  {p.email}
+                  <span className="text-muted">
+                    {" "}
+                    ({voteStatusLabel(p.voteStatus)})
+                  </span>
                 </li>
               ))}
             </ul>

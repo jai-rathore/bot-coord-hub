@@ -31,7 +31,9 @@ export default async function ActivityPage({
         Activity
       </h1>
       <p className="mt-2 max-w-xl text-muted">
-        The back-and-forth your agent is handling, shown in plain English.
+        What your agent is coordinating, and who still needs to respond.
+        HoneyMatcha does not email people — if someone has not joined, send
+        them the invite from the task.
       </p>
 
       {dbError ? (

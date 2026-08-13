@@ -53,6 +53,9 @@ See `/docs` on the website for curl examples.
 | Tool | API |
 |------|-----|
 | whoami | `GET /api/v1/me` |
+| get_inbox | `GET /api/v1/inbox` |
+| ack_inbox | `POST /api/v1/inbox/:id/ack` |
+| register_agent_callback | `POST /api/v1/me/callback` |
 | list_links | `GET /api/v1/links` |
 | create_invite | `POST /api/v1/links/invite` |
 | accept_invite | `POST /api/v1/links/accept` |
@@ -68,6 +71,7 @@ See `/docs` on the website for curl examples.
 | read_guest_task | `GET /api/v1/guest-tasks/:publicId` |
 | revoke_guest_task | `POST /api/v1/guest-tasks/:publicId/revoke` |
 
-`request_schedule_meeting` creates a task and human approval. Production
-requires real connected calendars and default agent pairings cannot approve in
-the human’s place.
+`request_schedule_meeting` starts coordination. It does not book a calendar
+event. If the other person is missing, it returns a share URL for the human
+to send. Production requires real connected calendars, and default agent
+pairings cannot approve in the human’s place.

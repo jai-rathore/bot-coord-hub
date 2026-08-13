@@ -115,6 +115,8 @@ export const apiKeys = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    /** Optional HTTPS endpoint HoneyMatcha POSTs when this agent has inbox work. */
+    callbackUrl: text("callback_url"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -509,6 +511,36 @@ export const calendarConnections = pgTable(
   ],
 );
 
+/**
+ * Work for a person's paired agent. HoneyMatcha writes here when another
+ * agent starts coordination. Agents poll get_inbox / whoami; optional
+ * callbackUrl on the API key gets a POST.
+ */
+export const agentInbox = pgTable(
+  "agent_inbox",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id").references(() => sessions.id, {
+      onDelete: "cascade",
+    }),
+    kind: text("kind").notNull(),
+    summary: text("summary").notNull(),
+    body: jsonb("body").$type<Record<string, unknown>>().notNull().default({}),
+    ackedAt: timestamp("acked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("agent_inbox_user_created_idx").on(t.userId, t.createdAt),
+    index("agent_inbox_user_unacked_idx").on(t.userId, t.ackedAt),
+    index("agent_inbox_session_kind_idx").on(t.sessionId, t.kind),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type Link = typeof links.$inferSelect;
@@ -523,3 +555,4 @@ export type CalendarConnection = typeof calendarConnections.$inferSelect;
 export type GuestTask = typeof guestTasks.$inferSelect;
 export type GuestResponse = typeof guestResponses.$inferSelect;
 export type AgentPairing = typeof agentPairings.$inferSelect;
+export type AgentInbox = typeof agentInbox.$inferSelect;
