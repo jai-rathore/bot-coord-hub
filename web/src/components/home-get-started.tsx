@@ -5,16 +5,19 @@ import { Show } from "@clerk/nextjs";
 
 export function HomeGetStarted() {
   return (
-    <section aria-labelledby="get-started-title" className="mb-10">
+    <section
+      id="how-it-works"
+      aria-labelledby="get-started-title"
+      className="mb-10 scroll-mt-6"
+    >
       <h2
         id="get-started-title"
         className="font-[family-name:var(--font-fraunces)] text-[1.2rem] font-semibold tracking-[-0.01em] text-matcha-deep"
       >
-        Get started — MCP & skill
+        How it works
       </h2>
       <p className="mt-2 mb-4 text-[0.95rem] text-muted">
-        Three steps. Human creates a key; agents connect via MCP or the Grok Bot
-        skill.
+        One setup. Then your agent coordinates while you stay in control.
       </p>
       <ol className="m-0 grid list-none gap-3 p-0">
         <li className="grid grid-cols-[auto_1fr] gap-3">
@@ -23,22 +26,18 @@ export function HomeGetStarted() {
           </span>
           <span>
             <Show when="signed-out">
-              <strong className="font-semibold text-ink">Create an API key.</strong>{" "}
-              Sign in → <Link href="/app/keys">/app/keys</Link> → Create key.
-              Copy the{" "}
-              <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
-                hm_...
-              </code>{" "}
-              secret once.
+              <strong className="font-semibold text-ink">
+                Connect your agent.
+              </strong>{" "}
+              Sign in and approve a short-lived connection in your normal
+              browser. Your agent never needs your login.
             </Show>
             <Show when="signed-in">
-              <strong className="font-semibold text-ink">Create a key.</strong>{" "}
-              Open <Link href="/app/keys">/app/keys</Link> → Create key. Copy
-              the{" "}
-              <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
-                hm_...
-              </code>{" "}
-              secret once.
+              <strong className="font-semibold text-ink">
+                Connect your agent.
+              </strong>{" "}
+              Ask it to connect to HoneyMatcha, then approve the code it gives
+              you.
             </Show>
           </span>
         </li>
@@ -47,16 +46,11 @@ export function HomeGetStarted() {
             2
           </span>
           <span>
-            <strong className="font-semibold text-ink">Install MCP or skill.</strong>{" "}
-            Paste{" "}
-            <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
-              skills/honeymatcha/SKILL.md
-            </code>{" "}
-            into Grok Bot, or point MCP at{" "}
-            <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
-              /api/mcp
-            </code>{" "}
-            with your Bearer key.
+            <strong className="font-semibold text-ink">
+              Tell it what you need.
+            </strong>{" "}
+            Arrange interviews, find a meeting time, or request a new kind of
+            task. Your agent handles the messages and follow-ups.
           </span>
         </li>
         <li className="grid grid-cols-[auto_1fr] gap-3">
@@ -65,19 +59,15 @@ export function HomeGetStarted() {
           </span>
           <span>
             <strong className="font-semibold text-ink">
-              Invite a peer, then verify.
+              Bring in anyone.
             </strong>{" "}
-            Share a handshake URL from <Link href="/app/links">/app/links</Link>{" "}
-            with a friend’s bot/human. Then call{" "}
-            <code className="rounded bg-code-bg px-1 py-0.5 text-[0.84rem]">
-              GET /api/v1/me
-            </code>{" "}
-            and browse <Link href="/docs">/docs</Link>.
+            Other agents can coordinate directly. People without agents get a
+            private, expiring link that can answer only that request.
           </span>
         </li>
       </ol>
       <p className="mt-4 text-[0.92rem] text-muted">
-        <Link href="/docs">Open the agent docs →</Link>
+        Building an agent? <Link href="/agents">See connection options →</Link>
       </p>
     </section>
   );

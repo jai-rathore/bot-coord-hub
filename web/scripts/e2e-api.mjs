@@ -3,7 +3,7 @@
  * Hits running Next server (default http://127.0.0.1:3000).
  */
 import "dotenv/config";
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import postgres from "postgres";
 
 const base = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000";
@@ -13,17 +13,33 @@ if (!url) {
   process.exit(1);
 }
 const sql = postgres(url, { max: 1 });
+const safeScopes = [
+  "profile:read",
+  "people:read",
+  "people:write",
+  "tasks:read",
+  "tasks:write",
+  "approvals:read",
+  "guest_tasks:read",
+  "guest_tasks:write",
+  "intents:read",
+  "intents:request",
+];
 
 function hashApiKey(rawKey) {
   return createHash("sha256").update(rawKey).digest("hex");
 }
 
-async function jsonFetch(path, { method = "GET", token, body } = {}) {
+async function jsonFetch(
+  path,
+  { method = "GET", token, body, headers = {} } = {},
+) {
   const res = await fetch(`${base}${path}`, {
     method,
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(body ? { "Content-Type": "application/json" } : {}),
+      ...headers,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -51,10 +67,10 @@ async function main() {
   const aliceRaw = `hm_${randomBytes(24).toString("base64url")}`;
   const bobRaw = `hm_${randomBytes(24).toString("base64url")}`;
   await sql`
-    insert into api_keys (user_id, name, key_prefix, key_hash)
+    insert into api_keys (user_id, name, key_prefix, key_hash, scopes)
     values
-      (${alice.id}, ${"alice"}, ${aliceRaw.slice(0, 11)}, ${hashApiKey(aliceRaw)}),
-      (${bob.id}, ${"bob"}, ${bobRaw.slice(0, 11)}, ${hashApiKey(bobRaw)})
+      (${alice.id}, ${"alice"}, ${aliceRaw.slice(0, 11)}, ${hashApiKey(aliceRaw)}, ${sql.json(safeScopes)}),
+      (${bob.id}, ${"bob"}, ${bobRaw.slice(0, 11)}, ${hashApiKey(bobRaw)}, ${sql.json(safeScopes)})
   `;
 
   const me = await jsonFetch("/api/v1/me", { token: aliceRaw });
@@ -67,8 +83,8 @@ async function main() {
   });
   assert(invite.res.status === 201, `invite failed: ${JSON.stringify(invite.data)}`);
   assert(
-    String(invite.data.message || "").includes("friend"),
-    "invite copy should mention friend",
+    String(invite.data.message || "").includes("private"),
+    "invite copy should describe a private invitation",
   );
   assert(
     String(invite.data.link.inviteUrl || "").includes("/invite/"),
@@ -84,12 +100,80 @@ async function main() {
   assert(accept.res.ok, `accept failed: ${JSON.stringify(accept.data)}`);
   assert(accept.data.link.status === "active", "accepted link should be active");
   assert(accept.data.pair?.status === "active", "pair link should be active");
+  const peerPolicyTamper = await jsonFetch(
+    `/api/v1/links/${accept.data.link.id}`,
+    {
+      method: "PATCH",
+      token: bobRaw,
+      body: { confirmRequired: false },
+    },
+  );
+  assert(
+    peerPolicyTamper.res.status === 403,
+    "a peer must not change another principal's policy",
+  );
 
   const aliceLinks = await jsonFetch("/api/v1/links", { token: aliceRaw });
   assert(aliceLinks.res.ok, "list links failed");
   assert(
     aliceLinks.data.links.some((l) => l.status === "active"),
     "alice should see active link",
+  );
+
+  await sql`
+    update links
+    set scopes = ${sql.json(["schedule_meeting"])}
+    where id = ${accept.data.link.id}
+  `;
+  const blockedByScope = await jsonFetch("/api/v1/schedule", {
+    method: "POST",
+    token: aliceRaw,
+    headers: { "Idempotency-Key": randomUUID() },
+    body: {
+      linkId: accept.data.link.id,
+      durationMinutes: 30,
+      windowStart: "2026-08-18T09:00:00.000Z",
+      windowEnd: "2026-08-18T17:00:00.000Z",
+    },
+  });
+  assert(
+    blockedByScope.res.status === 403,
+    "linkId scheduling must enforce relationship scopes",
+  );
+  await sql`
+    update links
+    set scopes = ${sql.json(["schedule_meeting", "avail.read_freebusy"])}
+    where id = ${accept.data.link.id}
+  `;
+
+  const scheduleIdempotency = randomUUID();
+  const scheduleBody = {
+    linkId: accept.data.link.id,
+    durationMinutes: 30,
+    windowStart: "2026-08-18T09:00:00.000Z",
+    windowEnd: "2026-08-18T17:00:00.000Z",
+    timezone: "UTC",
+    title: "Idempotent scheduling test",
+  };
+  const scheduled = await jsonFetch("/api/v1/schedule", {
+    method: "POST",
+    token: aliceRaw,
+    headers: { "Idempotency-Key": scheduleIdempotency },
+    body: scheduleBody,
+  });
+  assert(
+    scheduled.res.status === 201,
+    `schedule failed: ${JSON.stringify(scheduled.data)}`,
+  );
+  const scheduleReplay = await jsonFetch("/api/v1/schedule", {
+    method: "POST",
+    token: aliceRaw,
+    headers: { "Idempotency-Key": scheduleIdempotency },
+    body: scheduleBody,
+  });
+  assert(
+    scheduleReplay.data.idempotent === true,
+    "schedule retry should return existing task",
   );
 
   const session = await jsonFetch("/api/v1/sessions", {
@@ -149,8 +233,15 @@ async function main() {
       note: "Looks good",
     },
   });
-  assert(respond.res.ok, `respond failed: ${JSON.stringify(respond.data)}`);
-  assert(respond.data.confirm.status === "approved", "confirm should be approved");
+  assert(
+    respond.res.status === 403,
+    "default agent must not approve for a human",
+  );
+  await sql`
+    update confirms
+    set status = 'approved', decided_at = now()
+    where id = ${confirm.data.confirm.id}
+  `;
 
   const after = await jsonFetch("/api/v1/confirms?status=pending", {
     token: aliceRaw,

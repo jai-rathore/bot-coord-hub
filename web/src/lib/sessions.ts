@@ -10,6 +10,13 @@ import {
   type SessionMessage,
   type User,
 } from "@/db/schema";
+import { AgentApiError } from "@/lib/agent-errors";
+import { requireSupportedIntent } from "@/lib/intent-gate";
+import {
+  assertLinkScopes,
+  INTENT_REQUIRED_LINK_SCOPES,
+} from "@/lib/scopes";
+import { assertPayloadSize, boundedText } from "@/lib/validation";
 
 export type PublicParticipant = {
   userId: string;
@@ -37,6 +44,7 @@ export type PublicMessage = {
   id: string;
   sessionId: string;
   senderUserId: string | null;
+  actorKind: string;
   kind: string;
   body: Record<string, unknown>;
   createdAt: string;
@@ -195,21 +203,38 @@ export async function createSessionForUser(opts: {
   peerUserId?: string | null;
   linkId?: string | null;
   payload?: Record<string, unknown>;
+  idempotencyKey?: string | null;
 }): Promise<PublicSession> {
-  const intentType = opts.intentType.trim();
-  if (!intentType) {
-    throw Object.assign(new Error("intentType is required"), { status: 400 });
-  }
+  const intentType = boundedText(opts.intentType, "intentType", 80, {
+    required: true,
+  })!;
+  await requireSupportedIntent(intentType);
+  assertPayloadSize(opts.payload);
 
   const db = getDb();
   let peerUserId = opts.peerUserId ?? null;
-  let linkId = opts.linkId ?? null;
+  const requestedLinkId = opts.linkId ?? null;
+  let canonicalLinkId: string | null = null;
 
-  if (linkId) {
+  if (opts.idempotencyKey) {
+    const [existing] = await db
+      .select()
+      .from(sessions)
+      .where(
+        and(
+          eq(sessions.initiatorUserId, opts.user.id),
+          eq(sessions.idempotencyKey, opts.idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (existing) return toPublicSession(existing, null, []);
+  }
+
+  if (requestedLinkId) {
     const linkRows = await db
       .select()
       .from(links)
-      .where(and(eq(links.id, linkId), eq(links.status, "active")))
+      .where(and(eq(links.id, requestedLinkId), eq(links.status, "active")))
       .limit(1);
     const link = linkRows[0];
     if (!link) {
@@ -222,6 +247,46 @@ export async function createSessionForUser(opts: {
     }
     peerUserId =
       link.fromUserId === opts.user.id ? link.toUserId : link.fromUserId;
+    if (!peerUserId) {
+      throw new AgentApiError(409, "Relationship has no accepted peer");
+    }
+
+    const relationshipRows = await db
+      .select()
+      .from(links)
+      .where(
+        and(
+          eq(links.status, "active"),
+          or(
+            and(
+              eq(links.fromUserId, opts.user.id),
+              eq(links.toUserId, peerUserId),
+            ),
+            and(
+              eq(links.fromUserId, peerUserId),
+              eq(links.toUserId, opts.user.id),
+            ),
+          ),
+        ),
+      );
+    const ownerLink = relationshipRows.find(
+      (row) => row.fromUserId === opts.user.id,
+    );
+    const peerLink = relationshipRows.find(
+      (row) => row.fromUserId === peerUserId,
+    );
+    if (!ownerLink || !peerLink) {
+      throw new AgentApiError(409, "Mutual relationship is incomplete");
+    }
+    const requiredScopes = INTENT_REQUIRED_LINK_SCOPES[intentType] ?? [];
+    assertLinkScopes(ownerLink.scopes, requiredScopes, "this person");
+    assertLinkScopes(peerLink.scopes, requiredScopes, "this person");
+    canonicalLinkId = ownerLink.id;
+  } else if (peerUserId) {
+    throw new AgentApiError(
+      400,
+      "A trusted relationship is required to start a task with another user",
+    );
   }
 
   if (peerUserId === opts.user.id) {
@@ -236,9 +301,10 @@ export async function createSessionForUser(opts: {
       intentType,
       initiatorUserId: opts.user.id,
       peerUserId,
-      linkId,
+      linkId: canonicalLinkId,
       status: "open",
       payload: opts.payload ?? {},
+      idempotencyKey: opts.idempotencyKey ?? null,
     })
     .returning();
 
@@ -295,6 +361,8 @@ export async function postSessionMessage(opts: {
   sender: User;
   kind: string;
   body?: Record<string, unknown>;
+  actorApiKeyId?: string | null;
+  actorKind?: "user" | "agent" | "guest" | "system";
 }): Promise<PublicMessage> {
   const kind = opts.kind.trim();
   if (!kind) {
@@ -303,12 +371,15 @@ export async function postSessionMessage(opts: {
 
   const db = getDb();
   const body = opts.body ?? {};
+  assertPayloadSize(body, 8_192, "message body");
 
   const [created] = await db
     .insert(sessionMessages)
     .values({
       sessionId: opts.session.id,
       senderUserId: opts.sender.id,
+      actorApiKeyId: opts.actorApiKeyId ?? null,
+      actorKind: opts.actorKind ?? "user",
       kind,
       body,
     })
@@ -351,6 +422,7 @@ function toPublicMessage(message: SessionMessage): PublicMessage {
     id: message.id,
     sessionId: message.sessionId,
     senderUserId: message.senderUserId,
+    actorKind: message.actorKind,
     kind: message.kind,
     body,
     createdAt: message.createdAt.toISOString(),

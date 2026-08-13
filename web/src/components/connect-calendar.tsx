@@ -35,9 +35,7 @@ export function ConnectCalendar({
   if (!initial.enabled) {
     return (
       <p className="mt-4 text-sm text-muted">
-        Google Calendar is disabled. Set{" "}
-        <code>GOOGLE_CALENDAR_ENABLED=true</code> and OAuth client credentials
-        to enable Connect Calendar.
+        Calendar connections are not available in this environment yet.
       </p>
     );
   }
@@ -45,8 +43,8 @@ export function ConnectCalendar({
   if (!initial.configured) {
     return (
       <p className="mt-4 text-sm text-muted">
-        Missing <code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>
-        . MockCalendar remains active for schedule_meeting.
+        Google Calendar is temporarily unavailable. HoneyMatcha will never
+        pretend that a meeting was booked.
       </p>
     );
   }
@@ -81,8 +79,8 @@ export function ConnectCalendar({
       ) : (
         <>
           <p className="text-sm text-muted">
-            Connect Google Calendar so schedule_meeting can read free/busy and
-            create events with Meet when confirms are approved.
+            Connect Google Calendar so your agent can compare free/busy and
+            create an event with Meet after everyone approves.
           </p>
           <a
             href="/api/google/start"

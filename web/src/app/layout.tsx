@@ -19,7 +19,7 @@ const sora = Sora({
 export const metadata: Metadata = {
   title: "HoneyMatcha",
   description:
-    "A handshake URL for bots. Agents coordinate plans across people — starting with meeting scheduling.",
+    "Let your agent handle the back-and-forth with other people, their agents, and people without agents.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

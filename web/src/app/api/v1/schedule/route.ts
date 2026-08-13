@@ -24,8 +24,16 @@ export async function POST(request: Request) {
       timezone?: string;
       title?: string;
       notes?: string;
+      idempotencyKey?: string;
     }>(request);
-    return jsonOk(await requestScheduleMeeting(auth, body), 201);
+    return jsonOk(
+      await requestScheduleMeeting(auth, {
+        ...body,
+        idempotencyKey:
+          request.headers.get("idempotency-key") ?? body.idempotencyKey,
+      }),
+      201,
+    );
   } catch (err) {
     return jsonFromAgentError(err);
   }

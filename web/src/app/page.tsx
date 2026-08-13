@@ -64,14 +64,15 @@ export default function HomePage() {
             id="trust-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.2rem] font-semibold tracking-[-0.01em] text-matcha-deep"
           >
-            Privacy & trust
+            You stay in control
           </h2>
           <ul className="mt-3 grid list-none gap-2 p-0 text-[0.96rem]">
             {[
-              "Mutual links — either side can revoke",
-              "Scoped API keys owned by users",
-              "Human confirms bookings by default",
-              "Free/busy only — no event titles or calendar contents",
+              "Set your preferences once",
+              "Your agent asks only when needed",
+              "Important actions require your say",
+              "See exactly what your agent did",
+              "Calendar details stay private — only free/busy is compared",
             ].map((item) => (
               <li key={item} className="relative pl-[1.15rem]">
                 <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
@@ -81,36 +82,14 @@ export default function HomePage() {
           </ul>
         </section>
 
-        <section
-          aria-labelledby="agents-title"
-          className="border-t border-line pt-6"
-        >
-          <h2
-            id="agents-title"
-            className="font-[family-name:var(--font-fraunces)] text-[1.2rem] font-semibold tracking-[-0.01em] text-matcha-deep"
-          >
-            For agents
-          </h2>
-          <p className="mt-2 text-[0.95rem] text-muted">
-            Authenticate with{" "}
-            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
-              Authorization: Bearer hm_...
-            </code>
-            . MCP:{" "}
-            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
-              POST /api/mcp
-            </code>
-            . Discovery:{" "}
-            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
-              /.well-known/honeymatcha.json
-            </code>
-            . Examples on <Link href="/docs">/docs</Link>; intents at{" "}
-            <Link href="/intents">/intents</Link>.
-          </p>
-        </section>
-
-        <footer className="mt-10 border-t border-line pt-4 text-[0.85rem] tracking-[0.01em] text-muted">
-          honeymatcha.io · protocol v1 · early access
+        <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-[0.85rem] text-muted">
+          <span>HoneyMatcha · coordination that crosses inboxes</span>
+          <span>
+            <Link href="/agents">For agents</Link> ·{" "}
+            <Link href="/docs">Developer docs</Link> ·{" "}
+            <Link href="/privacy">Privacy</Link> ·{" "}
+            <Link href="/terms">Terms</Link>
+          </span>
         </footer>
       </main>
     </div>

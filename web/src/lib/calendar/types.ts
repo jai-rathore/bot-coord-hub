@@ -15,6 +15,8 @@ export type FreeBusyResult = {
 };
 
 export type CreateEventInput = {
+  /** Stable per coordination task so provider retries are idempotent. */
+  requestId: string;
   title: string;
   start: string;
   end: string;

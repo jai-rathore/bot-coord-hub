@@ -87,14 +87,64 @@ export function mergeLinkPolicies(
   confirmRequired: boolean;
   allowedHours: AllowedHours | null;
   timezone: string | null;
+  constraints: Array<{
+    allowedHours: AllowedHours;
+    timezone: string;
+  }>;
 } {
-  // Most restrictive: any link requiring confirm → confirm required.
-  const confirmRequired = links.some((l) => l.confirmRequired);
-  const withHours = links.find((l) => l.allowedHours);
-  const withTz = links.find((l) => l.timezone);
+  const constraints = links
+    .filter(
+      (
+        link,
+      ): link is {
+        confirmRequired: boolean;
+        allowedHours: AllowedHours;
+        timezone: string;
+      } => Boolean(link.allowedHours && link.timezone),
+    )
+    .map((link) => ({
+      allowedHours: link.allowedHours,
+      timezone: link.timezone,
+    }));
+
+  const serializedHours = new Set(
+    links
+      .filter((link) => link.allowedHours)
+      .map((link) => JSON.stringify(link.allowedHours)),
+  );
+  const timezones = new Set(
+    links.map((link) => link.timezone).filter((value): value is string => Boolean(value)),
+  );
+  const policiesDiffer = serializedHours.size > 1 || timezones.size > 1;
+  const confirmRequired =
+    links.some((link) => link.confirmRequired) || policiesDiffer;
+  const commonHours =
+    serializedHours.size === 1
+      ? links.find((link) => link.allowedHours)?.allowedHours ?? null
+      : null;
+  const commonTimezone =
+    timezones.size === 1 ? [...timezones][0] ?? null : null;
+
   return {
     confirmRequired,
-    allowedHours: withHours?.allowedHours ?? null,
-    timezone: withTz?.timezone ?? null,
+    allowedHours: commonHours,
+    timezone: commonTimezone,
+    constraints,
   };
+}
+
+export function slotWithinAllAllowedHours(
+  slot: SessionSlot,
+  constraints: Array<{
+    allowedHours: AllowedHours;
+    timezone: string;
+  }>,
+): boolean {
+  return constraints.every((constraint) =>
+    slotWithinAllowedHours(
+      slot,
+      constraint.allowedHours,
+      constraint.timezone,
+    ),
+  );
 }

@@ -4,7 +4,7 @@
  */
 
 export const PROTOCOL_VERSION = 1;
-export const PRODUCT_VERSION = "0.2.0";
+export const PRODUCT_VERSION = "0.3.0";
 
 export function getDiscoveryDocument(baseUrl?: string) {
   const base = (baseUrl ?? "").replace(/\/$/, "");
@@ -15,11 +15,16 @@ export function getDiscoveryDocument(baseUrl?: string) {
     name: "HoneyMatcha",
     version: PRODUCT_VERSION,
     protocol: PROTOCOL_VERSION,
-    tagline: "A handshake URL for bots.",
+    tagline: "Let your agent handle the back-and-forth.",
     docs: abs("/docs"),
     homepage: abs("/"),
     health: abs("/api/v1/health"),
     openapi: abs("/api/v1/openapi"),
+    agent_card: abs("/.well-known/agent-card.json"),
+    a2a: {
+      jsonrpc: abs("/api/a2a"),
+      protocol_version: "1.0",
+    },
     mcp: {
       http: abs("/api/mcp"),
       stdio: "web/mcp (Node entry; see /docs)",
@@ -27,10 +32,16 @@ export function getDiscoveryDocument(baseUrl?: string) {
         "Prefer HTTP JSON-RPC at /api/mcp for remote agents, or run the stdio MCP server that wraps this API.",
     },
     auth: {
-      type: "bearer",
-      header: "Authorization: Bearer <api_key>",
+      type: "scoped_bearer",
+      header: "Authorization: Bearer <agent_credential>",
       key_prefix: "hm_",
       create_key_url: abs("/app/keys"),
+      pairing: {
+        start: abs("/api/v1/pairings/start"),
+        token: abs("/api/v1/pairings/token"),
+        human_verification: abs("/connect/{userCode}"),
+      },
+      protected_resource: abs("/.well-known/oauth-protected-resource"),
     },
     endpoints: {
       whoami: { method: "GET", path: "/api/v1/me" },
@@ -56,11 +67,20 @@ export function getDiscoveryDocument(baseUrl?: string) {
       request_schedule_meeting: { method: "POST", path: "/api/v1/schedule" },
       list_confirms: { method: "GET", path: "/api/v1/confirms" },
       request_confirm: { method: "POST", path: "/api/v1/confirms" },
-      respond_confirm: { method: "POST", path: "/api/v1/confirms/respond" },
+      list_guest_tasks: { method: "GET", path: "/api/v1/guest-tasks" },
+      create_guest_task: { method: "POST", path: "/api/v1/guest-tasks" },
+      read_guest_task: {
+        method: "GET",
+        path: "/api/v1/guest-tasks/:publicId",
+      },
+      revoke_guest_task: {
+        method: "POST",
+        path: "/api/v1/guest-tasks/:publicId/revoke",
+      },
     },
     intents: ["schedule_meeting"],
     agent_instructions:
-      "1) Human creates an API key at /app/keys (hm_...). 2) Call GET /api/v1/me with Authorization: Bearer <key>. 3) Share an invite URL (/invite/{code}) with a friend’s bot/human, accept to form mutual links, then use sessions/board + confirms. Or use MCP tools at /api/mcp. request_schedule_meeting (peerEmails for 3+) proposes from free/busy, opens a human confirm gate, then books via CalendarPort (Mock or per-user Google + Meet). Humans connect Google at /app/settings. Share free/busy only; never peer event titles. Docs: web/docs/SCHEDULE_MEETING.md.",
+      "1) Start pairing at /api/v1/pairings/start and ask the human to approve the displayed code in their browser. 2) Exchange the approved device code once for a scoped hm_ credential. 3) Use MCP, A2A, or /api/v1 operations. For people without agents, create a targeted guest task: its gt_ capability can answer only that task and cannot access the network. Meeting bookings pause for human approval by default. Share free/busy only; never peer event titles.",
     skill: {
       path: "skills/honeymatcha/SKILL.md",
       name: "honeymatcha",

@@ -1,22 +1,22 @@
-import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
 import { listConfirms, requestConfirm } from "@/lib/agent-api";
 import {
   jsonFromAgentError,
   jsonOk,
   readJsonBody,
+  requireAgent,
 } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Confirm gates for the authenticated user.
- * Human-gated by default — dashboard: /app/confirm.
+ * Human decisions are completed in the browser at /app/attention.
  * GET  /api/v1/confirms?status=pending|approved|denied
  * POST /api/v1/confirms — request { sessionId, action, note?, metadata?, confirmUserId? }
  */
 export async function GET(request: Request) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   try {
     const url = new URL(request.url);
@@ -34,8 +34,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   try {
     const body = await readJsonBody<{

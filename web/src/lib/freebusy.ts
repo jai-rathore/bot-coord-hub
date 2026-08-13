@@ -24,7 +24,7 @@ export function mergeBusy(blocks: BusyBlock[]): BusyBlock[] {
 
 /**
  * Propose free slots of `durationMinutes` inside [windowStart, windowEnd]
- * that do not overlap any busy block. Steps every `durationMinutes`.
+ * that do not overlap any busy block. Starts on a 15-minute boundary.
  * Returns free/busy-derived windows only — never calendar event contents.
  */
 export function proposeFreeSlots(opts: {
@@ -50,7 +50,8 @@ export function proposeFreeSlots(opts: {
   const busy = mergeBusy(opts.busy);
   const slots: SessionSlot[] = [];
   const max = opts.maxSlots ?? 8;
-  let cursor = startMs;
+  const stepMs = 15 * 60_000;
+  let cursor = Math.ceil(startMs / stepMs) * stepMs;
   let rank = 1;
 
   while (cursor + durationMs <= endMs && slots.length < max) {
@@ -67,7 +68,7 @@ export function proposeFreeSlots(opts: {
         rank: rank++,
       });
     }
-    cursor += durationMs;
+    cursor += stepMs;
   }
 
   return slots;

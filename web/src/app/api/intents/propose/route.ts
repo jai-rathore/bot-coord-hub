@@ -6,13 +6,14 @@ import {
 } from "@/lib/intents";
 import { normalizeIntentName, slugify } from "@/lib/slug";
 import { ensureCurrentUser } from "@/lib/users";
+import { boundedText } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const user = await ensureCurrentUser();
   if (!user) {
-    return Response.json({ error: "Sign in to propose an intent" }, { status: 401 });
+    return Response.json({ error: "Sign in to request a task" }, { status: 401 });
   }
 
   let body: {
@@ -40,7 +41,16 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid slug" }, { status: 400 });
   }
 
-  const description = body.description?.trim() || null;
+  let description: string | null;
+  try {
+    description =
+      boundedText(body.description, "description", 2_000) ?? null;
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Invalid description" },
+      { status: 400 },
+    );
+  }
   const hits = await findDedupeHits(name, slug);
   const exact = isExactDedupeConflict(hits, name, slug);
 

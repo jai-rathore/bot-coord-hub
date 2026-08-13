@@ -1,5 +1,5 @@
-import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
 import { PRODUCT_VERSION } from "@/lib/discovery";
+import { requireAgent } from "@/lib/http";
 import {
   dispatchMcpTool,
   MCP_TOOLS,
@@ -45,8 +45,8 @@ function rpcError(
  * Also accepts { tool, arguments } shortcut for tools/call.
  */
 export async function POST(request: Request) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   let body: JsonRpcRequest;
   try {
@@ -122,8 +122,8 @@ export async function POST(request: Request) {
 
 /** GET returns tool catalog (discovery helper). Auth required. */
 export async function GET(request: Request) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   return Response.json({
     ok: true,

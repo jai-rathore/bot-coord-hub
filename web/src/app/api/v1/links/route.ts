@@ -1,10 +1,10 @@
-import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
 import { createInvite, listLinks } from "@/lib/agent-api";
 import {
   jsonFromAgentError,
   jsonOk,
   readJsonBody,
   requestBaseUrl,
+  requireAgent,
 } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +16,8 @@ export const dynamic = "force-dynamic";
  * Also accepts POST as an alias of /api/v1/links/invite for convenience.
  */
 export async function GET(request: Request) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   try {
     return jsonOk(await listLinks(auth, requestBaseUrl(request)));
@@ -27,19 +27,20 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   try {
     let body: {
       toEmail?: string;
       toName?: string;
       scopes?: string[];
+      expiresInHours?: number;
     } = {};
     try {
       body = await readJsonBody(request);
     } catch {
-      // open invite with empty body is ok
+      // Shared validation reports a recipient requirement.
       body = {};
     }
     return jsonOk(

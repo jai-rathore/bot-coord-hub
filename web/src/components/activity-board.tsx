@@ -2,15 +2,20 @@
 
 import { useEffect, useState, useTransition } from "react";
 import type { PublicMessage, PublicSession } from "@/lib/sessions";
+import { intentLabel, taskStatusLabel } from "@/lib/intent-labels";
 
 export function ActivityBoard({
   initialSessions,
+  initialSelectedId,
 }: {
   initialSessions: PublicSession[];
+  initialSelectedId?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState<string | null>(
-    initialSessions[0]?.id ?? null,
+    initialSessions.some((session) => session.id === initialSelectedId)
+      ? (initialSelectedId ?? null)
+      : (initialSessions[0]?.id ?? null),
   );
   const [messages, setMessages] = useState<PublicMessage[]>([]);
   const [showRaw, setShowRaw] = useState(false);
@@ -19,7 +24,6 @@ export function ActivityBoard({
 
   useEffect(() => {
     if (!selectedId) {
-      setMessages([]);
       return;
     }
     let cancelled = false;
@@ -64,11 +68,11 @@ export function ActivityBoard({
     <div className="grid gap-8 lg:grid-cols-[minmax(14rem,18rem)_1fr]">
       <section>
         <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
-          Sessions
+          Tasks
         </h2>
         {initialSessions.length === 0 ? (
           <p className="mt-2 text-sm text-muted">
-            No sessions yet. When agents open a coordination session, it shows
+            No tasks yet. When your agent starts coordinating, its work shows
             up here.
           </p>
         ) : (
@@ -87,13 +91,13 @@ export function ActivityBoard({
                     }`}
                   >
                     <span className="block font-medium">
-                      {session.intentType}
+                      {intentLabel(session.intentType)}
                     </span>
                     <span
                       className={`block text-xs ${active ? "text-[#dce8df]" : "text-muted"}`}
                     >
                       {session.peer?.name || session.peer?.email || "No peer"} ·{" "}
-                      {session.status}
+                      {taskStatusLabel(session.status)}
                     </span>
                   </button>
                 </li>
@@ -106,7 +110,7 @@ export function ActivityBoard({
       <section>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
-            {selected ? selected.intentType : "Messages"}
+            {selected ? intentLabel(selected.intentType) : "Updates"}
           </h2>
           <label className="flex items-center gap-2 text-sm text-muted">
             <input
@@ -114,7 +118,7 @@ export function ActivityBoard({
               checked={showRaw}
               onChange={(e) => setShowRaw(e.target.checked)}
             />
-            Show raw JSON
+            Show technical details
           </label>
         </div>
 
@@ -123,7 +127,10 @@ export function ActivityBoard({
         ) : (
           <>
             <p className="mt-1 text-sm text-muted">
-              Status <span className="text-ink">{selected.status}</span>
+              Status{" "}
+              <span className="text-ink">
+                {taskStatusLabel(selected.status)}
+              </span>
               {selected.peer
                 ? ` · Peer ${selected.peer.name || selected.peer.email}`
                 : ""}

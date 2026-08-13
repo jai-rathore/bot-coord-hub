@@ -3,7 +3,7 @@
  * linked peers → free/busy propose → confirm gate → CalendarPort book (+ Meet).
  */
 
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   confirms,
@@ -27,17 +27,42 @@ import { proposeFreeSlots } from "@/lib/freebusy";
 import {
   mergeLinkPolicies,
   shouldAutoBook,
-  slotWithinAllowedHours,
+  slotWithinAllAllowedHours,
 } from "@/lib/policy";
+import { requireSupportedIntent } from "@/lib/intent-gate";
+import { assertLinkScopes } from "@/lib/scopes";
+import {
+  assertPeerCount,
+  boundedText,
+  parseScheduleWindow,
+} from "@/lib/validation";
 
-const SCHEDULE_SCOPES = ["schedule_meeting", "avail.read_freebusy"];
+const SCHEDULE_SCOPES = [
+  "schedule_meeting",
+  "avail.read_freebusy",
+] as const;
 
-function findActiveLink(a: string, b: string, rows: Link[]): Link | undefined {
+type ResolvedPeer = {
+  peer: User;
+  actorLink: Link;
+  peerLink: Link;
+};
+
+type ScheduleActor = {
+  apiKeyId?: string | null;
+  kind?: "user" | "agent";
+};
+
+function findDirectionalLink(
+  fromUserId: string,
+  toUserId: string,
+  rows: Link[],
+): Link | undefined {
   return rows.find(
-    (l) =>
-      l.status === "active" &&
-      ((l.fromUserId === a && l.toUserId === b) ||
-        (l.fromUserId === b && l.toUserId === a)),
+    (link) =>
+      link.status === "active" &&
+      link.fromUserId === fromUserId &&
+      link.toUserId === toUserId,
   );
 }
 
@@ -45,8 +70,7 @@ async function loadUsersByEmails(emails: string[]): Promise<User[]> {
   const normalized = [...new Set(emails.map((e) => e.trim().toLowerCase()))];
   if (normalized.length === 0) return [];
   const db = getDb();
-  const rows = await db.select().from(users);
-  return rows.filter((u) => normalized.includes(u.email.toLowerCase()));
+  return db.select().from(users).where(inArray(users.email, normalized));
 }
 
 async function participantsFor(sessionId: string) {
@@ -69,8 +93,11 @@ export async function runScheduleMeeting(
     timezone?: string;
     title?: string;
     notes?: string;
+    idempotencyKey?: string;
   },
+  actorMeta: ScheduleActor = { kind: "user" },
 ) {
+  await requireSupportedIntent("schedule_meeting");
   const peerEmails = [
     ...(body.peerEmail ? [body.peerEmail] : []),
     ...(body.peerEmails ?? []),
@@ -83,16 +110,48 @@ export async function runScheduleMeeting(
   }
 
   const durationMinutes = Number(body.durationMinutes ?? 30);
-  if (!Number.isFinite(durationMinutes) || durationMinutes < 5) {
-    throw new AgentApiError(400, "durationMinutes must be >= 5");
+  if (
+    !Number.isInteger(durationMinutes) ||
+    durationMinutes < 5 ||
+    durationMinutes > 8 * 60
+  ) {
+    throw new AgentApiError(
+      400,
+      "durationMinutes must be a whole number between 5 and 480",
+    );
   }
-  if (!body.windowStart || !body.windowEnd) {
-    throw new AgentApiError(400, "windowStart and windowEnd are required");
-  }
+  const window = parseScheduleWindow(body.windowStart, body.windowEnd);
+  const title =
+    boundedText(body.title, "title", 120) ?? "Meeting";
+  const notes =
+    boundedText(body.notes, "notes", 2_000) ?? null;
+  const idempotencyKey =
+    boundedText(body.idempotencyKey, "idempotencyKey", 160) ?? null;
 
   const db = getDb();
   let peers: User[] = [];
-  let resolved: Array<{ peer: User; link: Link }> = [];
+  const resolved: ResolvedPeer[] = [];
+
+  if (idempotencyKey) {
+    const [existing] = await db
+      .select()
+      .from(sessions)
+      .where(
+        and(
+          eq(sessions.initiatorUserId, actor.id),
+          eq(sessions.idempotencyKey, idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      return {
+        ok: true,
+        idempotent: true,
+        session: existing,
+        message: "This scheduling request was already received.",
+      };
+    }
+  }
 
   if (body.linkId && peerEmails.length === 0) {
     const [link] = await db
@@ -114,8 +173,35 @@ export async function runScheduleMeeting(
       .limit(1);
     if (!peer) throw new AgentApiError(404, "Peer user not found");
     peers = [peer];
-    resolved = [{ peer, link }];
+
+    const relationshipRows = await db
+      .select()
+      .from(links)
+      .where(
+        and(
+          eq(links.status, "active"),
+          or(
+            and(
+              eq(links.fromUserId, actor.id),
+              eq(links.toUserId, peer.id),
+            ),
+            and(
+              eq(links.fromUserId, peer.id),
+              eq(links.toUserId, actor.id),
+            ),
+          ),
+        ),
+      );
+    const actorLink = findDirectionalLink(actor.id, peer.id, relationshipRows);
+    const peerLink = findDirectionalLink(peer.id, actor.id, relationshipRows);
+    if (!actorLink || !peerLink) {
+      throw new AgentApiError(409, "Mutual relationship is incomplete");
+    }
+    assertLinkScopes(actorLink.scopes, SCHEDULE_SCOPES, peer.email);
+    assertLinkScopes(peerLink.scopes, SCHEDULE_SCOPES, peer.email);
+    resolved.push({ peer, actorLink, peerLink });
   } else {
+    assertPeerCount(peerEmails.length);
     peers = await loadUsersByEmails(peerEmails);
     const found = new Set(peers.map((p) => p.email.toLowerCase()));
     const missing = peerEmails.filter((e) => !found.has(e));
@@ -145,113 +231,143 @@ export async function runScheduleMeeting(
       );
 
     for (const peer of peers) {
-      const link = findActiveLink(actor.id, peer.id, linkRows);
-      if (!link) {
+      const actorLink = findDirectionalLink(actor.id, peer.id, linkRows);
+      const peerLink = findDirectionalLink(peer.id, actor.id, linkRows);
+      if (!actorLink || !peerLink) {
         throw new AgentApiError(
           409,
           `No active link with ${peer.email}. Invite and accept first.`,
           { peerEmail: peer.email },
         );
       }
-      const scopes = link.scopes ?? [];
-      if (!SCHEDULE_SCOPES.every((s) => scopes.includes(s))) {
-        throw new AgentApiError(
-          403,
-          `Link with ${peer.email} missing schedule_meeting / avail.read_freebusy scopes`,
-        );
-      }
-      resolved.push({ peer, link });
+      assertLinkScopes(actorLink.scopes, SCHEDULE_SCOPES, peer.email);
+      assertLinkScopes(peerLink.scopes, SCHEDULE_SCOPES, peer.email);
+      resolved.push({ peer, actorLink, peerLink });
     }
   }
+  assertPeerCount(resolved.length);
 
   const policy = mergeLinkPolicies(
-    resolved.map(({ link }) => ({
-      confirmRequired: link.confirmRequired,
-      allowedHours: (link.allowedHours as AllowedHours | null) ?? null,
-      timezone: link.timezone,
-    })),
+    resolved.flatMap(({ actorLink, peerLink }) =>
+      [actorLink, peerLink].map((link) => ({
+        confirmRequired: link.confirmRequired,
+        allowedHours: (link.allowedHours as AllowedHours | null) ?? null,
+        timezone: link.timezone,
+      })),
+    ),
   );
 
   const primary = resolved[0]!;
   const timezone = body.timezone?.trim() || policy.timezone || "UTC";
-  const title = body.title?.trim() || "Meeting";
 
-  const [session] = await db
-    .insert(sessions)
-    .values({
-      intentType: "schedule_meeting",
-      initiatorUserId: actor.id,
-      peerUserId: peers.length === 1 ? primary.peer.id : null,
-      linkId: peers.length === 1 ? primary.link.id : null,
-      status: "open",
-      payload: {
-        phase: "initiated",
+  const session = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(sessions)
+      .values({
+        intentType: "schedule_meeting",
+        initiatorUserId: actor.id,
+        peerUserId: peers.length === 1 ? primary.peer.id : null,
+        linkId: peers.length === 1 ? primary.actorLink.id : null,
+        status: "open",
+        idempotencyKey,
+        payload: {
+          phase: "initiated",
+          durationMinutes,
+          windowStart: window.start.toISOString(),
+          windowEnd: window.end.toISOString(),
+          timezone,
+          title,
+          notes,
+          confirmRequired: policy.confirmRequired,
+          policySnapshot: policy,
+          participants: [
+            { userId: actor.id, email: actor.email, role: "organizer" },
+            ...resolved.map(({ peer }) => ({
+              userId: peer.id,
+              email: peer.email,
+              role: "invitee" as const,
+            })),
+          ],
+        },
+      })
+      .returning();
+
+    await tx.insert(sessionParticipants).values([
+      {
+        sessionId: created.id,
+        userId: actor.id,
+        email: actor.email,
+        role: "organizer" as const,
+        linkId: null,
+        voteStatus: "accepted",
+      },
+      ...resolved.map(({ peer, actorLink }) => ({
+        sessionId: created.id,
+        userId: peer.id,
+        email: peer.email,
+        role: "invitee" as const,
+        linkId: actorLink.id,
+        voteStatus: "pending",
+      })),
+    ]);
+
+    await tx.insert(sessionMessages).values({
+      sessionId: created.id,
+      senderUserId: actor.id,
+      actorApiKeyId: actorMeta.apiKeyId ?? null,
+      actorKind: actorMeta.kind ?? "user",
+      kind: "intent.schedule_meeting",
+      body: {
+        text: `Requested meeting: ${title}`,
         durationMinutes,
-        windowStart: body.windowStart,
-        windowEnd: body.windowEnd,
+        windowStart: window.start.toISOString(),
+        windowEnd: window.end.toISOString(),
         timezone,
         title,
-        notes: body.notes?.trim() || null,
-        confirmRequired: policy.confirmRequired,
-        policySnapshot: policy,
-        participants: [
-          { userId: actor.id, email: actor.email, role: "organizer" },
-          ...resolved.map(({ peer }) => ({
-            userId: peer.id,
-            email: peer.email,
-            role: "invitee" as const,
-          })),
-        ],
+        notes,
       },
-    })
-    .returning();
-
-  await db.insert(sessionParticipants).values({
-    sessionId: session.id,
-    userId: actor.id,
-    email: actor.email,
-    role: "organizer",
-    linkId: null,
-    voteStatus: "accepted",
-  });
-  for (const { peer, link } of resolved) {
-    await db.insert(sessionParticipants).values({
-      sessionId: session.id,
-      userId: peer.id,
-      email: peer.email,
-      role: "invitee",
-      linkId: link.id,
-      voteStatus: "pending",
     });
-  }
-
-  await db.insert(sessionMessages).values({
-    sessionId: session.id,
-    senderUserId: actor.id,
-    kind: "intent.schedule_meeting",
-    body: {
-      text: `Requested meeting: ${title}`,
-      durationMinutes,
-      windowStart: body.windowStart,
-      windowEnd: body.windowEnd,
-      timezone,
-      title,
-      notes: body.notes?.trim() || null,
-    },
+    return created;
   });
 
   await writeAudit({
     actorUserId: actor.id,
+    actorApiKeyId: actorMeta.apiKeyId ?? null,
+    actorKind: actorMeta.kind ?? "user",
     action: "session.start",
     entityType: "session",
     entityId: session.id,
     metadata: { title, peerEmails: peers.map((p) => p.email) },
   });
 
-  return proposeAndGate(actor, session.id);
+  try {
+    return await proposeAndGate(actor, session.id, actorMeta);
+  } catch (error) {
+    const currentPayload = (session.payload ?? {}) as Record<string, unknown>;
+    await db
+      .update(sessions)
+      .set({
+        status: "cancelled",
+        payload: {
+          ...currentPayload,
+          phase: "failed",
+          error: {
+            message:
+              error instanceof Error ? error.message : "Scheduling failed",
+          },
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(sessions.id, session.id));
+    throw error;
+  }
 }
 
-async function proposeAndGate(actor: User, sessionId: string) {
+async function proposeAndGate(
+  actor: User,
+  sessionId: string,
+  actorMeta: ScheduleActor,
+) {
   const db = getDb();
   const [session] = await db
     .select()
@@ -271,6 +387,10 @@ async function proposeAndGate(actor: User, sessionId: string) {
     confirmRequired?: boolean;
     allowedHours?: AllowedHours | null;
     timezone?: string | null;
+    constraints?: Array<{
+      allowedHours: AllowedHours;
+      timezone: string;
+    }>;
   };
 
   const parts = await participantsFor(sessionId);
@@ -287,6 +407,8 @@ async function proposeAndGate(actor: User, sessionId: string) {
   await db.insert(sessionMessages).values({
     sessionId,
     senderUserId: actor.id,
+    actorApiKeyId: actorMeta.apiKeyId ?? null,
+    actorKind: actorMeta.kind ?? "user",
     kind: "avail.request",
     body: {
       text: `Collected free/busy from ${parts.length} calendars (${freeBusy.provider}).`,
@@ -306,9 +428,22 @@ async function proposeAndGate(actor: User, sessionId: string) {
 
   const allowedHours = policySnapshot.allowedHours ?? null;
   const policyTz = policySnapshot.timezone || timezone;
-  if (allowedHours) {
+  const constraints =
+    policySnapshot.constraints?.length
+      ? policySnapshot.constraints
+      : [
+          {
+            allowedHours: {
+              start: "09:00",
+              end: "17:00",
+              days: [1, 2, 3, 4, 5],
+            },
+            timezone: policyTz,
+          },
+        ];
+  if (constraints.length) {
     proposedSlots = proposedSlots.filter((s) =>
-      slotWithinAllowedHours(s, allowedHours, policyTz),
+      slotWithinAllAllowedHours(s, constraints),
     );
   }
 
@@ -352,6 +487,8 @@ async function proposeAndGate(actor: User, sessionId: string) {
   await db.insert(sessionMessages).values({
     sessionId,
     senderUserId: actor.id,
+    actorApiKeyId: actorMeta.apiKeyId ?? null,
+    actorKind: actorMeta.kind ?? "user",
     kind: "slot.propose",
     body: {
       text: `Proposed ${proposedSlots.length} free slot(s).`,
@@ -362,6 +499,8 @@ async function proposeAndGate(actor: User, sessionId: string) {
 
   await writeAudit({
     actorUserId: actor.id,
+    actorApiKeyId: actorMeta.apiKeyId ?? null,
+    actorKind: actorMeta.kind ?? "user",
     action: "session.propose",
     entityType: "session",
     entityId: sessionId,
@@ -376,61 +515,71 @@ async function proposeAndGate(actor: User, sessionId: string) {
   });
 
   if (auto) {
-    return bookMeeting(actor, sessionId, {
-      acceptedBy: "policy",
-      note: "auto_book: confirm_required=false and slot within allowed hours",
-    });
-  }
-
-  const confirmRows = [];
-  for (const p of parts) {
-    const [confirm] = await db
-      .insert(confirms)
-      .values({
-        sessionId,
-        userId: p.userId,
-        action: "book_meeting",
-        note: "Awaiting human confirmation before calendar booking",
-        status: "pending",
-        metadata: {
-          gate: "schedule_meeting",
-          slot: acceptedSlot,
-          title,
-        },
-      })
-      .returning();
-    confirmRows.push(confirm);
-  }
-
-  await db
-    .update(sessions)
-    .set({
-      status: "accepted",
-      payload: {
-        ...payload,
-        phase: "awaiting_confirm",
-        proposedSlots,
-        acceptedSlot,
-        calendarProvider: freeBusy.provider,
+    return bookMeeting(
+      actor,
+      sessionId,
+      {
+        acceptedBy: "policy",
+        note: "auto_book: confirm_required=false and slot within allowed hours",
       },
-      updatedAt: new Date(),
-    })
-    .where(eq(sessions.id, sessionId));
+      actorMeta,
+    );
+  }
 
-  await db.insert(sessionMessages).values({
-    sessionId,
-    senderUserId: actor.id,
-    kind: "confirm.requested",
-    body: {
-      text: `Confirmation requested for ${title}`,
-      confirmIds: confirmRows.map((c) => c.id),
-      slot: acceptedSlot,
-      action: "book_meeting",
-    },
+  const confirmRows = await db.transaction(async (tx) => {
+    const rows = await tx
+      .insert(confirms)
+      .values(
+        parts.map((participant) => ({
+          sessionId,
+          userId: participant.userId,
+          action: "book_meeting",
+          note: "Awaiting your confirmation before calendar booking",
+          status: "pending" as const,
+          metadata: {
+            gate: "schedule_meeting",
+            slot: acceptedSlot,
+            title,
+          },
+        })),
+      )
+      .returning();
+
+    await tx
+      .update(sessions)
+      .set({
+        status: "accepted",
+        payload: {
+          ...payload,
+          phase: "awaiting_confirm",
+          proposedSlots,
+          acceptedSlot,
+          calendarProvider: freeBusy.provider,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(sessions.id, sessionId));
+
+    await tx.insert(sessionMessages).values({
+      sessionId,
+      senderUserId: actor.id,
+      actorApiKeyId: actorMeta.apiKeyId ?? null,
+      actorKind: actorMeta.kind ?? "user",
+      kind: "confirm.requested",
+      body: {
+        text: `Confirmation requested for ${title}`,
+        confirmIds: rows.map((confirm) => confirm.id),
+        slot: acceptedSlot,
+        action: "book_meeting",
+      },
+    });
+    return rows;
   });
 
   await writeAudit({
     actorUserId: actor.id,
+    actorApiKeyId: actorMeta.apiKeyId ?? null,
+    actorKind: actorMeta.kind ?? "user",
     action: "confirm.requested",
     entityType: "session",
     entityId: sessionId,
@@ -475,8 +624,8 @@ async function proposeAndGate(actor: User, sessionId: string) {
         "Proposed via free/busy. Human confirms required before booking.",
     },
     next_steps: [
-      "Humans approve at /app/confirm (or agents call respond_confirm after human OK).",
-      "When all participants approve, CalendarPort books the event (Mock or Google + Meet).",
+      "Humans approve at /app/attention.",
+      "When all participants approve, HoneyMatcha books the real connected calendar event.",
     ],
   };
 }
@@ -488,6 +637,7 @@ async function proposeAndGate(actor: User, sessionId: string) {
 export async function tryBookAfterConfirmApprovals(
   actor: User,
   sessionId: string,
+  actorMeta: ScheduleActor = { kind: "user" },
 ): Promise<Record<string, unknown> | null> {
   const db = getDb();
   const [session] = await db
@@ -551,13 +701,19 @@ export async function tryBookAfterConfirmApprovals(
     };
   }
 
-  return bookMeeting(actor, sessionId, { acceptedBy: "user" });
+  return bookMeeting(
+    actor,
+    sessionId,
+    { acceptedBy: "user" },
+    actorMeta,
+  );
 }
 
 async function bookMeeting(
   actor: User,
   sessionId: string,
   meta: { acceptedBy: "user" | "policy"; note?: string },
+  actorMeta: ScheduleActor,
 ) {
   const db = getDb();
   const [session] = await db
@@ -577,14 +733,76 @@ async function bookMeeting(
   const parts = await participantsFor(sessionId);
   const organizerId = session.initiatorUserId;
   const calendar = await getCalendarPortForUser(organizerId);
-  const event = await calendar.createEvent({
-    title: String(payload.title ?? "Meeting"),
-    start: slot.start,
-    end: slot.end,
-    timezone: slot.timezone || String(payload.timezone ?? "UTC"),
-    attendeeEmails: parts.map((p) => p.email),
-    notes: (payload.notes as string | null) ?? undefined,
-  });
+  if (process.env.NODE_ENV === "production" && calendar.provider === "mock") {
+    throw new AgentApiError(
+      409,
+      "Connect a real calendar before booking. No simulated event was created.",
+      { code: "calendar_not_connected" },
+    );
+  }
+
+  const [claimed] = await db
+    .update(sessions)
+    .set({
+      payload: { ...payload, phase: "booking" },
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(sessions.id, sessionId),
+        sql`${sessions.payload}->>'phase' in ('proposing', 'awaiting_confirm', 'book_failed')`,
+      ),
+    )
+    .returning();
+
+  if (!claimed) {
+    const [current] = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, sessionId))
+      .limit(1);
+    return {
+      ok: true,
+      idempotent: true,
+      session: current,
+      calendar: {
+        status:
+          (current?.payload as Record<string, unknown> | null)?.phase ===
+          "confirmed"
+            ? "booked"
+            : "booking_in_progress",
+        message: "This booking is already being processed.",
+      },
+    };
+  }
+
+  let event: Awaited<ReturnType<typeof calendar.createEvent>>;
+  try {
+    event = await calendar.createEvent({
+      requestId: `honeymatcha-${sessionId}`,
+      title: String(payload.title ?? "Meeting"),
+      start: slot.start,
+      end: slot.end,
+      timezone: slot.timezone || String(payload.timezone ?? "UTC"),
+      attendeeEmails: parts.map((p) => p.email),
+      notes: (payload.notes as string | null) ?? undefined,
+    });
+  } catch (error) {
+    await db
+      .update(sessions)
+      .set({
+        status: "accepted",
+        payload: {
+          ...payload,
+          phase: "book_failed",
+          bookingError:
+            error instanceof Error ? error.message : "Calendar booking failed",
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(sessions.id, sessionId));
+    throw error;
+  }
 
   const nextPayload = {
     ...payload,
@@ -598,37 +816,48 @@ async function bookMeeting(
     },
   };
 
-  await db
-    .update(sessions)
-    .set({
-      status: "confirmed",
-      payload: nextPayload,
-      updatedAt: new Date(),
-    })
-    .where(eq(sessions.id, sessionId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(sessions)
+      .set({
+        status: "confirmed",
+        payload: nextPayload,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(sessions.id, sessionId),
+          sql`${sessions.payload}->>'phase' = 'booking'`,
+        ),
+      );
 
-  await db
-    .update(sessionParticipants)
-    .set({ voteStatus: "accepted" })
-    .where(eq(sessionParticipants.sessionId, sessionId));
+    await tx
+      .update(sessionParticipants)
+      .set({ voteStatus: "accepted" })
+      .where(eq(sessionParticipants.sessionId, sessionId));
 
-  await db.insert(sessionMessages).values({
-    sessionId,
-    senderUserId: actor.id,
-    kind: "meeting.confirm",
-    body: {
-      text: `Booked via ${event.provider}${
-        event.meetLink ? ` · Meet: ${event.meetLink}` : ""
-      }`,
-      acceptedBy: meta.acceptedBy,
-      note: meta.note,
-      calendarEvent: nextPayload.calendarEvent,
-      slot,
-    },
+    await tx.insert(sessionMessages).values({
+      sessionId,
+      senderUserId: actor.id,
+      actorApiKeyId: actorMeta.apiKeyId ?? null,
+      actorKind: actorMeta.kind ?? "user",
+      kind: "meeting.confirm",
+      body: {
+        text: `Booked via ${event.provider}${
+          event.meetLink ? ` · Meet: ${event.meetLink}` : ""
+        }`,
+        acceptedBy: meta.acceptedBy,
+        note: meta.note,
+        calendarEvent: nextPayload.calendarEvent,
+        slot,
+      },
+    });
   });
 
   await writeAudit({
     actorUserId: actor.id,
+    actorApiKeyId: actorMeta.apiKeyId ?? null,
+    actorKind: actorMeta.kind ?? "user",
     action: "meeting.booked",
     entityType: "session",
     entityId: sessionId,

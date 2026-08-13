@@ -1,6 +1,10 @@
-import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
 import { proposeIntent } from "@/lib/agent-api";
-import { jsonFromAgentError, jsonOk, readJsonBody } from "@/lib/http";
+import {
+  jsonFromAgentError,
+  jsonOk,
+  readJsonBody,
+  requireAgent,
+} from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -9,14 +13,15 @@ export const dynamic = "force-dynamic";
  * POST /api/v1/intents/propose — Authorization: Bearer hm_...
  */
 export async function POST(request: Request) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   try {
     const body = await readJsonBody<{
       name?: string;
       slug?: string;
       description?: string;
+      category?: string;
       force?: boolean;
     }>(request);
     return jsonOk(await proposeIntent(auth, body), 201);

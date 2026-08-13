@@ -9,9 +9,11 @@ and the `scripts` blocks of each `package.json`).
 
 ### 1. bot-coord-hub (`src/`)
 - Self-contained Node HTTP API on port `8787`. No database and no secrets required.
-- Run `npm run dev` (tsx watch) / test with `npm test`. Health: `GET /health`. Seeded Bearer
-  keys `bc_jai_dev_key` and `bc_rishav_dev_key`. State persists to `data/store.json`
-  (gitignored) — delete it and restart to reseed.
+- Run `npm run dev` (tsx watch) / test with `npm test`. Health: `GET /health`.
+  Legacy local Bearer keys are generated per process unless explicit
+  `LEGACY_*_KEY` variables are set. State persists to `data/store.json`
+  (gitignored) — delete it and restart to reseed. Production serves only a
+  retirement tombstone unless `ENABLE_LEGACY_HUB=true`.
 - Non-obvious: `npx tsc --noEmit` reports 2 pre-existing type errors and there is no `lint`
   script. This does not block anything — the app runs through `tsx`, which does not type-check.
 
@@ -31,18 +33,17 @@ and the `scripts` blocks of each `package.json`).
   "Production Keys are only allowed for domain 'honeymatcha.io'" and the sign-in widget renders
   blank. Use a Clerk _development_ instance's keys (which allow localhost) to test human sign-in
   and the signed-in dashboard locally.
-- **Migration gotcha:** `drizzle-kit migrate` (`npm run db:migrate`) fails silently here (spinner,
-  exit 1, no tables created). Apply migrations with the drizzle-orm migrator instead — a short node
-  script calling `migrate(db, { migrationsFolder: './drizzle' })` from `drizzle-orm/postgres-js/migrator`
-  — or use `npm run db:push`. Then `npm run db:seed`.
+- `npm run db:migrate` uses the drizzle-orm runtime migrator (not the unreliable
+  `drizzle-kit migrate` path). Follow it with `npm run db:seed`, then run
+  `PREFLIGHT_PRODUCTION=true npm run db:preflight` before production deploys.
 - **Test gotcha:** `npm run test:e2e-lib` and `npm run test:e2e-api` load `.env` only (not
   `.env.local`), so pass the DB URL inline, e.g.
   `DATABASE_URL='postgres://honeymatcha:honeymatcha@localhost:5432/honeymatcha' npm run test:e2e-lib`.
   `test:e2e-api` also needs `npm run dev` already running on port 3000.
 - `npm run build` (Turbopack) needs outbound network access to Google Fonts (`Sora`, `Fraunces`).
-- `npm run lint` works but reports pre-existing errors/warnings in committed code.
-- The full agent coordination flow (invite → accept → sessions → confirms) is exercised
-  entirely through the Bearer API and does not require Clerk.
+- `npm run lint` is expected to pass cleanly.
+- Pairing, guest capability, A2A, invite, session, scheduling, and approval
+  boundaries are exercised without Clerk by the integration scripts.
 
 ### Concurrent work (informational)
 - Branch `cursor/honeymatcha-branding-mobile-ui-7552` (PR #13) is doing HoneyMatcha logo/favicon

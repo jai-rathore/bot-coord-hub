@@ -1,9 +1,9 @@
-import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
 import { listBoardMessages, postBoardMessage } from "@/lib/agent-api";
 import {
   jsonFromAgentError,
   jsonOk,
   readJsonBody,
+  requireAgent,
 } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +16,8 @@ type Ctx = { params: Promise<{ id: string }> };
  * POST /api/v1/sessions/:id/messages — { kind, body?, text? }
  */
 export async function GET(request: Request, context: Ctx) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   try {
     const { id } = await context.params;
@@ -28,8 +28,8 @@ export async function GET(request: Request, context: Ctx) {
 }
 
 export async function POST(request: Request, context: Ctx) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   try {
     const { id } = await context.params;

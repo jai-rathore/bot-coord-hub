@@ -1,6 +1,5 @@
-import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
 import { revokeLink } from "@/lib/agent-api";
-import { jsonFromAgentError, jsonOk } from "@/lib/http";
+import { jsonFromAgentError, jsonOk, requireAgent } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +11,8 @@ export async function POST(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const auth = await authenticateAgent(_request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(_request);
+  if (auth instanceof Response) return auth;
 
   try {
     const { id } = await context.params;

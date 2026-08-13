@@ -1,6 +1,5 @@
-import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
 import { readBoard } from "@/lib/agent-api";
-import { jsonFromAgentError, jsonOk } from "@/lib/http";
+import { jsonFromAgentError, jsonOk, requireAgent } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +10,8 @@ type Ctx = { params: Promise<{ id: string }> };
  * GET /api/v1/sessions/:id/board — Authorization: Bearer hm_...
  */
 export async function GET(request: Request, context: Ctx) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   try {
     const { id } = await context.params;

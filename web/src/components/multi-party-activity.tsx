@@ -2,6 +2,7 @@ import { desc, eq, inArray, or } from "drizzle-orm";
 import { getDb } from "@/db";
 import { sessionParticipants, sessions } from "@/db/schema";
 import { sessionIdsForUser } from "@/lib/schedule-meeting";
+import { intentLabel, taskStatusLabel } from "@/lib/intent-labels";
 import { ensureCurrentUser } from "@/lib/users";
 
 export async function MultiPartyActivity() {
@@ -44,9 +45,8 @@ export async function MultiPartyActivity() {
   if (rows.length === 0) {
     return (
       <p className="mt-6 rounded-md border border-dashed border-line bg-[rgba(255,252,246,0.55)] px-4 py-3 text-sm text-muted">
-        No sessions yet. Agents start one with{" "}
-        <code>POST /api/v1/schedule</code> (supports <code>peerEmails</code> for
-        3+ parties). See <code>web/docs/SCHEDULE_MEETING.md</code>.
+        No group tasks yet. When your agent coordinates with several people,
+        progress appears here.
       </p>
     );
   }
@@ -71,11 +71,11 @@ export async function MultiPartyActivity() {
           <li key={s.id} className="border-b border-line/80 pb-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="font-[family-name:var(--font-fraunces)] text-lg text-matcha-deep">
-                {payload.title || s.intentType}
+                {payload.title || intentLabel(s.intentType)}
               </h2>
               <span className="text-xs uppercase tracking-wide text-muted">
-                {payload.phase ?? s.status}
-                {multi ? " · multi-party" : ""}
+                {taskStatusLabel(s.status)}
+                {multi ? " · group" : ""}
               </span>
             </div>
             <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink">
@@ -88,7 +88,8 @@ export async function MultiPartyActivity() {
             </ul>
             {payload.acceptedSlot ? (
               <p className="mt-2 text-sm text-ink">
-                Slot: {new Date(payload.acceptedSlot.start).toLocaleString()} →{" "}
+                Proposed time:{" "}
+                {new Date(payload.acceptedSlot.start).toLocaleString()} →{" "}
                 {new Date(payload.acceptedSlot.end).toLocaleString()}
               </p>
             ) : null}
@@ -109,7 +110,6 @@ export async function MultiPartyActivity() {
                 ) : null}
               </p>
             ) : null}
-            <p className="mt-1 font-mono text-xs text-muted">{s.id}</p>
           </li>
         );
       })}

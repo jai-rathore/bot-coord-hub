@@ -1,6 +1,5 @@
-import { authenticateAgent, unauthorizedJson } from "@/lib/agent-auth";
 import { whoami } from "@/lib/agent-api";
-import { jsonFromAgentError, jsonOk } from "@/lib/http";
+import { jsonFromAgentError, jsonOk, requireAgent } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +8,8 @@ export const dynamic = "force-dynamic";
  * GET /api/v1/me — Authorization: Bearer hm_...
  */
 export async function GET(request: Request) {
-  const auth = await authenticateAgent(request);
-  if (!auth) return unauthorizedJson();
+  const auth = await requireAgent(request);
+  if (auth instanceof Response) return auth;
 
   try {
     return jsonOk(await whoami(auth));

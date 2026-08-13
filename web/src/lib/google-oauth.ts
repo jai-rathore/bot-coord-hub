@@ -1,7 +1,12 @@
-import { createHash, randomBytes } from "crypto";
+import {
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from "crypto";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { calendarConnections, type CalendarConnection, type User } from "@/db/schema";
+import { decryptSecret, encryptSecret } from "@/lib/secret-crypto";
 
 const GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN = "https://oauth2.googleapis.com/token";
@@ -42,42 +47,67 @@ export function googleRedirectUri(requestOrigin?: string): string {
   return "https://honeymatcha-web.onrender.com/api/google/callback";
 }
 
-/** Signed-ish state: userId.nonce.hmac */
-export function buildOAuthState(userId: string): string {
-  const nonce = randomBytes(16).toString("hex");
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1_000;
+
+function oauthStateSecret(): string {
   const secret =
-    process.env.CLERK_SECRET_KEY ||
-    process.env.GOOGLE_CLIENT_SECRET ||
-    "honeymatcha";
-  const payload = `${userId}.${nonce}`;
-  const sig = createHash("sha256")
-    .update(`${payload}.${secret}`)
-    .digest("hex")
-    .slice(0, 32);
-  return `${payload}.${sig}`;
+    process.env.OAUTH_STATE_SECRET ??
+    process.env.CLERK_SECRET_KEY ??
+    process.env.GOOGLE_CLIENT_SECRET;
+  if (!secret) throw new Error("OAUTH_STATE_SECRET is required");
+  return secret;
 }
 
-export function parseOAuthState(state: string): string | null {
+/** Expiring HMAC state bound to a nonce cookie in the browser. */
+export function buildOAuthState(userId: string): {
+  state: string;
+  nonce: string;
+} {
+  const nonce = randomBytes(16).toString("hex");
+  const timestamp = Date.now().toString(36);
+  const payload = `${userId}.${timestamp}.${nonce}`;
+  const sig = createHmac("sha256", oauthStateSecret())
+    .update(payload)
+    .digest("base64url");
+  return { state: `${payload}.${sig}`, nonce };
+}
+
+export function parseOAuthState(
+  state: string,
+  expectedNonce: string | null,
+): string | null {
   const parts = state.split(".");
-  if (parts.length !== 3) return null;
-  const [userId, nonce, sig] = parts;
-  if (!userId || !nonce || !sig) return null;
-  const secret =
-    process.env.CLERK_SECRET_KEY ||
-    process.env.GOOGLE_CLIENT_SECRET ||
-    "honeymatcha";
-  const expected = createHash("sha256")
-    .update(`${userId}.${nonce}.${secret}`)
-    .digest("hex")
-    .slice(0, 32);
-  if (expected !== sig) return null;
+  if (parts.length !== 4) return null;
+  const [userId, timestamp, nonce, sig] = parts;
+  if (!userId || !timestamp || !nonce || !sig || nonce !== expectedNonce) {
+    return null;
+  }
+  const issuedAt = Number.parseInt(timestamp, 36);
+  if (
+    !Number.isFinite(issuedAt) ||
+    issuedAt > Date.now() + 60_000 ||
+    Date.now() - issuedAt > OAUTH_STATE_TTL_MS
+  ) {
+    return null;
+  }
+  const expected = createHmac("sha256", oauthStateSecret())
+    .update(`${userId}.${timestamp}.${nonce}`)
+    .digest();
+  const supplied = Buffer.from(sig, "base64url");
+  if (
+    supplied.length !== expected.length ||
+    !timingSafeEqual(supplied, expected)
+  ) {
+    return null;
+  }
   return userId;
 }
 
 export function googleAuthorizeUrl(opts: {
   userId: string;
   requestOrigin?: string;
-}): string {
+}): { url: string; nonce: string } {
+  const { state, nonce } = buildOAuthState(opts.userId);
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID!,
     redirect_uri: googleRedirectUri(opts.requestOrigin),
@@ -85,10 +115,10 @@ export function googleAuthorizeUrl(opts: {
     scope: SCOPES,
     access_type: "offline",
     prompt: "consent",
-    state: buildOAuthState(opts.userId),
+    state,
     include_granted_scopes: "true",
   });
-  return `${GOOGLE_AUTH}?${params.toString()}`;
+  return { url: `${GOOGLE_AUTH}?${params.toString()}`, nonce };
 }
 
 export async function exchangeCodeForTokens(
@@ -185,8 +215,8 @@ export async function upsertGoogleConnection(
     const [updated] = await db
       .update(calendarConnections)
       .set({
-        accessToken: tokens.accessToken,
-        refreshToken,
+        accessToken: encryptSecret(tokens.accessToken),
+        refreshToken: encryptSecret(refreshToken),
         tokenExpiresAt: tokens.expiresAt,
         googleAccountEmail: tokens.email ?? existing[0].googleAccountEmail,
         scopes: tokens.scopes,
@@ -211,8 +241,8 @@ export async function upsertGoogleConnection(
     .values({
       userId: user.id,
       provider: "google",
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
+      accessToken: encryptSecret(tokens.accessToken),
+      refreshToken: encryptSecret(tokens.refreshToken),
       tokenExpiresAt: tokens.expiresAt,
       googleAccountEmail: tokens.email,
       scopes: tokens.scopes,
@@ -241,6 +271,33 @@ export async function getGoogleConnection(
 
 export async function disconnectGoogle(userId: string): Promise<boolean> {
   const db = getDb();
+  const [connection] = await db
+    .select()
+    .from(calendarConnections)
+    .where(
+      and(
+        eq(calendarConnections.userId, userId),
+        eq(calendarConnections.provider, "google"),
+      ),
+    )
+    .limit(1);
+  if (connection) {
+    const token = decryptSecret(
+      connection.refreshToken || connection.accessToken,
+    );
+    try {
+      await fetch(
+        `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        },
+      );
+    } catch {
+      // Local deletion still revokes HoneyMatcha access; surface errors in logs.
+      console.error("[calendar] Google token revocation request failed");
+    }
+  }
   const deleted = await db
     .delete(calendarConnections)
     .where(
@@ -259,13 +316,13 @@ export async function getValidGoogleAccessToken(
 ): Promise<string> {
   const expiresAt = connection.tokenExpiresAt?.getTime() ?? 0;
   if (expiresAt > Date.now() + 60_000) {
-    return connection.accessToken;
+    return decryptSecret(connection.accessToken);
   }
 
   const body = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID!,
     client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-    refresh_token: connection.refreshToken,
+    refresh_token: decryptSecret(connection.refreshToken),
     grant_type: "refresh_token",
   });
   const res = await fetch(GOOGLE_TOKEN, {
@@ -289,7 +346,7 @@ export async function getValidGoogleAccessToken(
   await db
     .update(calendarConnections)
     .set({
-      accessToken: data.access_token,
+      accessToken: encryptSecret(data.access_token),
       tokenExpiresAt: data.expires_in
         ? new Date(Date.now() + data.expires_in * 1000)
         : null,

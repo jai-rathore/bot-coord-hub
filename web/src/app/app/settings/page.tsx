@@ -1,4 +1,5 @@
 import { ConnectCalendar } from "@/components/connect-calendar";
+import Link from "next/link";
 import {
   getGoogleConnection,
   googleCalendarEnabled,
@@ -27,8 +28,7 @@ export default async function SettingsPage({
         Settings
       </h1>
       <p className="mt-2 max-w-xl text-muted">
-        Connect tools your agent uses for coordination — starting with Google
-        Calendar.
+        Connections and preferences your agent uses when coordinating for you.
       </p>
 
       {params.calendar === "connected" ? (
@@ -58,6 +58,21 @@ export default async function SettingsPage({
             updatedAt: conn?.updatedAt?.toISOString() ?? null,
           }}
         />
+      </section>
+      <section className="mt-10 border-t border-line pt-7">
+        <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
+          Your agent
+        </h2>
+        <p className="mt-2 max-w-xl text-sm text-muted">
+          Agents connect through a short-lived code in your browser. They never
+          need your HoneyMatcha password.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3 text-sm">
+          <Link href="/agents" className="font-semibold">
+            Connection instructions
+          </Link>
+          <Link href="/app/keys">Advanced connection settings</Link>
+        </div>
       </section>
     </div>
   );

@@ -10,7 +10,7 @@ export async function GET(request: Request) {
 
   const paths: Record<string, Record<string, unknown>> = {};
   for (const [name, ep] of Object.entries(discovery.endpoints)) {
-    const path = ep.path.replace(":id", "{id}");
+    const path = ep.path.replace(/:([A-Za-z]+)/g, "{$1}");
     const method = ep.method.toLowerCase();
     paths[path] ??= {};
     const publicOp = name === "health" || name === "triage_intents";
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       title: "HoneyMatcha Agent API",
       version: PRODUCT_VERSION,
       description:
-        "Bearer API key (hm_...) agent surface. See /docs and MCP at /api/mcp.",
+        "Scoped agent surface. Pair in a human browser, then use the issued hm_ credential through REST, MCP, or A2A.",
     },
     servers: [{ url: base }],
     components: {

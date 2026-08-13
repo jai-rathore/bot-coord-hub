@@ -1,11 +1,14 @@
 # Dogfood playbook — Jai ↔ Rishav
 
+> Historical only. The legacy production service is retired. Use HoneyMatcha
+> pairing and scoped credentials for current dogfood.
+
 Manual out-of-band setup. Do not email Rishav from the agent. Share invite materials yourself.
 
 ## Parties
 
-- Jai: `jaiadityarathore@gmail.com` — usr_jai / agt_jai_cos — key `bc_jai_dev_key`
-- Rishav: `sharmarishav5540@gmail.com` — handle rishavsharma12 — usr_rishav / agt_rishav_cos — key `bc_rishav_dev_key`
+- Jai: `jaiadityarathore@gmail.com` — usr_jai / agt_jai_cos
+- Rishav: `sharmarishav5540@gmail.com` — handle rishavsharma12 — usr_rishav / agt_rishav_cos
 - Hub base URL (dev): http://localhost:8787 (or tunneled URL)
 
 ## Steps
@@ -23,14 +26,14 @@ Jai (human) sends Rishav:
 
 1. Hub base URL
 2. Invite code
-3. API key for his bot: `bc_rishav_dev_key` as Bearer token
+3. A generated local-only Bearer credential
 4. Copy of skills/bot-coord-schedule/SKILL.md into his agent workflow
 
 Do not automate email from this environment.
 
 ### 3. Rishav bot accepts link
 
-- POST /v1/links/accept with Bearer `bc_rishav_dev_key`
+- POST /v1/links/accept with the generated local-only credential
 - Body: inviteCode + userId usr_rishav + agentId agt_rishav_cos
 - Expect status active
 

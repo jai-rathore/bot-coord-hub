@@ -1,4 +1,5 @@
 import { ensureCurrentUser } from "@/lib/users";
+import { NextResponse } from "next/server";
 import {
   googleAuthorizeUrl,
   googleCalendarEnabled,
@@ -26,9 +27,17 @@ export async function GET(request: Request) {
   }
 
   const origin = requestOrigin(request);
-  const url = googleAuthorizeUrl({
+  const authorization = googleAuthorizeUrl({
     userId: user.id,
     requestOrigin: origin,
   });
-  return Response.redirect(url, 302);
+  const response = NextResponse.redirect(authorization.url, 302);
+  response.cookies.set("hm_google_oauth_nonce", authorization.nonce, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/api/google/callback",
+    maxAge: 10 * 60,
+  });
+  return response;
 }

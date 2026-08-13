@@ -229,7 +229,7 @@ export function startServer(port = DEFAULT_PORT): ReturnType<typeof createServer
     console.log(`bot-coord-hub listening on http://0.0.0.0:${port}`);
     console.log(`about: GET /`);
     console.log(`health: GET /health`);
-    console.log(`seed keys: bc_jai_dev_key, bc_rishav_dev_key`);
+    console.log("legacy local credentials are generated per process");
   });
 
   return server;
