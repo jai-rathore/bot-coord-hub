@@ -11,7 +11,7 @@ import {
 import { BrandLink } from "@/components/brand-link";
 
 const SECONDARY_LINKS = [
-  { href: "/#how-it-works", label: "How it works" },
+  { href: "/#how-it-works", label: "How to start" },
   { href: "/agents", label: "For agents" },
 ] as const;
 

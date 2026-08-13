@@ -3,6 +3,8 @@ import { HomeGetStarted } from "@/components/home-get-started";
 import { HomeHero } from "@/components/home-hero";
 import { SiteHeader } from "@/components/site-header";
 
+export const dynamic = "force-dynamic";
+
 export default function HomePage() {
   return (
     <div className="flex min-h-full flex-col">
