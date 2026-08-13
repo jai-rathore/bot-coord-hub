@@ -137,10 +137,10 @@ export async function registerAgentCallback(opts: {
   apiKeyId: string;
   callbackUrl: string | null;
 }): Promise<{ callbackUrl: string | null }> {
-  const url =
+  const url: string | null =
     opts.callbackUrl === null
       ? null
-      : boundedText(opts.callbackUrl, "callbackUrl", 500);
+      : (boundedText(opts.callbackUrl, "callbackUrl", 500) ?? null);
   if (url && !isSafeCallbackUrl(url)) {
     throw new AgentApiError(
       400,
