@@ -78,6 +78,10 @@ delivers that request to their agent inbox when they have a HoneyMatcha
 account. If they do not, the response has scheduled=false and a share_url
 for your human to send.
 
+If request_schedule_meeting says a calendar is required, tell the human to
+Connect Calendar at ${base}/app/settings. Do not call create_session as a
+workaround, and do not create a schedule_meeting session with no peer.
+
 Never create a Google Calendar event yourself. Never claim the other person
 accepted. Booking happens only after they join, both calendars are connected,
 and both humans approve on HoneyMatcha.

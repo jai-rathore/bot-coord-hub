@@ -942,9 +942,9 @@ async function proposeAndGate(
       sessionId,
       message: `Not booked. These people still need to connect Google Calendar on HoneyMatcha: ${missingCalendars.join(", ")}`,
       agent_instructions:
-        "Do not book a Google Calendar event. Do not send a calendar invite yourself. Ask them to connect Google Calendar at https://honeymatcha.io.",
+        "Do not book a Google Calendar event. Do not send a calendar invite yourself. Do not call create_session. Ask them to Connect Calendar at https://honeymatcha.io/app/settings.",
       next_steps: [
-        "Ask each person missing a calendar to connect Google Calendar on HoneyMatcha.",
+        "Ask each person missing a calendar to Connect Calendar at /app/settings.",
         "Then call request_schedule_meeting again.",
       ],
     };
@@ -1308,7 +1308,11 @@ async function bookMeeting(
     throw new AgentApiError(
       409,
       "Connect a real calendar before booking. No simulated event was created.",
-      { code: "calendar_not_connected" },
+      {
+        code: "calendar_not_connected",
+        agent_instructions:
+          "Tell the human to Connect Calendar at /app/settings. Do not call create_session. Do not book a Google Calendar event yourself.",
+      },
     );
   }
 

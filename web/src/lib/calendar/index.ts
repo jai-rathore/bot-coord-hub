@@ -1,3 +1,4 @@
+import { AgentApiError } from "@/lib/agent-errors";
 import {
   getGoogleConnection,
   googleCalendarEnabled,
@@ -6,6 +7,12 @@ import {
 import { GoogleCalendarPort } from "./google";
 import { MockCalendar } from "./mock";
 import type { BusyBlock, CalendarPort } from "./types";
+
+export const CALENDAR_REQUIRED_MESSAGE =
+  "A connected calendar is required. HoneyMatcha never simulates production bookings.";
+
+export const CALENDAR_REQUIRED_AGENT_INSTRUCTIONS =
+  "Tell the human to Connect Calendar at /app/settings. Do not call create_session. Do not book a Google Calendar event yourself.";
 
 export type {
   BusyBlock,
@@ -40,12 +47,10 @@ export async function getCalendarPortForUser(
     }
   }
   if (!mockCalendarAllowed()) {
-    throw Object.assign(
-      new Error(
-        "A connected calendar is required. HoneyMatcha never simulates production bookings.",
-      ),
-      { status: 409, code: "calendar_not_connected" },
-    );
+    throw new AgentApiError(409, CALENDAR_REQUIRED_MESSAGE, {
+      code: "calendar_not_connected",
+      agent_instructions: CALENDAR_REQUIRED_AGENT_INSTRUCTIONS,
+    });
   }
   return new MockCalendar();
 }

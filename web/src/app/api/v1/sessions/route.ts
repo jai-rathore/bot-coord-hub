@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
  * Sessions for the authenticated agent user.
  * GET  /api/v1/sessions
  * POST /api/v1/sessions — { intentType, peerUserId?, linkId?, payload? }
+ * schedule_meeting requires peerUserId or linkId.
  */
 export async function GET(request: Request) {
   const auth = await requireAgent(request);
