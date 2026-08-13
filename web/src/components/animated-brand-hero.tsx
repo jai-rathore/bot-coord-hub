@@ -3,6 +3,7 @@
 import Image from "next/image";
 import {
   type PointerEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -43,28 +44,31 @@ function useReducedMotion() {
 }
 
 export function AnimatedBrandHero() {
-  const [stateIndex, setStateIndex] = useState(0);
-  const previousPath = useRef(MONOGRAM_PATHS.ready);
+  const [animation, setAnimation] = useState({
+    stateIndex: 0,
+    fromPath: MONOGRAM_PATHS.ready,
+  });
   const stageRef = useRef<HTMLButtonElement>(null);
   const reducedMotion = useReducedMotion();
+  const { stateIndex, fromPath } = animation;
   const state = BRAND_STATES[stateIndex];
   const path = MONOGRAM_PATHS[state.id];
 
+  const showNextState = useCallback(() => {
+    setAnimation((current) => {
+      const currentState = BRAND_STATES[current.stateIndex];
+      return {
+        stateIndex: (current.stateIndex + 1) % BRAND_STATES.length,
+        fromPath: MONOGRAM_PATHS[currentState.id],
+      };
+    });
+  }, []);
+
   useEffect(() => {
     if (reducedMotion) return;
-    const timer = window.setInterval(() => {
-      setStateIndex((current) => (current + 1) % BRAND_STATES.length);
-    }, 3400);
+    const timer = window.setInterval(showNextState, 3400);
     return () => window.clearInterval(timer);
-  }, [reducedMotion]);
-
-  useEffect(() => {
-    previousPath.current = path;
-  }, [path]);
-
-  const showNextState = () => {
-    setStateIndex((current) => (current + 1) % BRAND_STATES.length);
-  };
+  }, [reducedMotion, showNextState]);
 
   const handlePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
     if (reducedMotion || !stageRef.current) return;
@@ -146,11 +150,11 @@ export function AnimatedBrandHero() {
           className="hm-brand-monogram"
           filter="url(#hm-monogram-soft)"
         >
-          {!reducedMotion && previousPath.current !== path ? (
+          {!reducedMotion && fromPath !== path ? (
             <animate
               key={`${state.id}-${stateIndex}`}
               attributeName="d"
-              from={previousPath.current}
+              from={fromPath}
               to={path}
               dur="650ms"
               fill="freeze"
