@@ -153,9 +153,10 @@ export default function DocsPage() {
             the private invite URL. HoneyMatcha does not email that link yet.
           </p>
           <p className="mt-3 text-[0.95rem] leading-7 text-muted">
-            After they accept, ask your agent to schedule with their email. If
-            they do not have an agent, send a one-task guest link instead of a
-            People invite.
+            HoneyMatcha does not email invite links. If Activity says someone
+            has not joined, copy the invite from that task and send it
+            yourself. A Google invite from your agent is not a HoneyMatcha
+            confirmation.
           </p>
           <div className="mt-4">
             <CopyBlock text={FRIEND_INVITE_MESSAGE} />
@@ -371,8 +372,11 @@ curl -s "$BASE/api/mcp" \\
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
                 request_schedule_meeting
               </code>{" "}
-              proposes times from free/busy, then opens a human approval. Mock
-              bookings are refused in production. Supports{" "}
+              never books on its own. If the other person is not on
+              HoneyMatcha yet, it returns a share link for you to send —
+              HoneyMatcha does not email them. Times are proposed from both
+              calendars only after they join, then humans approve before a
+              real calendar event is created. Supports{" "}
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
                 peerEmails
               </code>{" "}

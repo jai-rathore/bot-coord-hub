@@ -40,7 +40,7 @@ export function getAgentCard(baseUrl: string) {
         id: "schedule-meeting",
         name: "Schedule a meeting",
         description:
-          "Find an allowed time across linked people and pause for human approval before booking.",
+          "Coordinate a meeting only after the other person joins. Pause for human approval before HoneyMatcha books. Never treat a one-sided Google invite as done.",
         tags: ["coordination", "calendar", "approval"],
       },
       {

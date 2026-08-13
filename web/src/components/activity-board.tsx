@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import type { PublicMessage, PublicSession } from "@/lib/sessions";
-import { intentLabel, taskStatusLabel } from "@/lib/intent-labels";
+import {
+  collapseActivityMessages,
+  sessionPeerLabel,
+  sessionStatusForHuman,
+  sessionTitle,
+  sharePrompt,
+} from "@/lib/activity-copy";
 
 export function ActivityBoard({
   initialSessions,
@@ -12,6 +18,7 @@ export function ActivityBoard({
   initialSelectedId?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
+  const [showStopped, setShowStopped] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(
     initialSessions.some((session) => session.id === initialSelectedId)
       ? (initialSelectedId ?? null)
@@ -22,8 +29,35 @@ export function ActivityBoard({
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
 
+  const visibleSessions = useMemo(() => {
+    if (showStopped) return initialSessions;
+    const active = initialSessions.filter(
+      (session) => session.status !== "cancelled",
+    );
+    return active.length > 0 ? active : initialSessions;
+  }, [initialSessions, showStopped]);
+
+  const stoppedCount = initialSessions.filter(
+    (session) => session.status === "cancelled",
+  ).length;
+
+  useEffect(() => {
+    setSelectedId((current) => {
+      if (current && visibleSessions.some((session) => session.id === current)) {
+        return current;
+      }
+      return (
+        visibleSessions.find((session) => session.id === initialSelectedId)
+          ?.id ??
+        visibleSessions[0]?.id ??
+        null
+      );
+    });
+  }, [initialSelectedId, visibleSessions]);
+
   useEffect(() => {
     if (!selectedId) {
+      setMessages([]);
       return;
     }
     let cancelled = false;
@@ -63,6 +97,8 @@ export function ActivityBoard({
   }
 
   const selected = initialSessions.find((s) => s.id === selectedId) ?? null;
+  const visibleMessages = collapseActivityMessages(messages);
+  const share = selected ? sharePrompt(selected) : null;
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(14rem,18rem)_1fr]">
@@ -70,14 +106,24 @@ export function ActivityBoard({
         <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
           Tasks
         </h2>
-        {initialSessions.length === 0 ? (
+        {stoppedCount > 0 ? (
+          <label className="mt-2 flex items-center gap-2 text-xs text-muted">
+            <input
+              type="checkbox"
+              checked={showStopped}
+              onChange={(e) => setShowStopped(e.target.checked)}
+            />
+            Show stopped ({stoppedCount})
+          </label>
+        ) : null}
+        {visibleSessions.length === 0 ? (
           <p className="mt-2 text-sm text-muted">
             No tasks yet. When your agent starts coordinating, its work shows
             up here.
           </p>
         ) : (
           <ul className="mt-3 space-y-1">
-            {initialSessions.map((session) => {
+            {visibleSessions.map((session) => {
               const active = session.id === selectedId;
               return (
                 <li key={session.id}>
@@ -91,13 +137,13 @@ export function ActivityBoard({
                     }`}
                   >
                     <span className="block font-medium">
-                      {intentLabel(session.intentType)}
+                      {sessionTitle(session)}
                     </span>
                     <span
                       className={`block text-xs ${active ? "text-[#dce8df]" : "text-muted"}`}
                     >
-                      {session.peer?.name || session.peer?.email || "No peer"} ·{" "}
-                      {taskStatusLabel(session.status)}
+                      {sessionPeerLabel(session)} ·{" "}
+                      {sessionStatusForHuman(session)}
                     </span>
                   </button>
                 </li>
@@ -110,7 +156,7 @@ export function ActivityBoard({
       <section>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
-            {selected ? intentLabel(selected.intentType) : "Updates"}
+            {selected ? sessionTitle(selected) : "Updates"}
           </h2>
           <label className="flex items-center gap-2 text-sm text-muted">
             <input
@@ -123,18 +169,30 @@ export function ActivityBoard({
         </div>
 
         {!selected ? (
-          <p className="mt-3 text-sm text-muted">Select a session to read its board.</p>
+          <p className="mt-3 text-sm text-muted">
+            Select a task to see what happened.
+          </p>
         ) : (
           <>
             <p className="mt-1 text-sm text-muted">
-              Status{" "}
-              <span className="text-ink">
-                {taskStatusLabel(selected.status)}
-              </span>
-              {selected.peer
-                ? ` · Peer ${selected.peer.name || selected.peer.email}`
-                : ""}
+              {sessionStatusForHuman(selected)}
             </p>
+
+            {share ? (
+              <div className="mt-4 rounded-md border border-line bg-[rgba(255,252,246,0.75)] px-4 py-3">
+                <p className="text-sm font-medium text-ink">{share.headline}</p>
+                <p className="mt-1 text-sm text-muted">{share.body}</p>
+                {share.inviteUrl ? (
+                  <ShareLinkRow label="Invite link" url={share.inviteUrl} />
+                ) : null}
+                {share.guestUrl ? (
+                  <ShareLinkRow
+                    label="Pick-a-time link (no account needed)"
+                    url={share.guestUrl}
+                  />
+                ) : null}
+              </div>
+            ) : null}
 
             {error && (
               <p className="mt-3 text-sm font-medium text-danger" role="alert">
@@ -145,15 +203,17 @@ export function ActivityBoard({
             <ol className="mt-4 space-y-3 border-t border-line pt-4">
               {pending && messages.length === 0 ? (
                 <li className="text-sm text-muted">Loading…</li>
-              ) : messages.length === 0 ? (
-                <li className="text-sm text-muted">No messages on this board yet.</li>
+              ) : visibleMessages.length === 0 ? (
+                <li className="text-sm text-muted">
+                  Nothing has happened on this task yet.
+                </li>
               ) : (
-                messages.map((message) => (
+                visibleMessages.map((message) => (
                   <li key={message.id} className="text-sm">
                     <p className="font-medium text-ink">{message.plainEnglish}</p>
                     <p className="text-xs text-muted">
-                      {message.kind} ·{" "}
                       {new Date(message.createdAt).toLocaleString()}
+                      {showRaw ? ` · ${message.kind}` : ""}
                     </p>
                     {showRaw && (
                       <pre className="mt-2 overflow-x-auto rounded bg-code-bg p-2 text-xs text-matcha-deep">
@@ -172,7 +232,7 @@ export function ActivityBoard({
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   className="rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus:border-matcha"
-                  placeholder="Visible on the session board"
+                  placeholder="Visible on this task"
                 />
               </label>
               <button
@@ -186,6 +246,29 @@ export function ActivityBoard({
           </>
         )}
       </section>
+    </div>
+  );
+}
+
+function ShareLinkRow({ label, url }: { label: string; url: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="mt-3">
+      <p className="text-xs font-medium text-muted">{label}</p>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <code className="break-all text-xs text-ink">{url}</code>
+        <button
+          type="button"
+          className="cursor-pointer rounded-md border border-line bg-white/90 px-2 py-1 text-xs font-medium text-matcha-deep"
+          onClick={async () => {
+            await navigator.clipboard.writeText(url);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
     </div>
   );
 }

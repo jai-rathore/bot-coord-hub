@@ -313,7 +313,11 @@ export async function createSession(
       payload: body.payload,
       idempotencyKey: body.idempotencyKey,
     });
-    return { ok: true, session };
+    const notice =
+      session.intentType === "schedule_meeting" && !session.peerUserId
+        ? "This task is not with anyone yet. Call request_schedule_meeting with their email. Do not book a calendar event yourself."
+        : undefined;
+    return { ok: true, session, scheduled: false, booked: false, notice };
   } catch (err) {
     rethrowAsAgentError(err);
   }
@@ -462,8 +466,8 @@ export async function proposeIntent(
 }
 
 /**
- * request_schedule_meeting — free/busy propose → confirm gate → CalendarPort book.
- * Supports peerEmail (pairwise) or peerEmails (3+ group).
+ * request_schedule_meeting — invite if needed, then free/busy, then confirm, then book.
+ * Never claims a meeting is booked until HoneyMatcha actually creates the event.
  */
 export async function requestScheduleMeeting(
   auth: AgentAuth,
@@ -478,6 +482,7 @@ export async function requestScheduleMeeting(
     title?: string;
     notes?: string;
     idempotencyKey?: string;
+    origin?: string;
   },
 ) {
   assertAgentScope(auth, "tasks:write");

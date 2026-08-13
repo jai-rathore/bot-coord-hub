@@ -20,17 +20,26 @@ import {
 import { writeAudit } from "@/lib/audit";
 import { AgentApiError } from "@/lib/agent-errors";
 import {
+  calendarConnectionStatus,
   collectFreeBusyForUsers,
   getCalendarPortForUser,
 } from "@/lib/calendar";
+import { PRODUCTION_ORIGIN } from "@/lib/connect-copy";
 import { proposeFreeSlots } from "@/lib/freebusy";
+import { createGuestTask } from "@/lib/guest-tasks";
+import { createInviteLink } from "@/lib/links";
 import {
   mergeLinkPolicies,
   shouldAutoBook,
   slotWithinAllAllowedHours,
 } from "@/lib/policy";
 import { requireSupportedIntent } from "@/lib/intent-gate";
+import {
+  buildScheduleWaitingResult,
+  type WaitingPeer,
+} from "@/lib/schedule-copy";
 import { assertLinkScopes } from "@/lib/scopes";
+import { findReusableOpenSession } from "@/lib/sessions";
 import {
   assertPeerCount,
   boundedText,
@@ -81,6 +90,229 @@ async function participantsFor(sessionId: string) {
     .where(eq(sessionParticipants.sessionId, sessionId));
 }
 
+async function inviteUnlinkedPeer(
+  actor: User,
+  email: string,
+  peer: User | null,
+  origin: string,
+  title: string,
+  actorMeta: ScheduleActor,
+): Promise<WaitingPeer> {
+  const link = await createInviteLink({
+    fromUser: actor,
+    toEmail: email,
+    toName: peer?.name ?? null,
+    origin,
+  });
+  let guestUrl: string | null = null;
+  try {
+    const guest = await createGuestTask({
+      organizer: actor,
+      taskType: "availability",
+      title: `Pick a time: ${title}`,
+      description: `${actor.name || actor.email} wants to meet. HoneyMatcha does not email you — this private link is how you reply.`,
+      targetEmail: email,
+      origin,
+      actor: {
+        kind: actorMeta.kind ?? "user",
+        apiKeyId: actorMeta.apiKeyId ?? null,
+      },
+    });
+    guestUrl = guest.guestUrl;
+  } catch {
+    guestUrl = null;
+  }
+  return {
+    email,
+    name: peer?.name ?? link.toName,
+    userId: peer?.id ?? null,
+    onHoneyMatcha: Boolean(peer),
+    linked: false,
+    inviteUrl: link.inviteUrl,
+    guestUrl,
+    reason: peer ? "invite_pending" : "not_on_honeymatcha",
+  };
+}
+
+async function persistWaitingSchedule(opts: {
+  actor: User;
+  actorMeta: ScheduleActor;
+  title: string;
+  notes: string | null;
+  durationMinutes: number;
+  timezone: string;
+  window: { start: Date; end: Date };
+  idempotencyKey: string | null;
+  waiting: WaitingPeer[];
+  peerEmails: string[];
+}) {
+  const reusable = await findReusableOpenSession({
+    userId: opts.actor.id,
+    intentType: "schedule_meeting",
+    waitingEmails: opts.peerEmails,
+    title: opts.title,
+  });
+  if (reusable) {
+    const payload = (reusable.payload ?? {}) as Record<string, unknown>;
+    const existingWaiting = Array.isArray(payload.waitingFor)
+      ? (payload.waitingFor as WaitingPeer[])
+      : opts.waiting;
+    const merged = opts.waiting.map((person) => {
+      const prev = existingWaiting.find(
+        (row) => row.email.toLowerCase() === person.email.toLowerCase(),
+      );
+      return {
+        ...person,
+        guestUrl: person.guestUrl || prev?.guestUrl || null,
+        inviteUrl: person.inviteUrl || prev?.inviteUrl || "",
+      };
+    });
+    return buildScheduleWaitingResult({
+      sessionId: reusable.id,
+      title: opts.title,
+      waiting: merged,
+    });
+  }
+
+  const knownPeer = opts.waiting.length === 1 ? opts.waiting[0] : null;
+  const db = getDb();
+  const session = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(sessions)
+      .values({
+        intentType: "schedule_meeting",
+        initiatorUserId: opts.actor.id,
+        peerUserId: knownPeer?.userId ?? null,
+        linkId: null,
+        status: "open",
+        idempotencyKey: opts.idempotencyKey,
+        payload: {
+          phase: "waiting_for_peer",
+          durationMinutes: opts.durationMinutes,
+          windowStart: opts.window.start.toISOString(),
+          windowEnd: opts.window.end.toISOString(),
+          timezone: opts.timezone,
+          title: opts.title,
+          notes: opts.notes,
+          waitingFor: opts.waiting,
+        },
+      })
+      .returning();
+
+    await tx.insert(sessionParticipants).values([
+      {
+        sessionId: created.id,
+        userId: opts.actor.id,
+        email: opts.actor.email,
+        role: "organizer" as const,
+        linkId: null,
+        voteStatus: "accepted",
+      },
+      ...opts.waiting
+        .filter((person): person is WaitingPeer & { userId: string } =>
+          Boolean(person.userId),
+        )
+        .map((person) => ({
+          sessionId: created.id,
+          userId: person.userId,
+          email: person.email,
+          role: "invitee" as const,
+          linkId: null,
+          voteStatus: "pending" as const,
+        })),
+    ]);
+
+    await tx.insert(sessionMessages).values({
+      sessionId: created.id,
+      senderUserId: opts.actor.id,
+      actorApiKeyId: opts.actorMeta.apiKeyId ?? null,
+      actorKind: opts.actorMeta.kind ?? "user",
+      kind: "waiting.peer",
+      body: {
+        text: `Waiting for ${opts.waiting
+          .map((person) => person.name || person.email)
+          .join(", ")} to join. HoneyMatcha does not email them — send them the invite link.`,
+        title: opts.title,
+        waitingFor: opts.waiting.map((person) => ({
+          email: person.email,
+          inviteUrl: person.inviteUrl,
+          guestUrl: person.guestUrl,
+        })),
+      },
+    });
+    return created;
+  });
+
+  await writeAudit({
+    actorUserId: opts.actor.id,
+    actorApiKeyId: opts.actorMeta.apiKeyId ?? null,
+    actorKind: opts.actorMeta.kind ?? "user",
+    action: "session.start",
+    entityType: "session",
+    entityId: session.id,
+    metadata: {
+      title: opts.title,
+      peerEmails: opts.peerEmails,
+      phase: "waiting_for_peer",
+    },
+  });
+
+  return buildScheduleWaitingResult({
+    sessionId: session.id,
+    title: opts.title,
+    waiting: opts.waiting,
+  });
+}
+
+async function ensureInviteeParticipants(
+  sessionId: string,
+  resolved: ResolvedPeer[],
+) {
+  const db = getDb();
+  const existing = await participantsFor(sessionId);
+  const have = new Set(existing.map((p) => p.userId));
+  const missing = resolved.filter((row) => !have.has(row.peer.id));
+  if (missing.length > 0) {
+    await db.insert(sessionParticipants).values(
+      missing.map(({ peer, actorLink }) => ({
+        sessionId,
+        userId: peer.id,
+        email: peer.email,
+        role: "invitee" as const,
+        linkId: actorLink.id,
+        voteStatus: "pending" as const,
+      })),
+    );
+  }
+
+  const primary = resolved[0];
+  const [session] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  if (!session || !primary) return;
+  const payload = (session.payload ?? {}) as Record<string, unknown>;
+  await db
+    .update(sessions)
+    .set({
+      peerUserId:
+        resolved.length === 1 ? primary.peer.id : session.peerUserId,
+      linkId: resolved.length === 1 ? primary.actorLink.id : session.linkId,
+      payload: {
+        ...payload,
+        phase:
+          payload.phase === "waiting_for_peer" ||
+          payload.phase === "waiting_for_calendars"
+            ? "initiated"
+            : payload.phase,
+        waitingFor: [],
+      },
+      updatedAt: new Date(),
+    })
+    .where(eq(sessions.id, sessionId));
+}
+
 export async function runScheduleMeeting(
   actor: User,
   body: {
@@ -94,6 +326,7 @@ export async function runScheduleMeeting(
     title?: string;
     notes?: string;
     idempotencyKey?: string;
+    origin?: string;
   },
   actorMeta: ScheduleActor = { kind: "user" },
 ) {
@@ -205,44 +438,96 @@ export async function runScheduleMeeting(
     peers = await loadUsersByEmails(peerEmails);
     const found = new Set(peers.map((p) => p.email.toLowerCase()));
     const missing = peerEmails.filter((e) => !found.has(e));
-    if (missing.length) {
-      throw new AgentApiError(
-        404,
-        `No HoneyMatcha user for: ${missing.join(", ")}. They must accept a link invite first.`,
-        { missing },
-      );
-    }
     if (peers.some((p) => p.id === actor.id)) {
       throw new AgentApiError(400, "Cannot schedule with yourself");
     }
 
+    const origin = (body.origin?.trim() || PRODUCTION_ORIGIN).replace(
+      /\/$/,
+      "",
+    );
+    const reusableWaiting = await findReusableOpenSession({
+      userId: actor.id,
+      intentType: "schedule_meeting",
+      waitingEmails: peerEmails,
+      title,
+    });
+    if (reusableWaiting) {
+      const payload = (reusableWaiting.payload ?? {}) as Record<
+        string,
+        unknown
+      >;
+      if (
+        payload.phase === "waiting_for_peer" &&
+        Array.isArray(payload.waitingFor) &&
+        payload.waitingFor.length > 0
+      ) {
+        return buildScheduleWaitingResult({
+          sessionId: reusableWaiting.id,
+          title,
+          waiting: payload.waitingFor as WaitingPeer[],
+        });
+      }
+    }
+
     const allIds = [actor.id, ...peers.map((p) => p.id)];
-    const linkRows = await db
-      .select()
-      .from(links)
-      .where(
-        and(
-          eq(links.status, "active"),
-          or(
-            inArray(links.fromUserId, allIds),
-            inArray(links.toUserId, allIds),
-          ),
-        ),
+    const linkRows =
+      allIds.length > 1
+        ? await db
+            .select()
+            .from(links)
+            .where(
+              and(
+                eq(links.status, "active"),
+                or(
+                  inArray(links.fromUserId, allIds),
+                  inArray(links.toUserId, allIds),
+                ),
+              ),
+            )
+        : [];
+
+    const waiting: WaitingPeer[] = [];
+    for (const email of missing) {
+      waiting.push(
+        await inviteUnlinkedPeer(actor, email, null, origin, title, actorMeta),
       );
+    }
 
     for (const peer of peers) {
       const actorLink = findDirectionalLink(actor.id, peer.id, linkRows);
       const peerLink = findDirectionalLink(peer.id, actor.id, linkRows);
       if (!actorLink || !peerLink) {
-        throw new AgentApiError(
-          409,
-          `No active link with ${peer.email}. Invite and accept first.`,
-          { peerEmail: peer.email },
+        waiting.push(
+          await inviteUnlinkedPeer(
+            actor,
+            peer.email,
+            peer,
+            origin,
+            title,
+            actorMeta,
+          ),
         );
+        continue;
       }
       assertLinkScopes(actorLink.scopes, SCHEDULE_SCOPES, peer.email);
       assertLinkScopes(peerLink.scopes, SCHEDULE_SCOPES, peer.email);
       resolved.push({ peer, actorLink, peerLink });
+    }
+
+    if (waiting.length > 0) {
+      return persistWaitingSchedule({
+        actor,
+        actorMeta,
+        title,
+        notes,
+        durationMinutes,
+        timezone: body.timezone?.trim() || "UTC",
+        window,
+        idempotencyKey,
+        waiting,
+        peerEmails,
+      });
     }
   }
   assertPeerCount(resolved.length);
@@ -259,6 +544,18 @@ export async function runScheduleMeeting(
 
   const primary = resolved[0]!;
   const timezone = body.timezone?.trim() || policy.timezone || "UTC";
+
+  const reusableReady = await findReusableOpenSession({
+    userId: actor.id,
+    intentType: "schedule_meeting",
+    peerUserId: peers.length === 1 ? primary.peer.id : null,
+    waitingEmails: peers.map((p) => p.email),
+    title,
+  });
+  if (reusableReady) {
+    await ensureInviteeParticipants(reusableReady.id, resolved);
+    return proposeAndGate(actor, reusableReady.id, actorMeta);
+  }
 
   const session = await db.transaction(async (tx) => {
     const [created] = await tx
@@ -377,6 +674,52 @@ async function proposeAndGate(
   if (!session) throw new AgentApiError(404, "Session not found");
 
   const payload = (session.payload ?? {}) as Record<string, unknown>;
+  const phase = String(payload.phase ?? "");
+  if (phase === "confirmed" || session.status === "confirmed") {
+    return {
+      ok: true,
+      scheduled: true,
+      booked: true,
+      session,
+      calendar: { status: "booked", message: "Already booked on HoneyMatcha." },
+      agent_instructions:
+        "This meeting is already booked on HoneyMatcha. Do not send a second Google invite.",
+    };
+  }
+  if (phase === "awaiting_confirm" || session.status === "accepted") {
+    return {
+      ok: true,
+      scheduled: false,
+      booked: false,
+      session,
+      calendar: {
+        status: "awaiting_confirm",
+        message:
+          "Proposed via free/busy. Humans must approve before HoneyMatcha books.",
+      },
+      next_steps: [
+        "Humans approve at /app/attention.",
+        "Do not book this on Google Calendar yourself.",
+      ],
+      agent_instructions:
+        "Do not book a Google Calendar event. Wait for humans to approve on HoneyMatcha.",
+    };
+  }
+  if (phase === "proposing" || session.status === "proposed") {
+    return {
+      ok: true,
+      scheduled: false,
+      booked: false,
+      session,
+      calendar: {
+        status: "proposed",
+        message: "Times were already suggested. Waiting for confirmation.",
+      },
+      agent_instructions:
+        "Do not book a Google Calendar event. Wait for the other person on HoneyMatcha.",
+    };
+  }
+
   const windowStart = String(payload.windowStart ?? "");
   const windowEnd = String(payload.windowEnd ?? "");
   const durationMinutes = Number(payload.durationMinutes ?? 30);
@@ -396,6 +739,53 @@ async function proposeAndGate(
   const parts = await participantsFor(sessionId);
   const emailsByUserId: Record<string, string> = {};
   for (const p of parts) emailsByUserId[p.userId] = p.email;
+
+  const missingCalendars: string[] = [];
+  for (const part of parts) {
+    const status = await calendarConnectionStatus(part.userId);
+    if (status === "none") missingCalendars.push(part.email);
+  }
+  if (missingCalendars.length > 0) {
+    await db
+      .update(sessions)
+      .set({
+        payload: {
+          ...payload,
+          phase: "waiting_for_calendars",
+          missingCalendars,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(sessions.id, sessionId));
+    if (phase !== "waiting_for_calendars") {
+      await db.insert(sessionMessages).values({
+        sessionId,
+        senderUserId: actor.id,
+        actorApiKeyId: actorMeta.apiKeyId ?? null,
+        actorKind: actorMeta.kind ?? "user",
+        kind: "waiting.calendar",
+        body: {
+          text: `Waiting for a connected calendar from: ${missingCalendars.join(", ")}. HoneyMatcha will not pick a time from one calendar alone.`,
+          missingCalendars,
+        },
+      });
+    }
+    return {
+      ok: true,
+      scheduled: false,
+      booked: false,
+      waiting_for_calendars: true,
+      missingCalendars,
+      sessionId,
+      message: `Not booked. These people still need to connect Google Calendar on HoneyMatcha: ${missingCalendars.join(", ")}`,
+      agent_instructions:
+        "Do not book a Google Calendar event. Do not send a calendar invite yourself. Ask them to connect Google Calendar at https://honeymatcha.io.",
+      next_steps: [
+        "Ask each person missing a calendar to connect Google Calendar on HoneyMatcha.",
+        "Then call request_schedule_meeting again.",
+      ],
+    };
+  }
 
   const freeBusy = await collectFreeBusyForUsers({
     userIds: parts.map((p) => p.userId),
@@ -621,12 +1011,15 @@ async function proposeAndGate(
       status: "awaiting_confirm",
       provider: freeBusy.provider,
       message:
-        "Proposed via free/busy. Human confirms required before booking.",
+        "Proposed via free/busy. Human confirms required before booking. Do not send a Google invite yourself.",
     },
     next_steps: [
       "Humans approve at /app/attention.",
       "When all participants approve, HoneyMatcha books the real connected calendar event.",
+      "Do not book this meeting on Google Calendar yourself.",
     ],
+    agent_instructions:
+      "Do not book a Google Calendar event and do not tell the human it is confirmed until HoneyMatcha returns calendar.status booked.",
   };
 }
 

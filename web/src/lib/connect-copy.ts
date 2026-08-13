@@ -58,5 +58,15 @@ Agent card: ${base}/.well-known/agent-card.json
 Docs: ${base}/docs
 
 Share free/busy only. Never peer calendar event titles.
+
+## Scheduling
+
+Call request_schedule_meeting with the other person's email. If the response
+has scheduled=false or a share_url, the meeting is not booked. Show the human
+the share_url and ask them to send it. HoneyMatcha does not email people.
+
+Never create a Google Calendar event yourself. Never claim the other person
+accepted. Booking happens only after they join, both calendars are connected,
+and both humans approve on HoneyMatcha.
 `;
 }

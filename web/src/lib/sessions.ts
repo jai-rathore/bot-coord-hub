@@ -91,15 +91,40 @@ export function messageToPlainEnglish(
     case "link.accepted":
       return text ?? "Peer link accepted. You can coordinate on this session.";
     case "avail.offer":
-      return text ?? "Shared available times (free/busy only).";
+      return text ?? "Shared available times (busy times only — no event titles).";
+    case "avail.request":
+      return text ?? "Looked up calendars (busy times only).";
     case "slot.propose":
-      return text ?? "Proposed meeting time(s).";
+      return text ?? "Proposed meeting time(s) from overlapping free time.";
     case "slot.accept":
       return text ?? "Accepted a proposed time.";
+    case "proposal":
+      return (
+        text ??
+        (typeof body.title === "string" && body.title.trim()
+          ? `Suggested: ${body.title.trim()}`
+          : "Suggested a meeting.")
+      );
     case "intent.schedule_meeting":
-      return text ?? "Started a schedule_meeting intent.";
-    default:
-      return text ?? `Event: ${kind}`;
+      return (
+        text ??
+        (typeof body.title === "string" && body.title.trim()
+          ? `Started coordinating: ${body.title.trim()}`
+          : "Started coordinating a meeting.")
+      );
+    case "meeting.confirm":
+      return text ?? "Booked on the connected calendar.";
+    case "waiting.peer":
+      return text ?? "Waiting for the other person to join HoneyMatcha.";
+    case "waiting.calendar":
+      return text ?? "Waiting for everyone to connect a calendar.";
+    default: {
+      if (text) return text;
+      if (typeof body.title === "string" && body.title.trim()) {
+        return body.title.trim();
+      }
+      return "Update from your agent.";
+    }
   }
 }
 
@@ -295,6 +320,40 @@ export async function createSessionForUser(opts: {
     });
   }
 
+  const title =
+    typeof opts.payload?.title === "string" ? opts.payload.title : null;
+  const reusable = await findReusableOpenSession({
+    userId: opts.user.id,
+    intentType,
+    peerUserId,
+    title,
+  });
+  if (reusable) {
+    let existingPeer: User | null = null;
+    if (reusable.peerUserId) {
+      const found = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, reusable.peerUserId))
+        .limit(1);
+      existingPeer = found[0] ?? null;
+    }
+    const existingParts = await db
+      .select()
+      .from(sessionParticipants)
+      .where(eq(sessionParticipants.sessionId, reusable.id));
+    return toPublicSession(
+      reusable,
+      existingPeer,
+      existingParts.map((p) => ({
+        userId: p.userId,
+        email: p.email,
+        role: p.role,
+        voteStatus: p.voteStatus,
+      })),
+    );
+  }
+
   const [created] = await db
     .insert(sessions)
     .values({
@@ -391,6 +450,89 @@ export async function postSessionMessage(opts: {
     .where(eq(sessions.id, opts.session.id));
 
   return toPublicMessage(created);
+}
+
+const REUSABLE_STATUSES: Session["status"][] = [
+  "open",
+  "proposed",
+  "accepted",
+];
+
+function titlesMatch(left: string | null | undefined, right: string | null | undefined) {
+  const a = (left ?? "").trim().toLowerCase();
+  const b = (right ?? "").trim().toLowerCase();
+  const blank = (value: string) => !value || value === "meeting";
+  if (blank(a) && blank(b)) return true;
+  return a === b;
+}
+
+export async function findReusableOpenSession(opts: {
+  userId: string;
+  intentType: string;
+  peerUserId?: string | null;
+  waitingEmails?: string[];
+  title?: string | null;
+}): Promise<Session | null> {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.initiatorUserId, opts.userId),
+        eq(sessions.intentType, opts.intentType),
+      ),
+    )
+    .orderBy(desc(sessions.updatedAt))
+    .limit(40);
+
+  const wantedEmails = (opts.waitingEmails ?? [])
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean)
+    .sort();
+
+  for (const row of rows) {
+    if (!REUSABLE_STATUSES.includes(row.status)) continue;
+    const payload = (row.payload as Record<string, unknown>) ?? {};
+    if (!titlesMatch(opts.title, typeof payload.title === "string" ? payload.title : null)) {
+      continue;
+    }
+
+    if (wantedEmails.length > 0) {
+      const waiting = Array.isArray(payload.waitingFor)
+        ? payload.waitingFor
+            .map((item) =>
+              item && typeof item === "object" && "email" in item
+                ? String((item as { email?: unknown }).email ?? "")
+                    .trim()
+                    .toLowerCase()
+                : "",
+            )
+            .filter(Boolean)
+        : [];
+      const parts = await db
+        .select()
+        .from(sessionParticipants)
+        .where(eq(sessionParticipants.sessionId, row.id));
+      const emails = [
+        ...new Set(
+          [
+            ...waiting,
+            ...parts
+              .filter((p) => p.userId !== opts.userId)
+              .map((p) => p.email.toLowerCase()),
+          ].filter(Boolean),
+        ),
+      ].sort();
+      if (emails.join(",") === wantedEmails.join(",")) return row;
+      continue;
+    }
+
+    if ((row.peerUserId ?? null) === (opts.peerUserId ?? null)) {
+      return row;
+    }
+  }
+  return null;
 }
 
 function toPublicSession(

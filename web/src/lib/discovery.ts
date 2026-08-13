@@ -84,7 +84,7 @@ export function getDiscoveryDocument(baseUrl?: string) {
     connect_as_agent:
       "If a human asks you to connect to HoneyMatcha or honeymatcha.io as their agent, start pairing immediately. Do not sign into Clerk or solve CAPTCHA.",
     agent_instructions:
-      "If a human says connect to honeymatcha.io as their agent: POST /api/v1/pairings/start with {\"agentName\":\"<your name>\"}, show them verificationUrl, then poll POST /api/v1/pairings/token with the deviceCode until you receive an hm_ credential. Never sign into Clerk or solve CAPTCHA. Then use MCP at /api/mcp or REST under /api/v1. For people without agents, create a targeted guest task. Meeting bookings pause for human approval. Share free/busy only; never peer event titles.",
+      "If a human says connect to honeymatcha.io as their agent: POST /api/v1/pairings/start with {\"agentName\":\"<your name>\"}, show them verificationUrl, then poll POST /api/v1/pairings/token with the deviceCode until you receive an hm_ credential. Never sign into Clerk or solve CAPTCHA. Then use MCP at /api/mcp or REST under /api/v1. For people without agents, create a targeted guest task. request_schedule_meeting does not book a calendar event; if it returns share_url, show that link to the human and ask them to send it. Never send a Google invite yourself or claim the other person accepted. Meeting bookings pause for human approval. Share free/busy only; never peer event titles.",
     skill: {
       path: "skills/honeymatcha/SKILL.md",
       name: "honeymatcha",

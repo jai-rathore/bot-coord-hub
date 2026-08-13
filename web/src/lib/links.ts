@@ -95,6 +95,23 @@ export async function createInviteLink(opts: {
     }
   }
 
+  const [existingPending] = await db
+    .select()
+    .from(links)
+    .where(
+      and(
+        eq(links.fromUserId, opts.fromUser.id),
+        eq(links.toEmail, toEmail),
+        eq(links.status, "pending"),
+        or(isNull(links.expiresAt), gt(links.expiresAt, new Date())),
+      ),
+    )
+    .orderBy(desc(links.createdAt))
+    .limit(1);
+  if (existingPending) {
+    return toPublicLink(existingPending, opts.fromUser, opts.origin, null);
+  }
+
   const [created] = await db
     .insert(links)
     .values({

@@ -3,6 +3,7 @@
  * Used by POST /api/mcp (JSON-RPC) and documented for the stdio MCP entry.
  */
 
+import { SCHEDULE_MEETING_TOOL_DESCRIPTION } from "@/lib/schedule-copy";
 import type { AgentAuth } from "@/lib/agent-auth";
 import { assertAgentScope } from "@/lib/scopes";
 import {
@@ -172,8 +173,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   },
   {
     name: "request_schedule_meeting",
-    description:
-      "Start schedule_meeting with linked peers: free/busy propose → human confirm gate → CalendarPort book (Mock or Google + Meet). Use peerEmails for 3+ participants.",
+    description: SCHEDULE_MEETING_TOOL_DESCRIPTION,
     inputSchema: {
       type: "object",
       properties: {
@@ -344,6 +344,7 @@ export async function dispatchMcpTool(
         title: args.title as string | undefined,
         notes: args.notes as string | undefined,
         idempotencyKey: args.idempotencyKey as string | undefined,
+        origin: baseUrl,
       });
     case "list_confirms":
       return listConfirms(auth);

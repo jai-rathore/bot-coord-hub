@@ -50,6 +50,17 @@ export async function getCalendarPortForUser(
   return new MockCalendar();
 }
 
+export async function calendarConnectionStatus(
+  userId: string,
+): Promise<"google" | "mock" | "none"> {
+  if (googleCalendarEnabled() && googleOAuthConfigured()) {
+    const conn = await getGoogleConnection(userId);
+    if (conn?.refreshToken) return "google";
+  }
+  if (mockCalendarAllowed()) return "mock";
+  return "none";
+}
+
 /** Aggregate free/busy across participants (each user's connection or mock). */
 export async function collectFreeBusyForUsers(opts: {
   userIds: string[];
