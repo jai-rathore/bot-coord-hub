@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CopyBlock } from "@/components/copy-block";
 import { SiteHeader } from "@/components/site-header";
 import {
+  ASK_AGENT_PROMPT,
   FRIEND_INVITE_MESSAGE,
   GROK_CONNECT_PROMPT,
   GROK_MCP_CLI,
@@ -103,36 +104,31 @@ export default function DocsPage() {
             If you use Grok
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
-            Sign in at HoneyMatcha first, then connect Google Calendar in{" "}
-            <Link href="/app/settings">Settings</Link>. After that, pick one
-            path:
+            Sign in at HoneyMatcha first, then connect Google Calendar when
+            asked. Then paste this into Grok and approve the link:
           </p>
-          <ol className="mt-4 grid list-none gap-3 p-0 text-[0.95rem] text-muted">
-            <li className="relative pl-[1.15rem]">
-              <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
-              <strong className="font-semibold text-ink">
-                Fastest for grok.com:
-              </strong>{" "}
-              create a key at <Link href="/app/keys">/app/keys</Link>, then add
-              a custom MCP connector at{" "}
-              <a href="https://grok.com/connectors">grok.com/connectors</a>{" "}
-              with URL{" "}
-              <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
-                https://honeymatcha.io/api/mcp
-              </code>{" "}
-              and the <code>hm_</code> key as the Bearer token.
-            </li>
-            <li className="relative pl-[1.15rem]">
-              <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
-              <strong className="font-semibold text-ink">Grok CLI / Build:</strong>
-            </li>
-          </ol>
+          <div className="mt-3">
+            <CopyBlock text={ASK_AGENT_PROMPT} />
+          </div>
+          <p className="mt-4 text-[0.95rem] leading-7 text-muted">
+            That is the whole Grok path. If your Grok cannot make HTTP calls,
+            create a key at <Link href="/app/keys">/app/keys</Link> and add a
+            custom MCP connector at{" "}
+            <a href="https://grok.com/connectors">grok.com/connectors</a> with
+            URL{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+              https://honeymatcha.io/api/mcp
+            </code>
+            .
+          </p>
+          <p className="mt-4 text-[0.95rem] leading-7 text-muted">
+            Grok CLI / Build:
+          </p>
           <div className="mt-3">
             <CopyBlock text={GROK_MCP_CLI} />
           </div>
           <p className="mt-4 text-[0.95rem] leading-7 text-muted">
-            Or paste this into Grok and let it start pairing. Approve the link
-            it shows you in your normal browser.
+            Detailed pairing prompt if the one sentence is not enough:
           </p>
           <div className="mt-3">
             <CopyBlock text={GROK_CONNECT_PROMPT} />

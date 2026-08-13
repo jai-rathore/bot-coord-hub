@@ -15,9 +15,11 @@ export function getDiscoveryDocument(baseUrl?: string) {
     name: "HoneyMatcha",
     version: PRODUCT_VERSION,
     protocol: PROTOCOL_VERSION,
-    tagline: "Let your agent handle the back-and-forth.",
+    what: "HoneyMatcha is a coordination platform for a human and their personal agent. It is not a chat app or a message board. The human signs in. The agent pairs once, then does the coordination work. The human approves important actions.",
+    tagline: "A coordination platform for you and your personal agent.",
     docs: abs("/docs"),
     homepage: abs("/"),
+    llms: abs("/llms.txt"),
     health: abs("/api/v1/health"),
     openapi: abs("/api/v1/openapi"),
     agent_card: abs("/.well-known/agent-card.json"),
@@ -78,9 +80,11 @@ export function getDiscoveryDocument(baseUrl?: string) {
         path: "/api/v1/guest-tasks/:publicId/revoke",
       },
     },
-    intents: ["schedule_meeting"],
+    intents: ["schedule_meeting", "hiring_compatibility"],
+    connect_as_agent:
+      "If a human asks you to connect to HoneyMatcha or honeymatcha.io as their agent, start pairing immediately. Do not sign into Clerk or solve CAPTCHA.",
     agent_instructions:
-      "1) Start pairing at /api/v1/pairings/start and ask the human to approve the displayed code in their browser. 2) Exchange the approved device code once for a scoped hm_ credential. 3) Use MCP, A2A, or /api/v1 operations. For people without agents, create a targeted guest task: its gt_ capability can answer only that task and cannot access the network. Meeting bookings pause for human approval by default. Share free/busy only; never peer event titles.",
+      "If a human says connect to honeymatcha.io as their agent: POST /api/v1/pairings/start with {\"agentName\":\"<your name>\"}, show them verificationUrl, then poll POST /api/v1/pairings/token with the deviceCode until you receive an hm_ credential. Never sign into Clerk or solve CAPTCHA. Then use MCP at /api/mcp or REST under /api/v1. For people without agents, create a targeted guest task. Meeting bookings pause for human approval. Share free/busy only; never peer event titles.",
     skill: {
       path: "skills/honeymatcha/SKILL.md",
       name: "honeymatcha",

@@ -2,8 +2,8 @@ import Link from "next/link";
 import { CopyBlock } from "@/components/copy-block";
 import { SiteHeader } from "@/components/site-header";
 import {
+  ASK_AGENT_PROMPT,
   FRIEND_INVITE_MESSAGE,
-  GROK_CONNECT_PROMPT,
 } from "@/lib/connect-copy";
 
 export default function AgentsPage() {
@@ -15,26 +15,26 @@ export default function AgentsPage() {
           For agents and builders
         </p>
         <h1 className="mt-2 font-[family-name:var(--font-fraunces)] text-4xl font-semibold tracking-[-0.03em] text-matcha-deep">
-          Connect an agent once. Let it coordinate from there.
+          Ask your agent to connect. Approve the link.
         </h1>
         <p className="mt-4 max-w-2xl text-lg leading-8 text-muted">
-          Agents never sign into Clerk or solve a CAPTCHA. You connect your
-          agent to your HoneyMatcha account. A friend connects theirs to
-          theirs. Then you invite each other as people.
+          HoneyMatcha is a coordination platform your personal agent works on.
+          You do not paste keys. Tell your agent this, then approve the page it
+          opens:
         </p>
+        <div className="mt-5">
+          <CopyBlock text={ASK_AGENT_PROMPT} />
+        </div>
 
         <section className="mt-10 rounded-2xl border border-line bg-white/75 p-5 sm:p-7">
           <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
             If you use Grok
           </h2>
           <p className="mt-3 text-sm leading-6 text-muted">
-            Paste this into Grok. Approve the link it shows you in your
-            browser. Full options, including grok.com connectors:{" "}
+            The sentence above is enough. Paste it into Grok and approve the
+            link it shows you. Full options, including grok.com connectors:{" "}
             <Link href="/docs#grok">docs</Link>.
           </p>
-          <div className="mt-4">
-            <CopyBlock text={GROK_CONNECT_PROMPT} />
-          </div>
         </section>
 
         <section className="mt-8 rounded-2xl border border-line bg-white/75 p-5 sm:p-7">

@@ -1,9 +1,12 @@
 ---
 name: honeymatcha
-description: Connect to HoneyMatcha so an agent can handle cross-person coordination, invite no-account guests, and request reviewed task types. Pair in the human browser, then use scoped REST, MCP, or A2A capabilities.
+description: If a human says connect to honeymatcha.io as their agent, start pairing immediately. Do not sign into Clerk. Then coordinate meetings, guest asks, and hiring compatibility.
 ---
 
 # HoneyMatcha — connect & coordinate
+
+If the human says **connect to honeymatcha.io as my agent**, start pairing
+immediately. Do not sign into Clerk. Do not solve CAPTCHA.
 
 ## When to use
 
