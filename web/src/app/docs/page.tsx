@@ -47,52 +47,52 @@ export default function DocsPage() {
             id="steps-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
           >
-            Three steps
+            Two steps
           </h2>
+          <p className="mt-2 mb-4 text-[0.95rem] text-muted">
+            After that, you talk to your agent.
+          </p>
           <ol className="mt-4 grid list-none gap-4 p-0">
-            {[
-              {
-                title: "Start a short-lived pairing",
-                body: (
-                  <>
-                    Call{" "}
-                    <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
-                      POST /api/v1/pairings/start
-                    </code>{" "}
-                    with the agent&apos;s name.
-                  </>
-                ),
-              },
-              {
-                title: "Ask the human to approve",
-                body: (
-                  <>
-                    Open the returned verification URL in their normal browser.
-                    Agents never receive Clerk credentials or solve CAPTCHA.
-                  </>
-                ),
-              },
-              {
-                title: "Exchange once and verify",
-                body: (
-                  <>
-                    Poll <code>POST /api/v1/pairings/token</code>, store the
-                    scoped <code>hm_</code> credential, then call{" "}
-                    <code>whoami</code>.
-                  </>
-                ),
-              },
-            ].map((step, i) => (
-              <li key={step.title} className="grid grid-cols-[auto_1fr] gap-3">
-                <span className="mt-0.5 grid h-[1.55rem] w-[1.55rem] place-items-center rounded-full bg-honey-soft text-[0.78rem] font-semibold text-matcha-deep">
-                  {i + 1}
-                </span>
-                <div>
-                  <strong className="font-semibold text-ink">{step.title}</strong>
-                  <p className="mt-1 text-[0.95rem] text-muted">{step.body}</p>
+            <li className="grid grid-cols-[auto_1fr] gap-3">
+              <span className="mt-0.5 grid h-[1.55rem] w-[1.55rem] place-items-center rounded-full bg-honey-soft text-[0.78rem] font-semibold text-matcha-deep">
+                1
+              </span>
+              <div>
+                <strong className="font-semibold text-ink">
+                  Connect Google Calendar
+                </strong>
+                <p className="mt-1 text-[0.95rem] text-muted">
+                  HoneyMatcha will ask you to do this after you sign in. Only
+                  free/busy is used.
+                </p>
+              </div>
+            </li>
+            <li className="grid grid-cols-[auto_1fr] gap-3">
+              <span className="mt-0.5 grid h-[1.55rem] w-[1.55rem] place-items-center rounded-full bg-honey-soft text-[0.78rem] font-semibold text-matcha-deep">
+                2
+              </span>
+              <div>
+                <strong className="font-semibold text-ink">
+                  Tell your agent to connect
+                </strong>
+                <p className="mt-1 text-[0.95rem] text-muted">
+                  Paste this, then approve the link it shows you. Agents never
+                  receive Clerk credentials or solve CAPTCHA. They start
+                  pairing at{" "}
+                  <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+                    POST /api/v1/pairings/start
+                  </code>
+                  , then exchange once at{" "}
+                  <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+                    POST /api/v1/pairings/token
+                  </code>{" "}
+                  and call <code>whoami</code>.
+                </p>
+                <div className="mt-3">
+                  <CopyBlock text={ASK_AGENT_PROMPT} />
                 </div>
-              </li>
-            ))}
+              </div>
+            </li>
           </ol>
         </section>
 
@@ -104,8 +104,8 @@ export default function DocsPage() {
             If you use Grok
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
-            Sign in at HoneyMatcha first, then connect Google Calendar when
-            asked. Then paste this into Grok and approve the link:
+            Connect Google Calendar when HoneyMatcha asks. Then paste this into
+            Grok and approve the link:
           </p>
           <div className="mt-3">
             <CopyBlock text={ASK_AGENT_PROMPT} />
