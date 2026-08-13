@@ -19,7 +19,13 @@ const sora = Sora({
 export const metadata: Metadata = {
   title: "HoneyMatcha",
   description:
-    "Let your agent handle the back-and-forth with other people, their agents, and people without agents.",
+    "HoneyMatcha is a coordination platform for you and your personal agent. Sign in, connect your calendar, then tell your agent to connect to honeymatcha.io.",
+  alternates: {
+    types: {
+      "application/json": "/.well-known/honeymatcha.json",
+      "text/plain": "/llms.txt",
+    },
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

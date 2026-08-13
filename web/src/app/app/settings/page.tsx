@@ -28,7 +28,9 @@ export default async function SettingsPage({
         Settings
       </h1>
       <p className="mt-2 max-w-xl text-muted">
-        Connections and preferences your agent uses when coordinating for you.
+        Connect Google Calendar here so your agent can find a real time.
+        Then ask your agent to connect to HoneyMatcha — this site is where
+        you approve, not where you chat.
       </p>
 
       {params.calendar === "connected" ? (

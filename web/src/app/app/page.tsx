@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { currentUser } from "@clerk/nextjs/server";
 import { AgentStatusCard } from "@/components/agent-status-card";
+import { SetupGuide } from "@/components/setup-guide";
 import { getHomeStatus } from "@/lib/home-status";
 import { intentLabel, taskStatusLabel } from "@/lib/intent-labels";
+import {
+  getGoogleConnection,
+  googleCalendarEnabled,
+  googleOAuthConfigured,
+} from "@/lib/google-oauth";
 import { ensureCurrentUser } from "@/lib/users";
 
 export default async function AppHomePage() {
@@ -14,19 +20,36 @@ export default async function AppHomePage() {
   if (!user) {
     return <p className="text-danger">Unable to resolve your account.</p>;
   }
-  const status = await getHomeStatus(user);
+  const [status, conn] = await Promise.all([
+    getHomeStatus(user),
+    getGoogleConnection(user.id),
+  ]);
+  const setupComplete = status.calendarConnected && status.agent.connected;
 
   return (
     <div className="space-y-10">
       <h1 className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.02em] text-matcha-deep">
-        Good to see you, {name}
+        {setupComplete ? `Good to see you, ${name}` : `Welcome, ${name}`}
       </h1>
       <p className="mt-2 max-w-xl text-muted">
-        Your agent handles coordination. You&apos;ll see progress here and
-        step in only when something needs your say.
+        {setupComplete
+          ? "Your agent handles coordination. You will see progress here and step in only when something needs your say."
+          : "HoneyMatcha is where your personal agent works. Connect a calendar, then ask your agent to connect. After that, you talk to the agent — not this site — unless something needs your say."}
       </p>
 
-      <AgentStatusCard status={status} />
+      <SetupGuide
+        calendar={{
+          connected: Boolean(conn),
+          enabled: googleCalendarEnabled(),
+          configured: googleOAuthConfigured(),
+          googleAccountEmail: conn?.googleAccountEmail ?? null,
+          calendarId: conn?.calendarId ?? null,
+          updatedAt: conn?.updatedAt?.toISOString() ?? null,
+        }}
+        agent={status.agent}
+      />
+
+      {setupComplete ? <AgentStatusCard status={status} /> : null}
 
       <section>
         <div className="flex items-center justify-between gap-3">
@@ -61,23 +84,10 @@ export default async function AppHomePage() {
           <div className="mt-4 rounded-2xl border border-dashed border-line bg-white/40 p-6">
             <p className="font-medium text-ink">No tasks yet.</p>
             <p className="mt-2 max-w-xl text-sm text-muted">
-              Connect your agent, then ask it to schedule something—or invite
-              someone so HoneyMatcha can start handling the back-and-forth.
+              {setupComplete
+                ? "Ask your agent to schedule a meeting or invite someone."
+                : "Finish the two setup steps above first."}
             </p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Link
-                href="/agents"
-                className="rounded-md bg-matcha-deep px-3 py-2 text-sm font-semibold text-white no-underline"
-              >
-                Connect your agent
-              </Link>
-              <Link
-                href="/app/people"
-                className="rounded-md border border-line px-3 py-2 text-sm font-semibold no-underline"
-              >
-                Add someone
-              </Link>
-            </div>
           </div>
         )}
       </section>

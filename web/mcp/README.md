@@ -10,7 +10,7 @@ Node stdio MCP server that wraps the HoneyMatcha Agent API.
 4. Set the returned scoped credential:
 
 ```bash
-export HONEYMATCHA_BASE_URL=https://YOUR_HOST
+export HONEYMATCHA_BASE_URL=https://honeymatcha.io
 export HONEYMATCHA_API_KEY=hm_...
 ```
 
@@ -29,7 +29,7 @@ node web/mcp/server.mjs
       "command": "node",
       "args": ["/absolute/path/to/bot-coord-hub/web/mcp/server.mjs"],
       "env": {
-        "HONEYMATCHA_BASE_URL": "https://YOUR_HOST",
+        "HONEYMATCHA_BASE_URL": "https://honeymatcha.io",
         "HONEYMATCHA_API_KEY": "hm_..."
       }
     }

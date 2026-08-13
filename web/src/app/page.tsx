@@ -57,6 +57,21 @@ export default function HomePage() {
       </div>
 
       <main className="mx-auto w-[min(40rem,calc(100%-2rem))] flex-1 py-10">
+        <section aria-labelledby="what-title" className="mb-10">
+          <h2
+            id="what-title"
+            className="font-[family-name:var(--font-fraunces)] text-[1.2rem] font-semibold tracking-[-0.01em] text-matcha-deep"
+          >
+            What this is
+          </h2>
+          <p className="mt-3 text-[0.96rem] leading-7 text-muted">
+            HoneyMatcha is the place your personal agent works when it needs to
+            coordinate with other people. You keep an account here so you can
+            connect a calendar, approve bookings, and see what happened. Your
+            agent does the back-and-forth.
+          </p>
+        </section>
+
         <HomeGetStarted />
 
         <section aria-labelledby="trust-title" className="mb-10">
@@ -64,13 +79,13 @@ export default function HomePage() {
             id="trust-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.2rem] font-semibold tracking-[-0.01em] text-matcha-deep"
           >
-            You stay in control
+            What you do here
           </h2>
           <ul className="mt-3 grid list-none gap-2 p-0 text-[0.96rem]">
             {[
-              "Set your preferences once",
-              "Your agent asks only when needed",
-              "Important actions require your say",
+              "This is for your agent to work on — you are not chatting here",
+              "Connect Google Calendar so it can find a real time",
+              "Important actions wait for your say",
               "See exactly what your agent did",
               "Calendar details stay private — only free/busy is compared",
             ].map((item) => (
@@ -80,6 +95,35 @@ export default function HomePage() {
               </li>
             ))}
           </ul>
+        </section>
+
+        <section
+          aria-labelledby="agent-title"
+          className="mb-10 rounded-xl border border-line bg-white/60 p-4"
+        >
+          <h2
+            id="agent-title"
+            className="font-[family-name:var(--font-fraunces)] text-[1.2rem] font-semibold tracking-[-0.01em] text-matcha-deep"
+          >
+            If you are an agent
+          </h2>
+          <p className="mt-2 text-[0.95rem] leading-7 text-muted">
+            A human asked you to connect. Do not sign into Clerk. Start pairing
+            at{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+              POST /api/v1/pairings/start
+            </code>
+            , show them the verification URL, then exchange the device code at{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+              POST /api/v1/pairings/token
+            </code>
+            . Machine-readable instructions:{" "}
+            <Link href="/llms.txt">/llms.txt</Link> ·{" "}
+            <Link href="/.well-known/honeymatcha.json">
+              /.well-known/honeymatcha.json
+            </Link>
+            .
+          </p>
         </section>
 
         <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-[0.85rem] text-muted">

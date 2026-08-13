@@ -1,5 +1,12 @@
 import Link from "next/link";
+import { CopyBlock } from "@/components/copy-block";
 import { SiteHeader } from "@/components/site-header";
+import {
+  ASK_AGENT_PROMPT,
+  FRIEND_INVITE_MESSAGE,
+  GROK_CONNECT_PROMPT,
+  GROK_MCP_CLI,
+} from "@/lib/connect-copy";
 
 const MCP_CONFIG = `{
   "mcpServers": {
@@ -7,7 +14,7 @@ const MCP_CONFIG = `{
       "command": "node",
       "args": ["web/mcp/server.mjs"],
       "env": {
-        "HONEYMATCHA_BASE_URL": "https://YOUR_HOST",
+        "HONEYMATCHA_BASE_URL": "https://honeymatcha.io",
         "HONEYMATCHA_API_KEY": "hm_..."
       }
     }
@@ -27,8 +34,9 @@ export default function DocsPage() {
             Connect an agent to HoneyMatcha
           </h1>
           <p className="mt-2 max-w-[42ch] text-[1.02rem] text-muted">
-            Pair in the human&apos;s browser, receive a scoped credential, then
-            use the same capabilities through REST, MCP, or A2A.
+            You connect your agent to your HoneyMatcha account. A friend
+            connects their agent to theirs. Then you invite each other as
+            people — agents never sign into Clerk.
           </p>
         </div>
       </div>
@@ -88,6 +96,72 @@ export default function DocsPage() {
           </ol>
         </section>
 
+        <section aria-labelledby="grok-title" className="mb-12" id="grok">
+          <h2
+            id="grok-title"
+            className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
+          >
+            If you use Grok
+          </h2>
+          <p className="mt-2 text-[0.95rem] leading-7 text-muted">
+            Sign in at HoneyMatcha first, then connect Google Calendar when
+            asked. Then paste this into Grok and approve the link:
+          </p>
+          <div className="mt-3">
+            <CopyBlock text={ASK_AGENT_PROMPT} />
+          </div>
+          <p className="mt-4 text-[0.95rem] leading-7 text-muted">
+            That is the whole Grok path. If your Grok cannot make HTTP calls,
+            create a key at <Link href="/app/keys">/app/keys</Link> and add a
+            custom MCP connector at{" "}
+            <a href="https://grok.com/connectors">grok.com/connectors</a> with
+            URL{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+              https://honeymatcha.io/api/mcp
+            </code>
+            .
+          </p>
+          <p className="mt-4 text-[0.95rem] leading-7 text-muted">
+            Grok CLI / Build:
+          </p>
+          <div className="mt-3">
+            <CopyBlock text={GROK_MCP_CLI} />
+          </div>
+          <p className="mt-4 text-[0.95rem] leading-7 text-muted">
+            Detailed pairing prompt if the one sentence is not enough:
+          </p>
+          <div className="mt-3">
+            <CopyBlock text={GROK_CONNECT_PROMPT} />
+          </div>
+        </section>
+
+        <section
+          aria-labelledby="friend-title"
+          className="mb-12"
+          id="connect-a-friend"
+        >
+          <h2
+            id="friend-title"
+            className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
+          >
+            Connecting with a friend
+          </h2>
+          <p className="mt-2 text-[0.95rem] leading-7 text-muted">
+            You do not connect their agent to yours. Each person connects their
+            own agent to their own HoneyMatcha account. Then you invite the
+            person from <Link href="/app/people">People</Link> and send them
+            the private invite URL. HoneyMatcha does not email that link yet.
+          </p>
+          <p className="mt-3 text-[0.95rem] leading-7 text-muted">
+            After they accept, ask your agent to schedule with their email. If
+            they do not have an agent, send a one-task guest link instead of a
+            People invite.
+          </p>
+          <div className="mt-4">
+            <CopyBlock text={FRIEND_INVITE_MESSAGE} />
+          </div>
+        </section>
+
         <section aria-labelledby="curl-title" className="mb-12">
           <h2
             id="curl-title"
@@ -96,11 +170,15 @@ export default function DocsPage() {
             curl examples
           </h2>
           <p className="mt-2 text-[0.95rem] text-muted">
-            Replace <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">BASE</code> and{" "}
-            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">hm_...</code>.
+            Production origin is{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+              https://honeymatcha.io
+            </code>
+            . Replace the <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">hm_...</code>{" "}
+            credential after pairing.
           </p>
           <pre className="mt-4 overflow-x-auto rounded-md border border-line bg-[rgba(255,252,246,0.75)] p-4 text-[0.82rem] leading-relaxed text-ink">
-{`export BASE=https://YOUR_HOST
+{`export BASE=https://honeymatcha.io
 
 # Start pairing (public)
 curl -s "$BASE/api/v1/pairings/start" \\
@@ -179,12 +257,14 @@ curl -s "$BASE/api/mcp" \\
             Grok Bot skill
           </h2>
           <p className="mt-2 text-[0.95rem] text-muted">
-            Paste{" "}
+            Prefer the Grok steps above. If you are wiring a custom Grok Bot,
+            paste{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
               skills/honeymatcha/SKILL.md
             </code>{" "}
-            into a compatible agent. The skill should use pairing rather than
-            automating human sign-in.
+            into it. The skill uses pairing rather than automating human
+            sign-in. See{" "}
+            <a href="#grok">If you use Grok</a>.
           </p>
         </section>
 
