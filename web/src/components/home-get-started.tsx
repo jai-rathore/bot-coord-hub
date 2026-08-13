@@ -26,23 +26,12 @@ export function HomeGetStarted({
       <p className="mt-2 mb-4 text-[0.95rem] text-muted">
         {signedIn
           ? "Two steps left. After that, you talk to your agent."
-          : "Three steps. After that, you talk to your agent."}
+          : "Two steps. After that, you talk to your agent."}
       </p>
       <ol className="m-0 grid list-none gap-3 p-0">
-        {signedIn ? null : (
-          <li className="grid grid-cols-[auto_1fr] gap-3">
-            <span className="mt-0.5 grid h-[1.55rem] w-[1.55rem] place-items-center rounded-full bg-honey-soft text-[0.78rem] font-semibold text-matcha-deep">
-              1
-            </span>
-            <span>
-              <strong className="font-semibold text-ink">Create an account.</strong>{" "}
-              That is for you, not your agent.
-            </span>
-          </li>
-        )}
         <li className="grid grid-cols-[auto_1fr] gap-3">
           <span className="mt-0.5 grid h-[1.55rem] w-[1.55rem] place-items-center rounded-full bg-honey-soft text-[0.78rem] font-semibold text-matcha-deep">
-            {signedIn ? "1" : "2"}
+            1
           </span>
           <span>
             <strong className="font-semibold text-ink">
@@ -54,7 +43,7 @@ export function HomeGetStarted({
         </li>
         <li className="grid grid-cols-[auto_1fr] gap-3">
           <span className="mt-0.5 grid h-[1.55rem] w-[1.55rem] place-items-center rounded-full bg-honey-soft text-[0.78rem] font-semibold text-matcha-deep">
-            {signedIn ? "2" : "3"}
+            2
           </span>
           <span>
             <strong className="font-semibold text-ink">
