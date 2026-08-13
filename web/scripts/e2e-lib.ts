@@ -7,6 +7,7 @@ import { acceptInviteLink, createInviteLink, listLinksForUser, revokeLinkForUser
 import { createSessionForUser, listMessagesForSession, postSessionMessage } from "../src/lib/sessions";
 import { decideConfirm, listConfirmsForUser, requestConfirm } from "../src/lib/confirms";
 import { DEFAULT_AGENT_SCOPES } from "../src/lib/scopes";
+import { syncUserIdentity } from "../src/lib/users";
 
 function hashApiKey(rawKey: string) {
   return createHash("sha256").update(rawKey).digest("hex");
@@ -15,6 +16,23 @@ function hashApiKey(rawKey: string) {
 async function main() {
   const db = getDb();
   const suffix = randomBytes(3).toString("hex");
+  const reconciliationEmail = `reconcile_${suffix}@example.com`;
+  const [legacyIdentity] = await db.insert(users).values({
+    clerkUserId: `clerk_old_${suffix}`,
+    email: reconciliationEmail,
+    name: "Old Identity",
+  }).returning();
+  const reconciledIdentity = await syncUserIdentity({
+    clerkUserId: `clerk_current_${suffix}`,
+    email: reconciliationEmail.toUpperCase(),
+    name: "Current Identity",
+  });
+  if (
+    reconciledIdentity.id !== legacyIdentity.id ||
+    reconciledIdentity.clerkUserId !== `clerk_current_${suffix}`
+  ) {
+    throw new Error("same-email Clerk identity was not reconciled");
+  }
   const [alice] = await db.insert(users).values({
     clerkUserId: `clerk_alice_${suffix}`,
     email: `alice_${suffix}@example.com`,
@@ -106,6 +124,7 @@ async function main() {
 
   await db.delete(users).where(eq(users.id, alice.id));
   await db.delete(users).where(eq(users.id, bob.id));
+  await db.delete(users).where(eq(users.id, reconciledIdentity.id));
   console.log(JSON.stringify({ ok: true, inviteCode: invite.inviteCode, sessionId: session.id, confirmId: confirm.id }, null, 2));
   process.exit(0);
 }
