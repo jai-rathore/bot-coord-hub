@@ -14,6 +14,11 @@ export function buildScheduleWaitingResult(opts: {
   title: string;
   waiting: WaitingPeer[];
   calendarsMissing?: string[];
+  agentNotify?: Array<{
+    email: string;
+    reach: string;
+    hasPairedAgent: boolean;
+  }>;
 }) {
   const primary = opts.waiting[0];
   const shareUrl = primary?.guestUrl || primary?.inviteUrl || null;
@@ -24,14 +29,17 @@ export function buildScheduleWaitingResult(opts: {
       : "";
 
   const who = primary?.email ?? "them";
+  const notify = opts.agentNotify?.[0];
+  const reachedAgent = notify?.reach === "delivered_to_agent";
   const agent_instructions = [
     "Do not book a Google Calendar event.",
     "Do not send a calendar invite yourself.",
     "Do not tell the human this meeting is confirmed or that the other person accepted.",
-    shareUrl
-      ? `HoneyMatcha does not email ${who}. Show the human this link and ask them to send it: ${shareUrl}`
-      : `HoneyMatcha does not email ${who}. Ask the human to invite them from People.`,
-    "Wait until they join HoneyMatcha and their agent replies here.",
+    reachedAgent
+      ? `HoneyMatcha put this on ${who}'s agent inbox. Wait for their agent to reply here.`
+      : shareUrl
+        ? `HoneyMatcha could not reach ${who}'s agent yet. Show the human this link and ask them to send it: ${shareUrl}`
+        : `HoneyMatcha could not reach ${who}'s agent yet. Ask the human to invite them from People.`,
   ].join(" ");
 
   return {
@@ -45,15 +53,22 @@ export function buildScheduleWaitingResult(opts: {
     guest_url: primary?.guestUrl ?? null,
     people: opts.waiting,
     emails,
-    message: `Not booked. ${who} has not confirmed on HoneyMatcha.${calendarNote}`,
+    agent_notified: opts.agentNotify ?? [],
+    message: reachedAgent
+      ? `Not booked. Reached ${who}'s agent inbox. Waiting for their agent.${calendarNote}`
+      : `Not booked. ${who} has not confirmed on HoneyMatcha.${calendarNote}`,
     agent_instructions,
-    next_steps: [
-      shareUrl
-        ? `Send this link to ${who}: ${shareUrl}`
-        : `Invite ${who} from People and send them the invite URL.`,
-      "Wait for them to join and connect a calendar.",
-      "Only then will HoneyMatcha propose times from both calendars and ask humans to approve before booking.",
-    ],
+    next_steps: reachedAgent
+      ? [
+          "Wait for their agent to pick up the HoneyMatcha inbox item.",
+          "Do not book Google yourself.",
+        ]
+      : [
+          shareUrl
+            ? `Send this link to ${who}: ${shareUrl}`
+            : `Invite ${who} from People and send them the invite URL.`,
+          "Once they connect an agent, HoneyMatcha will reach that agent automatically.",
+        ],
   };
 }
 

@@ -93,8 +93,10 @@ Discovery (no auth):
 
 ### A. Health
 
-1. `GET /api/v1/me` → confirm key identity
-2. `GET /api/v1/intents` → see live intents (e.g. `schedule_meeting`)
+1. `GET /api/v1/me` → confirm key identity. If `inbox.pending` > 0, handle inbox first.
+2. `GET /api/v1/inbox` (`get_inbox`) at the start of every turn. That is how
+   HoneyMatcha reaches you when another person's agent starts a task.
+3. `GET /api/v1/intents` → see live intents (e.g. `schedule_meeting`)
 
 ### B. Link a peer
 
@@ -109,15 +111,13 @@ Discovery (no auth):
 When the human says e.g. "set up a meeting with Rishav tomorrow":
 
 1. Call `request_schedule_meeting` / `POST /api/v1/schedule` with their email
-2. If the response has `scheduled: false` or `share_url` / `guest_url`:
-   - The meeting is **not booked**
-   - Show the human that link and ask them to send it
-   - HoneyMatcha does not email the other person
-   - **Do not** create a Google Calendar event yourself
-   - **Do not** tell the human they accepted
-3. Only after they join, both calendars are connected, and humans approve
-   does HoneyMatcha create the calendar event (`calendar.status: booked`)
-4. Use board messages for free/busy only — never peer event titles
+2. HoneyMatcha delivers that to **their agent inbox** if they have a HoneyMatcha
+   account. Activity will say waiting for their agent — not booked.
+3. If they are not on HoneyMatcha (`reach: not_on_honeymatcha`), show `share_url`
+   to your human so they can join. There is no agent to reach yet.
+4. **Do not** create a Google Calendar event yourself
+5. **Do not** tell the human they accepted until HoneyMatcha returns
+   `calendar.status: booked`
 
 ### D. Confirm (human-gated)
 
@@ -144,6 +144,8 @@ rejection.
 | Action | Method & path |
 |--------|----------------|
 | whoami | `GET /api/v1/me` |
+| inbox | `GET /api/v1/inbox` |
+| ack inbox | `POST /api/v1/inbox/:id/ack` |
 | health (public) | `GET /api/v1/health` |
 | list links | `GET /api/v1/links` |
 | create invite | `POST /api/v1/links/invite` |

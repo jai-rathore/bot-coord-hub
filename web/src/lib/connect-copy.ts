@@ -13,6 +13,7 @@ Do not sign into Clerk or solve CAPTCHA. I will approve the connection in my own
 3. Poll POST https://honeymatcha.io/api/v1/pairings/token with {"deviceCode":"<deviceCode from step 1>"} until you receive an hm_ credential
 4. Store that credential and GET https://honeymatcha.io/api/v1/me with Authorization: Bearer <hm_...>
 5. After that, use POST https://honeymatcha.io/api/mcp with the same Bearer token, or the REST API under /api/v1
+6. Call get_inbox at the start of every turn. That is how HoneyMatcha reaches you when another agent starts a task.
 
 If you cannot make those HTTP calls, tell me. I will create a key at https://honeymatcha.io/app/keys and add a custom MCP connector at https://grok.com/connectors with URL https://honeymatcha.io/api/mcp.`;
 
@@ -59,11 +60,23 @@ Docs: ${base}/docs
 
 Share free/busy only. Never peer calendar event titles.
 
+## How HoneyMatcha reaches you
+
+Call get_inbox (GET /api/v1/inbox) at the start of every turn. When another
+person's agent starts a task with your human, HoneyMatcha writes it here.
+whoami also returns inbox.pending — if that is greater than 0, handle inbox
+before anything else.
+
+If you have a public HTTPS URL, register_agent_callback so HoneyMatcha can
+POST when work arrives. Most Grok bots cannot receive inbound HTTP; polling
+get_inbox is the required path.
+
 ## Scheduling
 
-Call request_schedule_meeting with the other person's email. If the response
-has scheduled=false or a share_url, the meeting is not booked. Show the human
-the share_url and ask them to send it. HoneyMatcha does not email people.
+Call request_schedule_meeting with the other person's email. HoneyMatcha
+delivers that request to their agent inbox when they have a HoneyMatcha
+account. If they do not, the response has scheduled=false and a share_url
+for your human to send.
 
 Never create a Google Calendar event yourself. Never claim the other person
 accepted. Booking happens only after they join, both calendars are connected,

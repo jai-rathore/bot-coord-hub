@@ -118,6 +118,8 @@ export function messageToPlainEnglish(
       return text ?? "Waiting for the other person to join HoneyMatcha.";
     case "waiting.calendar":
       return text ?? "Waiting for everyone to connect a calendar.";
+    case "agent.notify":
+      return text ?? "Reached the other person's agent inbox.";
     default: {
       if (text) return text;
       if (typeof body.title === "string" && body.title.trim()) {

@@ -40,6 +40,7 @@ import {
 } from "@/lib/schedule-copy";
 import { assertLinkScopes } from "@/lib/scopes";
 import { findReusableOpenSession } from "@/lib/sessions";
+import { notifyPeerAgents, type AgentNotifyResult } from "@/lib/agent-inbox";
 import {
   assertPeerCount,
   boundedText,
@@ -88,6 +89,120 @@ async function participantsFor(sessionId: string) {
     .select()
     .from(sessionParticipants)
     .where(eq(sessionParticipants.sessionId, sessionId));
+}
+
+function notifyBoardText(notified: AgentNotifyResult[]): string {
+  return notified
+    .map((row) => {
+      const who = row.name || row.email;
+      if (row.reach === "delivered_to_agent") {
+        return `Reached ${who}'s agent inbox. Waiting for their agent.`;
+      }
+      if (row.reach === "no_paired_agent") {
+        return `${who} has a HoneyMatcha account but no paired agent yet. Left this in their agent inbox.`;
+      }
+      return `${who} is not on HoneyMatcha yet, so there is no agent to reach.`;
+    })
+    .join(" ");
+}
+
+async function notifyAndRecord(opts: {
+  actor: User;
+  actorMeta: ScheduleActor;
+  sessionId: string;
+  title: string;
+  recipients: Array<{
+    userId: string | null;
+    email: string;
+    name: string | null;
+  }>;
+  kind?: string;
+}): Promise<AgentNotifyResult[]> {
+  try {
+    return await notifyAndRecordInner(opts);
+  } catch {
+    return opts.recipients.map((recipient) => ({
+      userId: recipient.userId,
+      email: recipient.email,
+      name: recipient.name,
+      hasPairedAgent: false,
+      inboxId: null,
+      callback: "none" as const,
+      reach: recipient.userId ? "no_paired_agent" as const : "not_on_honeymatcha" as const,
+    }));
+  }
+}
+
+async function notifyAndRecordInner(opts: {
+  actor: User;
+  actorMeta: ScheduleActor;
+  sessionId: string;
+  title: string;
+  recipients: Array<{
+    userId: string | null;
+    email: string;
+    name: string | null;
+  }>;
+  kind?: string;
+}): Promise<AgentNotifyResult[]> {
+  const notified = await notifyPeerAgents({
+    recipients: opts.recipients,
+    sessionId: opts.sessionId,
+    kind: opts.kind ?? "schedule.requested",
+    summary: `${opts.actor.name || opts.actor.email} wants to meet: ${opts.title}. Open this HoneyMatcha task and respond. Do not book Google yourself.`,
+    body: {
+      fromEmail: opts.actor.email,
+      fromName: opts.actor.name,
+      title: opts.title,
+    },
+  });
+
+  const db = getDb();
+  const [session] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, opts.sessionId))
+    .limit(1);
+  const payload = (session?.payload ?? {}) as Record<string, unknown>;
+  const waitingFor = Array.isArray(payload.waitingFor)
+    ? (payload.waitingFor as Array<Record<string, unknown>>)
+    : [];
+  const mergedWaiting = waitingFor.map((row) => {
+    const email = String(row.email ?? "").toLowerCase();
+    const hit = notified.find((item) => item.email.toLowerCase() === email);
+    return hit
+      ? {
+          ...row,
+          reach: hit.reach,
+          hasPairedAgent: hit.hasPairedAgent,
+          inboxId: hit.inboxId,
+        }
+      : row;
+  });
+  await db
+    .update(sessions)
+    .set({
+      payload: {
+        ...payload,
+        waitingFor: mergedWaiting.length ? mergedWaiting : payload.waitingFor,
+        agentNotify: notified,
+      },
+      updatedAt: new Date(),
+    })
+    .where(eq(sessions.id, opts.sessionId));
+
+  await db.insert(sessionMessages).values({
+    sessionId: opts.sessionId,
+    senderUserId: opts.actor.id,
+    actorApiKeyId: opts.actorMeta.apiKeyId ?? null,
+    actorKind: opts.actorMeta.kind ?? "user",
+    kind: "agent.notify",
+    body: {
+      text: notifyBoardText(notified),
+      agentNotify: notified,
+    },
+  });
+  return notified;
 }
 
 async function inviteUnlinkedPeer(
@@ -167,10 +282,22 @@ async function persistWaitingSchedule(opts: {
         inviteUrl: person.inviteUrl || prev?.inviteUrl || "",
       };
     });
+    const notified = await notifyAndRecord({
+      actor: opts.actor,
+      actorMeta: opts.actorMeta,
+      sessionId: reusable.id,
+      title: opts.title,
+      recipients: merged.map((person) => ({
+        userId: person.userId,
+        email: person.email,
+        name: person.name,
+      })),
+    });
     return buildScheduleWaitingResult({
       sessionId: reusable.id,
       title: opts.title,
       waiting: merged,
+      agentNotify: notified,
     });
   }
 
@@ -257,10 +384,23 @@ async function persistWaitingSchedule(opts: {
     },
   });
 
+  const notified = await notifyAndRecord({
+    actor: opts.actor,
+    actorMeta: opts.actorMeta,
+    sessionId: session.id,
+    title: opts.title,
+    recipients: opts.waiting.map((person) => ({
+      userId: person.userId,
+      email: person.email,
+      name: person.name,
+    })),
+  });
+
   return buildScheduleWaitingResult({
     sessionId: session.id,
     title: opts.title,
     waiting: opts.waiting,
+    agentNotify: notified,
   });
 }
 
@@ -554,6 +694,17 @@ export async function runScheduleMeeting(
   });
   if (reusableReady) {
     await ensureInviteeParticipants(reusableReady.id, resolved);
+    await notifyAndRecord({
+      actor,
+      actorMeta,
+      sessionId: reusableReady.id,
+      title,
+      recipients: resolved.map(({ peer }) => ({
+        userId: peer.id,
+        email: peer.email,
+        name: peer.name,
+      })),
+    });
     return proposeAndGate(actor, reusableReady.id, actorMeta);
   }
 
@@ -635,6 +786,18 @@ export async function runScheduleMeeting(
     entityType: "session",
     entityId: session.id,
     metadata: { title, peerEmails: peers.map((p) => p.email) },
+  });
+
+  await notifyAndRecord({
+    actor,
+    actorMeta,
+    sessionId: session.id,
+    title,
+    recipients: resolved.map(({ peer }) => ({
+      userId: peer.id,
+      email: peer.email,
+      name: peer.name,
+    })),
   });
 
   try {
@@ -895,6 +1058,21 @@ async function proposeAndGate(
     entityType: "session",
     entityId: sessionId,
     metadata: { slotCount: proposedSlots.length, provider: freeBusy.provider },
+  });
+
+  await notifyAndRecord({
+    actor,
+    actorMeta,
+    sessionId,
+    title,
+    kind: "schedule.proposed",
+    recipients: parts
+      .filter((part) => part.userId !== actor.id)
+      .map((part) => ({
+        userId: part.userId,
+        email: part.email,
+        name: null,
+      })),
   });
 
   const auto = shouldAutoBook({

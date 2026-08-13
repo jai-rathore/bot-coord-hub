@@ -1,4 +1,5 @@
 import { intentLabel } from "@/lib/intent-labels";
+import type { AgentReach } from "@/lib/agent-inbox";
 import type { PublicMessage, PublicSession } from "@/lib/sessions";
 
 export type WaitingForPerson = {
@@ -7,7 +8,46 @@ export type WaitingForPerson = {
   inviteUrl?: string | null;
   guestUrl?: string | null;
   reason?: string | null;
+  reach?: AgentReach | null;
+  hasPairedAgent?: boolean;
+  inboxId?: string | null;
 };
+
+export function possessiveName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "their";
+  return /s$/i.test(trimmed) ? `${trimmed}'` : `${trimmed}'s`;
+}
+
+export function waitingForAgentLine(
+  peerLabel: string,
+  reach: AgentReach | null | undefined,
+): string {
+  if (reach === "delivered_to_agent") {
+    return `Waiting for ${possessiveName(peerLabel)} agent`;
+  }
+  if (reach === "no_paired_agent") {
+    return `Waiting for ${peerLabel} to connect an agent`;
+  }
+  return `Waiting for ${peerLabel} and/or their agent`;
+}
+
+function reachFromSession(session: PublicSession): AgentReach | null {
+  const waiting = waitingForFromPayload(session.payload);
+  if (waiting[0]?.reach) return waiting[0].reach;
+  const raw = session.payload.agentNotify;
+  if (Array.isArray(raw) && raw[0] && typeof raw[0] === "object") {
+    const reach = (raw[0] as { reach?: unknown }).reach;
+    if (
+      reach === "delivered_to_agent" ||
+      reach === "no_paired_agent" ||
+      reach === "not_on_honeymatcha"
+    ) {
+      return reach;
+    }
+  }
+  return null;
+}
 
 export function sessionTitle(session: PublicSession): string {
   const title = session.payload.title;
@@ -33,6 +73,14 @@ export function waitingForFromPayload(
       inviteUrl: typeof row.inviteUrl === "string" ? row.inviteUrl : null,
       guestUrl: typeof row.guestUrl === "string" ? row.guestUrl : null,
       reason: typeof row.reason === "string" ? row.reason : null,
+      reach:
+        row.reach === "delivered_to_agent" ||
+        row.reach === "no_paired_agent" ||
+        row.reach === "not_on_honeymatcha"
+          ? row.reach
+          : null,
+      hasPairedAgent: row.hasPairedAgent === true,
+      inboxId: typeof row.inboxId === "string" ? row.inboxId : null,
     });
   }
   return people;
@@ -60,13 +108,18 @@ export function sessionStatusForHuman(session: PublicSession): string {
   if (session.status === "proposed" || phase === "proposing") {
     return "Times suggested";
   }
-  if (phase === "waiting_for_peer" || phase === "waiting_for_calendars") {
-    return `Waiting for ${sessionPeerLabel(session)}`;
+  if (phase === "waiting_for_calendars") {
+    return `Waiting for ${sessionPeerLabel(session)} to connect a calendar`;
   }
   const pendingInvitee = session.participants.some(
     (p) => p.role === "invitee" && p.voteStatus === "pending",
   );
-  if (pendingInvitee) return `Waiting for ${sessionPeerLabel(session)}`;
+  if (phase === "waiting_for_peer" || pendingInvitee) {
+    return waitingForAgentLine(
+      sessionPeerLabel(session),
+      reachFromSession(session),
+    );
+  }
   if (!session.peer && waitingForFromPayload(session.payload).length === 0) {
     return "Not sent to anyone";
   }
@@ -129,15 +182,37 @@ export function sharePrompt(session: PublicSession): {
   }
 
   if (phase === "waiting_for_peer" || pendingInvitee || inviteUrl || notSent) {
+    const reach = reachFromSession(session);
     const hasLink = Boolean(inviteUrl || guestUrl);
+    if (notSent && !inviteUrl) {
+      return {
+        headline: "This was not sent to anyone",
+        body: "HoneyMatcha did not reach another person or their agent.",
+        inviteUrl,
+        guestUrl,
+      };
+    }
+    if (reach === "delivered_to_agent") {
+      return {
+        headline: `Waiting for ${possessiveName(peerName)} agent`,
+        body: "HoneyMatcha put this on their agent inbox. If their agent is connected, it will see this the next time it calls HoneyMatcha. HoneyMatcha does not ping the human — their agent does that.",
+        inviteUrl,
+        guestUrl,
+      };
+    }
+    if (reach === "no_paired_agent") {
+      return {
+        headline: `Waiting for ${peerName} to connect an agent`,
+        body: "They have a HoneyMatcha account, but no paired agent yet. The request is sitting in their agent inbox for when they connect one. If they have not signed in, send the link below.",
+        inviteUrl,
+        guestUrl,
+      };
+    }
     return {
-      headline:
-        notSent && !inviteUrl
-          ? "This was not sent to anyone"
-          : `${peerName} has not joined this yet`,
+      headline: `Waiting for ${peerName} and/or their agent`,
       body: hasLink
-        ? "HoneyMatcha does not email people. Copy the link and send it yourself. Do not treat a Google invite from your agent as confirmation."
-        : "HoneyMatcha does not email people. Ask them to open HoneyMatcha, or invite them from People and send that URL. A Google invite from your agent is not confirmation.",
+        ? "HoneyMatcha cannot reach their agent until they join. Copy the link and send it. Do not treat a Google invite from your agent as confirmation."
+        : "HoneyMatcha cannot reach their agent until they join and connect one. Invite them from People.",
       inviteUrl,
       guestUrl,
     };

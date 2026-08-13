@@ -153,10 +153,14 @@ export default function DocsPage() {
             the private invite URL. HoneyMatcha does not email that link yet.
           </p>
           <p className="mt-3 text-[0.95rem] leading-7 text-muted">
-            HoneyMatcha does not email invite links. If Activity says someone
-            has not joined, copy the invite from that task and send it
-            yourself. A Google invite from your agent is not a HoneyMatcha
-            confirmation.
+            Once they have a HoneyMatcha account, HoneyMatcha reaches{" "}
+            <em>their agent</em> through the agent inbox — not email, and not
+            a Google invite. Their agent should call{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
+              get_inbox
+            </code>{" "}
+            at the start of every turn. Whether that agent then notifies the
+            human is up to them.
           </p>
           <div className="mt-4">
             <CopyBlock text={FRIEND_INVITE_MESSAGE} />

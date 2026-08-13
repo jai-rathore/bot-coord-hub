@@ -33,14 +33,53 @@ function session(overrides: Partial<PublicSession> = {}): PublicSession {
   };
 }
 
-test("board copy uses the meeting title and never says Getting started", () => {
+test("board copy waits for the person and/or their agent", () => {
   const row = session({
     payload: { title: "Brainstorming", phase: "waiting_for_peer" },
     peer: { id: "u2", email: "rishav@example.com", name: "Rishav Sharma" },
   });
   assert.equal(sessionTitle(row), "Brainstorming");
   assert.equal(sessionPeerLabel(row), "Rishav Sharma");
-  assert.equal(sessionStatusForHuman(row), "Waiting for Rishav Sharma");
+  assert.equal(
+    sessionStatusForHuman(row),
+    "Waiting for Rishav Sharma and/or their agent",
+  );
+  assert.equal(
+    sessionStatusForHuman(
+      session({
+        payload: {
+          phase: "waiting_for_peer",
+          agentNotify: [
+            {
+              email: "rishav@example.com",
+              reach: "delivered_to_agent",
+              hasPairedAgent: true,
+            },
+          ],
+        },
+        peer: { id: "u2", email: "rishav@example.com", name: "Rishav Sharma" },
+      }),
+    ),
+    "Waiting for Rishav Sharma's agent",
+  );
+  assert.equal(
+    sessionStatusForHuman(
+      session({
+        payload: {
+          phase: "waiting_for_peer",
+          agentNotify: [
+            {
+              email: "rishav@example.com",
+              reach: "no_paired_agent",
+              hasPairedAgent: false,
+            },
+          ],
+        },
+        peer: { id: "u2", email: "rishav@example.com", name: "Rishav Sharma" },
+      }),
+    ),
+    "Waiting for Rishav Sharma to connect an agent",
+  );
   assert.equal(sessionStatusForHuman(session({ status: "confirmed" })), "Booked");
   assert.equal(sessionStatusForHuman(session({ status: "cancelled" })), "Stopped");
 });
@@ -64,7 +103,7 @@ test("share prompt tells the human HoneyMatcha does not email", () => {
   );
   assert.ok(prompt);
   assert.match(prompt!.headline, /Rishav/);
-  assert.match(prompt!.body, /does not email/i);
+  assert.match(prompt!.body, /cannot reach their agent/i);
   assert.equal(prompt!.inviteUrl, "https://honeymatcha.io/invite/HM-TEST");
   assert.ok(prompt!.guestUrl?.includes("/guest/"));
 });
@@ -125,9 +164,9 @@ test("schedule waiting result forbids agents from booking Google themselves", ()
   assert.equal(result.scheduled, false);
   assert.equal(result.booked, false);
   assert.match(result.agent_instructions, /Do not book a Google Calendar event/);
-  assert.match(result.agent_instructions, /does not email/);
   assert.equal(result.share_url, "https://honeymatcha.io/invite/HM-TEST");
   assert.match(SCHEDULE_MEETING_TOOL_DESCRIPTION, /does not book/i);
   const tool = MCP_TOOLS.find((item) => item.name === "request_schedule_meeting");
   assert.equal(tool?.description, SCHEDULE_MEETING_TOOL_DESCRIPTION);
+  assert.ok(MCP_TOOLS.some((item) => item.name === "get_inbox"));
 });
