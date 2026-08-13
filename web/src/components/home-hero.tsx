@@ -7,7 +7,7 @@ import {
   SignUpButton,
   useUser,
 } from "@clerk/nextjs";
-import { BrandHero } from "@/components/brand-mark";
+import { AnimatedBrandHero } from "@/components/animated-brand-hero";
 
 const NEXT_ACTIONS = [
   {
@@ -128,9 +128,8 @@ export function HomeHero() {
           <SignedInHero />
         </Show>
       </div>
-      <div className="animate-rise-delay-2 relative mx-auto w-full max-w-[32rem] lg:max-w-none">
-        <div className="pointer-events-none absolute inset-[8%] rounded-full bg-[radial-gradient(circle,rgba(232,210,154,0.55)_0%,rgba(111,154,124,0.18)_46%,transparent_70%)] blur-2xl" />
-        <BrandHero className="relative z-[1] h-auto w-full drop-shadow-[0_30px_60px_rgba(31,74,54,0.16)]" />
+      <div className="animate-rise-delay-2 relative mx-auto w-full max-w-[34rem] lg:max-w-none">
+        <AnimatedBrandHero />
       </div>
     </div>
   );
