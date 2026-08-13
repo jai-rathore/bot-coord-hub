@@ -19,7 +19,11 @@ import {
   slotWithinAllAllowedHours,
 } from "./policy";
 import { parseScheduleWindow } from "./validation";
-import { mockCalendarAllowed } from "./calendar";
+import {
+  CALENDAR_REQUIRED_AGENT_INSTRUCTIONS,
+  CALENDAR_REQUIRED_MESSAGE,
+  mockCalendarAllowed,
+} from "./calendar";
 import { buildOAuthState, parseOAuthState } from "./google-oauth";
 import { matchHiringConstraints } from "./hiring-match";
 import {
@@ -29,7 +33,15 @@ import {
   PRODUCTION_ORIGIN,
   agentLlmsText,
 } from "./connect-copy";
+import {
+  inboxKindForSessionActivity,
+  peerUserIdsExcludingActor,
+} from "./agent-inbox";
 import { getDiscoveryDocument } from "./discovery";
+import {
+  SCHEDULE_COUNTERPARTY_REQUIRED,
+  sessionRequiresCounterparty,
+} from "./sessions";
 
 test("default paired agents cannot approve for a human", () => {
   assert.equal(DEFAULT_AGENT_SCOPES.includes("approvals:write"), false);
@@ -190,11 +202,64 @@ test("connect copy uses the production origin and never asks agents to sign in",
   assert.match(llms, /Never sign into Clerk/);
   assert.match(llms, /get_inbox/);
   assert.match(llms, /Never create a Google Calendar event yourself/);
+  assert.match(llms, /Connect Calendar at https:\/\/honeymatcha.io\/app\/settings/);
+  assert.match(llms, /Do not call create_session/);
 
   const discovery = getDiscoveryDocument("https://honeymatcha.io");
   assert.match(discovery.what, /not a chat app/);
   assert.match(discovery.connect_as_agent, /start pairing immediately/);
   assert.match(discovery.agent_instructions, /Never sign into Clerk/);
   assert.match(discovery.agent_instructions, /get_inbox/);
+  assert.match(discovery.agent_instructions, /Connect Calendar at \/app\/settings/);
+  assert.match(discovery.agent_instructions, /do not call create_session/i);
   assert.equal(discovery.llms, "https://honeymatcha.io/llms.txt");
+});
+
+test("schedule_meeting sessions require a counterparty; hiring does not", () => {
+  assert.equal(sessionRequiresCounterparty("schedule_meeting"), true);
+  assert.equal(sessionRequiresCounterparty("hiring_compatibility"), false);
+  assert.match(SCHEDULE_COUNTERPARTY_REQUIRED, /request_schedule_meeting/);
+  assert.match(SCHEDULE_COUNTERPARTY_REQUIRED, /peerUserId or linkId/);
+});
+
+test("board and session activity notify the peer, not the actor", () => {
+  assert.equal(
+    inboxKindForSessionActivity("schedule_meeting"),
+    "schedule.requested",
+  );
+  assert.equal(
+    inboxKindForSessionActivity("hiring_compatibility"),
+    "session.activity",
+  );
+  assert.deepEqual(
+    peerUserIdsExcludingActor({
+      actorUserId: "alice",
+      initiatorUserId: "alice",
+      peerUserId: "rishav",
+      participantUserIds: ["alice", "rishav"],
+    }),
+    ["rishav"],
+  );
+  assert.deepEqual(
+    peerUserIdsExcludingActor({
+      actorUserId: "rishav",
+      initiatorUserId: "alice",
+      peerUserId: "rishav",
+    }),
+    ["alice"],
+  );
+  assert.deepEqual(
+    peerUserIdsExcludingActor({
+      actorUserId: "alice",
+      initiatorUserId: "alice",
+      peerUserId: null,
+    }),
+    [],
+  );
+});
+
+test("missing production calendar keeps the 409 and points at settings", () => {
+  assert.match(CALENDAR_REQUIRED_MESSAGE, /never simulates production bookings/);
+  assert.match(CALENDAR_REQUIRED_AGENT_INSTRUCTIONS, /\/app\/settings/);
+  assert.match(CALENDAR_REQUIRED_AGENT_INSTRUCTIONS, /Do not call create_session/);
 });

@@ -11,12 +11,27 @@ import {
   type User,
 } from "@/db/schema";
 import { AgentApiError } from "@/lib/agent-errors";
+import {
+  inboxKindForSessionActivity,
+  notifyPeerAgents,
+  peerUserIdsExcludingActor,
+} from "@/lib/agent-inbox";
 import { requireSupportedIntent } from "@/lib/intent-gate";
 import {
   assertLinkScopes,
   INTENT_REQUIRED_LINK_SCOPES,
 } from "@/lib/scopes";
 import { assertPayloadSize, boundedText } from "@/lib/validation";
+
+/** Intents that are always between people — creating one needs a counterparty. */
+export const PAIRWISE_SESSION_INTENTS = new Set(["schedule_meeting"]);
+
+export const SCHEDULE_COUNTERPARTY_REQUIRED =
+  "schedule_meeting requires peerUserId or linkId. Call request_schedule_meeting with their email.";
+
+export function sessionRequiresCounterparty(intentType: string): boolean {
+  return PAIRWISE_SESSION_INTENTS.has(intentType);
+}
 
 export type PublicParticipant = {
   userId: string;
@@ -238,6 +253,14 @@ export async function createSessionForUser(opts: {
   await requireSupportedIntent(intentType);
   assertPayloadSize(opts.payload);
 
+  if (
+    sessionRequiresCounterparty(intentType) &&
+    !opts.peerUserId &&
+    !opts.linkId
+  ) {
+    throw new AgentApiError(400, SCHEDULE_COUNTERPARTY_REQUIRED);
+  }
+
   const db = getDb();
   let peerUserId = opts.peerUserId ?? null;
   const requestedLinkId = opts.linkId ?? null;
@@ -344,7 +367,7 @@ export async function createSessionForUser(opts: {
       .select()
       .from(sessionParticipants)
       .where(eq(sessionParticipants.sessionId, reusable.id));
-    return toPublicSession(
+    const publicReusable = toPublicSession(
       reusable,
       existingPeer,
       existingParts.map((p) => ({
@@ -354,6 +377,8 @@ export async function createSessionForUser(opts: {
         voteStatus: p.voteStatus,
       })),
     );
+    await notifySessionPeers({ session: reusable, actor: opts.user });
+    return publicReusable;
   }
 
   const [created] = await db
@@ -379,7 +404,9 @@ export async function createSessionForUser(opts: {
     peer = found[0] ?? null;
   }
 
-  return toPublicSession(created, peer, []);
+  const publicCreated = toPublicSession(created, peer, []);
+  await notifySessionPeers({ session: created, actor: opts.user });
+  return publicCreated;
 }
 
 export async function getSessionForUser(
@@ -451,7 +478,66 @@ export async function postSessionMessage(opts: {
     .set({ updatedAt: new Date() })
     .where(eq(sessions.id, opts.session.id));
 
+  await notifySessionPeers({ session: opts.session, actor: opts.sender });
   return toPublicMessage(created);
+}
+
+async function notifySessionPeers(opts: {
+  session: Session;
+  actor: User;
+}): Promise<void> {
+  try {
+    const db = getDb();
+    const parts = await db
+      .select({ userId: sessionParticipants.userId })
+      .from(sessionParticipants)
+      .where(eq(sessionParticipants.sessionId, opts.session.id));
+    const userIds = peerUserIdsExcludingActor({
+      actorUserId: opts.actor.id,
+      initiatorUserId: opts.session.initiatorUserId,
+      peerUserId: opts.session.peerUserId,
+      participantUserIds: parts.map((part) => part.userId),
+    });
+    if (userIds.length === 0) return;
+
+    const rows = await db
+      .select()
+      .from(users)
+      .where(inArray(users.id, userIds));
+    if (rows.length === 0) return;
+
+    const payload = (opts.session.payload ?? {}) as Record<string, unknown>;
+    const title =
+      typeof payload.title === "string" && payload.title.trim()
+        ? payload.title.trim()
+        : opts.session.intentType === "schedule_meeting"
+          ? "Meeting"
+          : "task";
+    const who = opts.actor.name || opts.actor.email;
+    const summary =
+      opts.session.intentType === "schedule_meeting"
+        ? `${who} wants to meet: ${title}. Open this HoneyMatcha task and respond. Do not book Google yourself.`
+        : `${who} updated a HoneyMatcha task: ${title}. Open this task and respond. Do not book Google yourself.`;
+
+    await notifyPeerAgents({
+      recipients: rows.map((row) => ({
+        userId: row.id,
+        email: row.email,
+        name: row.name,
+      })),
+      sessionId: opts.session.id,
+      kind: inboxKindForSessionActivity(opts.session.intentType),
+      summary,
+      body: {
+        fromEmail: opts.actor.email,
+        fromName: opts.actor.name,
+        title,
+      },
+      skipIfUnacked: true,
+    });
+  } catch {
+    // Inbox notify must not fail session create or board writes.
+  }
 }
 
 const REUSABLE_STATUSES: Session["status"][] = [

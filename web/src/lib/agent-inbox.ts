@@ -155,6 +155,32 @@ export async function registerAgentCallback(opts: {
   return { callbackUrl: url };
 }
 
+/** schedule_meeting reuses schedule.requested so an unacked schedule notify is not doubled. */
+export function inboxKindForSessionActivity(intentType: string): string {
+  return intentType === "schedule_meeting"
+    ? "schedule.requested"
+    : "session.activity";
+}
+
+export function peerUserIdsExcludingActor(opts: {
+  actorUserId: string;
+  initiatorUserId: string;
+  peerUserId: string | null;
+  participantUserIds?: string[];
+}): string[] {
+  const ids = new Set<string>();
+  if (opts.initiatorUserId !== opts.actorUserId) {
+    ids.add(opts.initiatorUserId);
+  }
+  if (opts.peerUserId && opts.peerUserId !== opts.actorUserId) {
+    ids.add(opts.peerUserId);
+  }
+  for (const id of opts.participantUserIds ?? []) {
+    if (id !== opts.actorUserId) ids.add(id);
+  }
+  return [...ids];
+}
+
 export async function notifyPeerAgents(opts: {
   recipients: Array<{
     userId: string | null;
@@ -165,6 +191,8 @@ export async function notifyPeerAgents(opts: {
   kind: string;
   summary: string;
   body?: Record<string, unknown>;
+  /** Reuse an existing unacked inbox row and skip the callback. */
+  skipIfUnacked?: boolean;
 }): Promise<AgentNotifyResult[]> {
   const results: AgentNotifyResult[] = [];
   for (const recipient of opts.recipients) {
@@ -193,6 +221,7 @@ export async function notifyPeerAgents(opts: {
           fromEmail: opts.body?.fromEmail,
           sessionId: opts.sessionId,
         },
+        skipIfUnacked: opts.skipIfUnacked,
       }),
     );
   }
@@ -207,6 +236,7 @@ async function deliverToUserAgent(opts: {
   kind: string;
   summary: string;
   body: Record<string, unknown>;
+  skipIfUnacked?: boolean;
 }): Promise<AgentNotifyResult> {
   const db = getDb();
   const paired = await userHasPairedAgent(opts.userId);
@@ -223,6 +253,18 @@ async function deliverToUserAgent(opts: {
       ),
     )
     .limit(1);
+
+  if (existing && opts.skipIfUnacked) {
+    return {
+      userId: opts.userId,
+      email: opts.email,
+      name: opts.name,
+      hasPairedAgent: paired.hasPairedAgent,
+      inboxId: existing.id,
+      callback: "none",
+      reach: paired.hasPairedAgent ? "delivered_to_agent" : "no_paired_agent",
+    };
+  }
 
   let inboxId = existing?.id ?? null;
   if (!inboxId) {

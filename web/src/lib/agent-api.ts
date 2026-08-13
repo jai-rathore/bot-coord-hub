@@ -379,11 +379,7 @@ export async function createSession(
       payload: body.payload,
       idempotencyKey: body.idempotencyKey,
     });
-    const notice =
-      session.intentType === "schedule_meeting" && !session.peerUserId
-        ? "This task is not with anyone yet. Call request_schedule_meeting with their email. Do not book a calendar event yourself."
-        : undefined;
-    return { ok: true, session, scheduled: false, booked: false, notice };
+    return { ok: true, session, scheduled: false, booked: false };
   } catch (err) {
     rethrowAsAgentError(err);
   }
