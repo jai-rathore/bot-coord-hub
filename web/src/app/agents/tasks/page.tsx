@@ -16,7 +16,7 @@ export default async function AgentTasksPage() {
   }));
 
   return (
-    <div className="min-h-full bg-[linear-gradient(180deg,#f8fbf7_0%,#f4f7f3_50%,#f0ebe0_100%)]">
+    <div className="min-h-full hm-atmosphere">
       <SiteHeader />
       <main className="mx-auto w-[min(48rem,calc(100%-2rem))] py-10">
         <p className="text-sm text-muted">

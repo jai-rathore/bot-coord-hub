@@ -18,7 +18,7 @@ export function AppNav({ attentionCount = 0 }: { attentionCount?: number }) {
   const pathname = usePathname();
 
   return (
-    <header className="border-b border-line bg-[rgba(255,252,246,0.65)] backdrop-blur-sm">
+    <header className="hm-glass sticky top-0 z-30 border-b border-[rgba(213,224,214,0.55)]">
       <div className="mx-auto w-[min(64rem,calc(100%-2rem))] py-3">
         <div className="flex items-center justify-between gap-4">
           <BrandLink />
@@ -36,7 +36,7 @@ export function AppNav({ attentionCount = 0 }: { attentionCount?: number }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`shrink-0 snap-start whitespace-nowrap rounded-md px-2.5 py-1.5 no-underline transition ${
+                  className={`shrink-0 snap-start whitespace-nowrap rounded-full px-3 py-1.5 no-underline transition ${
                     active
                       ? "bg-matcha-deep text-[#f7faf6] hover:text-[#f7faf6]"
                       : "text-muted hover:bg-[rgba(111,154,124,0.12)] hover:text-matcha-deep"

@@ -70,7 +70,7 @@ body {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -78,33 +78,535 @@ body {
   }
 }
 
-@keyframes drift {
+@keyframes hm-float {
   from {
     transform: translate3d(0, 0, 0) scale(1);
   }
   to {
-    transform: translate3d(-1.5%, 1.2%, 0) scale(1.03);
+    transform: translate3d(4%, 6%, 0) scale(1.08);
+  }
+}
+
+@keyframes hm-mote {
+  from {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.15;
+  }
+  to {
+    transform: translate3d(-18px, -46px, 0);
+    opacity: 0.8;
+  }
+}
+
+@keyframes hm-brand-aura-breathe {
+  from {
+    opacity: 0.62;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 0.95;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes hm-brand-cup-celebrate {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  35% {
+    transform: translateY(-18px) rotate(-1.5deg) scale(1.025);
+  }
+  68% {
+    transform: translateY(-4px) rotate(1deg) scale(1.008);
+  }
+}
+
+@keyframes hm-brand-drop-fall {
+  0% {
+    opacity: 0;
+    transform: translateY(-36px) scale(0.42);
+  }
+  18% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(28px) scale(0.78);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(64px) scale(0.25, 0.12);
+  }
+}
+
+@keyframes hm-brand-thought-bubble {
+  0%,
+  100% {
+    opacity: 0.32;
+    transform: translateY(5px) scale(0.88);
+  }
+  50% {
+    opacity: 0.95;
+    transform: translateY(-8px) scale(1.08);
+  }
+}
+
+@keyframes hm-brand-route {
+  to {
+    stroke-dashoffset: -120;
+  }
+}
+
+@keyframes hm-brand-success-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.45) rotate(-12deg);
+  }
+  68% {
+    opacity: 1;
+    transform: scale(1.08) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
   }
 }
 
 .animate-rise {
-  animation: rise 0.7s ease both;
+  animation: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .animate-rise-delay-1 {
-  animation: rise 0.75s ease 0.08s both;
+  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
 }
 
 .animate-rise-delay-2 {
-  animation: rise 0.75s ease 0.16s both;
+  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.16s both;
 }
 
 .animate-rise-delay-3 {
-  animation: rise 0.75s ease 0.24s both;
+  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
 }
 
-.animate-drift {
-  animation: drift 12s ease-in-out infinite alternate;
+.hm-atmosphere {
+  background:
+    radial-gradient(920px 460px at 8% -12%, rgba(111, 154, 124, 0.4) 0%, transparent 58%),
+    radial-gradient(720px 420px at 96% 0%, rgba(232, 210, 154, 0.58) 0%, transparent 56%),
+    radial-gradient(540px 280px at 50% 100%, rgba(196, 154, 60, 0.16) 0%, transparent 52%),
+    linear-gradient(165deg, #f8fbf7 0%, #eef4ef 46%, #f3ead8 100%);
+}
+
+.hm-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(52px);
+  animation: hm-float 16s ease-in-out infinite alternate;
+}
+
+.hm-orb-a {
+  width: min(34rem, 80vw);
+  height: min(34rem, 80vw);
+  left: -12%;
+  top: -28%;
+  background: rgba(111, 154, 124, 0.42);
+}
+
+.hm-orb-b {
+  width: min(26rem, 70vw);
+  height: min(26rem, 70vw);
+  right: -10%;
+  top: -16%;
+  background: rgba(232, 210, 154, 0.58);
+  animation-delay: -5s;
+}
+
+.hm-orb-c {
+  width: min(22rem, 60vw);
+  height: min(22rem, 60vw);
+  right: 18%;
+  bottom: -24%;
+  background: rgba(196, 154, 60, 0.2);
+  animation-delay: -9s;
+}
+
+.hm-mote {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #c49a3c;
+  animation: hm-mote 7.5s ease-in-out infinite alternate;
+}
+
+.hm-mote-1 {
+  left: 12%;
+  top: 38%;
+}
+.hm-mote-2 {
+  left: 78%;
+  top: 22%;
+  width: 5px;
+  height: 5px;
+  background: #6f9a7c;
+  animation-delay: -2s;
+}
+.hm-mote-3 {
+  left: 64%;
+  top: 62%;
+  width: 6px;
+  height: 6px;
+  background: #e8d29a;
+  animation-delay: -3.5s;
+}
+.hm-mote-4 {
+  left: 28%;
+  top: 72%;
+  animation-delay: -1.2s;
+}
+.hm-mote-5 {
+  left: 88%;
+  top: 48%;
+  width: 4px;
+  height: 4px;
+  background: #fffaf0;
+  animation-delay: -4.4s;
+}
+
+.hm-brand-stage {
+  --hm-pointer-x: 0px;
+  --hm-pointer-y: 0px;
+  --hm-rotate-x: 0deg;
+  --hm-rotate-y: 0deg;
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 6;
+  margin: 0;
+  padding: 0;
+  isolation: isolate;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transform:
+    perspective(1000px)
+    rotateX(var(--hm-rotate-x))
+    rotateY(var(--hm-rotate-y))
+    translate3d(var(--hm-pointer-x), var(--hm-pointer-y), 0);
+  transform-style: preserve-3d;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hm-brand-stage:focus-visible {
+  outline: 3px solid rgba(47, 107, 74, 0.48);
+  outline-offset: 5px;
+  border-radius: 36%;
+}
+
+.hm-brand-aura {
+  position: absolute;
+  z-index: 0;
+  inset: 11% 7% 9%;
+  border-radius: 45%;
+  background:
+    radial-gradient(circle at 52% 48%, rgba(232, 210, 154, 0.62), transparent 44%),
+    radial-gradient(circle at 46% 56%, rgba(111, 154, 124, 0.26), transparent 67%);
+  filter: blur(26px);
+  animation: hm-brand-aura-breathe 4.6s ease-in-out infinite alternate;
+  transition:
+    opacity 600ms ease,
+    background 600ms ease;
+}
+
+.hm-brand-cup,
+.hm-brand-dipper {
+  position: absolute;
+  display: block;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform;
+  transition:
+    transform 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 700ms ease;
+}
+
+.hm-brand-cup {
+  z-index: 2;
+  left: 2%;
+  bottom: 3%;
+  width: 96%;
+  filter: drop-shadow(0 30px 28px rgba(31, 74, 54, 0.16));
+  transform: translateY(0) rotate(0deg) scale(1);
+}
+
+.hm-brand-dipper {
+  z-index: 3;
+  top: -10%;
+  right: -1%;
+  width: 59%;
+  clip-path: inset(0 0 24% 0);
+  filter: drop-shadow(0 18px 16px rgba(97, 61, 18, 0.2));
+  transform: translate(0, 0) rotate(0deg);
+  transform-origin: 84% 8%;
+}
+
+.hm-brand-overlay {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.hm-brand-monogram {
+  fill: none;
+  stroke: #fffaf0;
+  stroke-width: 15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition:
+    stroke 500ms ease,
+    stroke-width 500ms ease,
+    opacity 500ms ease;
+}
+
+.hm-brand-drop {
+  opacity: 0.78;
+  transform: translateY(-18px) scale(0.58);
+  transform-box: fill-box;
+  transform-origin: top center;
+  transition:
+    opacity 420ms ease,
+    transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hm-brand-thinking,
+.hm-brand-connections,
+.hm-brand-success {
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+
+.hm-brand-thinking {
+  fill: rgba(232, 210, 154, 0.9);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.hm-brand-thinking circle {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.hm-brand-thinking circle:nth-child(2) {
+  animation-delay: -380ms;
+}
+
+.hm-brand-thinking circle:nth-child(3) {
+  animation-delay: -760ms;
+}
+
+.hm-brand-connections path {
+  fill: none;
+  stroke: rgba(58, 107, 79, 0.58);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 12 17;
+}
+
+.hm-brand-connections circle {
+  fill: #fffaf0;
+  stroke: #c49a3c;
+  stroke-width: 6;
+}
+
+.hm-brand-success {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.hm-brand-success circle {
+  fill: rgba(255, 250, 240, 0.96);
+  stroke: #c49a3c;
+  stroke-width: 7;
+}
+
+.hm-brand-success path {
+  fill: none;
+  stroke: #2f6b4a;
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hm-brand-success .hm-brand-success-spark {
+  stroke: #c49a3c;
+  stroke-width: 7;
+}
+
+.hm-brand-status {
+  position: absolute;
+  z-index: 6;
+  right: 5%;
+  bottom: 7%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 6.5rem;
+  padding: 0.48rem 0.78rem;
+  border: 1px solid rgba(213, 224, 214, 0.82);
+  border-radius: 999px;
+  background: rgba(255, 252, 246, 0.8);
+  box-shadow: 0 12px 28px rgba(31, 74, 54, 0.12);
+  color: var(--matcha-deep);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.hm-brand-status-dot {
+  width: 0.48rem;
+  height: 0.48rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--matcha);
+  box-shadow: 0 0 0 4px rgba(111, 154, 124, 0.15);
+  transition:
+    background 450ms ease,
+    box-shadow 450ms ease;
+}
+
+.hm-brand-stage:hover .hm-brand-aura {
+  opacity: 1;
+}
+
+.hm-brand-stage[data-state="thinking"] .hm-brand-cup {
+  transform: translateY(-6px) scale(1.012);
+  filter:
+    saturate(1.08)
+    drop-shadow(0 34px 30px rgba(31, 74, 54, 0.18));
+}
+
+.hm-brand-stage[data-state="thinking"] .hm-brand-dipper {
+  transform: translate(-2%, -2%) rotate(-3deg);
+}
+
+.hm-brand-stage[data-state="thinking"] .hm-brand-drop {
+  opacity: 1;
+  transform: translateY(-8px) scale(0.78);
+}
+
+.hm-brand-stage[data-state="thinking"] .hm-brand-thinking {
+  opacity: 1;
+}
+
+.hm-brand-stage[data-state="thinking"] .hm-brand-thinking circle {
+  animation: hm-brand-thought-bubble 1.6s ease-in-out infinite;
+}
+
+.hm-brand-stage[data-state="thinking"] .hm-brand-status-dot {
+  background: var(--honey);
+  box-shadow: 0 0 0 4px rgba(196, 154, 60, 0.16);
+}
+
+.hm-brand-stage[data-state="coordinating"] .hm-brand-cup {
+  transform: translateY(-3px) rotate(-0.5deg) scale(1.006);
+}
+
+.hm-brand-stage[data-state="coordinating"] .hm-brand-dipper {
+  transform: translate(-4%, 2%) rotate(5deg);
+}
+
+.hm-brand-stage[data-state="coordinating"] .hm-brand-drop {
+  animation: hm-brand-drop-fall 1.35s ease-in infinite;
+}
+
+.hm-brand-stage[data-state="coordinating"] .hm-brand-connections {
+  opacity: 1;
+}
+
+.hm-brand-stage[data-state="coordinating"] .hm-brand-connections path {
+  animation: hm-brand-route 2.2s linear infinite;
+}
+
+.hm-brand-stage[data-state="coordinating"] .hm-brand-status-dot {
+  background: #4f8a63;
+  box-shadow: 0 0 0 4px rgba(79, 138, 99, 0.18);
+}
+
+.hm-brand-stage[data-state="done"] .hm-brand-cup {
+  animation: hm-brand-cup-celebrate 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hm-brand-stage[data-state="done"] .hm-brand-dipper {
+  transform: translate(3%, -4%) rotate(4deg);
+}
+
+.hm-brand-stage[data-state="done"] .hm-brand-drop {
+  opacity: 0;
+  transform: translateY(28px) scale(0.2);
+}
+
+.hm-brand-stage[data-state="done"] .hm-brand-monogram {
+  stroke: #fffdf5;
+  stroke-width: 16;
+}
+
+.hm-brand-stage[data-state="done"] .hm-brand-success {
+  opacity: 1;
+  animation: hm-brand-success-pop 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hm-brand-stage[data-state="done"] .hm-brand-status-dot {
+  background: #2f6b4a;
+  box-shadow:
+    0 0 0 4px rgba(47, 107, 74, 0.16),
+    0 0 14px rgba(47, 107, 74, 0.32);
+}
+
+@media (max-width: 640px) {
+  .hm-brand-status {
+    right: 4%;
+    bottom: 5%;
+    min-width: 0;
+    padding: 0.42rem 0.68rem;
+    font-size: 0.7rem;
+  }
+}
+
+.hm-card {
+  transition:
+    transform 0.35s ease,
+    box-shadow 0.35s ease,
+    border-color 0.35s ease;
+}
+
+.hm-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(111, 154, 124, 0.55);
+  box-shadow: 0 18px 40px rgba(31, 74, 54, 0.1);
+}
+
+.hm-btn-primary {
+  background: linear-gradient(180deg, #3f7556 0%, #1f4a36 100%);
+  box-shadow: 0 10px 24px rgba(31, 74, 54, 0.22);
+}
+
+.hm-btn-primary:hover {
+  background: linear-gradient(180deg, #4a8663 0%, #2a5d44 100%);
+}
+
+.hm-glass {
+  background: rgba(248, 251, 247, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 @media (prefers-reduced-motion: reduce) {

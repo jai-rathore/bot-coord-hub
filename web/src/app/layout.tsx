@@ -22,6 +22,7 @@ export const metadata: Metadata = {
     "Let your agent handle the back-and-forth with other people, their agents, and people without agents.",
   icons: {
     icon: [
+      { url: "/logo-mark.svg", type: "image/svg+xml" },
       { url: "/favicon.ico", sizes: "any" },
       { url: "/favicon.png", type: "image/png", sizes: "32x32" },
       { url: "/logo-mark.png", type: "image/png", sizes: "512x512" },

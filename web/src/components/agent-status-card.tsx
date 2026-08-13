@@ -83,7 +83,7 @@ export function AgentStatusCard({ status }: { status: HomeStatus }) {
           </h2>
         </div>
       </div>
-      <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-white/70">
+      <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-white/75 shadow-[0_16px_40px_rgba(31,74,54,0.06)]">
         {rows.map((row) => (
           <div
             key={row.label}

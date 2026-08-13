@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 
 type BrandLinkProps = {
   className?: string;
@@ -20,16 +20,9 @@ export function BrandLink({
       href="/"
       className={`inline-flex min-w-0 items-center gap-1.5 text-matcha-deep no-underline transition hover:text-matcha sm:gap-2 ${className}`}
     >
-      <Image
-        src="/logo-mark.png"
-        alt=""
-        width={32}
-        height={32}
-        className="h-7 w-7 shrink-0 rounded-full sm:h-8 sm:w-8"
-        priority
-      />
+      <BrandMark className="h-8 w-8 shrink-0 sm:h-9 sm:w-9" />
       {showWordmark ? (
-        <span className="hidden whitespace-nowrap font-[family-name:var(--font-fraunces)] text-lg font-semibold sm:inline">
+        <span className="hidden whitespace-nowrap font-[family-name:var(--font-fraunces)] text-lg font-semibold tracking-[-0.02em] sm:inline">
           HoneyMatcha
         </span>
       ) : null}
