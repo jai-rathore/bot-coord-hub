@@ -37,14 +37,22 @@ Open `http://localhost:3000`.
 
 - Human-facing connection guide: `/agents`
 - Developer documentation: `/docs`
+- Grok: `https://honeymatcha.io/docs#grok`
+- Connecting with a friend: `https://honeymatcha.io/docs#connect-a-friend`
 - A2A Agent Card: `/.well-known/agent-card.json`
 - MCP protected-resource metadata: `/.well-known/oauth-protected-resource`
 - Legacy-compatible discovery: `/.well-known/honeymatcha.json`
 - Agent skill: [`skills/honeymatcha/SKILL.md`](./skills/honeymatcha/SKILL.md)
 
+You connect your agent to your HoneyMatcha account. A friend connects theirs
+to theirs. Then you invite the person from People — you do not pair their
+agent into your account.
+
 Agents should start at `POST /api/v1/pairings/start`, ask the human to approve
 the returned verification URL in a normal browser, then exchange the device
-code once at `POST /api/v1/pairings/token`.
+code once at `POST /api/v1/pairings/token`. Grok users can also add
+`https://honeymatcha.io/api/mcp` as a custom connector with a scoped `hm_`
+Bearer key.
 
 ## Legacy prototype
 

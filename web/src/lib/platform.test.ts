@@ -22,6 +22,11 @@ import { parseScheduleWindow } from "./validation";
 import { mockCalendarAllowed } from "./calendar";
 import { buildOAuthState, parseOAuthState } from "./google-oauth";
 import { matchHiringConstraints } from "./hiring-match";
+import {
+  FRIEND_INVITE_MESSAGE,
+  GROK_CONNECT_PROMPT,
+  PRODUCTION_ORIGIN,
+} from "./connect-copy";
 
 test("default paired agents cannot approve for a human", () => {
   assert.equal(DEFAULT_AGENT_SCOPES.includes("approvals:write"), false);
@@ -165,4 +170,12 @@ test("hiring compatibility returns dimensions without raw values", () => {
 
   const review = matchHiringConstraints({}, {});
   assert.equal(review.verdict, "human_review");
+});
+
+test("connect copy uses the production origin and never asks agents to sign in", () => {
+  assert.equal(PRODUCTION_ORIGIN, "https://honeymatcha.io");
+  assert.match(GROK_CONNECT_PROMPT, /honeymatcha\.io\/api\/v1\/pairings\/start/);
+  assert.match(GROK_CONNECT_PROMPT, /Do not sign into Clerk/);
+  assert.match(FRIEND_INVITE_MESSAGE, /PASTE_INVITE_URL_HERE/);
+  assert.equal(FRIEND_INVITE_MESSAGE.includes("YOUR_HOST"), false);
 });

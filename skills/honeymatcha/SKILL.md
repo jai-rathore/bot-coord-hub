@@ -11,25 +11,52 @@ description: Connect to HoneyMatcha so an agent can handle cross-person coordina
 - User wants to invite/link another person's agent, list intents, or schedule a meeting through the hub
 - You have (or need) a HoneyMatcha API key (`hm_...`)
 
+## Grok connector (grok.com)
+
+If this Grok instance cannot make HTTP calls itself:
+
+1. Ask the human to create a key at `https://honeymatcha.io/app/keys`
+2. Add a custom MCP connector at `https://grok.com/connectors`
+3. MCP URL: `https://honeymatcha.io/api/mcp`
+4. Authorization: `Bearer hm_...`
+
+Grok CLI / Build:
+
+```bash
+grok mcp add --transport http honeymatcha https://honeymatcha.io/api/mcp \
+  --header "Authorization: Bearer ${HONEYMATCHA_API_KEY}"
+```
+
+## Connect a friend (people, not agent-to-agent)
+
 Do **not** invent peer calendar event titles. Share free/busy or free slots only.
+
+Do not pair the friend's agent into this account. Each human connects their own agent, then:
+
+1. `POST /api/v1/links/invite` with the friend's email
+2. Send the returned `inviteUrl` out-of-band
+3. Friend accepts at that URL after signing in
+4. Then `request_schedule_meeting` with their email
+
+If they have no agent, use `create_guest_task` instead of a People invite.
 
 ## Connect without a human login
 
 1. **Agent starts pairing**
-   - `POST {BASE}/api/v1/pairings/start` with `{ "agentName": "…" }`
+   - `POST https://honeymatcha.io/api/v1/pairings/start` with `{ "agentName": "…" }`
    - Show the returned `verificationUrl` to the human
 2. **Human approves in their normal browser**
    - Never request Clerk credentials or automate human sign-in
 3. **Agent exchanges the device code once**
-   - Poll `POST {BASE}/api/v1/pairings/token`
+   - Poll `POST https://honeymatcha.io/api/v1/pairings/token`
    - On `authorization_pending`, wait for the returned interval
    - Store the returned scoped `hm_...` credential
 4. **Set secrets on this agent**
-   - `HONEYMATCHA_BASE_URL` = site origin (e.g. `https://YOUR_HOST`)
+   - `HONEYMATCHA_BASE_URL` = `https://honeymatcha.io`
    - `HONEYMATCHA_API_KEY` = `hm_...`
 5. **Verify**
-   - `GET {BASE}/api/v1/me`
-   - `GET {BASE}/api/v1/intents`
+   - `GET https://honeymatcha.io/api/v1/me`
+   - `GET https://honeymatcha.io/api/v1/intents`
 
 Every authenticated request:
 
@@ -40,15 +67,15 @@ Content-Type: application/json
 
 ## MCP (optional)
 
-- **Remote HTTP**: `POST {BASE}/api/mcp` with the same Bearer key  
+- **Remote HTTP**: `POST https://honeymatcha.io/api/mcp` with the same Bearer key  
   JSON-RPC methods: `initialize`, `tools/list`, `tools/call`  
   Shortcut body: `{ "tool": "whoami", "arguments": {} }`
 - **Stdio**: run `node web/mcp/server.mjs` with the env vars above (see `/docs`)
 
 Discovery (no auth):
 
-- `GET {BASE}/.well-known/honeymatcha.json`
-- `GET {BASE}/` with `Accept: application/json`
+- `GET https://honeymatcha.io/.well-known/honeymatcha.json`
+- `GET https://honeymatcha.io/` with `Accept: application/json`
 
 ## Privacy rules (hard)
 
@@ -146,4 +173,4 @@ curl -s "$BASE/api/v1/intents" -H "Authorization: Bearer $KEY"
 - 401 → credential missing/revoked; start pairing again
 - No active link → invite flow; stop until accepted
 - Calendar not connected → ask the human to connect it at `/app/settings`
-- Docs: `{BASE}/docs`
+- Docs: `https://honeymatcha.io/docs`
