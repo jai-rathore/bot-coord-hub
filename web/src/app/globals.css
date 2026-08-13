@@ -70,7 +70,7 @@ body {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -78,33 +78,287 @@ body {
   }
 }
 
-@keyframes drift {
+@keyframes hm-float {
   from {
     transform: translate3d(0, 0, 0) scale(1);
   }
   to {
-    transform: translate3d(-1.5%, 1.2%, 0) scale(1.03);
+    transform: translate3d(4%, 6%, 0) scale(1.08);
+  }
+}
+
+@keyframes hm-mote {
+  from {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.15;
+  }
+  to {
+    transform: translate3d(-18px, -46px, 0);
+    opacity: 0.8;
+  }
+}
+
+@keyframes hm-bob {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes hm-swirl {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes hm-drip {
+  0% {
+    transform: translate(0, 0) scale(0.55);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+    transform: translate(4px, 10px) scale(1);
+  }
+  72% {
+    opacity: 1;
+    transform: translate(10px, 78px) scale(1);
+  }
+  88% {
+    opacity: 0.35;
+    transform: translate(12px, 96px) scale(0.55, 0.35);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(12px, 102px) scale(0.2);
+  }
+}
+
+@keyframes hm-ripple {
+  0%,
+  68% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  76% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes hm-steam {
+  0% {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  24% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(-28px);
+    opacity: 0;
+  }
+}
+
+@keyframes hm-sparkle {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(12deg);
+  }
+}
+
+@keyframes hm-dipper {
+  from {
+    transform: rotate(-2deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes hm-glow-pulse {
+  from {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.04);
   }
 }
 
 .animate-rise {
-  animation: rise 0.7s ease both;
+  animation: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .animate-rise-delay-1 {
-  animation: rise 0.75s ease 0.08s both;
+  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
 }
 
 .animate-rise-delay-2 {
-  animation: rise 0.75s ease 0.16s both;
+  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.16s both;
 }
 
 .animate-rise-delay-3 {
-  animation: rise 0.75s ease 0.24s both;
+  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
 }
 
-.animate-drift {
-  animation: drift 12s ease-in-out infinite alternate;
+.hm-atmosphere {
+  background:
+    radial-gradient(920px 460px at 8% -12%, rgba(111, 154, 124, 0.4) 0%, transparent 58%),
+    radial-gradient(720px 420px at 96% 0%, rgba(232, 210, 154, 0.58) 0%, transparent 56%),
+    radial-gradient(540px 280px at 50% 100%, rgba(196, 154, 60, 0.16) 0%, transparent 52%),
+    linear-gradient(165deg, #f8fbf7 0%, #eef4ef 46%, #f3ead8 100%);
+}
+
+.hm-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(52px);
+  animation: hm-float 16s ease-in-out infinite alternate;
+}
+
+.hm-orb-a {
+  width: min(34rem, 80vw);
+  height: min(34rem, 80vw);
+  left: -12%;
+  top: -28%;
+  background: rgba(111, 154, 124, 0.42);
+}
+
+.hm-orb-b {
+  width: min(26rem, 70vw);
+  height: min(26rem, 70vw);
+  right: -10%;
+  top: -16%;
+  background: rgba(232, 210, 154, 0.58);
+  animation-delay: -5s;
+}
+
+.hm-orb-c {
+  width: min(22rem, 60vw);
+  height: min(22rem, 60vw);
+  right: 18%;
+  bottom: -24%;
+  background: rgba(196, 154, 60, 0.2);
+  animation-delay: -9s;
+}
+
+.hm-mote {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #c49a3c;
+  animation: hm-mote 7.5s ease-in-out infinite alternate;
+}
+
+.hm-mote-1 {
+  left: 12%;
+  top: 38%;
+}
+.hm-mote-2 {
+  left: 78%;
+  top: 22%;
+  width: 5px;
+  height: 5px;
+  background: #6f9a7c;
+  animation-delay: -2s;
+}
+.hm-mote-3 {
+  left: 64%;
+  top: 62%;
+  width: 6px;
+  height: 6px;
+  background: #e8d29a;
+  animation-delay: -3.5s;
+}
+.hm-mote-4 {
+  left: 28%;
+  top: 72%;
+  animation-delay: -1.2s;
+}
+.hm-mote-5 {
+  left: 88%;
+  top: 48%;
+  width: 4px;
+  height: 4px;
+  background: #fffaf0;
+  animation-delay: -4.4s;
+}
+
+.hm-bob {
+  animation: hm-bob 5.5s ease-in-out infinite alternate;
+}
+
+.hm-swirl {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hm-swirl 28s linear infinite;
+}
+
+.hm-drip {
+  animation: hm-drip 2.8s ease-in infinite;
+}
+
+.hm-ripple {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hm-ripple 2.8s ease-out infinite;
+}
+
+.hm-steam {
+  animation: hm-steam 4.2s ease-in-out infinite;
+}
+
+.hm-sparkle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hm-sparkle 10s ease-in-out infinite alternate;
+}
+
+.hm-dipper {
+  transform-box: fill-box;
+  transform-origin: 80% 10%;
+  animation: hm-dipper 4.8s ease-in-out infinite alternate;
+}
+
+.hm-card {
+  transition:
+    transform 0.35s ease,
+    box-shadow 0.35s ease,
+    border-color 0.35s ease;
+}
+
+.hm-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(111, 154, 124, 0.55);
+  box-shadow: 0 18px 40px rgba(31, 74, 54, 0.1);
+}
+
+.hm-btn-primary {
+  background: linear-gradient(180deg, #3f7556 0%, #1f4a36 100%);
+  box-shadow: 0 10px 24px rgba(31, 74, 54, 0.22);
+}
+
+.hm-btn-primary:hover {
+  background: linear-gradient(180deg, #4a8663 0%, #2a5d44 100%);
+}
+
+.hm-glass {
+  background: rgba(248, 251, 247, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 @media (prefers-reduced-motion: reduce) {

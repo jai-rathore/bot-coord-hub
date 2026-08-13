@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/site-header";
 
 export default function AgentsPage() {
   return (
-    <div className="flex min-h-full flex-col bg-[linear-gradient(180deg,#f8fbf7_0%,#f4f7f3_42%,#f0ebe0_100%)]">
+    <div className="relative flex min-h-full flex-col hm-atmosphere">
       <SiteHeader />
       <main className="mx-auto w-[min(46rem,calc(100%-2rem))] flex-1 py-10 sm:py-14">
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-matcha">

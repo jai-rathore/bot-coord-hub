@@ -17,9 +17,9 @@ const MCP_CONFIG = `{
 export default function DocsPage() {
   return (
     <div className="flex min-h-full flex-col">
-      <div className="border-b border-[rgba(213,224,214,0.85)] bg-[radial-gradient(520px_220px_at_8%_-20%,rgba(111,154,124,0.28)_0%,transparent_55%),linear-gradient(165deg,#f8fbf7_0%,#eef4ef_55%,#f3efe6_100%)]">
-        <SiteHeader />
-        <div className="mx-auto w-[min(44rem,calc(100%-2rem))] px-0 pb-8 pt-4">
+      <SiteHeader />
+      <div className="border-b border-[rgba(213,224,214,0.85)] hm-atmosphere">
+        <div className="mx-auto w-[min(44rem,calc(100%-2rem))] px-0 pb-8 pt-6">
           <p className="text-sm font-medium tracking-[0.04em] text-matcha-soft uppercase">
             Docs
           </p>
