@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, notInArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   apiKeys,
@@ -8,6 +8,21 @@ import {
   sessions,
   type User,
 } from "@/db/schema";
+
+export const HIDDEN_HOME_TASK_STATUSES = ["cancelled", "declined"] as const;
+
+export function isSetupComplete(status: {
+  calendarConnected: boolean;
+  agent: { connected: boolean };
+}) {
+  return status.calendarConnected && status.agent.connected;
+}
+
+export function isVisibleHomeTask(status: string) {
+  return !HIDDEN_HOME_TASK_STATUSES.includes(
+    status as (typeof HIDDEN_HOME_TASK_STATUSES)[number],
+  );
+}
 
 export async function getHomeStatus(user: User) {
   const db = getDb();
@@ -46,7 +61,12 @@ export async function getHomeStatus(user: User) {
       db
         .select()
         .from(sessions)
-        .where(eq(sessions.initiatorUserId, user.id))
+        .where(
+          and(
+            eq(sessions.initiatorUserId, user.id),
+            notInArray(sessions.status, [...HIDDEN_HOME_TASK_STATUSES]),
+          ),
+        )
         .orderBy(desc(sessions.updatedAt))
         .limit(3),
       db

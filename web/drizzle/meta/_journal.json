@@ -50,6 +50,13 @@
       "when": 1786590000000,
       "tag": "0006_agent_inbox",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786597200000,
+      "tag": "0007_clear_dogfood_sessions",
+      "breakpoints": true
     }
   ]
 }

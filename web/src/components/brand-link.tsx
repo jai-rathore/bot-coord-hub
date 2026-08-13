@@ -3,6 +3,7 @@ import Link from "next/link";
 
 type BrandLinkProps = {
   className?: string;
+  href?: string;
   /**
    * Show the serif wordmark next to the mark from `sm` and up (default true).
    * Below `sm`, only the logo mark is shown (wordmark stays available to AT via sr-only).
@@ -13,11 +14,12 @@ type BrandLinkProps = {
 /** HoneyMatcha mark + optional wordmark for headers / auth chrome. */
 export function BrandLink({
   className = "",
+  href = "/",
   showWordmark = true,
 }: BrandLinkProps) {
   return (
     <Link
-      href="/"
+      href={href}
       className={`inline-flex min-w-0 items-center gap-1.5 text-matcha-deep no-underline transition hover:text-matcha sm:gap-2 ${className}`}
     >
       <Image

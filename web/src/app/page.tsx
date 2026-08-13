@@ -1,11 +1,36 @@
 import Link from "next/link";
+import { currentUser } from "@clerk/nextjs/server";
 import { HomeGetStarted } from "@/components/home-get-started";
 import { HomeHero } from "@/components/home-hero";
 import { SiteHeader } from "@/components/site-header";
+import { getHomeStatus, isSetupComplete } from "@/lib/home-status";
+import { ensureCurrentUser } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
+async function loadSignedInHome(): Promise<{
+  firstName: string | null;
+  setupComplete: boolean;
+} | null> {
+  const clerkUser = await currentUser();
+  if (!clerkUser) return null;
+  const firstName = clerkUser.firstName?.trim() || null;
+  try {
+    const user = await ensureCurrentUser();
+    if (!user) return { firstName, setupComplete: false };
+    const status = await getHomeStatus(user);
+    return { firstName, setupComplete: isSetupComplete(status) };
+  } catch {
+    // Don't nag a signed-in person about setup if status cannot be loaded.
+    return { firstName, setupComplete: true };
+  }
+}
+
+export default async function HomePage() {
+  const signedInHome = await loadSignedInHome();
+  const signedIn = Boolean(signedInHome);
+  const setupComplete = signedInHome?.setupComplete ?? false;
+
   return (
     <div className="flex min-h-full flex-col">
       <div className="relative border-b border-[rgba(213,224,214,0.85)] bg-[radial-gradient(620px_280px_at_10%_-10%,rgba(111,154,124,0.34)_0%,transparent_58%),radial-gradient(480px_240px_at_96%_0%,rgba(232,210,154,0.52)_0%,transparent_55%),linear-gradient(165deg,#f8fbf7_0%,#eef4ef_48%,#f0ebe0_100%)]">
@@ -54,8 +79,12 @@ export default function HomePage() {
           </svg>
         </div>
 
-        <SiteHeader />
-        <HomeHero />
+        <SiteHeader showHowToStart={!setupComplete} />
+        <HomeHero
+          signedIn={signedIn}
+          setupComplete={setupComplete}
+          firstName={signedInHome?.firstName ?? null}
+        />
       </div>
 
       <main className="mx-auto w-[min(40rem,calc(100%-2rem))] flex-1 py-10">
@@ -74,7 +103,7 @@ export default function HomePage() {
           </p>
         </section>
 
-        <HomeGetStarted />
+        <HomeGetStarted signedIn={signedIn} setupComplete={setupComplete} />
 
         <section aria-labelledby="trust-title" className="mb-10">
           <h2
@@ -84,13 +113,21 @@ export default function HomePage() {
             What you do here
           </h2>
           <ul className="mt-3 grid list-none gap-2 p-0 text-[0.96rem]">
-            {[
-              "This is for your agent to work on — you are not chatting here",
-              "Connect Google Calendar so it can find a real time",
-              "Important actions wait for your say",
-              "See exactly what your agent did",
-              "Calendar details stay private — only free/busy is compared",
-            ].map((item) => (
+            {(setupComplete
+              ? [
+                  "This is for your agent to work on — you are not chatting here",
+                  "Important actions wait for your say",
+                  "See exactly what your agent did",
+                  "Calendar details stay private — only free/busy is compared",
+                ]
+              : [
+                  "This is for your agent to work on — you are not chatting here",
+                  "Connect Google Calendar so it can find a real time",
+                  "Important actions wait for your say",
+                  "See exactly what your agent did",
+                  "Calendar details stay private — only free/busy is compared",
+                ]
+            ).map((item) => (
               <li key={item} className="relative pl-[1.15rem]">
                 <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
                 {item}

@@ -21,7 +21,7 @@ export function AppNav({ attentionCount = 0 }: { attentionCount?: number }) {
     <header className="border-b border-line bg-[rgba(255,252,246,0.65)] backdrop-blur-sm">
       <div className="mx-auto w-[min(64rem,calc(100%-2rem))] py-3">
         <div className="flex items-center justify-between gap-4">
-          <BrandLink />
+          <BrandLink href="/app" />
           <UserButton />
         </div>
         <nav

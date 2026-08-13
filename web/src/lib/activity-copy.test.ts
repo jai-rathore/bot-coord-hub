@@ -6,6 +6,7 @@ import {
   sessionStatusForHuman,
   sessionTitle,
   sharePrompt,
+  visibleActivitySessions,
   voteStatusLabel,
 } from "./activity-copy";
 import { messageToPlainEnglish, type PublicSession } from "./sessions";
@@ -82,6 +83,14 @@ test("board copy waits for the person and/or their agent", () => {
   );
   assert.equal(sessionStatusForHuman(session({ status: "confirmed" })), "Booked");
   assert.equal(sessionStatusForHuman(session({ status: "cancelled" })), "Stopped");
+});
+
+test("activity list stays empty when the only tasks are stopped", () => {
+  const stopped = session({ id: "s-stopped", status: "cancelled" });
+  const open = session({ id: "s-open", status: "open" });
+  assert.deepEqual(visibleActivitySessions([stopped], false), []);
+  assert.deepEqual(visibleActivitySessions([stopped], true), [stopped]);
+  assert.deepEqual(visibleActivitySessions([stopped, open], false), [open]);
 });
 
 test("share prompt tells the human HoneyMatcha does not email", () => {

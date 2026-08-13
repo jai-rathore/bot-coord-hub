@@ -2,7 +2,7 @@ import Link from "next/link";
 import { currentUser } from "@clerk/nextjs/server";
 import { AgentStatusCard } from "@/components/agent-status-card";
 import { SetupGuide } from "@/components/setup-guide";
-import { getHomeStatus } from "@/lib/home-status";
+import { getHomeStatus, isSetupComplete } from "@/lib/home-status";
 import { intentLabel, taskStatusLabel } from "@/lib/intent-labels";
 import {
   getGoogleConnection,
@@ -24,7 +24,7 @@ export default async function AppHomePage() {
     getHomeStatus(user),
     getGoogleConnection(user.id),
   ]);
-  const setupComplete = status.calendarConnected && status.agent.connected;
+  const setupComplete = isSetupComplete(status);
 
   return (
     <div className="space-y-10">

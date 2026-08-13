@@ -126,6 +126,14 @@ export function sessionStatusForHuman(session: PublicSession): string {
   return "In progress";
 }
 
+export function visibleActivitySessions<T extends { status: string }>(
+  sessions: T[],
+  showStopped: boolean,
+): T[] {
+  if (showStopped) return sessions;
+  return sessions.filter((session) => session.status !== "cancelled");
+}
+
 export function collapseActivityMessages(
   messages: PublicMessage[],
 ): PublicMessage[] {

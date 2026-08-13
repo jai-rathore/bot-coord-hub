@@ -2,6 +2,7 @@ import Link from "next/link";
 import { TaskRequestForm } from "@/components/task-request-form";
 import { listRegistryIntents } from "@/lib/intents";
 import { intentLabel, taskStatusLabel } from "@/lib/intent-labels";
+import { isVisibleHomeTask } from "@/lib/home-status";
 import { listSessionsForUser } from "@/lib/sessions";
 import { ensureCurrentUser } from "@/lib/users";
 
@@ -16,6 +17,9 @@ export default async function TasksPage() {
     listSessionsForUser(user),
     listRegistryIntents(),
   ]);
+  const listedSessions = sessions.filter((session) =>
+    isVisibleHomeTask(session.status),
+  );
   const supportedTasks = registry
     .filter((item) => item.status === "live")
     .map((item) => ({
@@ -38,9 +42,9 @@ export default async function TasksPage() {
         <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
           In progress and recent
         </h2>
-        {sessions.length ? (
+        {listedSessions.length ? (
           <ul className="mt-4 divide-y divide-line rounded-2xl border border-line bg-white/65 px-4">
-            {sessions.map((session) => (
+            {listedSessions.map((session) => (
               <li
                 key={session.id}
                 className="flex flex-wrap items-center justify-between gap-4 py-4"

@@ -8,6 +8,7 @@ import {
   sessionStatusForHuman,
   sessionTitle,
   sharePrompt,
+  visibleActivitySessions,
 } from "@/lib/activity-copy";
 
 export function ActivityBoard({
@@ -29,13 +30,10 @@ export function ActivityBoard({
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
 
-  const visibleSessions = useMemo(() => {
-    if (showStopped) return initialSessions;
-    const active = initialSessions.filter(
-      (session) => session.status !== "cancelled",
-    );
-    return active.length > 0 ? active : initialSessions;
-  }, [initialSessions, showStopped]);
+  const visibleSessions = useMemo(
+    () => visibleActivitySessions(initialSessions, showStopped),
+    [initialSessions, showStopped],
+  );
 
   const stoppedCount = initialSessions.filter(
     (session) => session.status === "cancelled",

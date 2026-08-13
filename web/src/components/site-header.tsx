@@ -15,10 +15,17 @@ const SECONDARY_LINKS = [
   { href: "/agents", label: "For agents" },
 ] as const;
 
-export function SiteHeader() {
+export function SiteHeader({
+  showHowToStart = true,
+}: {
+  showHowToStart?: boolean;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
+  const secondaryLinks = showHowToStart
+    ? SECONDARY_LINKS
+    : SECONDARY_LINKS.filter((link) => link.href !== "/#how-it-works");
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -58,7 +65,7 @@ export function SiteHeader() {
       </div>
       <nav className="flex shrink-0 items-center gap-1.5 text-sm font-medium sm:gap-3">
         <div className="hidden items-center gap-3 sm:flex">
-          {SECONDARY_LINKS.map((link) => (
+          {secondaryLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
@@ -108,7 +115,7 @@ export function SiteHeader() {
               role="menu"
               className="absolute right-0 z-40 mt-2 min-w-[10.5rem] rounded-md border border-line bg-[rgba(255,252,246,0.98)] p-1 shadow-[0_8px_24px_rgba(31,74,54,0.16)] backdrop-blur-sm"
             >
-              {SECONDARY_LINKS.map((link) => (
+              {secondaryLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
