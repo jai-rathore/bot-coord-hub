@@ -146,6 +146,77 @@ async function main() {
     "organizer should see one guest response",
   );
 
+  const hiringTask = await jsonFetch("/api/v1/guest-tasks", {
+    method: "POST",
+    bearer: token,
+    body: {
+      taskType: "hiring_compatibility",
+      title: "Private role compatibility check",
+      description: "Compare hard constraints before an introduction.",
+      targetEmail: "candidate@example.com",
+      privateConfig: {
+        compensationMaximum: 180000,
+        locations: ["New York"],
+        workModes: ["Hybrid"],
+        sponsorshipAvailable: true,
+        latestStart: "2026-11-01",
+        levels: ["Senior"],
+      },
+    },
+  });
+  assert(hiringTask.response.status === 201, JSON.stringify(hiringTask.data));
+  const hiringUrl = new URL(hiringTask.data.guestUrl);
+  const hiringToken = hiringUrl.hash.slice(1);
+  const hiringPublicId = hiringTask.data.task.publicId;
+  const hiringRead = await jsonFetch(`/api/guest/tasks/${hiringPublicId}`, {
+    guest: hiringToken,
+  });
+  assert(hiringRead.response.ok, JSON.stringify(hiringRead.data));
+  assert(
+    hiringRead.data.task.privateConfig === undefined,
+    "guest must never receive employer private constraints",
+  );
+  const hiringResponse = await jsonFetch(
+    `/api/guest/tasks/${hiringPublicId}/respond`,
+    {
+      method: "POST",
+      guest: hiringToken,
+      headers: { "Idempotency-Key": randomUUID() },
+      body: {
+        email: "candidate@example.com",
+        response: {
+          compensationMinimum: 165000,
+          locations: ["New York"],
+          workModes: ["Hybrid"],
+          sponsorshipRequired: true,
+          earliestStart: "2026-10-01",
+          levels: ["Senior"],
+        },
+      },
+    },
+  );
+  assert(hiringResponse.response.ok, JSON.stringify(hiringResponse.data));
+  const hiringOrganizerRead = await jsonFetch(
+    `/api/v1/guest-tasks/${hiringPublicId}`,
+    { bearer: token },
+  );
+  const publicMatch = hiringOrganizerRead.data.responses?.[0]?.response;
+  assert(publicMatch?.verdict === "compatible", "hiring match should be compatible");
+  assert(
+    publicMatch?.compensationMinimum === undefined,
+    "organizer must not receive candidate raw constraints",
+  );
+  const [storedHiring] = await sql`
+    select gr.private_response, gr.response
+    from guest_responses gr
+    join guest_tasks gt on gt.id = gr.guest_task_id
+    where gt.public_id = ${hiringPublicId}
+  `;
+  assert(
+    String(storedHiring.private_response).startsWith("enc:v1:"),
+    "candidate constraints must be encrypted at rest",
+  );
+
   const a2a = await jsonFetch("/api/a2a", {
     method: "POST",
     bearer: token,
@@ -172,6 +243,7 @@ async function main() {
         pairedAgent: exchange.data.agentName,
         guestTask: publicId,
         guestResponses: organizerRead.data.responses.length,
+        hiringCompatibility: publicMatch.verdict,
         a2a: "SendMessage completed",
       },
       null,

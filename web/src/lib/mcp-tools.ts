@@ -226,12 +226,23 @@ export const MCP_TOOLS: McpToolDef[] = [
       properties: {
         taskType: {
           type: "string",
-          enum: ["binary_choice", "text_response", "availability"],
+          enum: [
+            "binary_choice",
+            "text_response",
+            "availability",
+            "hiring_compatibility",
+          ],
         },
         title: { type: "string" },
         description: { type: "string" },
         targetEmail: { type: "string" },
         config: { type: "object", additionalProperties: true },
+        privateConfig: {
+          type: "object",
+          description:
+            "Organizer-only constraints. Required for hiring_compatibility and never returned to the guest.",
+          additionalProperties: true,
+        },
         expiresInMinutes: { type: "number" },
         maxResponses: { type: "number" },
         sessionId: { type: "string" },
@@ -347,6 +358,9 @@ export async function dispatchMcpTool(
           description: args.description as string | undefined,
           targetEmail: args.targetEmail as string | undefined,
           config: args.config as Record<string, unknown> | undefined,
+          privateConfig: args.privateConfig as
+            | Record<string, unknown>
+            | undefined,
           expiresInMinutes: args.expiresInMinutes as number | undefined,
           maxResponses: args.maxResponses as number | undefined,
           sessionId: args.sessionId as string | undefined,

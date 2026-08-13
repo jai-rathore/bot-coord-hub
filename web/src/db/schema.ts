@@ -55,6 +55,7 @@ export const guestTaskTypeEnum = pgEnum("guest_task_type", [
   "binary_choice",
   "text_response",
   "availability",
+  "hiring_compatibility",
 ]);
 
 export const pairingStatusEnum = pgEnum("pairing_status", [
@@ -361,6 +362,10 @@ export const guestTasks = pgTable(
     title: text("title").notNull(),
     description: text("description"),
     config: jsonb("config").$type<Record<string, unknown>>().notNull().default({}),
+    privateConfig: jsonb("private_config")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
     sessionId: uuid("session_id").references(() => sessions.id, {
       onDelete: "set null",
     }),
@@ -396,6 +401,7 @@ export const guestResponses = pgTable(
       .references(() => guestTasks.id, { onDelete: "cascade" }),
     idempotencyKey: text("idempotency_key").notNull(),
     response: jsonb("response").$type<Record<string, unknown>>().notNull(),
+    privateResponse: text("private_response"),
     submitterEmailHash: text("submitter_email_hash"),
     clientIpHash: text("client_ip_hash"),
     createdAt: timestamp("created_at", { withTimezone: true })

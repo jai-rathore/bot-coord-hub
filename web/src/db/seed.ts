@@ -49,6 +49,52 @@ async function seed() {
     console.log("Updated intent_types: schedule_meeting");
   }
 
+  const hiringDescription =
+    "Privately compare compensation, location, work mode, sponsorship, timing, and level before an introduction. No ranking or automatic rejection.";
+  const hiringSchema = {
+    taskType: "hiring_compatibility",
+    targetEmail: "string",
+    privateConfig: {
+      compensationMaximum: "number?",
+      locations: "string[]?",
+      workModes: "string[]?",
+      sponsorshipAvailable: "boolean?",
+      latestStart: "ISO date?",
+      levels: "string[]?",
+    },
+  };
+  const [existingHiring] = await db
+    .select()
+    .from(intentTypes)
+    .where(eq(intentTypes.slug, "hiring_compatibility"))
+    .limit(1);
+  if (existingHiring) {
+    await db
+      .update(intentTypes)
+      .set({
+        name: "Check hiring compatibility",
+        description: hiringDescription,
+        status: "live",
+        category: "hiring",
+        requiredScopes: ["guest_tasks:write"],
+        schema: hiringSchema,
+        updatedAt: new Date(),
+      })
+      .where(eq(intentTypes.id, existingHiring.id));
+    console.log("Updated intent_types: hiring_compatibility");
+  } else {
+    await db.insert(intentTypes).values({
+      slug: "hiring_compatibility",
+      name: "Check hiring compatibility",
+      description: hiringDescription,
+      status: "live",
+      category: "hiring",
+      requiredScopes: ["guest_tasks:write"],
+      schema: hiringSchema,
+    });
+    console.log("Seeded intent_types: hiring_compatibility (live)");
+  }
+
   process.exit(0);
 }
 

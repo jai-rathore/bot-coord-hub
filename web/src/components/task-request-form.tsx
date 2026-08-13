@@ -54,6 +54,8 @@ export function TaskRequestForm({
     const prompt =
       task.slug === "schedule_meeting"
         ? "Use HoneyMatcha to schedule a meeting with [person] sometime next week."
+        : task.slug === "hiring_compatibility"
+          ? "Use HoneyMatcha to privately check hiring compatibility with [candidate email]. Ask me for the role's compensation ceiling, locations, work modes, sponsorship availability, latest start date, and levels before creating the request."
         : `Use HoneyMatcha to ${task.name.toLowerCase()}.`;
     await navigator.clipboard.writeText(prompt);
     setCopied(task.slug);

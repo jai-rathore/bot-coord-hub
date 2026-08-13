@@ -36,6 +36,13 @@
       "when": 1786571387875,
       "tag": "0004_organic_kylun",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786583501592,
+      "tag": "0005_solid_captain_universe",
+      "breakpoints": true
     }
   ]
 }

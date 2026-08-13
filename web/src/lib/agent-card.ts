@@ -51,6 +51,13 @@ export function getAgentCard(baseUrl: string) {
         tags: ["coordination", "guest", "capability"],
       },
       {
+        id: "hiring-compatibility",
+        name: "Check hiring compatibility",
+        description:
+          "Compare private hard constraints and return only compatibility by dimension, with human review for missing information.",
+        tags: ["hiring", "privacy", "compatibility"],
+      },
+      {
         id: "request-task-type",
         name: "Request a new task type",
         description:

@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       title?: string;
       description?: string;
       config?: Record<string, unknown>;
+      privateConfig?: Record<string, unknown>;
       targetEmail?: string;
       expiresInMinutes?: number;
       maxResponses?: number;
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
       title: body.title,
       description: body.description,
       config: body.config,
+      privateConfig: body.privateConfig,
       targetEmail: body.targetEmail,
       expiresInMinutes: body.expiresInMinutes,
       maxResponses: body.maxResponses,
