@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 
 type GuestTask = {
   publicId: string;
-  taskType: "binary_choice" | "text_response" | "availability";
+  taskType:
+    | "binary_choice"
+    | "text_response"
+    | "availability"
+    | "hiring_compatibility";
   title: string;
   description: string | null;
   config: Record<string, unknown>;
@@ -29,6 +33,12 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
   const [email, setEmail] = useState("");
   const [choice, setChoice] = useState("");
   const [text, setText] = useState("");
+  const [compensationMinimum, setCompensationMinimum] = useState("");
+  const [locations, setLocations] = useState("");
+  const [workModes, setWorkModes] = useState("");
+  const [sponsorshipRequired, setSponsorshipRequired] = useState("no");
+  const [earliestStart, setEarliestStart] = useState("");
+  const [levels, setLevels] = useState("");
   const [slots, setSlots] = useState<SlotDraft[]>([
     { start: "", end: "", timezone: "UTC" },
   ]);
@@ -98,6 +108,26 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
         ? { choice }
         : task.taskType === "text_response"
           ? { text }
+          : task.taskType === "hiring_compatibility"
+            ? {
+                compensationMinimum: compensationMinimum
+                  ? Number(compensationMinimum)
+                  : undefined,
+                locations: locations
+                  .split(",")
+                  .map((value) => value.trim())
+                  .filter(Boolean),
+                workModes: workModes
+                  .split(",")
+                  .map((value) => value.trim())
+                  .filter(Boolean),
+                sponsorshipRequired: sponsorshipRequired === "yes",
+                earliestStart: earliestStart || undefined,
+                levels: levels
+                  .split(",")
+                  .map((value) => value.trim())
+                  .filter(Boolean),
+              }
           : {
               slots: slots.map((slot) => ({
                 start: new Date(slot.start).toISOString(),
@@ -168,6 +198,12 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
       </h1>
       {task.description ? (
         <p className="mt-3 text-muted">{task.description}</p>
+      ) : null}
+      {task.taskType === "hiring_compatibility" &&
+      typeof task.config.privacy === "string" ? (
+        <p className="mt-3 rounded-lg border border-matcha-soft bg-[rgba(111,154,124,0.08)] p-3 text-sm text-matcha-deep">
+          {task.config.privacy}
+        </p>
       ) : null}
       <p className="mt-3 text-xs text-muted">
         Expires {new Date(task.expiresAt).toLocaleString()}
@@ -291,6 +327,83 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
                 + Add another time
               </button>
             ) : null}
+          </fieldset>
+        ) : null}
+
+        {task.taskType === "hiring_compatibility" ? (
+          <fieldset className="space-y-4">
+            <legend className="text-sm font-semibold text-ink">
+              Your private constraints
+            </legend>
+            <label className="grid gap-1.5 text-sm">
+              <span className="font-medium text-ink">
+                Minimum annual compensation
+              </span>
+              <input
+                type="number"
+                min="1"
+                max="10000000"
+                value={compensationMinimum}
+                onChange={(event) => setCompensationMinimum(event.target.value)}
+                placeholder="For example: 150000"
+                className="rounded-md border border-line bg-white px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm">
+              <span className="font-medium text-ink">
+                Locations that work
+              </span>
+              <input
+                value={locations}
+                onChange={(event) => setLocations(event.target.value)}
+                placeholder="New York, San Francisco"
+                className="rounded-md border border-line bg-white px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm">
+              <span className="font-medium text-ink">Work modes</span>
+              <input
+                value={workModes}
+                onChange={(event) => setWorkModes(event.target.value)}
+                placeholder="Remote, Hybrid"
+                className="rounded-md border border-line bg-white px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm">
+              <span className="font-medium text-ink">
+                Do you require sponsorship?
+              </span>
+              <select
+                value={sponsorshipRequired}
+                onChange={(event) => setSponsorshipRequired(event.target.value)}
+                className="rounded-md border border-line bg-white px-3 py-2.5"
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-sm">
+              <span className="font-medium text-ink">Earliest start date</span>
+              <input
+                type="date"
+                value={earliestStart}
+                onChange={(event) => setEarliestStart(event.target.value)}
+                className="rounded-md border border-line bg-white px-3 py-2.5"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm">
+              <span className="font-medium text-ink">Levels you would accept</span>
+              <input
+                value={levels}
+                onChange={(event) => setLevels(event.target.value)}
+                placeholder="Senior, Staff"
+                className="rounded-md border border-line bg-white px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
+              />
+            </label>
+            <p className="text-xs leading-5 text-muted">
+              HoneyMatcha returns overlap by dimension. It does not rank or
+              automatically reject candidates.
+            </p>
           </fieldset>
         ) : null}
 

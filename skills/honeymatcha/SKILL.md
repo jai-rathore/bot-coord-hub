@@ -98,10 +98,16 @@ When user says e.g. "book 30m with Peer next week":
 ### E. Work with a person who has no account
 
 1. `POST /api/v1/guest-tasks` with a target email and one task type:
-   `binary_choice`, `text_response`, or `availability`
+   `binary_choice`, `text_response`, `availability`, or
+   `hiring_compatibility`
 2. Share the returned private `guestUrl` only with that recipient
 3. Poll `GET /api/v1/guest-tasks/{publicId}` for the response
 4. The guest capability cannot list people, create tasks, or access the network
+
+For `hiring_compatibility`, put employer hard constraints in `privateConfig`.
+HoneyMatcha returns only a verdict and per-dimension compatibility. Never expose
+candidate raw values, rank candidates, or treat the result as an automatic
+rejection.
 
 ## Endpoints cheat sheet
 

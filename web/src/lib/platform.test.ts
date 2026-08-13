@@ -21,6 +21,7 @@ import {
 import { parseScheduleWindow } from "./validation";
 import { mockCalendarAllowed } from "./calendar";
 import { buildOAuthState, parseOAuthState } from "./google-oauth";
+import { matchHiringConstraints } from "./hiring-match";
 
 test("default paired agents cannot approve for a human", () => {
   assert.equal(DEFAULT_AGENT_SCOPES.includes("approvals:write"), false);
@@ -130,4 +131,38 @@ test("production never enables a simulated calendar by default", () => {
   assert.equal(mockCalendarAllowed("production", "false"), false);
   assert.equal(mockCalendarAllowed("production", "true"), true);
   assert.equal(mockCalendarAllowed("development", undefined), true);
+});
+
+test("hiring compatibility returns dimensions without raw values", () => {
+  const compatible = matchHiringConstraints(
+    {
+      compensationMaximum: 180_000,
+      locations: ["New York"],
+      workModes: ["Hybrid"],
+      sponsorshipAvailable: true,
+      latestStart: "2026-11-01",
+      levels: ["Senior"],
+    },
+    {
+      compensationMinimum: 165_000,
+      locations: ["New York"],
+      workModes: ["Hybrid"],
+      sponsorshipRequired: true,
+      earliestStart: "2026-10-01",
+      levels: ["Senior"],
+    },
+  );
+  assert.equal(compatible.verdict, "compatible");
+  assert.equal(compatible.dimensions.compensation, "compatible");
+  assert.equal("compensationMaximum" in compatible, false);
+
+  const incompatible = matchHiringConstraints(
+    { compensationMaximum: 150_000, sponsorshipAvailable: false },
+    { compensationMinimum: 175_000, sponsorshipRequired: true },
+  );
+  assert.equal(incompatible.verdict, "incompatible");
+  assert.equal(incompatible.dimensions.sponsorship, "incompatible");
+
+  const review = matchHiringConstraints({}, {});
+  assert.equal(review.verdict, "human_review");
 });

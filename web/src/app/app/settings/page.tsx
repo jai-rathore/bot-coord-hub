@@ -61,18 +61,39 @@ export default async function SettingsPage({
       </section>
       <section className="mt-10 border-t border-line pt-7">
         <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
-          Your agent
+          {conn ? "Continue setup" : "Your coordination setup"}
         </h2>
         <p className="mt-2 max-w-xl text-sm text-muted">
-          Agents connect through a short-lived code in your browser. They never
-          need your HoneyMatcha password.
+          Calendar is one part of the setup. Connect your agent and choose the
+          people it can coordinate with next.
         </p>
-        <div className="mt-4 flex flex-wrap gap-3 text-sm">
-          <Link href="/agents" className="font-semibold">
-            Connection instructions
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <Link
+            href="/agents"
+            className="rounded-xl border border-line bg-white/70 p-4 no-underline transition hover:border-matcha-soft"
+          >
+            <span className="font-semibold text-matcha-deep">
+              Connect your agent
+            </span>
+            <span className="mt-1 block text-sm leading-6 text-muted">
+              Approve a short-lived code in your browser. Your agent never
+              needs your password.
+            </span>
           </Link>
-          <Link href="/app/keys">Advanced connection settings</Link>
+          <Link
+            href="/app/people"
+            className="rounded-xl border border-line bg-white/70 p-4 no-underline transition hover:border-matcha-soft"
+          >
+            <span className="font-semibold text-matcha-deep">Add people</span>
+            <span className="mt-1 block text-sm leading-6 text-muted">
+              Invite known people your agent can coordinate with, or use a
+              private guest request when they do not have an account.
+            </span>
+          </Link>
         </div>
+        <Link href="/app/keys" className="mt-4 inline-flex text-xs text-muted">
+          Advanced connection settings
+        </Link>
       </section>
     </div>
   );
