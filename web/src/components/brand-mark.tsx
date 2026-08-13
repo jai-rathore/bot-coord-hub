@@ -135,7 +135,7 @@ export function BrandHero({ className = "" }: BrandHeroProps) {
 
       <ellipse
         cx="320"
-        cy="548"
+        cy="590"
         rx="168"
         ry="22"
         fill="#1f4a36"
@@ -144,53 +144,60 @@ export function BrandHero({ className = "" }: BrandHeroProps) {
       />
 
       <g className="hm-bob origin-center">
-        <ellipse cx="320" cy="528" rx="156" ry="28" fill={`url(#${saucer})`} />
+        <ellipse cx="320" cy="560" rx="178" ry="30" fill={`url(#${saucer})`} />
         <ellipse
           cx="320"
-          cy="522"
-          rx="118"
+          cy="552"
+          rx="132"
           ry="16"
           fill="#d9c9a6"
-          opacity="0.45"
+          opacity="0.4"
         />
 
         <path
-          d="M186 318c8 118 38 196 134 210 96-14 126-92 134-210"
+          d="M198 332c6 128 36 198 122 214 86-16 116-86 122-214"
           fill={`url(#${cup})`}
         />
         <path
-          d="M198 328c8 102 34 172 122 184 88-12 114-82 122-184"
+          d="M214 344c6 108 32 170 106 184 74-14 100-76 106-184"
           fill="#fffdf8"
-          opacity="0.35"
+          opacity="0.28"
         />
         <path
-          d="M214 300c18 8 70 14 106 14 36 0 88-6 106-14"
+          d="M454 368c42-8 58 42 18 78"
+          fill="none"
+          stroke={`url(#${cup})`}
+          strokeWidth="18"
+          strokeLinecap="round"
+        />
+        <path
+          d="M454 368c42-8 58 42 18 78"
           fill="none"
           stroke="#fffdf8"
-          strokeWidth="10"
+          strokeWidth="6"
           strokeLinecap="round"
-          opacity="0.55"
+          opacity="0.45"
         />
 
-        <ellipse cx="320" cy="304" rx="142" ry="48" fill="#efe4cc" />
-        <ellipse cx="320" cy="300" rx="124" ry="40" fill="#1f4a36" />
-        <ellipse cx="320" cy="298" rx="116" ry="34" fill={`url(#${matcha})`} />
+        <ellipse cx="320" cy="328" rx="138" ry="50" fill="#efe4cc" />
+        <ellipse cx="320" cy="324" rx="118" ry="40" fill="#1f4a36" />
+        <ellipse cx="320" cy="322" rx="110" ry="34" fill={`url(#${matcha})`} />
 
-        <g className="hm-swirl origin-[320px_298px]" opacity="0.28">
+        <g className="hm-swirl origin-[320px_322px]" opacity="0.28">
           <ellipse
             cx="320"
-            cy="298"
-            rx="78"
-            ry="16"
+            cy="322"
+            rx="74"
+            ry="15"
             fill="none"
             stroke="#dcefdc"
             strokeWidth="6"
           />
           <ellipse
             cx="320"
-            cy="298"
-            rx="46"
-            ry="9"
+            cy="322"
+            rx="44"
+            ry="8"
             fill="none"
             stroke="#f7faf6"
             strokeWidth="4"
@@ -199,20 +206,20 @@ export function BrandHero({ className = "" }: BrandHeroProps) {
 
         <path
           className="hm-art"
-          d="M240 318V268c0-16 24-16 24 0 0 12-12 20-24 26 22-18 46-18 48 10 0 12-2 22-4 24m4-24c22-28 40-24 38 4-2 12-6 20-10 22"
+          d="M248 338V292c0-14 22-14 22 0 0 10-10 18-22 23 20-16 42-16 44 8 0 10-2 20-4 22m4-22c20-24 36-22 34 4-2 10-5 18-9 20"
           fill="none"
           stroke="#fffaf0"
-          strokeWidth="6.5"
+          strokeWidth="6.2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
 
-        <g className="hm-ripple origin-[320px_298px]">
+        <g className="hm-ripple origin-[328px_318px]">
           <ellipse
-            cx="304"
-            cy="292"
-            rx="18"
-            ry="6"
+            cx="328"
+            cy="318"
+            rx="16"
+            ry="5"
             fill="none"
             stroke="#f7de8a"
             strokeWidth="2.4"
@@ -220,23 +227,23 @@ export function BrandHero({ className = "" }: BrandHeroProps) {
         </g>
       </g>
 
-      <g className="hm-steam" opacity="0.55">
+      <g className="hm-steam" opacity="0.5">
         <path
-          d="M268 250c8-22 0-36 8-54"
+          d="M276 268c8-22 0-36 8-54"
           fill="none"
           stroke="#6f9a7c"
           strokeWidth="6"
           strokeLinecap="round"
         />
         <path
-          d="M318 236c10-24 2-40 10-62"
+          d="M322 254c10-24 2-40 10-62"
           fill="none"
           stroke="#9ec79a"
           strokeWidth="5"
           strokeLinecap="round"
         />
         <path
-          d="M364 248c8-20 0-34 8-52"
+          d="M366 266c8-20 0-34 8-52"
           fill="none"
           stroke="#6f9a7c"
           strokeWidth="5"
@@ -244,44 +251,37 @@ export function BrandHero({ className = "" }: BrandHeroProps) {
         />
       </g>
 
-      <g className="hm-dipper origin-[430px_120px]">
+      <g className="hm-dipper origin-[470px_90px]">
         <path
-          d="M486 48c28 18 62 86 78 132"
+          d="M548 56c-18 34-58 92-96 148"
           fill="none"
           stroke={`url(#${wood})`}
-          strokeWidth="16"
+          strokeWidth="14"
           strokeLinecap="round"
         />
-        <ellipse
-          cx="430"
-          cy="214"
-          rx="38"
-          ry="26"
-          fill={`url(#${wood})`}
-          transform="rotate(-28 430 214)"
-        />
-        <path
-          d="M404 200h52M400 214h60M408 226h46"
-          stroke="#7a4a22"
-          strokeWidth="3.2"
-          strokeLinecap="round"
-          opacity="0.45"
-          transform="rotate(-28 430 214)"
-        />
-        <ellipse
-          cx="418"
-          cy="228"
-          rx="22"
-          ry="10"
-          fill={`url(#${honey})`}
-          opacity="0.92"
-          transform="rotate(-28 430 214)"
-        />
+        <g transform="rotate(-38 430 230)">
+          <ellipse cx="430" cy="230" rx="34" ry="22" fill={`url(#${wood})`} />
+          <path
+            d="M408 218h44M404 230h52M410 242h40"
+            stroke="#7a4a22"
+            strokeWidth="3"
+            strokeLinecap="round"
+            opacity="0.45"
+          />
+          <ellipse
+            cx="430"
+            cy="246"
+            rx="18"
+            ry="8"
+            fill={`url(#${honey})`}
+            opacity="0.95"
+          />
+        </g>
       </g>
 
       <g className="hm-drip">
         <path
-          d="M392 236c8-14 22-14 22 0 0 14-11 24-11 24s-11-10-11-24z"
+          d="M412 258c7-13 20-13 20 0 0 13-10 22-10 22s-10-9-10-22z"
           fill={`url(#${honey})`}
         />
       </g>
