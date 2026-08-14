@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   boolean,
   integer,
+  check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -164,6 +165,14 @@ export const publicInvites = pgTable(
       t.createdAt,
     ),
     index("public_invites_status_expires_idx").on(t.status, t.expiresAt),
+    check(
+      "public_invites_max_redemptions_check",
+      sql`${t.maxRedemptions} between 1 and 100`,
+    ),
+    check(
+      "public_invites_redemption_count_check",
+      sql`${t.redemptionCount} between 0 and ${t.maxRedemptions}`,
+    ),
   ],
 );
 

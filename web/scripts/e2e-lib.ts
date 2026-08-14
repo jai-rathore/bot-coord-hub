@@ -8,6 +8,7 @@ import {
   acceptInviteLink,
   approveConnectionRequest,
   createInviteLink,
+  getPendingInviteByCode,
   listLinksForUser,
   revokeLinkForUser,
 } from "../src/lib/links";
@@ -82,11 +83,26 @@ async function main() {
   });
 
   const origin = "http://localhost:3000";
+  const capResults = await Promise.allSettled(
+    Array.from({ length: 6 }, (_, index) =>
+      createPublicInvite({
+        owner: bob,
+        label: `Concurrent cap ${index}`,
+        maxRedemptions: 1,
+        origin,
+      }),
+    ),
+  );
+  if (capResults.filter((result) => result.status === "fulfilled").length !== 5) {
+    throw new Error("concurrent public invite creation must enforce owner cap");
+  }
+
   const publicInvite = await createPublicInvite({
     owner: alice,
     label: "E2E public QR",
     maxRedemptions: 2,
     expiresInHours: 24,
+    confirmRequired: false,
     origin,
   });
   const publicToken = decodeURIComponent(
@@ -118,6 +134,9 @@ async function main() {
     (link) => link.id === carolRequest.request.id,
   );
   if (!carolPending) throw new Error("requester should see pending request");
+  if (await getPendingInviteByCode(carolPending.inviteCode)) {
+    throw new Error("public requests must not render as private invites");
+  }
   await assert.rejects(
     () =>
       acceptInviteLink({
@@ -127,11 +146,22 @@ async function main() {
       }),
     /must be approved by the inviter/,
   );
-  await redeemPublicInvite({ user: dave, token: publicToken });
+  const daveRequest = await redeemPublicInvite({
+    user: dave,
+    token: publicToken,
+  });
   await assert.rejects(
     () => redeemPublicInvite({ user: eve, token: publicToken }),
     /no longer available|reached its limit/,
   );
+  await revokeLinkForUser({
+    user: dave,
+    linkId: daveRequest.request.id,
+  });
+  const eveRequest = await redeemPublicInvite({
+    user: eve,
+    token: publicToken,
+  });
   await assert.rejects(
     () =>
       approveConnectionRequest({
@@ -152,6 +182,9 @@ async function main() {
   ) {
     throw new Error("approved public request should create mutual links");
   }
+  if (!publicAccepted.link.confirmRequired) {
+    throw new Error("public relationships must always require confirmation");
+  }
   await revokePublicInvite({
     owner: alice,
     publicInviteId: publicInvite.id,
@@ -159,6 +192,47 @@ async function main() {
   if (await getPublicInvitePreview(publicToken)) {
     throw new Error("revoked public invite should not resolve");
   }
+  await assert.rejects(
+    () =>
+      approveConnectionRequest({
+        user: alice,
+        linkId: eveRequest.request.id,
+        origin,
+      }),
+    /no longer pending|revoked or expired/,
+  );
+
+  const stalePrivate = await createInviteLink({
+    fromUser: alice,
+    toEmail: eve.email,
+    origin,
+  });
+  const collisionInvite = await createPublicInvite({
+    owner: alice,
+    label: "Private collision regression",
+    maxRedemptions: 1,
+    origin,
+  });
+  const collisionToken = decodeURIComponent(
+    collisionInvite.inviteUrl.split("/").at(-1) ?? "",
+  );
+  await assert.rejects(
+    () => redeemPublicInvite({ user: eve, token: collisionToken }),
+    /Resolve the existing connection request/,
+  );
+  const staleAccepted = await acceptInviteLink({
+    user: eve,
+    inviteCode: stalePrivate.inviteCode,
+    origin,
+  });
+  if (staleAccepted.link.status !== "active") {
+    throw new Error("private invite should remain independently acceptable");
+  }
+  await revokeLinkForUser({ user: alice, linkId: staleAccepted.link.id });
+  await revokePublicInvite({
+    owner: alice,
+    publicInviteId: collisionInvite.id,
+  });
 
   const invite = await createInviteLink({
     fromUser: alice,

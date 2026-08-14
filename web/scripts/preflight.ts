@@ -39,10 +39,19 @@ async function main() {
     "OAUTH_STATE_SECRET",
   ] as const) {
     const configured = Boolean(process.env[name]);
+    const valid =
+      name !== "PUBLIC_INVITE_SECRET" ||
+      (process.env[name]?.length ?? 0) >= 32;
     checks.push({
       name,
-      ok: !production || configured,
-      detail: configured ? "configured" : production ? "required" : "optional locally",
+      ok: !production || (configured && valid),
+      detail: !configured
+        ? production
+          ? "required"
+          : "optional locally"
+        : valid
+          ? "configured"
+          : "must be at least 32 characters",
     });
   }
 

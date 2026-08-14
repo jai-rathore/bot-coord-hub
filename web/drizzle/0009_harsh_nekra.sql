@@ -1,0 +1,2 @@
+ALTER TABLE "public_invites" ADD CONSTRAINT "public_invites_max_redemptions_check" CHECK ("public_invites"."max_redemptions" between 1 and 100);--> statement-breakpoint
+ALTER TABLE "public_invites" ADD CONSTRAINT "public_invites_redemption_count_check" CHECK ("public_invites"."redemption_count" between 0 and "public_invites"."max_redemptions");

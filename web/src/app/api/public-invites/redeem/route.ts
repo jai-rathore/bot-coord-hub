@@ -11,6 +11,10 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const user = await ensureCurrentUser();
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
   let body: { token?: string } = {};
   try {
     body = await request.json();
@@ -20,14 +24,6 @@ export async function POST(request: Request) {
   const token = body.token?.trim() ?? "";
   const limit = rateLimit(publicInviteRateLimitKey(request, token), 10);
   if (!limit.ok) return rateLimitedJson(limit);
-
-  const user = await ensureCurrentUser();
-  if (!user) {
-    return Response.json(
-      { error: "Unauthorized" },
-      { status: 401, headers: rateLimitHeaders(limit) },
-    );
-  }
   try {
     return Response.json(await redeemPublicInvite({ user, token }), {
       headers: rateLimitHeaders(limit),

@@ -1,7 +1,8 @@
-import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   links,
+  publicInvites,
   users,
   type AllowedHours,
   type Link,
@@ -368,6 +369,23 @@ export async function approveConnectionRequest(opts: {
         status: 410,
       });
     }
+    const [sourceInvite] = await tx
+      .select({ id: publicInvites.id })
+      .from(publicInvites)
+      .where(
+        and(
+          eq(publicInvites.id, request.publicInviteId),
+          eq(publicInvites.status, "active"),
+          gt(publicInvites.expiresAt, new Date()),
+        ),
+      )
+      .limit(1);
+    if (!sourceInvite) {
+      throw Object.assign(
+        new Error("The public invitation was revoked or expired"),
+        { status: 409 },
+      );
+    }
 
     const [requester] = await tx
       .select()
@@ -408,7 +426,12 @@ export async function approveConnectionRequest(opts: {
     const now = new Date();
     const [claimed] = await tx
       .update(links)
-      .set({ status: "active", expiresAt: null, updatedAt: now })
+      .set({
+        status: "active",
+        confirmRequired: true,
+        expiresAt: null,
+        updatedAt: now,
+      })
       .where(and(eq(links.id, request.id), eq(links.status, "pending")))
       .returning();
     if (!claimed) {
@@ -483,6 +506,31 @@ export async function revokeLinkForUser(opts: {
   }
 
   const now = new Date();
+  if (link.status === "pending" && link.publicInviteId) {
+    const revoked = await db.transaction(async (tx) => {
+      const [claimed] = await tx
+        .update(links)
+        .set({ status: "revoked", updatedAt: now })
+        .where(and(eq(links.id, link.id), eq(links.status, "pending")))
+        .returning({ id: links.id });
+      if (!claimed) return false;
+      await tx
+        .update(publicInvites)
+        .set({
+          redemptionCount: sql`greatest(${publicInvites.redemptionCount} - 1, 0)`,
+          updatedAt: now,
+        })
+        .where(eq(publicInvites.id, link.publicInviteId!));
+      return true;
+    });
+    if (!revoked) {
+      throw Object.assign(new Error("Connection request was already handled"), {
+        status: 409,
+      });
+    }
+    return { id: link.id, status: "revoked", revokedIds: [link.id] };
+  }
+
   const ids = [link.id];
   if (link.pairLinkId) ids.push(link.pairLinkId);
 
@@ -581,6 +629,7 @@ export async function getPendingInviteByCode(inviteCode: string) {
       and(
         eq(links.inviteCode, inviteCode),
         eq(links.status, "pending"),
+        isNull(links.publicInviteId),
         or(isNull(links.expiresAt), gt(links.expiresAt, new Date())),
       ),
     )

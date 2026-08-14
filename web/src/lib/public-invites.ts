@@ -4,6 +4,7 @@ import {
   links,
   publicInvites,
   users,
+  type Link,
   type PublicInvite,
   type User,
 } from "@/db/schema";
@@ -119,36 +120,41 @@ export async function createPublicInvite(opts: {
   );
   const now = new Date();
   const db = getDb();
-  const active = await db
-    .select({ id: publicInvites.id })
-    .from(publicInvites)
-    .where(
-      and(
-        eq(publicInvites.ownerUserId, opts.owner.id),
-        eq(publicInvites.status, "active"),
-        gt(publicInvites.expiresAt, now),
-        lt(publicInvites.redemptionCount, publicInvites.maxRedemptions),
-      ),
-    )
-    .limit(MAX_ACTIVE_PUBLIC_INVITES);
-  if (active.length >= MAX_ACTIVE_PUBLIC_INVITES) {
-    throw new AgentApiError(
-      409,
-      `You can have at most ${MAX_ACTIVE_PUBLIC_INVITES} active public invites`,
+  const created = await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${opts.owner.id}))`,
     );
-  }
-
-  const [created] = await db
-    .insert(publicInvites)
-    .values({
-      ownerUserId: opts.owner.id,
-      label,
-      scopes,
-      confirmRequired: opts.confirmRequired ?? true,
-      expiresAt: new Date(now.getTime() + expiresInHours * 60 * 60 * 1_000),
-      maxRedemptions,
-    })
-    .returning();
+    const active = await tx
+      .select({ id: publicInvites.id })
+      .from(publicInvites)
+      .where(
+        and(
+          eq(publicInvites.ownerUserId, opts.owner.id),
+          eq(publicInvites.status, "active"),
+          gt(publicInvites.expiresAt, now),
+          lt(publicInvites.redemptionCount, publicInvites.maxRedemptions),
+        ),
+      )
+      .limit(MAX_ACTIVE_PUBLIC_INVITES);
+    if (active.length >= MAX_ACTIVE_PUBLIC_INVITES) {
+      throw new AgentApiError(
+        409,
+        `You can have at most ${MAX_ACTIVE_PUBLIC_INVITES} active public invites`,
+      );
+    }
+    const [row] = await tx
+      .insert(publicInvites)
+      .values({
+        ownerUserId: opts.owner.id,
+        label,
+        scopes,
+        confirmRequired: true,
+        expiresAt: new Date(now.getTime() + expiresInHours * 60 * 60 * 1_000),
+        maxRedemptions,
+      })
+      .returning();
+    return row;
+  });
   if (!created) throw new AgentApiError(503, "Could not create public invite");
 
   await writeAudit({
@@ -221,7 +227,9 @@ export async function redeemPublicInvite(opts: {
   const db = getDb();
   const now = new Date();
 
-  const result = await db.transaction(async (tx) => {
+  let result: { request: Link; idempotent: boolean };
+  try {
+    result = await db.transaction(async (tx) => {
     const [invite] = await tx
       .select()
       .from(publicInvites)
@@ -259,12 +267,23 @@ export async function redeemPublicInvite(opts: {
         ),
       )
       .limit(1);
-    if (existing?.status === "active") {
-      throw new AgentApiError(409, "You are already connected");
-    }
-    if (existing) {
-      return { request: existing, idempotent: true };
-    }
+      if (existing?.status === "active") {
+        throw new AgentApiError(409, "You are already connected");
+      }
+      if (
+        existing?.status === "pending" &&
+        existing.publicInviteId === invite.id &&
+        existing.fromUserId === invite.ownerUserId &&
+        existing.toUserId === opts.user.id
+      ) {
+        return { request: existing, idempotent: true };
+      }
+      if (existing) {
+        throw new AgentApiError(
+          409,
+          "Resolve the existing connection request before using this public invite",
+        );
+      }
 
     const [claimed] = await tx
       .update(publicInvites)
@@ -296,15 +315,42 @@ export async function redeemPublicInvite(opts: {
         status: "pending",
         scopes: invite.scopes,
         publicInviteId: invite.id,
-        confirmRequired: invite.confirmRequired,
+        confirmRequired: true,
         expiresAt: invite.expiresAt,
       })
       .returning();
     if (!request) {
       throw new AgentApiError(503, "Could not create connection request");
     }
-    return { request, idempotent: false };
-  });
+      return { request, idempotent: false };
+    });
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "23505"
+    ) {
+      const [existing] = await db
+        .select()
+        .from(links)
+        .where(
+          and(
+            eq(links.publicInviteId, publicInviteId),
+            eq(links.toUserId, opts.user.id),
+            eq(links.status, "pending"),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        result = { request: existing, idempotent: true };
+      } else {
+        throw error;
+      }
+    } else {
+      throw error;
+    }
+  }
 
   await writeAudit({
     actorUserId: opts.user.id,
@@ -334,17 +380,31 @@ export async function revokePublicInvite(opts: {
   publicInviteId: string;
 }): Promise<{ id: string; status: "revoked" }> {
   const now = new Date();
-  const [revoked] = await getDb()
-    .update(publicInvites)
-    .set({ status: "revoked", revokedAt: now, updatedAt: now })
-    .where(
-      and(
-        eq(publicInvites.id, opts.publicInviteId),
-        eq(publicInvites.ownerUserId, opts.owner.id),
-        eq(publicInvites.status, "active"),
-      ),
-    )
-    .returning();
+  const db = getDb();
+  const revoked = await db.transaction(async (tx) => {
+    const [invite] = await tx
+      .update(publicInvites)
+      .set({ status: "revoked", revokedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(publicInvites.id, opts.publicInviteId),
+          eq(publicInvites.ownerUserId, opts.owner.id),
+          eq(publicInvites.status, "active"),
+        ),
+      )
+      .returning();
+    if (!invite) return null;
+    await tx
+      .update(links)
+      .set({ status: "revoked", updatedAt: now })
+      .where(
+        and(
+          eq(links.publicInviteId, invite.id),
+          eq(links.status, "pending"),
+        ),
+      );
+    return invite;
+  });
   if (!revoked) {
     throw new AgentApiError(404, "Active public invite not found");
   }

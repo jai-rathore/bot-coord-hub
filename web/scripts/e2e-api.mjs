@@ -99,6 +99,14 @@ async function main() {
   const publicUrl = publicInvite.data.publicInvite.inviteUrl;
   assert(publicUrl.includes("/join/pi_"), "public invite URL should be signed");
   const publicToken = decodeURIComponent(publicUrl.split("/").at(-1));
+  const unauthenticatedRedeem = await jsonFetch("/api/public-invites/redeem", {
+    method: "POST",
+    body: { token: publicToken },
+  });
+  assert(
+    unauthenticatedRedeem.res.status === 401,
+    "browser redemption must authenticate before consuming rate limits",
+  );
   const publicPage = await fetch(publicUrl, {
     headers: { Accept: "text/html" },
     redirect: "manual",

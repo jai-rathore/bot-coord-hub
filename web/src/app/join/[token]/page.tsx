@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Connect on HoneyMatcha",
+  referrer: "no-referrer",
   robots: { index: false, follow: false },
 };
 
