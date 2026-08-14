@@ -32,7 +32,7 @@ function CoordinationPreview() {
                 Scheduling task
               </p>
               <p className="mt-1.5 font-[family-name:var(--font-fraunces)] text-xl font-semibold tracking-[-0.02em]">
-                Coffee with Maya
+                Coffee with Sam and Anu
               </p>
               <p className="mt-1 text-xs text-white/65">
                 Your Grok Bot is comparing availability
@@ -53,7 +53,7 @@ function CoordinationPreview() {
           </div>
           <div className="mt-5 flex items-center gap-3">
             <div className="flex -space-x-2">
-              {["HM", "Y", "M"].map((label, index) => (
+              {["HM", "S", "A"].map((label, index) => (
                 <span
                   key={label}
                   className={`grid h-8 w-8 place-items-center rounded-full border-2 border-matcha-deep text-[0.58rem] font-bold ${
