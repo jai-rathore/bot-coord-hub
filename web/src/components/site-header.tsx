@@ -113,14 +113,12 @@ export function SiteHeader({
           {menuOpen ? (
             <div
               id={menuId}
-              role="menu"
               className="absolute right-0 z-40 mt-2 min-w-[11rem] rounded-xl border border-line bg-[rgba(255,255,252,0.98)] p-1.5 shadow-[0_18px_48px_rgba(23,63,46,0.18)] backdrop-blur-xl"
             >
               {secondaryLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  role="menuitem"
                   onClick={() => setMenuOpen(false)}
                   className="block rounded-lg px-3 py-2.5 text-muted no-underline hover:bg-matcha-soft/10 hover:text-matcha-deep"
                 >

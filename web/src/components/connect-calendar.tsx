@@ -90,7 +90,11 @@ export function ConnectCalendar({
           </a>
         </>
       )}
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? (
+        <p className="text-sm text-danger" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

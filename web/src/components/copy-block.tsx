@@ -25,6 +25,7 @@ export function CopyBlock({
       <button
         type="button"
         onClick={() => void copy()}
+        aria-live="polite"
         className="absolute top-2 right-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-white/95 px-2.5 py-1.5 text-[0.7rem] font-semibold text-matcha-deep shadow-sm transition hover:border-matcha-soft"
       >
         <svg
