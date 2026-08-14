@@ -7,6 +7,8 @@ import {
   calendarConnections,
   guestTasks,
   intentTypes,
+  links,
+  publicInvites,
 } from "../src/db/schema";
 
 config({ path: ".env.local" });
@@ -32,6 +34,7 @@ async function main() {
 
   for (const name of [
     "GUEST_TOKEN_PEPPER",
+    "PUBLIC_INVITE_SECRET",
     "TOKEN_ENCRYPTION_KEY",
     "OAUTH_STATE_SECRET",
   ] as const) {
@@ -81,15 +84,24 @@ async function main() {
           .from(apiKeys)
           .where(isNull(apiKeys.revokedAt))
           .limit(1),
+        db
+          .select({ id: publicInvites.id })
+          .from(publicInvites)
+          .limit(1),
+        db
+          .select({ publicInviteId: links.publicInviteId })
+          .from(links)
+          .limit(1),
       ]);
       checks.push({
-        name: "Schema 0004",
+        name: "Current schema",
         ok: true,
-        detail: "guest tasks, pairings, and scoped credentials available",
+        detail:
+          "guest tasks, pairings, scoped credentials, and public invites available",
       });
     } catch (error) {
       checks.push({
-        name: "Schema 0004",
+        name: "Current schema",
         ok: false,
         detail: error instanceof Error ? error.message : "schema check failed",
       });
