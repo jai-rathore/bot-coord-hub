@@ -1,31 +1,28 @@
 export const PRODUCTION_ORIGIN = "https://honeymatcha.io";
+export const GROK_BOT_URL = "https://x.ai/bot";
 
 /** The one sentence a human should say to their personal agent. */
 export const ASK_AGENT_PROMPT =
   "Connect to https://honeymatcha.io as my agent.";
 
-export const GROK_CONNECT_PROMPT = `${ASK_AGENT_PROMPT}
+export const GROK_BOT_CONNECT_PROMPT = `${ASK_AGENT_PROMPT}
 
-Do not sign into Clerk or solve CAPTCHA. I will approve the connection in my own browser.
+You are my Grok Bot. Use the terminal on your persistent cloud computer to complete the pairing steps below. Do not sign into Clerk, ask for my password, or solve CAPTCHA. I will approve the connection in my own browser.
 
-1. POST https://honeymatcha.io/api/v1/pairings/start with JSON {"agentName":"Grok"}
+1. POST https://honeymatcha.io/api/v1/pairings/start with JSON {"agentName":"<your Bot name>"}
 2. Show me the verificationUrl so I can open it and approve
 3. Poll POST https://honeymatcha.io/api/v1/pairings/token with {"deviceCode":"<deviceCode from step 1>"} until you receive an hm_ credential
-4. Store that credential and GET https://honeymatcha.io/api/v1/me with Authorization: Bearer <hm_...>
+4. Store that credential securely on your Grok Bot computer and GET https://honeymatcha.io/api/v1/me with Authorization: Bearer <hm_...>
 5. After that, use POST https://honeymatcha.io/api/mcp with the same Bearer token, or the REST API under /api/v1
 6. Call get_inbox at the start of every turn. That is how HoneyMatcha reaches you when another agent starts a task.
 
-If you cannot make those HTTP calls, tell me. I will create a key at https://honeymatcha.io/app/keys and add a custom MCP connector at https://grok.com/connectors with URL https://honeymatcha.io/api/mcp.`;
+If a step fails, stop and show me the exact error. Do not fall back to signing in as me.`;
 
 export const FRIEND_INVITE_MESSAGE = `Hey — can you sign up at https://honeymatcha.io?
 
 Connect Google Calendar when the site asks. If you have a personal agent, tell it: connect to honeymatcha.io as my agent. Approve the link it shows you.
 
 Then accept my invite: PASTE_INVITE_URL_HERE`;
-
-export const GROK_MCP_CLI = `export HONEYMATCHA_API_KEY=hm_...
-grok mcp add --transport http honeymatcha https://honeymatcha.io/api/mcp \\
-  --header "Authorization: Bearer \${HONEYMATCHA_API_KEY}"`;
 
 export function agentLlmsText(origin = PRODUCTION_ORIGIN): string {
   const base = origin.replace(/\/$/, "");
@@ -68,7 +65,7 @@ whoami also returns inbox.pending — if that is greater than 0, handle inbox
 before anything else.
 
 If you have a public HTTPS URL, register_agent_callback so HoneyMatcha can
-POST when work arrives. Most Grok bots cannot receive inbound HTTP; polling
+POST when work arrives. Grok Bots generally cannot receive inbound HTTP; polling
 get_inbox is the required path.
 
 ## Scheduling

@@ -28,7 +28,7 @@ export default async function SettingsPage({
       <PageHeading
         eyebrow="Preferences"
         title="Settings"
-        description="Connect your calendar so your agent can find real times, then manage the people and tools available in your workspace."
+        description="Connect your calendar so your Grok Bot can find real times, then manage the people and tools available in your workspace."
       />
 
       {params.calendar === "connected" ? (
@@ -67,7 +67,7 @@ export default async function SettingsPage({
           {conn ? "Continue setup" : "Your coordination setup"}
         </h2>
         <p className="mt-2 max-w-xl text-sm text-muted">
-          Calendar is one part of the setup. Connect your agent and choose the
+          Calendar is one part of the setup. Connect your Grok Bot and choose the
           people it can coordinate with next.
         </p>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -76,10 +76,10 @@ export default async function SettingsPage({
             className="surface-card surface-card-interactive p-5 no-underline"
           >
             <span className="font-semibold text-matcha-deep">
-              Connect your agent
+              Connect your Grok Bot
             </span>
             <span className="mt-1 block text-sm leading-6 text-muted">
-              Approve a short-lived code in your browser. Your agent never
+              Approve a short-lived code in your browser. Your Bot never
               needs your password.
             </span>
           </Link>
@@ -89,7 +89,7 @@ export default async function SettingsPage({
           >
             <span className="font-semibold text-matcha-deep">Add people</span>
             <span className="mt-1 block text-sm leading-6 text-muted">
-              Invite known people your agent can coordinate with, or use a
+              Invite known people your Grok Bot can coordinate with, or use a
               private guest request when they do not have an account.
             </span>
           </Link>

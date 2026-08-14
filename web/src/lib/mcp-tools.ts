@@ -74,7 +74,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "register_agent_callback",
     description:
-      "Optional. Register an HTTPS URL HoneyMatcha will POST when you have new inbox work. Most Grok bots cannot receive this; they should poll get_inbox instead.",
+      "Optional. Register an HTTPS URL HoneyMatcha will POST when you have new inbox work. Grok Bots generally cannot receive this; they should poll get_inbox instead.",
     inputSchema: {
       type: "object",
       properties: {

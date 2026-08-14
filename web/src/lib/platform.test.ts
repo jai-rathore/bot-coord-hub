@@ -29,7 +29,8 @@ import { matchHiringConstraints } from "./hiring-match";
 import {
   ASK_AGENT_PROMPT,
   FRIEND_INVITE_MESSAGE,
-  GROK_CONNECT_PROMPT,
+  GROK_BOT_CONNECT_PROMPT,
+  GROK_BOT_URL,
   PRODUCTION_ORIGIN,
   agentLlmsText,
 } from "./connect-copy";
@@ -189,9 +190,11 @@ test("hiring compatibility returns dimensions without raw values", () => {
 
 test("connect copy uses the production origin and never asks agents to sign in", () => {
   assert.equal(PRODUCTION_ORIGIN, "https://honeymatcha.io");
+  assert.equal(GROK_BOT_URL, "https://x.ai/bot");
   assert.equal(ASK_AGENT_PROMPT, "Connect to https://honeymatcha.io as my agent.");
-  assert.match(GROK_CONNECT_PROMPT, /honeymatcha\.io\/api\/v1\/pairings\/start/);
-  assert.match(GROK_CONNECT_PROMPT, /Do not sign into Clerk/);
+  assert.match(GROK_BOT_CONNECT_PROMPT, /Grok Bot/);
+  assert.match(GROK_BOT_CONNECT_PROMPT, /honeymatcha\.io\/api\/v1\/pairings\/start/);
+  assert.match(GROK_BOT_CONNECT_PROMPT, /Do not sign into Clerk/);
   assert.match(FRIEND_INVITE_MESSAGE, /PASTE_INVITE_URL_HERE/);
   assert.match(FRIEND_INVITE_MESSAGE, /connect to honeymatcha\.io as my agent/);
   assert.equal(FRIEND_INVITE_MESSAGE.includes("YOUR_HOST"), false);

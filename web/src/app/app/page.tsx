@@ -42,8 +42,8 @@ export default async function AppHomePage() {
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-muted sm:text-base">
             {setupComplete
-              ? "Your agent handles the coordination. Follow progress here and step in only when something needs your say."
-              : "Connect your calendar and personal agent once. After that, your agent handles the work while HoneyMatcha keeps you in control."}
+              ? "Your Grok Bot handles the coordination. Follow progress here and step in only when something needs your say."
+              : "Connect your calendar and Grok Bot once. After that, your Bot handles the work while HoneyMatcha keeps you in control."}
           </p>
         </div>
       </section>
@@ -121,7 +121,7 @@ export default async function AppHomePage() {
             <p className="font-medium text-ink">No tasks yet.</p>
             <p className="mt-2 max-w-xl text-sm text-muted">
               {setupComplete
-                ? "Ask your agent to schedule a meeting or invite someone."
+                ? "Ask your Grok Bot to schedule a meeting or invite someone."
                 : "Finish the two setup steps above first."}
             </p>
           </div>

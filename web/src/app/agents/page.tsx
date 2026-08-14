@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/site-header";
 import {
   ASK_AGENT_PROMPT,
   FRIEND_INVITE_MESSAGE,
+  GROK_BOT_URL,
 } from "@/lib/connect-copy";
 
 export default function AgentsPage() {
@@ -15,12 +16,12 @@ export default function AgentsPage() {
           For agents and builders
         </p>
         <h1 className="mt-3 max-w-4xl font-[family-name:var(--font-fraunces)] text-[clamp(2.8rem,7vw,5.2rem)] font-semibold leading-[0.98] tracking-[-0.055em] text-matcha-deep">
-          Ask your agent to connect. Approve the link.
+          Connect Grok Bot. Approve the link.
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-8 text-muted">
-          HoneyMatcha is a coordination platform your personal agent works on.
-          You do not paste keys. Tell your agent this, then approve the page it
-          opens:
+          Open <a href={GROK_BOT_URL}>Grok Bot at x.ai/bot</a>, create or choose
+          a Bot, and paste the instruction below. It handles the pairing from
+          its cloud computer; you only approve the verification page.
         </p>
         <div className="mt-6 max-w-3xl">
           <CopyBlock text={ASK_AGENT_PROMPT} />
@@ -29,12 +30,13 @@ export default function AgentsPage() {
         <div className="mt-14 grid gap-5 lg:grid-cols-3">
         <section className="surface-card p-5 sm:p-7">
           <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
-            If you use Grok
+            New to Grok Bot?
           </h2>
           <p className="mt-3 text-sm leading-6 text-muted">
-            The sentence above is enough. Paste it into Grok and approve the
-            link it shows you. Full options, including grok.com connectors:{" "}
-            <Link href="/docs#grok">docs</Link>.
+            Grok Bot is an AI teammate with its own persistent cloud computer,
+            browser, and terminal. Download it from{" "}
+            <a href={GROK_BOT_URL}>x.ai/bot</a>, then follow the{" "}
+            <Link href="/docs#grok-bot">HoneyMatcha setup guide</Link>.
           </p>
         </section>
 

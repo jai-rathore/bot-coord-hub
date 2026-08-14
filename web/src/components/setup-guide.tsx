@@ -3,7 +3,7 @@
 import { CopyBlock } from "@/components/copy-block";
 import { ConnectCalendar } from "@/components/connect-calendar";
 import type { CalendarConnectionSummary } from "@/components/connect-calendar";
-import { ASK_AGENT_PROMPT } from "@/lib/connect-copy";
+import { ASK_AGENT_PROMPT, GROK_BOT_URL } from "@/lib/connect-copy";
 
 type AgentStatus = {
   connected: boolean;
@@ -38,12 +38,12 @@ export function SetupGuide({
         id="setup-title"
         className="relative mt-1 font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-[-0.03em] text-matcha-deep sm:text-3xl"
       >
-        Two things, then your agent can work
+        Two things, then your Grok Bot can work
       </h2>
       <p className="relative mt-2 max-w-2xl text-sm leading-6 text-muted">
-        HoneyMatcha is where your personal agent coordinates with other people.
-        You connect a calendar and approve the agent once. After that, you talk
-        to your agent — not this website — unless something needs your say.
+        HoneyMatcha is where your Grok Bot coordinates with other people. You
+        connect a calendar and approve the Bot once. After that, you talk to
+        your Bot — not this website — unless something needs your say.
       </p>
 
       <ol className="relative mt-6 grid list-none gap-4 p-0 lg:grid-cols-2">
@@ -73,7 +73,7 @@ export function SetupGuide({
               2
             </span>
             <p className="font-semibold text-ink">
-              Connect your agent{" "}
+              Connect your Grok Bot{" "}
             {agentDone ? (
               <span className="font-normal text-matcha">· done</span>
             ) : null}
@@ -81,14 +81,15 @@ export function SetupGuide({
           </div>
           {agentDone ? (
             <p className="mt-3 text-sm text-muted">
-              {agent.name ?? "Your agent"} is connected. Ask it to coordinate
+              {agent.name ?? "Your Grok Bot"} is connected. Ask it to coordinate
               from here.
             </p>
           ) : (
             <>
               <p className="mt-3 text-sm leading-6 text-muted">
-                In Grok, Claude, or whatever you already use, paste this. Approve
-                the link it shows you.
+                Open <a href={GROK_BOT_URL}>Grok Bot at x.ai/bot</a>, paste this
+                into your Bot&apos;s conversation, and approve the verification
+                link it returns.
               </p>
               <div className="mt-3">
                 <CopyBlock text={ASK_AGENT_PROMPT} />

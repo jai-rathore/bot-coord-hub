@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { CopyBlock } from "@/components/copy-block";
-import { ASK_AGENT_PROMPT } from "@/lib/connect-copy";
+import { ASK_AGENT_PROMPT, GROK_BOT_URL } from "@/lib/connect-copy";
 
 function CoordinationPreview() {
   return (
@@ -32,10 +32,10 @@ function CoordinationPreview() {
                 Scheduling task
               </p>
               <p className="mt-1.5 font-[family-name:var(--font-fraunces)] text-xl font-semibold tracking-[-0.02em]">
-                Coffee with Maya
+                Coffee with Sam and Anu
               </p>
               <p className="mt-1 text-xs text-white/65">
-                Your agent is comparing availability
+                Your Grok Bot is comparing availability
               </p>
             </div>
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10">
@@ -53,7 +53,7 @@ function CoordinationPreview() {
           </div>
           <div className="mt-5 flex items-center gap-3">
             <div className="flex -space-x-2">
-              {["HM", "Y", "M"].map((label, index) => (
+              {["HM", "S", "A"].map((label, index) => (
                 <span
                   key={label}
                   className={`grid h-8 w-8 place-items-center rounded-full border-2 border-matcha-deep text-[0.58rem] font-bold ${
@@ -137,8 +137,8 @@ function SignedInHero({
       </p>
       <p className="animate-rise-delay-2 mt-3 max-w-[46ch] text-[1rem] leading-7 text-muted sm:text-[1.05rem]">
         {setupComplete
-          ? "Your agent does the work. This site is where you approve things and see what happened."
-          : "Finish setup in HoneyMatcha, then talk to your agent. This site is where you approve things — your agent does the work."}
+          ? "Your Grok Bot does the work. This site is where you approve things and see what happened."
+          : "Finish setup in HoneyMatcha, then message your Grok Bot. This site is where you approve things — your Bot does the work."}
       </p>
       <div className="animate-rise-delay-3 mt-7">
         <Link
@@ -156,12 +156,11 @@ function SignedOutHero() {
   return (
     <>
       <p className="animate-rise-delay-1 mt-5 max-w-[23ch] font-[family-name:var(--font-fraunces)] text-[clamp(1.35rem,3.4vw,1.75rem)] font-semibold leading-[1.25] tracking-[-0.02em] text-ink">
-        Let your agent handle the back-and-forth.
+        Let your Grok Bot handle the back-and-forth.
       </p>
       <p className="animate-rise-delay-2 mt-3 max-w-[47ch] text-[1rem] leading-7 text-muted sm:text-[1.05rem]">
-        HoneyMatcha gives personal agents a trusted place to schedule,
-        coordinate, and work across inboxes — with you in control of every
-        important decision.
+        HoneyMatcha gives Grok Bot a trusted place to schedule, coordinate, and
+        work across inboxes — with you in control of every important decision.
       </p>
       <div className="animate-rise-delay-3 mt-7 flex flex-wrap gap-3">
         <SignUpButton mode="redirect">
@@ -182,9 +181,13 @@ function SignedOutHero() {
         </SignInButton>
       </div>
       <div className="animate-rise-delay-3 mt-8 max-w-[46ch]">
-        <p className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.08em] text-matcha uppercase">
+        <p className="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold tracking-[0.08em] text-matcha uppercase">
           <span className="h-px w-5 bg-matcha-soft" />
-          After you sign up, tell your agent:
+          After you sign up, open{" "}
+          <a href={GROK_BOT_URL} className="underline">
+            Grok Bot
+          </a>{" "}
+          and paste:
         </p>
         <CopyBlock text={ASK_AGENT_PROMPT} />
       </div>

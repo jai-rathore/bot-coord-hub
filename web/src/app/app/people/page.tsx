@@ -28,7 +28,7 @@ export default async function PeoplePage() {
       <PageHeading
         eyebrow="Your network"
         title="People"
-        description="People your agent can coordinate with. Invitations are private, expire automatically, and can be revoked by either person."
+        description="People your Grok Bot can coordinate with. Invitations are private, expire automatically, and can be revoked by either person."
       />
       <div className="mt-9">
         <LinksManager initialLinks={links} />

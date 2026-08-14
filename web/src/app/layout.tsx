@@ -19,7 +19,7 @@ const sora = Sora({
 export const metadata: Metadata = {
   title: "HoneyMatcha",
   description:
-    "HoneyMatcha is a coordination platform for you and your personal agent. Sign in, connect your calendar, then tell your agent to connect to honeymatcha.io.",
+    "HoneyMatcha is a coordination platform for you and your Grok Bot. Sign in, connect your calendar, then tell your Bot to connect to honeymatcha.io.",
   alternates: {
     types: {
       "application/json": "/.well-known/honeymatcha.json",
