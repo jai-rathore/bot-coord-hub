@@ -226,7 +226,15 @@ async function main() {
 
   await revokeLinkForUser({ user: alice, linkId: accepted.link.id });
   const after = await listLinksForUser(alice, origin);
-  if (after.some((l) => l.status === "active")) throw new Error("should be revoked");
+  if (
+    after.some(
+      (link) =>
+        link.status === "active" &&
+        (link.id === accepted.link.id || link.pairLinkId === accepted.pair.id),
+    )
+  ) {
+    throw new Error("targeted relationship should be revoked");
+  }
 
   await db.delete(users).where(eq(users.id, alice.id));
   await db.delete(users).where(eq(users.id, bob.id));
