@@ -2,6 +2,12 @@ import { ensureCurrentUser } from "@/lib/users";
 import { acceptInviteLink } from "@/lib/links";
 import { requestOrigin } from "@/lib/invite";
 import { jsonError } from "@/lib/http";
+import {
+  inviteAcceptRateLimitKey,
+  rateLimit,
+  rateLimitedJson,
+  rateLimitHeaders,
+} from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +27,11 @@ export async function POST(request: Request) {
   if (!body.inviteCode?.trim()) {
     return Response.json({ error: "inviteCode is required" }, { status: 400 });
   }
+  const limit = rateLimit(
+    inviteAcceptRateLimitKey(request, body.inviteCode),
+    10,
+  );
+  if (!limit.ok) return rateLimitedJson(limit);
 
   try {
     const result = await acceptInviteLink({
@@ -28,11 +39,14 @@ export async function POST(request: Request) {
       inviteCode: body.inviteCode,
       origin: requestOrigin(request),
     });
-    return Response.json({
-      ok: true,
-      link: result.link,
-      pair: result.pair,
-    });
+    return Response.json(
+      {
+        ok: true,
+        link: result.link,
+        pair: result.pair,
+      },
+      { headers: rateLimitHeaders(limit) },
+    );
   } catch (err) {
     return jsonError(err, "Failed to accept invite");
   }

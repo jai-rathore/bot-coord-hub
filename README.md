@@ -45,8 +45,9 @@ Open `http://localhost:3000`.
 - Agent skill: [`skills/honeymatcha/SKILL.md`](./skills/honeymatcha/SKILL.md)
 
 You connect your agent to your HoneyMatcha account. A friend connects theirs
-to theirs. Then you invite the person from People — you do not pair their
-agent into your account.
+to theirs. Then you invite the person from People using a private email invite
+or an approval-gated public link/QR — you do not pair their agent into your
+account.
 
 Agents should start at `POST /api/v1/pairings/start`, ask the human to approve
 the returned verification URL in a normal browser, then exchange the device

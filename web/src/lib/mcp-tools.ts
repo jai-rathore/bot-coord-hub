@@ -12,18 +12,22 @@ import {
   AgentApiError,
   createGuestTask,
   createInvite,
+  createPublicInvite,
   listConfirms,
   listGuestTasks,
   listInbox,
   listIntents,
   listLinks,
+  listPublicInvites,
   listSessions,
   postBoardMessage,
   proposeIntent,
   readGuestTask,
   readBoard,
   requestScheduleMeeting,
+  redeemPublicInvite,
   revokeGuestTask,
+  revokePublicInvite,
   setAgentCallback,
   whoami,
 } from "@/lib/agent-api";
@@ -139,6 +143,62 @@ export const MCP_TOOLS: McpToolDef[] = [
         inviteCode: { type: "string" },
       },
       required: ["inviteCode"],
+    },
+  },
+  {
+    name: "list_public_invites",
+    description:
+      "List reusable public connection links owned by the authenticated human.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "create_public_invite",
+    description:
+      "Create a reusable public link and QR target. Each redemption creates a request that the human owner must approve.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        label: { type: "string", description: "Optional label for the link" },
+        maxRedemptions: {
+          type: "number",
+          description: "Maximum requests, from 1 to 100 (default 25)",
+        },
+        expiresInHours: {
+          type: "number",
+          description: "Expiry from 1 to 720 hours (default 720)",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "redeem_public_invite",
+    description:
+      "Redeem a public invite URL token for the authenticated human. This sends an approval-gated connection request.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        token: {
+          type: "string",
+          description: "The pi_ token from the /join/ URL",
+        },
+      },
+      required: ["token"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "revoke_public_invite",
+    description: "Revoke one of the human's reusable public invitation links.",
+    inputSchema: {
+      type: "object",
+      properties: { publicInviteId: { type: "string" } },
+      required: ["publicInviteId"],
+      additionalProperties: false,
     },
   },
   {
@@ -361,6 +421,24 @@ export async function dispatchMcpTool(
         { inviteCode: args.inviteCode as string | undefined },
         baseUrl,
       );
+    case "list_public_invites":
+      return listPublicInvites(auth, baseUrl);
+    case "create_public_invite":
+      return createPublicInvite(
+        auth,
+        {
+          label: args.label,
+          maxRedemptions: args.maxRedemptions,
+          expiresInHours: args.expiresInHours,
+        },
+        baseUrl,
+      );
+    case "redeem_public_invite":
+      return redeemPublicInvite(auth, {
+        token: args.token as string | undefined,
+      });
+    case "revoke_public_invite":
+      return revokePublicInvite(auth, String(args.publicInviteId ?? ""));
     case "list_sessions":
       return listSessions(auth);
     case "post_board_message":

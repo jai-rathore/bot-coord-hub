@@ -101,6 +101,22 @@ export function pairingRateLimitKey(request: Request): string {
   return `pairing:${clientIpFromHeaders(request.headers)}`;
 }
 
+export function publicInviteRateLimitKey(
+  request: Request,
+  token = "anonymous",
+): string {
+  const fingerprint = token.trim().slice(0, 24) || "anonymous";
+  return `public-invite:${clientIpFromHeaders(request.headers)}:${fingerprint}`;
+}
+
+export function inviteAcceptRateLimitKey(
+  request: Request,
+  inviteCode = "anonymous",
+): string {
+  const fingerprint = inviteCode.trim().slice(0, 24) || "anonymous";
+  return `invite-accept:${clientIpFromHeaders(request.headers)}:${fingerprint}`;
+}
+
 export function rateLimitHeaders(result: RateLimitResult): HeadersInit {
   return {
     "X-RateLimit-Remaining": String(result.remaining),

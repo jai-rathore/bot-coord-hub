@@ -1,9 +1,22 @@
 import "dotenv/config";
+import assert from "node:assert/strict";
 import { createHash, randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
 import { getDb } from "../src/db";
 import { apiKeys, users } from "../src/db/schema";
-import { acceptInviteLink, createInviteLink, listLinksForUser, revokeLinkForUser } from "../src/lib/links";
+import {
+  acceptInviteLink,
+  approveConnectionRequest,
+  createInviteLink,
+  listLinksForUser,
+  revokeLinkForUser,
+} from "../src/lib/links";
+import {
+  createPublicInvite,
+  getPublicInvitePreview,
+  redeemPublicInvite,
+  revokePublicInvite,
+} from "../src/lib/public-invites";
 import { createSessionForUser, listMessagesForSession, postSessionMessage } from "../src/lib/sessions";
 import { decideConfirm, listConfirmsForUser, requestConfirm } from "../src/lib/confirms";
 import { DEFAULT_AGENT_SCOPES } from "../src/lib/scopes";
@@ -43,6 +56,21 @@ async function main() {
     email: `bob_${suffix}@example.com`,
     name: "Bob",
   }).returning();
+  const [carol] = await db.insert(users).values({
+    clerkUserId: `clerk_carol_${suffix}`,
+    email: `carol_${suffix}@example.com`,
+    name: "Carol",
+  }).returning();
+  const [dave] = await db.insert(users).values({
+    clerkUserId: `clerk_dave_${suffix}`,
+    email: `dave_${suffix}@example.com`,
+    name: "Dave",
+  }).returning();
+  const [eve] = await db.insert(users).values({
+    clerkUserId: `clerk_eve_${suffix}`,
+    email: `eve_${suffix}@example.com`,
+    name: "Eve",
+  }).returning();
 
   const aliceRaw = `hm_${randomBytes(24).toString("base64url")}`;
   await db.insert(apiKeys).values({
@@ -54,6 +82,84 @@ async function main() {
   });
 
   const origin = "http://localhost:3000";
+  const publicInvite = await createPublicInvite({
+    owner: alice,
+    label: "E2E public QR",
+    maxRedemptions: 2,
+    expiresInHours: 24,
+    origin,
+  });
+  const publicToken = decodeURIComponent(
+    publicInvite.inviteUrl.split("/").at(-1) ?? "",
+  );
+  const preview = await getPublicInvitePreview(publicToken);
+  if (
+    preview?.ownerName !== "Alice" ||
+    preview.remainingRedemptions !== 2
+  ) {
+    throw new Error("public invite preview should be safe and available");
+  }
+  const carolRequest = await redeemPublicInvite({
+    user: carol,
+    token: publicToken,
+  });
+  if (carolRequest.request.status !== "pending") {
+    throw new Error("public redemption must remain pending");
+  }
+  const carolReplay = await redeemPublicInvite({
+    user: carol,
+    token: publicToken,
+  });
+  if (!carolReplay.idempotent) {
+    throw new Error("public redemption replay should be idempotent");
+  }
+  const carolLinks = await listLinksForUser(carol, origin);
+  const carolPending = carolLinks.find(
+    (link) => link.id === carolRequest.request.id,
+  );
+  if (!carolPending) throw new Error("requester should see pending request");
+  await assert.rejects(
+    () =>
+      acceptInviteLink({
+        user: carol,
+        inviteCode: carolPending.inviteCode,
+        origin,
+      }),
+    /must be approved by the inviter/,
+  );
+  await redeemPublicInvite({ user: dave, token: publicToken });
+  await assert.rejects(
+    () => redeemPublicInvite({ user: eve, token: publicToken }),
+    /no longer available|reached its limit/,
+  );
+  await assert.rejects(
+    () =>
+      approveConnectionRequest({
+        user: carol,
+        linkId: carolRequest.request.id,
+        origin,
+      }),
+    /Only the public invite owner/,
+  );
+  const publicAccepted = await approveConnectionRequest({
+    user: alice,
+    linkId: carolRequest.request.id,
+    origin,
+  });
+  if (
+    publicAccepted.link.status !== "active" ||
+    publicAccepted.pair.status !== "active"
+  ) {
+    throw new Error("approved public request should create mutual links");
+  }
+  await revokePublicInvite({
+    owner: alice,
+    publicInviteId: publicInvite.id,
+  });
+  if (await getPublicInvitePreview(publicToken)) {
+    throw new Error("revoked public invite should not resolve");
+  }
+
   const invite = await createInviteLink({
     fromUser: alice,
     toEmail: bob.email,
@@ -124,6 +230,9 @@ async function main() {
 
   await db.delete(users).where(eq(users.id, alice.id));
   await db.delete(users).where(eq(users.id, bob.id));
+  await db.delete(users).where(eq(users.id, carol.id));
+  await db.delete(users).where(eq(users.id, dave.id));
+  await db.delete(users).where(eq(users.id, eve.id));
   await db.delete(users).where(eq(users.id, reconciledIdentity.id));
   console.log(JSON.stringify({ ok: true, inviteCode: invite.inviteCode, sessionId: session.id, confirmId: confirm.id }, null, 2));
   process.exit(0);

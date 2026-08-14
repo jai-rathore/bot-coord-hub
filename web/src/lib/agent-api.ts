@@ -58,6 +58,12 @@ import {
   listGuestTasksForOrganizer,
   revokeGuestTask as revokeScopedGuestTask,
 } from "@/lib/guest-tasks";
+import {
+  createPublicInvite as createShareablePublicInvite,
+  listPublicInvites as listShareablePublicInvites,
+  redeemPublicInvite as redeemShareablePublicInvite,
+  revokePublicInvite as revokeShareablePublicInvite,
+} from "@/lib/public-invites";
 
 import { AgentApiError } from "@/lib/agent-errors";
 export { AgentApiError } from "@/lib/agent-errors";
@@ -161,6 +167,85 @@ export async function createInvite(
       link,
       message:
         "Share this private, expiring invitation with the addressed person.",
+    };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
+}
+
+export async function listPublicInvites(
+  auth: AgentAuth,
+  baseUrl = "",
+) {
+  assertAgentScope(auth, "people:read");
+  try {
+    return {
+      publicInvites: await listShareablePublicInvites(auth.user, baseUrl),
+    };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
+}
+
+export async function createPublicInvite(
+  auth: AgentAuth,
+  body: {
+    label?: unknown;
+    scopes?: unknown;
+    confirmRequired?: boolean;
+    expiresInHours?: unknown;
+    maxRedemptions?: unknown;
+  },
+  baseUrl = "",
+) {
+  assertAgentScope(auth, "people:write");
+  try {
+    return {
+      ok: true,
+      publicInvite: await createShareablePublicInvite({
+        owner: auth.user,
+        label: body.label,
+        scopes: body.scopes,
+        confirmRequired: body.confirmRequired,
+        expiresInHours: body.expiresInHours,
+        maxRedemptions: body.maxRedemptions,
+        origin: baseUrl,
+      }),
+      message:
+        "Share the URL or QR with people. Every redemption still requires the human owner's approval.",
+    };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
+}
+
+export async function redeemPublicInvite(
+  auth: AgentAuth,
+  body: { token?: string },
+) {
+  assertAgentScope(auth, "people:write");
+  try {
+    return await redeemShareablePublicInvite({
+      user: auth.user,
+      token: body.token ?? "",
+    });
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
+}
+
+export async function revokePublicInvite(
+  auth: AgentAuth,
+  publicInviteId: string,
+) {
+  assertAgentScope(auth, "people:write");
+  try {
+    return {
+      ok: true,
+      ...(await revokeShareablePublicInvite({
+        owner: auth.user,
+        publicInviteId,
+      })),
     };
   } catch (err) {
     rethrowAsAgentError(err);

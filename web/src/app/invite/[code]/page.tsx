@@ -55,7 +55,7 @@ export default async function InviteAcceptPage({
           <div className="mt-6 space-y-4">
             <div className="rounded-md border border-line bg-[rgba(255,252,246,0.65)] px-4 py-3 text-sm">
               <p className="font-medium text-ink">
-                From {invite.inviter.name || invite.inviter.email}
+                From {invite.inviter.name || "a HoneyMatcha member"}
               </p>
               <p className="mt-1 text-muted">
                 This connection can be used to coordinate meeting times.

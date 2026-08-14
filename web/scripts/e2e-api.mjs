@@ -63,18 +63,81 @@ async function main() {
     values (${`clerk_bob_${suffix}`}, ${`bob_${suffix}@example.com`}, ${"Bob"})
     returning *
   `;
+  const [carol] = await sql`
+    insert into users (clerk_user_id, email, name)
+    values (${`clerk_carol_${suffix}`}, ${`carol_${suffix}@example.com`}, ${"Carol"})
+    returning *
+  `;
 
   const aliceRaw = `hm_${randomBytes(24).toString("base64url")}`;
   const bobRaw = `hm_${randomBytes(24).toString("base64url")}`;
+  const carolRaw = `hm_${randomBytes(24).toString("base64url")}`;
   await sql`
     insert into api_keys (user_id, name, key_prefix, key_hash, scopes)
     values
       (${alice.id}, ${"alice"}, ${aliceRaw.slice(0, 11)}, ${hashApiKey(aliceRaw)}, ${sql.json(safeScopes)}),
-      (${bob.id}, ${"bob"}, ${bobRaw.slice(0, 11)}, ${hashApiKey(bobRaw)}, ${sql.json(safeScopes)})
+      (${bob.id}, ${"bob"}, ${bobRaw.slice(0, 11)}, ${hashApiKey(bobRaw)}, ${sql.json(safeScopes)}),
+      (${carol.id}, ${"carol"}, ${carolRaw.slice(0, 11)}, ${hashApiKey(carolRaw)}, ${sql.json(safeScopes)})
   `;
 
   const me = await jsonFetch("/api/v1/me", { token: aliceRaw });
   assert(me.res.ok, `me failed: ${JSON.stringify(me.data)}`);
+
+  const publicInvite = await jsonFetch("/api/v1/public-invites", {
+    method: "POST",
+    token: aliceRaw,
+    body: {
+      label: "API QR smoke",
+      maxRedemptions: 1,
+      expiresInHours: 24,
+    },
+  });
+  assert(
+    publicInvite.res.status === 201,
+    `public invite failed: ${JSON.stringify(publicInvite.data)}`,
+  );
+  const publicUrl = publicInvite.data.publicInvite.inviteUrl;
+  assert(publicUrl.includes("/join/pi_"), "public invite URL should be signed");
+  const publicToken = decodeURIComponent(publicUrl.split("/").at(-1));
+  const publicPage = await fetch(publicUrl, {
+    headers: { Accept: "text/html" },
+    redirect: "manual",
+  });
+  assert(
+    publicPage.status < 400,
+    `public invitation page failed with ${publicPage.status}`,
+  );
+  const publicRedeem = await jsonFetch("/api/v1/public-invites/redeem", {
+    method: "POST",
+    token: carolRaw,
+    body: { token: publicToken },
+  });
+  assert(
+    publicRedeem.res.ok && publicRedeem.data.request.status === "pending",
+    `public redeem failed: ${JSON.stringify(publicRedeem.data)}`,
+  );
+  const publicReplay = await jsonFetch("/api/v1/public-invites/redeem", {
+    method: "POST",
+    token: carolRaw,
+    body: { token: publicToken },
+  });
+  assert(publicReplay.data.idempotent === true, "public redeem should be idempotent");
+  const publicList = await jsonFetch("/api/v1/public-invites", {
+    token: aliceRaw,
+  });
+  assert(
+    publicList.data.publicInvites.some(
+      (item) =>
+        item.id === publicInvite.data.publicInvite.id &&
+        item.redemptionCount === 1,
+    ),
+    "public invite use count should be visible",
+  );
+  const publicRevoke = await jsonFetch(
+    `/api/v1/public-invites/${publicInvite.data.publicInvite.id}/revoke`,
+    { method: "POST", token: aliceRaw },
+  );
+  assert(publicRevoke.res.ok, "public invite revoke failed");
 
   const invite = await jsonFetch("/api/v1/links/invite", {
     method: "POST",
@@ -272,7 +335,7 @@ async function main() {
     ),
   );
 
-  await sql`delete from users where id in (${alice.id}, ${bob.id})`;
+  await sql`delete from users where id in (${alice.id}, ${bob.id}, ${carol.id})`;
   await sql.end();
 }
 

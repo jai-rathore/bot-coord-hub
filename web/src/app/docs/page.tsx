@@ -176,9 +176,11 @@ export default function DocsPage() {
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
             You do not connect their Bot to yours. Each person connects their
-            own Grok Bot to their own HoneyMatcha account. Then you invite the
-            person from <Link href="/app/people">People</Link> and send them
-            the private invite URL. HoneyMatcha does not email that link yet.
+            own Grok Bot to their own HoneyMatcha account. From{" "}
+            <Link href="/app/people">People</Link>, send a private
+            email-targeted invite or create a reusable public link and QR code.
+            Public-link redemptions stay pending until you approve each person.
+            HoneyMatcha does not email these links.
           </p>
           <p className="mt-3 text-[0.95rem] leading-7 text-muted">
             Once they have a HoneyMatcha account, HoneyMatcha reaches{" "}

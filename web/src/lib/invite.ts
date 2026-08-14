@@ -8,7 +8,7 @@ export function generateInviteCode(): string {
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, "")
       .slice(0, 4);
-  return `HM-${part()}-${part()}`;
+  return `HM-${part()}-${part()}-${part()}-${part()}`;
 }
 
 export function inviteUrlForCode(origin: string, inviteCode: string): string {

@@ -66,6 +66,11 @@ export const pairingStatusEnum = pgEnum("pairing_status", [
   "expired",
 ]);
 
+export const publicInviteStatusEnum = pgEnum("public_invite_status", [
+  "active",
+  "revoked",
+]);
+
 /** Optional working-hours policy on a link. */
 export type AllowedHours = {
   start: string;
@@ -127,6 +132,41 @@ export const apiKeys = pgTable(
   ],
 );
 
+/**
+ * A reusable, signed share link. Redeeming one creates an approval-gated link
+ * request; it never grants relationship permissions by itself.
+ */
+export const publicInvites = pgTable(
+  "public_invites",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    label: text("label"),
+    status: publicInviteStatusEnum("status").notNull().default("active"),
+    scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+    confirmRequired: boolean("confirm_required").notNull().default(true),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    maxRedemptions: integer("max_redemptions").notNull().default(25),
+    redemptionCount: integer("redemption_count").notNull().default(0),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("public_invites_owner_created_idx").on(
+      t.ownerUserId,
+      t.createdAt,
+    ),
+    index("public_invites_status_expires_idx").on(t.status, t.expiresAt),
+  ],
+);
+
 export const links = pgTable(
   "links",
   {
@@ -145,6 +185,10 @@ export const links = pgTable(
     scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
     /** Points at the reciprocal row once a link is mutual/active. */
     pairLinkId: uuid("pair_link_id"),
+    /** Source share link for approval-gated public connection requests. */
+    publicInviteId: uuid("public_invite_id").references(() => publicInvites.id, {
+      onDelete: "set null",
+    }),
     /** When true, schedule_meeting waits for human confirms before booking. */
     confirmRequired: boolean("confirm_required").notNull().default(true),
     /** Optional IANA timezone for allowed_hours evaluation. */
@@ -164,6 +208,11 @@ export const links = pgTable(
     uniqueIndex("links_invite_code_uidx").on(t.inviteCode),
     index("links_from_user_id_idx").on(t.fromUserId),
     index("links_to_user_id_idx").on(t.toUserId),
+    index("links_public_invite_id_idx").on(t.publicInviteId),
+    uniqueIndex("links_public_invite_user_uidx").on(
+      t.publicInviteId,
+      t.toUserId,
+    ),
   ],
 );
 
@@ -543,6 +592,7 @@ export const agentInbox = pgTable(
 
 export type User = typeof users.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
+export type PublicInvite = typeof publicInvites.$inferSelect;
 export type Link = typeof links.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type SessionMessage = typeof sessionMessages.$inferSelect;

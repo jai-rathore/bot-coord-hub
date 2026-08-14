@@ -52,6 +52,19 @@ export function getDiscoveryDocument(baseUrl?: string) {
       create_invite: { method: "POST", path: "/api/v1/links/invite" },
       accept_invite: { method: "POST", path: "/api/v1/links/accept" },
       revoke_link: { method: "POST", path: "/api/v1/links/:id/revoke" },
+      list_public_invites: { method: "GET", path: "/api/v1/public-invites" },
+      create_public_invite: {
+        method: "POST",
+        path: "/api/v1/public-invites",
+      },
+      redeem_public_invite: {
+        method: "POST",
+        path: "/api/v1/public-invites/redeem",
+      },
+      revoke_public_invite: {
+        method: "POST",
+        path: "/api/v1/public-invites/:id/revoke",
+      },
       list_sessions: { method: "GET", path: "/api/v1/sessions" },
       get_inbox: { method: "GET", path: "/api/v1/inbox" },
       ack_inbox: { method: "POST", path: "/api/v1/inbox/:id/ack" },

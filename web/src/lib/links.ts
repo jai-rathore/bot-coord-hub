@@ -27,6 +27,7 @@ export type PublicLink = {
   toEmail: string | null;
   toName: string | null;
   pairLinkId: string | null;
+  publicInviteId: string | null;
   confirmRequired: boolean;
   timezone: string | null;
   allowedHours: AllowedHours | null;
@@ -185,132 +186,281 @@ export async function acceptInviteLink(opts: {
   }
 
   const db = getDb();
-  const pending = await db
-    .select()
-    .from(links)
-    .where(and(eq(links.inviteCode, code), eq(links.status, "pending")))
-    .limit(1);
+  const result = await db.transaction(async (tx) => {
+    const [invite] = await tx
+      .select()
+      .from(links)
+      .where(and(eq(links.inviteCode, code), eq(links.status, "pending")))
+      .limit(1);
+    if (!invite) {
+      throw Object.assign(new Error("Invite not found or not pending"), {
+        status: 404,
+      });
+    }
+    if (invite.publicInviteId) {
+      throw Object.assign(
+        new Error("Public connection requests must be approved by the inviter"),
+        { status: 403 },
+      );
+    }
+    if (invite.expiresAt && invite.expiresAt <= new Date()) {
+      throw Object.assign(new Error("This invitation has expired"), {
+        status: 410,
+      });
+    }
+    if (invite.fromUserId === opts.user.id) {
+      throw Object.assign(new Error("Cannot accept your own invite"), {
+        status: 400,
+      });
+    }
+    const targeted = normalizeEmail(invite.toEmail);
+    if (targeted && targeted !== opts.user.email.toLowerCase()) {
+      throw Object.assign(
+        new Error("This invite is addressed to a different email"),
+        { status: 403 },
+      );
+    }
 
-  const invite = pending[0];
-  if (!invite) {
-    throw Object.assign(new Error("Invite not found or not pending"), {
-      status: 404,
-    });
-  }
-  if (invite.expiresAt && invite.expiresAt <= new Date()) {
-    throw Object.assign(new Error("This invitation has expired"), {
-      status: 410,
-    });
-  }
-  if (invite.fromUserId === opts.user.id) {
-    throw Object.assign(new Error("Cannot accept your own invite"), {
-      status: 400,
-    });
-  }
-
-  const targeted = normalizeEmail(invite.toEmail);
-  if (targeted && targeted !== opts.user.email.toLowerCase()) {
-    throw Object.assign(
-      new Error("This invite is addressed to a different email"),
-      { status: 403 },
-    );
-  }
-
-  const inviterRows = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, invite.fromUserId))
-    .limit(1);
-  const inviter = inviterRows[0];
-  if (!inviter) {
-    throw Object.assign(new Error("Inviter no longer exists"), { status: 404 });
-  }
-
-  // Avoid duplicate active links between the same pair.
-  const existingActive = await db
-    .select()
-    .from(links)
-    .where(
-      and(
-        eq(links.status, "active"),
-        or(
-          and(
-            eq(links.fromUserId, invite.fromUserId),
-            eq(links.toUserId, opts.user.id),
-          ),
-          and(
-            eq(links.fromUserId, opts.user.id),
-            eq(links.toUserId, invite.fromUserId),
+    const [inviter] = await tx
+      .select()
+      .from(users)
+      .where(eq(users.id, invite.fromUserId))
+      .limit(1);
+    if (!inviter) {
+      throw Object.assign(new Error("Inviter no longer exists"), {
+        status: 404,
+      });
+    }
+    const [existingActive] = await tx
+      .select()
+      .from(links)
+      .where(
+        and(
+          eq(links.status, "active"),
+          or(
+            and(
+              eq(links.fromUserId, invite.fromUserId),
+              eq(links.toUserId, opts.user.id),
+            ),
+            and(
+              eq(links.fromUserId, opts.user.id),
+              eq(links.toUserId, invite.fromUserId),
+            ),
           ),
         ),
-      ),
-    )
-    .limit(1);
-  if (existingActive[0]) {
-    throw Object.assign(new Error("Active link already exists"), {
-      status: 409,
-      linkId: existingActive[0].id,
-    });
-  }
+      )
+      .limit(1);
+    if (existingActive) {
+      throw Object.assign(new Error("Active link already exists"), {
+        status: 409,
+        linkId: existingActive.id,
+      });
+    }
 
-  const now = new Date();
-  const pairCode = generateInviteCode();
+    const now = new Date();
+    const [claimed] = await tx
+      .update(links)
+      .set({
+        toUserId: opts.user.id,
+        toEmail: opts.user.email,
+        toName: opts.user.name,
+        status: "active",
+        expiresAt: null,
+        updatedAt: now,
+      })
+      .where(and(eq(links.id, invite.id), eq(links.status, "pending")))
+      .returning();
+    if (!claimed) {
+      throw Object.assign(new Error("This invitation was already accepted"), {
+        status: 409,
+      });
+    }
 
-  const [pair] = await db
-    .insert(links)
-    .values({
-      fromUserId: opts.user.id,
-      toUserId: inviter.id,
-      toEmail: inviter.email,
-      toName: inviter.name,
-      inviteCode: pairCode,
-      status: "active",
-      scopes: invite.scopes,
-      confirmRequired: true,
-      timezone: null,
-      allowedHours: null,
-      expiresAt: null,
-      updatedAt: now,
-    })
-    .returning();
-
-  const [activated] = await db
-    .update(links)
-    .set({
-      toUserId: opts.user.id,
-      toEmail: opts.user.email,
-      toName: opts.user.name,
-      status: "active",
-      pairLinkId: pair.id,
-      expiresAt: null,
-      updatedAt: now,
-    })
-    .where(eq(links.id, invite.id))
-    .returning();
-
-  await db
-    .update(links)
-    .set({ pairLinkId: activated.id, updatedAt: now })
-    .where(eq(links.id, pair.id));
-
-  const pairWithPairId = { ...pair, pairLinkId: activated.id };
+    const [pair] = await tx
+      .insert(links)
+      .values({
+        fromUserId: opts.user.id,
+        toUserId: inviter.id,
+        toEmail: inviter.email,
+        toName: inviter.name,
+        inviteCode: generateInviteCode(),
+        status: "active",
+        scopes: invite.scopes,
+        pairLinkId: claimed.id,
+        confirmRequired: true,
+        timezone: null,
+        allowedHours: null,
+        expiresAt: null,
+        updatedAt: now,
+      })
+      .returning();
+    if (!pair) {
+      throw Object.assign(new Error("Could not activate connection"), {
+        status: 503,
+      });
+    }
+    const [activated] = await tx
+      .update(links)
+      .set({ pairLinkId: pair.id, updatedAt: now })
+      .where(eq(links.id, claimed.id))
+      .returning();
+    return { activated, pair, inviter };
+  });
 
   await writeAudit({
     actorUserId: opts.user.id,
     action: "invite.accepted",
     entityType: "link",
-    entityId: activated.id,
+    entityId: result.activated.id,
     metadata: {
       inviteCode: code,
-      pairLinkId: pair.id,
-      fromUserId: inviter.id,
+      pairLinkId: result.pair.id,
+      fromUserId: result.inviter.id,
       toUserId: opts.user.id,
     },
   });
 
   return {
-    link: toPublicLink(activated, opts.user, opts.origin, inviter),
-    pair: toPublicLink(pairWithPairId, opts.user, opts.origin, inviter),
+    link: toPublicLink(
+      result.activated,
+      opts.user,
+      opts.origin,
+      result.inviter,
+    ),
+    pair: toPublicLink(result.pair, opts.user, opts.origin, result.inviter),
+  };
+}
+
+export async function approveConnectionRequest(opts: {
+  user: User;
+  linkId: string;
+  origin: string;
+}): Promise<{ link: PublicLink; pair: PublicLink }> {
+  const db = getDb();
+  const result = await db.transaction(async (tx) => {
+    const [request] = await tx
+      .select()
+      .from(links)
+      .where(eq(links.id, opts.linkId))
+      .limit(1);
+    if (!request) {
+      throw Object.assign(new Error("Connection request not found"), {
+        status: 404,
+      });
+    }
+    if (request.fromUserId !== opts.user.id) {
+      throw Object.assign(
+        new Error("Only the public invite owner can approve this request"),
+        { status: 403 },
+      );
+    }
+    if (
+      request.status !== "pending" ||
+      !request.publicInviteId ||
+      !request.toUserId
+    ) {
+      throw Object.assign(new Error("This request is no longer pending"), {
+        status: 409,
+      });
+    }
+    if (request.expiresAt && request.expiresAt <= new Date()) {
+      throw Object.assign(new Error("This request has expired"), {
+        status: 410,
+      });
+    }
+
+    const [requester] = await tx
+      .select()
+      .from(users)
+      .where(eq(users.id, request.toUserId))
+      .limit(1);
+    if (!requester) {
+      throw Object.assign(new Error("Requester no longer exists"), {
+        status: 404,
+      });
+    }
+
+    const [existingActive] = await tx
+      .select({ id: links.id })
+      .from(links)
+      .where(
+        and(
+          eq(links.status, "active"),
+          or(
+            and(
+              eq(links.fromUserId, opts.user.id),
+              eq(links.toUserId, requester.id),
+            ),
+            and(
+              eq(links.fromUserId, requester.id),
+              eq(links.toUserId, opts.user.id),
+            ),
+          ),
+        ),
+      )
+      .limit(1);
+    if (existingActive) {
+      throw Object.assign(new Error("Active link already exists"), {
+        status: 409,
+      });
+    }
+
+    const now = new Date();
+    const [claimed] = await tx
+      .update(links)
+      .set({ status: "active", expiresAt: null, updatedAt: now })
+      .where(and(eq(links.id, request.id), eq(links.status, "pending")))
+      .returning();
+    if (!claimed) {
+      throw Object.assign(new Error("This request was already handled"), {
+        status: 409,
+      });
+    }
+
+    const [pair] = await tx
+      .insert(links)
+      .values({
+        fromUserId: requester.id,
+        toUserId: opts.user.id,
+        toEmail: opts.user.email,
+        toName: opts.user.name,
+        inviteCode: generateInviteCode(),
+        status: "active",
+        scopes: claimed.scopes,
+        pairLinkId: claimed.id,
+        confirmRequired: true,
+        expiresAt: null,
+        updatedAt: now,
+      })
+      .returning();
+    if (!pair) {
+      throw Object.assign(new Error("Could not activate connection"), {
+        status: 503,
+      });
+    }
+
+    const [activated] = await tx
+      .update(links)
+      .set({ pairLinkId: pair.id, updatedAt: now })
+      .where(eq(links.id, claimed.id))
+      .returning();
+    return { activated, pair, requester };
+  });
+
+  await writeAudit({
+    actorUserId: opts.user.id,
+    action: "public_invite.request_approved",
+    entityType: "link",
+    entityId: result.activated.id,
+    metadata: {
+      publicInviteId: result.activated.publicInviteId,
+      requesterUserId: result.requester.id,
+      pairLinkId: result.pair.id,
+    },
+  });
+  return {
+    link: toPublicLink(result.activated, opts.user, opts.origin, result.requester),
+    pair: toPublicLink(result.pair, opts.user, opts.origin, result.requester),
   };
 }
 
@@ -476,6 +626,7 @@ function toPublicLink(
     toEmail: link.toEmail,
     toName: link.toName,
     pairLinkId: link.pairLinkId,
+    publicInviteId: link.publicInviteId,
     confirmRequired: link.confirmRequired,
     timezone: link.timezone,
     allowedHours: link.allowedHours ?? null,

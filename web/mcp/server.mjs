@@ -54,6 +54,42 @@ const TOOLS = [
     },
   },
   {
+    name: "list_public_invites",
+    description: "List reusable public connection links.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "create_public_invite",
+    description:
+      "Create a reusable public connection link. The human approves each request.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        label: { type: "string" },
+        maxRedemptions: { type: "number" },
+        expiresInHours: { type: "number" },
+      },
+    },
+  },
+  {
+    name: "redeem_public_invite",
+    description: "Send a connection request using a public invite token.",
+    inputSchema: {
+      type: "object",
+      properties: { token: { type: "string" } },
+      required: ["token"],
+    },
+  },
+  {
+    name: "revoke_public_invite",
+    description: "Revoke a reusable public connection link.",
+    inputSchema: {
+      type: "object",
+      properties: { publicInviteId: { type: "string" } },
+      required: ["publicInviteId"],
+    },
+  },
+  {
     name: "list_sessions",
     description: "List coordination sessions.",
     inputSchema: { type: "object", properties: {} },
@@ -218,6 +254,20 @@ async function callTool(name, args = {}) {
       return api("/api/v1/links/invite", { method: "POST", body: args });
     case "accept_invite":
       return api("/api/v1/links/accept", { method: "POST", body: args });
+    case "list_public_invites":
+      return api("/api/v1/public-invites");
+    case "create_public_invite":
+      return api("/api/v1/public-invites", { method: "POST", body: args });
+    case "redeem_public_invite":
+      return api("/api/v1/public-invites/redeem", {
+        method: "POST",
+        body: args,
+      });
+    case "revoke_public_invite":
+      return api(
+        `/api/v1/public-invites/${encodeURIComponent(args.publicInviteId)}/revoke`,
+        { method: "POST" },
+      );
     case "list_sessions":
       return api("/api/v1/sessions");
     case "post_board_message": {

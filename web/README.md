@@ -67,15 +67,16 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/agents/tasks` | Public | Supported tasks + signed-in task requests |
 | `/guest/[publicId]` | Public capability | One targeted, expiring guest request |
 | `/invite/[code]` | Public / signed-in accept | Targeted relationship invitation |
+| `/join/[token]` | Public / signed-in request | Signed, reusable public connection invitation |
 | `/app/**` | Clerk protected | Dashboard shell |
 | `/app/tasks` | Auth | Task history + request a new task type |
-| `/app/people` | Auth | Invite, connect, and revoke people |
+| `/app/people` | Auth | Private invites, public links/QRs, approvals, and revocation |
 | `/app/attention` | Auth | Human-only approvals |
 | `/app/activity` | Auth | Session list + plain-English messages (raw JSON toggle) |
 | `/app/settings` | Auth | Connect Google Calendar |
 | `/api/google/start` | Auth | Begin Google OAuth |
 | `/api/google/callback` | Public (OAuth) | OAuth redirect |
-| `/api/v1/*` | Bearer API key | Agent API (me, links, sessions, intents, schedule, confirms) |
+| `/api/v1/*` | Bearer API key | Agent API (me, links, public invites, sessions, intents, schedule, confirms) |
 | `/api/v1/pairings/*` | Public, short-lived | Device-style agent connection |
 | `/api/v1/guest-tasks/*` | Scoped agent | Create/read/revoke guest capabilities |
 | `/api/guest/tasks/*` | Guest capability | Read/respond to exactly one guest task |
@@ -161,7 +162,8 @@ Optional: keep the existing hub (`src/`) as a separate Render service until the 
 
 - `users` — Clerk user sync
 - `api_keys` — hashed agent secrets (revoke sets `revoked_at`; auth rejects immediately)
-- `links` — mutual peer links (`pair_link_id`, open invites, `confirm_required` / `timezone` / `allowed_hours`)
+- `links` — mutual peer links and approval-gated public connection requests
+- `public_invites` — signed reusable share links with expiry, request caps, and revocation
 - `sessions` / `session_messages` — coordination boards
 - `session_participants` — multi-party (3+) membership
 - `intent_types` / `intent_proposals` — registry (`pending` \| `live` \| `rejected`); proposals carry triage recommendation/reason

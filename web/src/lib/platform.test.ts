@@ -43,6 +43,11 @@ import {
   SCHEDULE_COUNTERPARTY_REQUIRED,
   sessionRequiresCounterparty,
 } from "./sessions";
+import {
+  publicInviteIdFromToken,
+  publicInviteTokenForId,
+  publicInviteUrlForId,
+} from "./public-invite-token";
 
 test("default paired agents cannot approve for a human", () => {
   assert.equal(DEFAULT_AGENT_SCOPES.includes("approvals:write"), false);
@@ -119,6 +124,28 @@ test("guest capabilities are random, hashed, and email-bound", () => {
   assert.equal(
     hashGuestEmail("Person@Example.com"),
     hashGuestEmail("person@example.com"),
+  );
+});
+
+test("public invite tokens are signed, tamper-evident, and URL-safe", () => {
+  process.env.PUBLIC_INVITE_SECRET =
+    "test-public-invite-secret-with-at-least-thirty-two-characters";
+  const id = "550e8400-e29b-41d4-a716-446655440000";
+  const token = publicInviteTokenForId(id);
+  assert.match(token, /^pi_[0-9a-f-]+\.[A-Za-z0-9_-]{43}$/);
+  assert.equal(publicInviteIdFromToken(token), id);
+  const replacement = token.endsWith("A") ? "B" : "A";
+  assert.equal(
+    publicInviteIdFromToken(`${token.slice(0, -1)}${replacement}`),
+    null,
+  );
+  assert.equal(
+    publicInviteIdFromToken("pi_550e8400-e29b-41d4-a716-446655440000.bad"),
+    null,
+  );
+  assert.equal(
+    publicInviteUrlForId("https://honeymatcha.io/", id),
+    `https://honeymatcha.io/join/${encodeURIComponent(token)}`,
   );
 });
 

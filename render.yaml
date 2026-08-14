@@ -18,6 +18,8 @@ services:
         sync: false
       - key: GUEST_TOKEN_PEPPER
         generateValue: true
+      - key: PUBLIC_INVITE_SECRET
+        generateValue: true
       - key: TOKEN_ENCRYPTION_KEY
         generateValue: true
       - key: OAUTH_STATE_SECRET

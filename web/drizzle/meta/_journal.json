@@ -57,6 +57,13 @@
       "when": 1786597200000,
       "tag": "0007_clear_dogfood_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786693666779,
+      "tag": "0008_loose_vulture",
+      "breakpoints": true
     }
   ]
 }
