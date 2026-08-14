@@ -92,26 +92,30 @@ export function getDiscoveryDocument(baseUrl?: string) {
         method: "GET",
         path: "/api/v1/discovery/catalog",
       },
-      set_agent_capabilities: {
-        method: "PUT",
-        path: "/api/v1/me/capabilities",
-      },
-      submit_discovery_enrollment: {
-        method: "POST",
-        path: "/api/v1/discovery/enrollments",
-      },
-      search_discovery: {
-        method: "POST",
-        path: "/api/v1/discovery/search",
-      },
-      list_discovery_interests: {
-        method: "GET",
-        path: "/api/v1/discovery/interests",
-      },
-      request_discovery_introduction: {
-        method: "POST",
-        path: "/api/v1/discovery/interests",
-      },
+      ...(discoveryEnabled
+        ? {
+            set_agent_capabilities: {
+              method: "PUT",
+              path: "/api/v1/me/capabilities",
+            },
+            submit_discovery_enrollment: {
+              method: "POST",
+              path: "/api/v1/discovery/enrollments",
+            },
+            search_discovery: {
+              method: "POST",
+              path: "/api/v1/discovery/search",
+            },
+            list_discovery_interests: {
+              method: "GET",
+              path: "/api/v1/discovery/interests",
+            },
+            request_discovery_introduction: {
+              method: "POST",
+              path: "/api/v1/discovery/interests",
+            },
+          }
+        : {}),
       cleanup_discovery_retention: {
         method: "POST",
         path: "/api/v1/discovery/cleanup",

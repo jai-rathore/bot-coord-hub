@@ -577,6 +577,46 @@ async function main() {
     .where(eq(intentTypes.slug, "dating_introduction"));
   assert.equal(datingRows.length, 0);
 
+  const withdrawalEnrollment = await submitDiscoveryEnrollment(
+    { user: moderator, kind: "user" },
+    {
+      intentSlug: "local_meetup",
+      claims: {
+        participantType: "attendee",
+        interests: ["walking"],
+        timeWindows: ["sunday morning"],
+      },
+      location: {
+        countryCode: "US",
+        region: "NY",
+        locality: "Brooklyn",
+        neighborhood: "Cobble Hill",
+        granularity: "neighborhood",
+      },
+      requestActivation: true,
+    },
+  );
+  const mutableEnv = process.env as Record<string, string | undefined>;
+  const previousDiscoveryFlag = process.env.ENABLE_DISCOVERY;
+  mutableEnv.ENABLE_DISCOVERY = "false";
+  try {
+    const pausedWhileDisabled = await decideDiscoveryEnrollment({
+      user: moderator,
+      enrollmentId: withdrawalEnrollment.id!,
+      decision: "pause",
+    });
+    assert.equal(pausedWhileDisabled.status, "paused");
+    const revokedWhileDisabled = await decideDiscoveryEnrollment({
+      user: moderator,
+      enrollmentId: withdrawalEnrollment.id!,
+      decision: "revoke",
+    });
+    assert.equal(revokedWhileDisabled.status, "revoked");
+  } finally {
+    if (previousDiscoveryFlag === undefined) delete mutableEnv.ENABLE_DISCOVERY;
+    else mutableEnv.ENABLE_DISCOVERY = previousDiscoveryFlag;
+  }
+
   const interestRows = await db
     .select()
     .from(discoveryInterests)

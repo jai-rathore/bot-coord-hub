@@ -630,14 +630,17 @@ export async function listIntents(query?: string) {
 
 export async function listDiscoveryCapabilities(auth: AgentAuth) {
   assertAgentScope(auth, "intents:read");
+  const enabled = discoveryFeatureEnabled();
   return {
     ok: true,
     intents: await listDiscoveryCatalog(auth.user.id),
     agentAccess: {
-      canSearch: hasAgentScope(auth, "discovery:read"),
-      canEnrollOrRequest: hasAgentScope(auth, "discovery:write"),
+      canSearch: enabled && hasAgentScope(auth, "discovery:read"),
+      canEnrollOrRequest: enabled && hasAgentScope(auth, "discovery:write"),
       instructions:
-        hasAgentScope(auth, "discovery:read") &&
+        !enabled
+          ? "Secure discovery is currently disabled."
+          : hasAgentScope(auth, "discovery:read") &&
         hasAgentScope(auth, "discovery:write")
           ? "This agent connection can use discovery after declaring supported intent versions."
           : "This existing agent connection predates discovery scopes. Ask the human to re-pair the agent before using discovery.",
@@ -660,6 +663,7 @@ export async function setDiscoveryCapabilityManifest(
   },
 ) {
   assertAgentScope(auth, "discovery:write");
+  assertDiscoveryEnabled();
   return {
     ok: true,
     capabilityManifest: await upsertAgentCapabilityManifest({

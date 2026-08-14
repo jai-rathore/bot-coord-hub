@@ -237,8 +237,11 @@ function assertSafeSharedContent(
   }
 }
 
-async function getDiscoveryIntent(slug: string) {
-  if (!discoveryFeatureEnabled()) {
+async function getDiscoveryIntent(
+  slug: string,
+  options: { allowDisabled?: boolean } = {},
+) {
+  if (!options.allowDisabled && !discoveryFeatureEnabled()) {
     throw new AgentApiError(503, "Discovery is temporarily unavailable", {
       code: "discovery_disabled",
     });
@@ -261,7 +264,10 @@ async function getDiscoveryIntent(slug: string) {
       code: "invalid_intent_definition",
     });
   }
-  if (!row.discoveryEnabled || !definition.discovery.enabled) {
+  if (
+    !options.allowDisabled &&
+    (!row.discoveryEnabled || !definition.discovery.enabled)
+  ) {
     throw new AgentApiError(409, "This intent is not enabled for discovery", {
       code: "discovery_disabled",
     });
@@ -940,7 +946,9 @@ export async function decideDiscoveryEnrollment(opts: {
     )
     .limit(1);
   if (!enrollment) throw new AgentApiError(404, "Enrollment not found");
-  const { definition } = await getDiscoveryIntent(enrollment.intentSlug);
+  const { definition } = await getDiscoveryIntent(enrollment.intentSlug, {
+    allowDisabled: opts.decision === "pause" || opts.decision === "revoke",
+  });
   const [location] = enrollment.locationId
     ? await db
         .select()

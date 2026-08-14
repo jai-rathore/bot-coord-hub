@@ -6,6 +6,7 @@ import {
   listUserDiscoveryAudit,
 } from "@/lib/discovery-service";
 import { ensureCurrentUser } from "@/lib/users";
+import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,17 @@ export default async function DiscoveryPage() {
   const user = await ensureCurrentUser();
   if (!user) {
     return <p className="text-danger">Unable to resolve your account.</p>;
+  }
+  if (!discoveryFeatureEnabled()) {
+    return (
+      <div>
+        <PageHeading
+          eyebrow="Private matching"
+          title="Discovery is not enabled yet"
+          description="Your existing coordination tools remain available. HoneyMatcha will show enrollment and introduction controls here when secure discovery is enabled."
+        />
+      </div>
+    );
   }
   const [intents, interests, audit] = await Promise.all([
     listDiscoveryCatalog(user.id, { includeOwnerReview: true }),
