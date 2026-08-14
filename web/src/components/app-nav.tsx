@@ -72,8 +72,17 @@ function NavIcon({ href }: { href: string }) {
   );
 }
 
-export function AppNav({ attentionCount = 0 }: { attentionCount?: number }) {
+export function AppNav({
+  attentionCount = 0,
+  discoveryEnabled = false,
+}: {
+  attentionCount?: number;
+  discoveryEnabled?: boolean;
+}) {
   const pathname = usePathname();
+  const visibleNav = discoveryEnabled
+    ? NAV
+    : NAV.filter((item) => item.href !== "/app/discovery");
 
   return (
     <header className="sticky top-0 z-40 border-b border-line/80 bg-[rgba(247,249,246,0.82)] px-4 backdrop-blur-xl sm:px-6">
@@ -92,7 +101,7 @@ export function AppNav({ attentionCount = 0 }: { attentionCount?: number }) {
           aria-label="HoneyMatcha"
           className="mt-3 flex snap-x gap-1 overflow-x-auto pb-1 text-sm [scrollbar-width:none]"
         >
-          {NAV.map((item) => {
+          {visibleNav.map((item) => {
             const active = item.exact
               ? pathname === item.href
               : pathname.startsWith(item.href);

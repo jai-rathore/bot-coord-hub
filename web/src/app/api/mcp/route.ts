@@ -2,7 +2,7 @@ import { PRODUCT_VERSION } from "@/lib/discovery";
 import { requireAgent } from "@/lib/http";
 import {
   dispatchMcpTool,
-  MCP_TOOLS,
+  getMcpTools,
   mcpToolError,
   mcpToolResult,
 } from "@/lib/mcp-tools";
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
       case "ping":
         return rpcResult(id, {});
       case "tools/list":
-        return rpcResult(id, { tools: MCP_TOOLS });
+        return rpcResult(id, { tools: getMcpTools() });
       case "tools/call": {
         const params = body.params ?? {};
         const name = String(params.name ?? "");
@@ -115,8 +115,8 @@ export async function POST(request: Request) {
         return rpcError(id, -32601, `Method not found: ${method}`);
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal error";
-    return rpcError(id, -32603, message);
+    console.error("[mcp] unexpected RPC error", err);
+    return rpcError(id, -32603, "Internal error");
   }
 }
 
@@ -130,7 +130,7 @@ export async function GET(request: Request) {
     server: "honeymatcha",
     version: PRODUCT_VERSION,
     protocolVersion: "2024-11-05",
-    tools: MCP_TOOLS,
+    tools: getMcpTools(),
     usage: {
       jsonrpc: 'POST { "jsonrpc":"2.0","id":1,"method":"tools/list" }',
       call: 'POST { "jsonrpc":"2.0","id":2,"method":"tools/call","params":{ "name":"whoami","arguments":{} } }',

@@ -62,9 +62,19 @@ export function isAgentAuth(value: AgentAuth | Response): value is AgentAuth {
 
 export function jsonFromAgentError(err: unknown) {
   if (err instanceof AgentApiError) {
+    const retryAfterSec =
+      typeof err.details?.retryAfterSec === "number"
+        ? err.details.retryAfterSec
+        : null;
     return Response.json(
       { error: err.message, ...(err.details ?? {}) },
-      { status: err.status },
+      {
+        status: err.status,
+        headers:
+          retryAfterSec == null
+            ? undefined
+            : { "Retry-After": String(retryAfterSec) },
+      },
     );
   }
   console.error("[http] unexpected agent API error", err);

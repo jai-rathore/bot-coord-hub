@@ -89,6 +89,19 @@ async function main() {
       : "disabled (safe deployment default)",
   });
 
+  const safetyAdminsConfigured = Boolean(
+    process.env.INTENT_ADMIN_EMAILS?.trim(),
+  );
+  checks.push({
+    name: "Discovery safety admins",
+    ok: !discoveryFeatureEnabled() || safetyAdminsConfigured,
+    detail: safetyAdminsConfigured
+      ? "configured"
+      : discoveryFeatureEnabled()
+        ? "INTENT_ADMIN_EMAILS is required before enabling discovery"
+        : "not required while discovery is disabled",
+  });
+
   const googleEnabled =
     process.env.GOOGLE_CALENDAR_ENABLED === "true" ||
     process.env.GOOGLE_CALENDAR_ENABLED === "1";
@@ -172,17 +185,22 @@ async function main() {
         (intent) => intent.slug === "schedule_meeting",
       );
       const hiringIntent = seededIntents.find(
-        (intent) =>
-          intent.slug === "hiring_compatibility" && intent.discoveryEnabled,
+        (intent) => intent.slug === "hiring_compatibility",
       );
       const meetupIntent = seededIntents.find(
-        (intent) => intent.slug === "local_meetup" && intent.discoveryEnabled,
+        (intent) => intent.slug === "local_meetup",
       );
+      const discoverySeedMatchesFlag =
+        Boolean(hiringIntent && meetupIntent) &&
+        hiringIntent!.discoveryEnabled === discoveryFeatureEnabled() &&
+        meetupIntent!.discoveryEnabled === discoveryFeatureEnabled();
       checks.push({
         name: "Supported task seed",
-        ok: Boolean(scheduleIntent && hiringIntent && meetupIntent),
-        detail: scheduleIntent && hiringIntent && meetupIntent
-          ? "schedule_meeting, hiring discovery, and local meetup discovery are live"
+        ok: Boolean(scheduleIntent && discoverySeedMatchesFlag),
+        detail: scheduleIntent && discoverySeedMatchesFlag
+          ? discoveryFeatureEnabled()
+            ? "schedule_meeting is live; hiring and meetup discovery are enabled"
+            : "schedule_meeting is live; discovery seeds are safely disabled"
           : "run npm run db:seed",
       });
     } catch (error) {

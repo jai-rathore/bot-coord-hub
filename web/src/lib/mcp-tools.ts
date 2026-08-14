@@ -6,6 +6,7 @@
 import { SCHEDULE_MEETING_TOOL_DESCRIPTION } from "@/lib/schedule-copy";
 import type { AgentAuth } from "@/lib/agent-auth";
 import { assertAgentScope } from "@/lib/scopes";
+import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import {
   acceptInvite,
   ackInbox,
@@ -467,6 +468,20 @@ export const MCP_TOOLS: McpToolDef[] = [
     },
   },
 ];
+
+const DISCOVERY_FLAGGED_TOOLS = new Set([
+  "set_agent_capabilities",
+  "submit_discovery_enrollment",
+  "search_discovery",
+  "request_discovery_introduction",
+  "list_discovery_interests",
+]);
+
+export function getMcpTools(): McpToolDef[] {
+  return discoveryFeatureEnabled()
+    ? MCP_TOOLS
+    : MCP_TOOLS.filter((tool) => !DISCOVERY_FLAGGED_TOOLS.has(tool.name));
+}
 
 function baseUrlFromRequest(request?: Request): string | undefined {
   if (!request) return undefined;

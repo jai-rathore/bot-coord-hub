@@ -50,6 +50,7 @@ import { decryptJson, encryptJson } from "@/lib/secret-crypto";
 import { boundedText } from "@/lib/validation";
 
 const DISCOVERY_TOKEN_PREFIX = "dc_";
+const PAIR_HISTORY_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
 const AGENT_INTEREST_RECEIPT =
   "The request was accepted for privacy-preserving processing. Direct your human to /app/discovery; do not infer candidate identity, prior interest, or whether this handle was previously seen.";
 const DISCOVERY_AUDIT_ACTIONS = [
@@ -1144,6 +1145,29 @@ function hashDiscoveryToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+function publicParticipantTypesCompatible(
+  intentSlug: string,
+  left: unknown,
+  right: unknown,
+) {
+  if (intentSlug === "hiring_compatibility") {
+    return (
+      ["candidate", "employer"].includes(String(left)) &&
+      ["candidate", "employer"].includes(String(right)) &&
+      left !== right
+    );
+  }
+  if (intentSlug === "local_meetup") {
+    const hosts = new Set(["host", "both"]);
+    const attendees = new Set(["attendee", "both"]);
+    return (
+      (hosts.has(String(left)) && attendees.has(String(right))) ||
+      (hosts.has(String(right)) && attendees.has(String(left)))
+    );
+  }
+  return true;
+}
+
 function createDiscoveryToken() {
   return `${DISCOVERY_TOKEN_PREFIX}${randomBytes(24).toString("base64url")}`;
 }
@@ -1224,6 +1248,10 @@ export async function searchDiscovery(opts: {
     .where(
       and(
         eq(discoveryPairHistory.intentSlug, opts.intentSlug),
+        gte(
+          discoveryPairHistory.updatedAt,
+          new Date(Date.now() - PAIR_HISTORY_RETENTION_MS),
+        ),
         or(
           eq(discoveryPairHistory.userAId, opts.actor.user.id),
           eq(discoveryPairHistory.userBId, opts.actor.user.id),
@@ -1297,6 +1325,15 @@ export async function searchDiscovery(opts: {
       ...(candidate.enrollment.publicClaims as Record<string, unknown>),
       ...decryptJson(candidate.enrollment.privateClaimsEncrypted),
     };
+    if (
+      !publicParticipantTypesCompatible(
+        opts.intentSlug,
+        seekerClaims.participantType,
+        candidateClaims.participantType,
+      )
+    ) {
+      continue;
+    }
     const compatibility = handler({
       seekerClaims,
       candidateClaims,
@@ -1445,6 +1482,19 @@ export async function requestDiscoveryIntroduction(opts: {
     if (block) {
       throw new AgentApiError(404, "Candidate is no longer available");
     }
+    if (idempotencyKey) {
+      const [replay] = await tx
+        .select()
+        .from(discoveryInterests)
+        .where(
+          and(
+            eq(discoveryInterests.requesterUserId, opts.actor.user.id),
+            eq(discoveryInterests.idempotencyKey, idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (replay) return { interest: replay, alreadyExisted: true };
+    }
     const [priorPair] = await tx
       .select({ id: discoveryPairHistory.id })
       .from(discoveryPairHistory)
@@ -1452,18 +1502,34 @@ export async function requestDiscoveryIntroduction(opts: {
         and(
           eq(discoveryPairHistory.intentSlug, handle.intentSlug),
           eq(discoveryPairHistory.pairKey, pairKey),
+          gte(
+            discoveryPairHistory.updatedAt,
+            new Date(Date.now() - PAIR_HISTORY_RETENTION_MS),
+          ),
         ),
       )
       .limit(1);
     if (priorPair) {
       throw new AgentApiError(404, "Candidate is no longer available");
     }
+    const [existing] = await tx
+      .select()
+      .from(discoveryInterests)
+      .where(
+        and(
+          eq(discoveryInterests.intentSlug, handle.intentSlug),
+          eq(discoveryInterests.pairKey, pairKey),
+        ),
+      )
+      .limit(1);
+    if (existing) return { interest: existing, alreadyExisted: true };
     const recentInbound = await tx
       .select({ id: discoveryInterests.id })
       .from(discoveryInterests)
       .where(
         and(
           eq(discoveryInterests.recipientUserId, handle.candidateUserId),
+          eq(discoveryInterests.status, "pending"),
           gte(
             discoveryInterests.createdAt,
             new Date(Date.now() - 24 * 60 * 60 * 1000),
@@ -1478,30 +1544,6 @@ export async function requestDiscoveryIntroduction(opts: {
         { code: "recipient_privacy_budget_exhausted" },
       );
     }
-    if (idempotencyKey) {
-      const [replay] = await tx
-        .select()
-        .from(discoveryInterests)
-        .where(
-          and(
-            eq(discoveryInterests.requesterUserId, opts.actor.user.id),
-            eq(discoveryInterests.idempotencyKey, idempotencyKey),
-          ),
-        )
-        .limit(1);
-      if (replay) return { interest: replay, alreadyExisted: true };
-    }
-    const [existing] = await tx
-      .select()
-      .from(discoveryInterests)
-      .where(
-        and(
-          eq(discoveryInterests.intentSlug, handle.intentSlug),
-          eq(discoveryInterests.pairKey, pairKey),
-        ),
-      )
-      .limit(1);
-    if (existing) return { interest: existing, alreadyExisted: true };
     const [created] = await tx
       .insert(discoveryInterests)
       .values({
@@ -2603,6 +2645,10 @@ export async function cleanupExpiredDiscoveryData(now = new Date()) {
       .delete(safetyReports)
       .where(lt(safetyReports.createdAt, retentionCutoff))
       .returning({ id: safetyReports.id });
+    const expiredPairHistory = await tx
+      .delete(discoveryPairHistory)
+      .where(lt(discoveryPairHistory.updatedAt, retentionCutoff))
+      .returning({ id: discoveryPairHistory.id });
     const orphanLocations = await tx
       .delete(userLocations)
       .where(
@@ -2618,12 +2664,13 @@ export async function cleanupExpiredDiscoveryData(now = new Date()) {
       deletedInterests: interestIds.length,
       deletedSessions: sessionIds.length,
       expiredReports: expiredReports.length,
+      expiredPairHistory: expiredPairHistory.length,
       deletedOrphanLocations: orphanLocations.length,
     };
   });
   return {
     ...result,
     retentionPolicy:
-      "Expired purpose enrollments and all derived introductions, disclosures, inbox copies, and meetup sessions are deleted. Safety reports are retained for 365 days.",
+      "Expired purpose enrollments and their introductions, disclosures, inbox copies, and sessions are deleted. Safety reports and minimal anti-probing pair outcomes are retained for up to 365 days.",
   };
 }

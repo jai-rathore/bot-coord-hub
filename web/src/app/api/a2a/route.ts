@@ -166,10 +166,7 @@ export async function POST(request: Request) {
         ...error.details,
       });
     }
-    return rpcError(
-      body.id,
-      -32603,
-      error instanceof Error ? error.message : "Internal error",
-    );
+    console.error("[a2a] unexpected RPC error", error);
+    return rpcError(body.id, -32603, "Internal error");
   }
 }

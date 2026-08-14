@@ -100,7 +100,7 @@ export default async function HomePage() {
                   id="discovery-title"
                   className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.04em] text-matcha-deep sm:text-4xl"
                 >
-                  Let your agent find the right people.
+                  Let your agent find potential people to meet.
                 </h2>
                 <p className="mt-4 text-base leading-7 text-muted">
                   Your agent can explain supported discovery tasks, gather only

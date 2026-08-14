@@ -76,6 +76,7 @@ import {
   type CoarseLocationInput,
 } from "@/lib/discovery-service";
 import { distributedRateLimit } from "@/lib/distributed-rate-limit";
+import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
 import { AgentApiError } from "@/lib/agent-errors";
 export { AgentApiError } from "@/lib/agent-errors";
@@ -85,25 +86,51 @@ async function assertDiscoveryRate(
   action: string,
   limit: number,
 ) {
-  const result = await distributedRateLimit(
-    `${action}:${auth.user.id}`,
-    limit,
-  );
+  let result: Awaited<ReturnType<typeof distributedRateLimit>>;
+  try {
+    result = await distributedRateLimit(
+      `${action}:${auth.user.id}`,
+      limit,
+    );
+  } catch {
+    throw new AgentApiError(
+      503,
+      "Discovery is temporarily unavailable",
+      { code: "rate_limiter_unavailable", retryAfterSec: 5 },
+    );
+  }
   if (!result.ok) {
     throw new AgentApiError(429, "Discovery rate limit exceeded", {
       code: "rate_limited",
       retryAfterSec: result.retryAfterSec,
     });
   }
-  const daily = await distributedRateLimit(
-    `${action}:daily:${auth.user.id}`,
-    limit * 20,
-    24 * 60 * 60 * 1000,
-  );
+  let daily: Awaited<ReturnType<typeof distributedRateLimit>>;
+  try {
+    daily = await distributedRateLimit(
+      `${action}:daily:${auth.user.id}`,
+      limit * 20,
+      24 * 60 * 60 * 1000,
+    );
+  } catch {
+    throw new AgentApiError(
+      503,
+      "Discovery is temporarily unavailable",
+      { code: "rate_limiter_unavailable", retryAfterSec: 5 },
+    );
+  }
   if (!daily.ok) {
     throw new AgentApiError(429, "Daily discovery privacy budget exceeded", {
       code: "privacy_budget_exceeded",
       retryAfterSec: daily.retryAfterSec,
+    });
+  }
+}
+
+function assertDiscoveryEnabled() {
+  if (!discoveryFeatureEnabled()) {
+    throw new AgentApiError(503, "Discovery is temporarily unavailable", {
+      code: "discovery_disabled",
     });
   }
 }
@@ -655,6 +682,7 @@ export async function submitDiscoveryProfile(
   },
 ) {
   assertAgentScope(auth, "discovery:write");
+  assertDiscoveryEnabled();
   await assertDiscoveryRate(auth, "enroll", 20);
   return {
     ok: true,
@@ -674,6 +702,7 @@ export async function searchDiscoveryCandidates(
   body: { intentSlug?: unknown; limit?: unknown },
 ) {
   assertAgentScope(auth, "discovery:read");
+  assertDiscoveryEnabled();
   await assertDiscoveryRate(auth, "search", 15);
   const intentSlug =
     typeof body.intentSlug === "string" ? body.intentSlug.trim() : "";
@@ -697,6 +726,7 @@ export async function requestDiscoveryInterest(
   body: { candidateHandle?: unknown; idempotencyKey?: unknown },
 ) {
   assertAgentScope(auth, "discovery:write");
+  assertDiscoveryEnabled();
   await assertDiscoveryRate(auth, "interest", 10);
   const candidateHandle =
     typeof body.candidateHandle === "string"

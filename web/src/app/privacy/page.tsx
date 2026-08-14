@@ -50,8 +50,10 @@ export default function PrivacyPage() {
               the fields you approved for that disclosure stage are released.
               Declining an introduction does not reveal your reasons. Purpose
               data and derived introductions are deleted when their shortest
-              approved retention period expires; safety reports are retained
-              for up to one year.
+              approved retention period expires. Safety reports and a minimal
+              record that two accounts previously declined, mismatched,
+              connected, or blocked are retained for up to one year to prevent
+              repeated private-constraint probing and abuse.
             </p>
           </section>
           <section>

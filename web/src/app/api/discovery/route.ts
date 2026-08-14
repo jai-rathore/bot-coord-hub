@@ -69,7 +69,19 @@ export async function POST(request: Request) {
       block?: boolean;
     };
     if (body.action === "submit_enrollment") {
-      const rate = await distributedRateLimit(`human:${user.id}`, 30);
+      let rate: Awaited<ReturnType<typeof distributedRateLimit>>;
+      try {
+        rate = await distributedRateLimit(`human:${user.id}`, 30);
+      } catch {
+        return Response.json(
+          {
+            error: "Discovery is temporarily unavailable",
+            code: "rate_limiter_unavailable",
+            retryAfterSec: 5,
+          },
+          { status: 503, headers: { "Retry-After": "5" } },
+        );
+      }
       if (!rate.ok) {
         return Response.json(
           { error: "Rate limit exceeded", retryAfterSec: rate.retryAfterSec },

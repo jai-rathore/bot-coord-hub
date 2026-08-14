@@ -239,6 +239,11 @@ export function validateIntentDefinition(value: unknown): IntentDefinition {
         `discovery.projectionFields may only include discoverable fields: ${key}`,
       );
     }
+    if (field.type !== "enum") {
+      throw new Error(
+        `discovery.projectionFields may only include enum fields: ${key}`,
+      );
+    }
   }
   for (const key of disclosureFields) {
     const field = fields.find((item) => item.key === key);
