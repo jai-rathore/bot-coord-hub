@@ -1429,6 +1429,11 @@ export async function requestDiscoveryIntroduction(opts: {
   candidateHandle: string;
   idempotencyKey?: string;
 }) {
+  if (!discoveryFeatureEnabled()) {
+    throw new AgentApiError(503, "Discovery is temporarily unavailable", {
+      code: "discovery_disabled",
+    });
+  }
   await assertSafetyActive(opts.actor.user.id);
   if (!/^dc_[A-Za-z0-9_-]{32,}$/.test(opts.candidateHandle)) {
     throw new AgentApiError(400, "Invalid candidate handle");
