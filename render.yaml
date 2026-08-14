@@ -5,6 +5,7 @@ services:
     plan: starter
     rootDir: web
     buildCommand: npm install && npm run build
+    preDeployCommand: npm run db:migrate && npm run db:seed && PREFLIGHT_PRODUCTION=true npm run db:preflight
     startCommand: npm run start
     healthCheckPath: /api/v1/health
     envVars:
@@ -38,7 +39,18 @@ services:
         sync: false
       - key: TRIAGE_SECRET
         generateValue: true
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: honeymatcha-rate-limit
+          property: connectionString
       - key: NEXT_PUBLIC_CLERK_SIGN_IN_URL
         value: /sign-in
       - key: NEXT_PUBLIC_CLERK_SIGN_UP_URL
         value: /sign-up
+  - type: keyvalue
+    name: honeymatcha-rate-limit
+    plan: starter
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []

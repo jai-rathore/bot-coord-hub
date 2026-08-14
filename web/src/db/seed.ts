@@ -2,6 +2,11 @@ import { config } from "dotenv";
 import { eq } from "drizzle-orm";
 import { getDb } from "./index";
 import { intentTypes } from "./schema";
+import {
+  HIRING_DISCOVERY_DEFINITION,
+  LOCAL_MEETUP_DEFINITION,
+  SCHEDULE_MEETING_DEFINITION,
+} from "../lib/intent-definitions";
 
 config({ path: ".env.local" });
 config();
@@ -24,6 +29,10 @@ async function seed() {
       status: "live",
       category: "professional_organizing",
       requiredScopes: ["tasks:write"],
+      definitionVersion: SCHEDULE_MEETING_DEFINITION.version,
+      definition: SCHEDULE_MEETING_DEFINITION,
+      discoveryEnabled: SCHEDULE_MEETING_DEFINITION.discovery.enabled,
+      handler: SCHEDULE_MEETING_DEFINITION.discovery.handler,
       schema: {
         durationMinutes: "number",
         windowStart: "string (ISO datetime)",
@@ -43,6 +52,10 @@ async function seed() {
         status: "live",
         category: "professional_organizing",
         requiredScopes: ["tasks:write"],
+        definitionVersion: SCHEDULE_MEETING_DEFINITION.version,
+        definition: SCHEDULE_MEETING_DEFINITION,
+        discoveryEnabled: SCHEDULE_MEETING_DEFINITION.discovery.enabled,
+        handler: SCHEDULE_MEETING_DEFINITION.discovery.handler,
         updatedAt: new Date(),
       })
       .where(eq(intentTypes.id, existing[0].id));
@@ -77,6 +90,10 @@ async function seed() {
         status: "live",
         category: "hiring",
         requiredScopes: ["guest_tasks:write"],
+        definitionVersion: HIRING_DISCOVERY_DEFINITION.version,
+        definition: HIRING_DISCOVERY_DEFINITION,
+        discoveryEnabled: HIRING_DISCOVERY_DEFINITION.discovery.enabled,
+        handler: HIRING_DISCOVERY_DEFINITION.discovery.handler,
         schema: hiringSchema,
         updatedAt: new Date(),
       })
@@ -90,9 +107,63 @@ async function seed() {
       status: "live",
       category: "hiring",
       requiredScopes: ["guest_tasks:write"],
+      definitionVersion: HIRING_DISCOVERY_DEFINITION.version,
+      definition: HIRING_DISCOVERY_DEFINITION,
+      discoveryEnabled: HIRING_DISCOVERY_DEFINITION.discovery.enabled,
+      handler: HIRING_DISCOVERY_DEFINITION.discovery.handler,
       schema: hiringSchema,
     });
     console.log("Seeded intent_types: hiring_compatibility (live)");
+  }
+
+  const meetupDescription =
+    "Privately discover hosted meetups by interest and coarse location; identities and venues are disclosed only after approval.";
+  const [existingMeetup] = await db
+    .select()
+    .from(intentTypes)
+    .where(eq(intentTypes.slug, "local_meetup"))
+    .limit(1);
+  if (existingMeetup) {
+    await db
+      .update(intentTypes)
+      .set({
+        name: "Discover a local meetup",
+        description: meetupDescription,
+        status: "live",
+        category: "social_coordination",
+        requiredScopes: ["discovery:read", "discovery:write"],
+        definitionVersion: LOCAL_MEETUP_DEFINITION.version,
+        definition: LOCAL_MEETUP_DEFINITION,
+        discoveryEnabled: LOCAL_MEETUP_DEFINITION.discovery.enabled,
+        handler: LOCAL_MEETUP_DEFINITION.discovery.handler,
+        schema: {
+          enrollment: "purpose-bound",
+          location: "country/region/city/neighborhood",
+          exactVenueDisclosure: "after_mutual_approval",
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(intentTypes.id, existingMeetup.id));
+    console.log("Updated intent_types: local_meetup");
+  } else {
+    await db.insert(intentTypes).values({
+      slug: "local_meetup",
+      name: "Discover a local meetup",
+      description: meetupDescription,
+      status: "live",
+      category: "social_coordination",
+      requiredScopes: ["discovery:read", "discovery:write"],
+      definitionVersion: LOCAL_MEETUP_DEFINITION.version,
+      definition: LOCAL_MEETUP_DEFINITION,
+      discoveryEnabled: LOCAL_MEETUP_DEFINITION.discovery.enabled,
+      handler: LOCAL_MEETUP_DEFINITION.discovery.handler,
+      schema: {
+        enrollment: "purpose-bound",
+        location: "country/region/city/neighborhood",
+        exactVenueDisclosure: "after_mutual_approval",
+      },
+    });
+    console.log("Seeded intent_types: local_meetup (live)");
   }
 
   process.exit(0);

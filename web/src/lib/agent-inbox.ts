@@ -228,6 +228,33 @@ export async function notifyPeerAgents(opts: {
   return results;
 }
 
+export async function deliverDiscoveryInbox(opts: {
+  userId: string;
+  kind: string;
+  summary: string;
+  body: Record<string, unknown>;
+  sessionId?: string | null;
+}): Promise<{ inboxId: string; callback: "delivered" | "failed" | "none" }> {
+  const [created] = await getDb()
+    .insert(agentInbox)
+    .values({
+      userId: opts.userId,
+      sessionId: opts.sessionId ?? null,
+      kind: opts.kind,
+      summary: opts.summary,
+      body: opts.body,
+    })
+    .returning();
+  const callback = await postAgentCallbacks({
+    userId: opts.userId,
+    inboxId: created.id,
+    sessionId: opts.sessionId ?? null,
+    kind: opts.kind,
+    summary: opts.summary,
+  });
+  return { inboxId: created.id, callback };
+}
+
 async function deliverToUserAgent(opts: {
   userId: string;
   email: string;
@@ -303,7 +330,7 @@ async function deliverToUserAgent(opts: {
 async function postAgentCallbacks(opts: {
   userId: string;
   inboxId: string;
-  sessionId: string;
+  sessionId: string | null;
   kind: string;
   summary: string;
 }): Promise<"delivered" | "failed" | "none"> {

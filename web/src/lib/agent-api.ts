@@ -64,9 +64,40 @@ import {
   redeemPublicInvite as redeemShareablePublicInvite,
   revokePublicInvite as revokeShareablePublicInvite,
 } from "@/lib/public-invites";
+import {
+  blockDiscoveryParticipant,
+  getAgentCapabilityManifest,
+  listDiscoveryCatalog,
+  listDiscoveryInterests,
+  reportDiscoveryParticipant,
+  requestDiscoveryIntroduction,
+  searchDiscovery,
+  submitDiscoveryEnrollment,
+  upsertAgentCapabilityManifest,
+  decideDiscoveryInterest,
+  type CoarseLocationInput,
+} from "@/lib/discovery-service";
+import { distributedRateLimit } from "@/lib/distributed-rate-limit";
 
 import { AgentApiError } from "@/lib/agent-errors";
 export { AgentApiError } from "@/lib/agent-errors";
+
+async function assertDiscoveryRate(
+  auth: AgentAuth,
+  action: string,
+  limit: number,
+) {
+  const result = await distributedRateLimit(
+    `${action}:${auth.user.id}:${auth.apiKey.id}`,
+    limit,
+  );
+  if (!result.ok) {
+    throw new AgentApiError(429, "Discovery rate limit exceeded", {
+      code: "rate_limited",
+      retryAfterSec: result.retryAfterSec,
+    });
+  }
+}
 
 function rethrowAsAgentError(err: unknown): never {
   if (err instanceof AgentApiError) throw err;
@@ -94,6 +125,7 @@ export async function whoami(auth: AgentAuth) {
     inbox = [];
   }
   const pendingInbox = inbox.length;
+  const capabilityManifest = await getAgentCapabilityManifest(auth.apiKey.id);
   return {
     ok: true,
     user: {
@@ -108,6 +140,7 @@ export async function whoami(auth: AgentAuth) {
       scopes: auth.apiKey.scopes,
       expiresAt: auth.apiKey.expiresAt,
       lastUsedAt: auth.apiKey.lastUsedAt,
+      capabilityManifest,
     },
     inbox: {
       pending: pendingInbox,
@@ -545,6 +578,206 @@ export async function listIntents(query?: string) {
     (i) => i.status === "live",
   );
   return { ok: true, intents };
+}
+
+export async function listDiscoveryCapabilities(auth: AgentAuth) {
+  assertAgentScope(auth, "discovery:read");
+  return {
+    ok: true,
+    intents: await listDiscoveryCatalog(auth.user.id),
+    trustModel: {
+      discoverableDoesNotMeanIdentifiable: true,
+      rawPrivateClaimsSharedBeforeIntroduction: false,
+      mutualHumanApprovalRequired: true,
+      exactLocationShared: false,
+    },
+  };
+}
+
+export async function setDiscoveryCapabilityManifest(
+  auth: AgentAuth,
+  body: {
+    supportedIntents?: unknown;
+    platforms?: unknown;
+    metadata?: unknown;
+  },
+) {
+  assertAgentScope(auth, "profile:read");
+  return {
+    ok: true,
+    capabilityManifest: await upsertAgentCapabilityManifest({
+      apiKeyId: auth.apiKey.id,
+      supportedIntents: body.supportedIntents,
+      platforms: body.platforms,
+      metadata: body.metadata,
+    }),
+  };
+}
+
+export async function submitDiscoveryProfile(
+  auth: AgentAuth,
+  body: {
+    intentSlug?: unknown;
+    claims?: unknown;
+    provenance?: unknown;
+    location?: CoarseLocationInput | null;
+    requestActivation?: unknown;
+  },
+) {
+  assertAgentScope(auth, "discovery:write");
+  await assertDiscoveryRate(auth, "enroll", 20);
+  return {
+    ok: true,
+    enrollment: await submitDiscoveryEnrollment(
+      {
+        user: auth.user,
+        kind: "agent",
+        apiKeyId: auth.apiKey.id,
+      },
+      body,
+    ),
+  };
+}
+
+export async function searchDiscoveryCandidates(
+  auth: AgentAuth,
+  body: { intentSlug?: unknown; limit?: unknown },
+) {
+  assertAgentScope(auth, "discovery:read");
+  await assertDiscoveryRate(auth, "search", 15);
+  const intentSlug =
+    typeof body.intentSlug === "string" ? body.intentSlug.trim() : "";
+  if (!intentSlug) throw new AgentApiError(400, "intentSlug is required");
+  return {
+    ok: true,
+    ...(await searchDiscovery({
+      actor: {
+        user: auth.user,
+        kind: "agent",
+        apiKeyId: auth.apiKey.id,
+      },
+      intentSlug,
+      limit: typeof body.limit === "number" ? body.limit : undefined,
+    })),
+  };
+}
+
+export async function requestDiscoveryInterest(
+  auth: AgentAuth,
+  body: { candidateHandle?: unknown; idempotencyKey?: unknown },
+) {
+  assertAgentScope(auth, "discovery:write");
+  await assertDiscoveryRate(auth, "interest", 10);
+  const candidateHandle =
+    typeof body.candidateHandle === "string"
+      ? body.candidateHandle.trim()
+      : "";
+  if (!candidateHandle) {
+    throw new AgentApiError(400, "candidateHandle is required");
+  }
+  return {
+    ok: true,
+    ...(await requestDiscoveryIntroduction({
+      actor: {
+        user: auth.user,
+        kind: "agent",
+        apiKeyId: auth.apiKey.id,
+      },
+      candidateHandle,
+      idempotencyKey:
+        typeof body.idempotencyKey === "string"
+          ? body.idempotencyKey
+          : undefined,
+    })),
+  };
+}
+
+export async function listDiscoveryRequests(auth: AgentAuth) {
+  assertAgentScope(auth, "discovery:read");
+  return {
+    ok: true,
+    interests: await listDiscoveryInterests(auth.user.id),
+  };
+}
+
+export async function respondDiscoveryInterest(
+  auth: AgentAuth,
+  body: { interestId?: unknown; decision?: unknown },
+) {
+  assertAgentScope(auth, "approvals:write");
+  await assertDiscoveryRate(auth, "interest-decision", 20);
+  const interestId =
+    typeof body.interestId === "string" ? body.interestId.trim() : "";
+  const decision =
+    body.decision === "accept" || body.decision === "decline"
+      ? body.decision
+      : null;
+  if (!interestId || !decision) {
+    throw new AgentApiError(
+      400,
+      "interestId and decision (accept or decline) are required",
+    );
+  }
+  return {
+    ok: true,
+    ...(await decideDiscoveryInterest({
+      user: auth.user,
+      interestId,
+      decision,
+    })),
+  };
+}
+
+export async function blockDiscoveryMatch(
+  auth: AgentAuth,
+  body: { interestId?: unknown; reasonCode?: unknown },
+) {
+  assertAgentScope(auth, "discovery:write");
+  const interestId =
+    typeof body.interestId === "string" ? body.interestId.trim() : "";
+  if (!interestId) throw new AgentApiError(400, "interestId is required");
+  return {
+    ok: true,
+    ...(await blockDiscoveryParticipant({
+      actor: {
+        user: auth.user,
+        kind: "agent",
+        apiKeyId: auth.apiKey.id,
+      },
+      interestId,
+      reasonCode: body.reasonCode,
+    })),
+  };
+}
+
+export async function reportDiscoveryMatch(
+  auth: AgentAuth,
+  body: {
+    interestId?: unknown;
+    reasonCode?: unknown;
+    details?: unknown;
+    block?: boolean;
+  },
+) {
+  assertAgentScope(auth, "discovery:write");
+  await assertDiscoveryRate(auth, "report", 10);
+  const interestId =
+    typeof body.interestId === "string" ? body.interestId.trim() : "";
+  if (!interestId) throw new AgentApiError(400, "interestId is required");
+  return {
+    ok: true,
+    ...(await reportDiscoveryParticipant({
+      actor: {
+        user: auth.user,
+        kind: "agent",
+        apiKeyId: auth.apiKey.id,
+      },
+      interestId,
+      reasonCode: body.reasonCode,
+      details: body.details,
+      block: body.block,
+    })),
+  };
 }
 
 export async function proposeIntent(

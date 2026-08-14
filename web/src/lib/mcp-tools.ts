@@ -14,6 +14,8 @@ import {
   createInvite,
   createPublicInvite,
   listConfirms,
+  listDiscoveryCapabilities,
+  listDiscoveryRequests,
   listGuestTasks,
   listInbox,
   listIntents,
@@ -25,10 +27,17 @@ import {
   readGuestTask,
   readBoard,
   requestScheduleMeeting,
+  requestDiscoveryInterest,
+  respondDiscoveryInterest,
   redeemPublicInvite,
   revokeGuestTask,
   revokePublicInvite,
   setAgentCallback,
+  setDiscoveryCapabilityManifest,
+  submitDiscoveryProfile,
+  searchDiscoveryCandidates,
+  blockDiscoveryMatch,
+  reportDiscoveryMatch,
   whoami,
 } from "@/lib/agent-api";
 
@@ -253,6 +262,141 @@ export const MCP_TOOLS: McpToolDef[] = [
     },
   },
   {
+    name: "list_discovery_capabilities",
+    description:
+      "List opt-in discovery capabilities, the questions your human still needs to answer, and each enrollment's approval state. Use this to proactively explain what HoneyMatcha supports.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "set_agent_capabilities",
+    description:
+      "Declare which HoneyMatcha intent contract versions this agent supports. This does not enroll the human in discovery.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        supportedIntents: {
+          type: "object",
+          description:
+            'Map intent slugs to supported contract versions, for example {"hiring_compatibility":1}.',
+          additionalProperties: true,
+        },
+        platforms: {
+          type: "array",
+          items: { type: "string" },
+        },
+        metadata: { type: "object", additionalProperties: true },
+      },
+      required: ["supportedIntents"],
+    },
+  },
+  {
+    name: "submit_discovery_enrollment",
+    description:
+      "Submit purpose-bound information for one discovery intent. Agent-supplied fields require provenance and activation always waits for human approval.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        intentSlug: { type: "string" },
+        claims: { type: "object", additionalProperties: true },
+        provenance: {
+          type: "object",
+          description:
+            "Per-field source records. Never submit scraped or inferred information without the human's review.",
+          additionalProperties: true,
+        },
+        location: {
+          type: "object",
+          description:
+            "Optional coarse country/region/city/neighborhood. Exact coordinates are unsupported.",
+          additionalProperties: true,
+        },
+        requestActivation: { type: "boolean" },
+      },
+      required: ["intentSlug", "claims", "provenance"],
+    },
+  },
+  {
+    name: "search_discovery",
+    description:
+      "Search globally within one active, human-approved purpose enrollment. Returns short-lived opaque handles and compatibility summaries, never identities or raw private claims.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        intentSlug: { type: "string" },
+        limit: { type: "number" },
+      },
+      required: ["intentSlug"],
+    },
+  },
+  {
+    name: "request_discovery_introduction",
+    description:
+      "Express interest using a short-lived candidate handle. The candidate remains anonymous and their human must approve before any introduction fields are released.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        candidateHandle: { type: "string" },
+        idempotencyKey: { type: "string" },
+      },
+      required: ["candidateHandle"],
+    },
+  },
+  {
+    name: "list_discovery_interests",
+    description:
+      "List incoming and outgoing discovery interests. Identity and approved disclosure fields appear only after mutual interest.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "decide_discovery_interest",
+    description:
+      "Privileged decision after explicit human approval. Default paired agents do not have approvals:write, so direct the human to /app/discovery.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        interestId: { type: "string" },
+        decision: { type: "string", enum: ["accept", "decline"] },
+      },
+      required: ["interestId", "decision"],
+    },
+  },
+  {
+    name: "block_discovery_participant",
+    description:
+      "Block the anonymous or introduced participant associated with an interest. This immediately prevents future discovery and revokes disclosures.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        interestId: { type: "string" },
+        reasonCode: { type: "string" },
+      },
+      required: ["interestId"],
+    },
+  },
+  {
+    name: "report_discovery_participant",
+    description:
+      "Report the participant associated with an interest to HoneyMatcha safety. Blocking is enabled by default.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        interestId: { type: "string" },
+        reasonCode: { type: "string" },
+        details: { type: "string" },
+        block: { type: "boolean" },
+      },
+      required: ["interestId", "reasonCode"],
+    },
+  },
+  {
     name: "propose_intent",
     description: "Propose a new intent type for the registry (deduped).",
     inputSchema: {
@@ -451,6 +595,61 @@ export async function dispatchMcpTool(
     case "list_intents":
       assertAgentScope(auth, "intents:read");
       return listIntents(args.q as string | undefined);
+    case "list_discovery_capabilities":
+      return listDiscoveryCapabilities(auth);
+    case "set_agent_capabilities":
+      return setDiscoveryCapabilityManifest(auth, {
+        supportedIntents: args.supportedIntents,
+        platforms: args.platforms,
+        metadata: args.metadata,
+      });
+    case "submit_discovery_enrollment":
+      return submitDiscoveryProfile(auth, {
+        intentSlug: args.intentSlug,
+        claims: args.claims,
+        provenance: args.provenance,
+        location: args.location as
+          | {
+              label?: unknown;
+              countryCode?: unknown;
+              region?: unknown;
+              locality?: unknown;
+              neighborhood?: unknown;
+              granularity?: unknown;
+              visibility?: unknown;
+            }
+          | undefined,
+        requestActivation: args.requestActivation,
+      });
+    case "search_discovery":
+      return searchDiscoveryCandidates(auth, {
+        intentSlug: args.intentSlug,
+        limit: args.limit,
+      });
+    case "request_discovery_introduction":
+      return requestDiscoveryInterest(auth, {
+        candidateHandle: args.candidateHandle,
+        idempotencyKey: args.idempotencyKey,
+      });
+    case "list_discovery_interests":
+      return listDiscoveryRequests(auth);
+    case "decide_discovery_interest":
+      return respondDiscoveryInterest(auth, {
+        interestId: args.interestId,
+        decision: args.decision,
+      });
+    case "block_discovery_participant":
+      return blockDiscoveryMatch(auth, {
+        interestId: args.interestId,
+        reasonCode: args.reasonCode,
+      });
+    case "report_discovery_participant":
+      return reportDiscoveryMatch(auth, {
+        interestId: args.interestId,
+        reasonCode: args.reasonCode,
+        details: args.details,
+        block: args.block as boolean | undefined,
+      });
     case "propose_intent":
       return proposeIntent(auth, {
         name: args.name as string | undefined,

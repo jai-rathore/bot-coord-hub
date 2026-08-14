@@ -71,6 +71,13 @@
       "when": 1786695396093,
       "tag": "0009_harsh_nekra",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786737621111,
+      "tag": "0010_brainy_true_believers",
+      "breakpoints": true
     }
   ]
 }

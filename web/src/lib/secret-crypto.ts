@@ -71,3 +71,16 @@ export function decryptSecret(value: string): string {
     decipher.final(),
   ]).toString("utf8");
 }
+
+export function encryptJson(value: Record<string, unknown>): string {
+  return encryptSecret(JSON.stringify(value));
+}
+
+export function decryptJson(value: string | null | undefined): Record<string, unknown> {
+  if (!value) return {};
+  const parsed: unknown = JSON.parse(decryptSecret(value));
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Encrypted JSON payload is malformed");
+  }
+  return parsed as Record<string, unknown>;
+}

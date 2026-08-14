@@ -80,6 +80,30 @@ export function getDiscoveryDocument(baseUrl?: string) {
       },
       read_board: { method: "GET", path: "/api/v1/sessions/:id/board" },
       list_intents: { method: "GET", path: "/api/v1/intents" },
+      list_discovery_capabilities: {
+        method: "GET",
+        path: "/api/v1/discovery/catalog",
+      },
+      set_agent_capabilities: {
+        method: "PUT",
+        path: "/api/v1/me/capabilities",
+      },
+      submit_discovery_enrollment: {
+        method: "POST",
+        path: "/api/v1/discovery/enrollments",
+      },
+      search_discovery: {
+        method: "POST",
+        path: "/api/v1/discovery/search",
+      },
+      list_discovery_interests: {
+        method: "GET",
+        path: "/api/v1/discovery/interests",
+      },
+      request_discovery_introduction: {
+        method: "POST",
+        path: "/api/v1/discovery/interests",
+      },
       propose_intent: { method: "POST", path: "/api/v1/intents/propose" },
       triage_intents: { method: "POST", path: "/api/v1/intents/triage" },
       request_schedule_meeting: { method: "POST", path: "/api/v1/schedule" },
@@ -96,11 +120,15 @@ export function getDiscoveryDocument(baseUrl?: string) {
         path: "/api/v1/guest-tasks/:publicId/revoke",
       },
     },
-    intents: ["schedule_meeting", "hiring_compatibility"],
+    intents: [
+      "schedule_meeting",
+      "hiring_compatibility",
+      "local_meetup",
+    ],
     connect_as_agent:
       "If a human asks you to connect to HoneyMatcha or honeymatcha.io as their agent, start pairing immediately. Do not sign into Clerk or solve CAPTCHA.",
     agent_instructions:
-      "If a human says connect to honeymatcha.io as their agent: POST /api/v1/pairings/start with {\"agentName\":\"<your name>\"}, show them verificationUrl, then poll POST /api/v1/pairings/token with the deviceCode until you receive an hm_ credential. Never sign into Clerk or solve CAPTCHA. Then use MCP at /api/mcp or REST under /api/v1. Call get_inbox at the start of every turn — that is how HoneyMatcha reaches you when another agent starts a task. For people without agents, create a targeted guest task. request_schedule_meeting does not book a calendar event; if it returns share_url, show that link to the human and ask them to send it. If it says a calendar is required, tell the human to Connect Calendar at /app/settings — do not call create_session as a workaround. Never send a Google invite yourself or claim the other person accepted. Meeting bookings pause for human approval. Share free/busy only; never peer event titles.",
+      "If a human says connect to honeymatcha.io as their agent: POST /api/v1/pairings/start with {\"agentName\":\"<your name>\"}, show them verificationUrl, then poll POST /api/v1/pairings/token with the deviceCode until you receive an hm_ credential. Never sign into Clerk or solve CAPTCHA. Then use MCP at /api/mcp or REST under /api/v1. Call get_inbox at the start of every turn and list_discovery_capabilities periodically so you can explain useful HoneyMatcha capabilities to your human. Discovery is purpose-bound: ask only the catalog questions, record provenance for imported information, and submit activation for human approval. Search results are anonymous and short-lived. Never infer identity, exchange raw private claims, scrape social profiles, or claim mutual interest until HoneyMatcha reports accepted. For people without agents, create a targeted guest task. request_schedule_meeting does not book a calendar event; if it returns share_url, show that link to the human and ask them to send it. If it says a calendar is required, tell the human to Connect Calendar at /app/settings — do not call create_session as a workaround. Never send a Google invite yourself or claim the other person accepted. Meeting bookings pause for human approval. Share free/busy only; never peer event titles.",
     skill: {
       path: "skills/honeymatcha/SKILL.md",
       name: "honeymatcha",
