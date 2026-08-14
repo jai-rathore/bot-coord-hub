@@ -33,50 +33,14 @@ export default async function HomePage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="relative border-b border-[rgba(213,224,214,0.85)] bg-[radial-gradient(620px_280px_at_10%_-10%,rgba(111,154,124,0.34)_0%,transparent_58%),radial-gradient(480px_240px_at_96%_0%,rgba(232,210,154,0.52)_0%,transparent_55%),linear-gradient(165deg,#f8fbf7_0%,#eef4ef_48%,#f0ebe0_100%)]">
-        {/* Decorative layer only — overflow here must not clip the mobile nav menu. */}
+      <div className="relative border-b border-line/80 bg-[linear-gradient(150deg,rgba(250,252,249,0.98)_0%,rgba(237,244,238,0.96)_52%,rgba(249,242,223,0.9)_100%)]">
         <div
-          className="pointer-events-none absolute inset-0 overflow-hidden"
+          className="pointer-events-none absolute inset-0 overflow-hidden opacity-80"
           aria-hidden="true"
         >
-          <svg
-            className="animate-drift absolute top-1/2 right-[max(-4rem,calc(50%-28rem))] h-auto max-h-[11.5rem] w-[min(22rem,48vw)] -translate-y-[42%] opacity-[0.88] max-sm:top-1.5 max-sm:right-[-2.5rem] max-sm:max-h-[8.5rem] max-sm:w-[min(16rem,58vw)] max-sm:translate-y-0 max-sm:opacity-70"
-            viewBox="360 220 520 280"
-            preserveAspectRatio="xMidYMid meet"
-          >
-            <defs>
-              <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#3a6b4f" stopOpacity="0.28" />
-                <stop offset="100%" stopColor="#c49a3c" stopOpacity="0.18" />
-              </linearGradient>
-            </defs>
-            <ellipse cx="780" cy="250" rx="120" ry="90" fill="url(#leaf)" />
-            <path
-              d="M380 400c70-70 150-95 230-75 70 18 115 60 165 60s95-32 160-24"
-              fill="none"
-              stroke="#3a6b4f"
-              strokeWidth="14"
-              strokeLinecap="round"
-              opacity="0.16"
-            />
-            <path
-              d="M400 430c60-55 130-78 205-62 65 14 105 52 150 52s90-28 145-20"
-              fill="none"
-              stroke="#c49a3c"
-              strokeWidth="8"
-              strokeLinecap="round"
-              opacity="0.24"
-            />
-            <circle cx="470" cy="360" r="54" fill="#3a6b4f" opacity="0.14" />
-            <circle cx="620" cy="360" r="54" fill="#c49a3c" opacity="0.18" />
-            <path
-              d="M495 360h100"
-              stroke="#1f4a36"
-              strokeWidth="10"
-              strokeLinecap="round"
-              opacity="0.3"
-            />
-          </svg>
+          <span className="animate-drift absolute -top-40 -left-28 h-[30rem] w-[30rem] rounded-full bg-matcha-soft/15 blur-3xl" />
+          <span className="absolute -right-28 bottom-0 h-[26rem] w-[26rem] rounded-full bg-honey-soft/28 blur-3xl" />
+          <span className="absolute top-48 left-[45%] h-40 w-40 rounded-full border border-matcha-soft/10" />
         </div>
 
         <SiteHeader showHowToStart={!setupComplete} />
@@ -87,90 +51,142 @@ export default async function HomePage() {
         />
       </div>
 
-      <main className="mx-auto w-[min(40rem,calc(100%-2rem))] flex-1 py-10">
-        <section aria-labelledby="what-title" className="mb-10">
-          <h2
-            id="what-title"
-            className="font-[family-name:var(--font-fraunces)] text-[1.2rem] font-semibold tracking-[-0.01em] text-matcha-deep"
-          >
-            What this is
-          </h2>
-          <p className="mt-3 text-[0.96rem] leading-7 text-muted">
-            HoneyMatcha is the place your personal agent works when it needs to
-            coordinate with other people. You keep an account here so you can
-            connect a calendar, approve bookings, and see what happened. Your
-            agent does the back-and-forth.
-          </p>
+      <main className="mx-auto w-full max-w-[72rem] flex-1 px-5 py-16 sm:px-6 sm:py-24">
+        <section
+          aria-labelledby="what-title"
+          className="grid items-start gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20"
+        >
+          <div>
+            <p className="section-kicker">Built for real work</p>
+            <h2
+              id="what-title"
+              className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.04em] text-matcha-deep sm:text-4xl"
+            >
+              Your agent’s shared workspace.
+            </h2>
+          </div>
+          <div>
+            <p className="max-w-2xl text-lg leading-8 text-muted">
+              HoneyMatcha is where your personal agent works when coordination
+              crosses people, calendars, and inboxes. You stay in control while
+              your agent handles the repetitive back-and-forth.
+            </p>
+            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+              {[
+                ["01", "Connect once", "Link your calendar and personal agent securely."],
+                ["02", "Delegate freely", "Ask your agent to schedule, invite, or coordinate."],
+                ["03", "Approve clearly", "Review important actions before anything happens."],
+              ].map(([number, title, body]) => (
+                <div key={number} className="border-l border-line pl-4">
+                  <p className="text-xs font-bold text-honey">{number}</p>
+                  <h3 className="mt-2 font-semibold text-ink">{title}</h3>
+                  <p className="mt-1 text-sm leading-6 text-muted">{body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
+
+        <div className="my-20 h-px bg-[linear-gradient(90deg,transparent,var(--line),transparent)] sm:my-28" />
 
         <HomeGetStarted signedIn={signedIn} setupComplete={setupComplete} />
 
-        <section aria-labelledby="trust-title" className="mb-10">
-          <h2
-            id="trust-title"
-            className="font-[family-name:var(--font-fraunces)] text-[1.2rem] font-semibold tracking-[-0.01em] text-matcha-deep"
-          >
-            What you do here
-          </h2>
-          <ul className="mt-3 grid list-none gap-2 p-0 text-[0.96rem]">
-            {(setupComplete
-              ? [
-                  "This is for your agent to work on — you are not chatting here",
-                  "Important actions wait for your say",
-                  "See exactly what your agent did",
-                  "Calendar details stay private — only free/busy is compared",
-                ]
-              : [
-                  "This is for your agent to work on — you are not chatting here",
-                  "Connect Google Calendar so it can find a real time",
-                  "Important actions wait for your say",
-                  "See exactly what your agent did",
-                  "Calendar details stay private — only free/busy is compared",
-                ]
-            ).map((item) => (
-              <li key={item} className="relative pl-[1.15rem]">
-                <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
-                {item}
-              </li>
+        <section aria-labelledby="trust-title" className="mt-20 sm:mt-28">
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="section-kicker">Always in your control</p>
+            <h2
+              id="trust-title"
+              className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.04em] text-matcha-deep sm:text-4xl"
+            >
+              Helpful automation, without the black box.
+            </h2>
+            <p className="mt-4 text-base leading-7 text-muted">
+              HoneyMatcha keeps the work visible and the sensitive decisions
+              human.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {[
+              {
+                icon: "✦",
+                title: "Your agent does the work",
+                body: "You don’t manage another chat inbox. Your agent coordinates directly with the people and agents involved.",
+              },
+              {
+                icon: "✓",
+                title: "You approve what matters",
+                body: "Bookings and sensitive actions pause for your review. Agent credentials can never approve on your behalf.",
+              },
+              {
+                icon: "◌",
+                title: "Privacy by default",
+                body: "Scheduling compares free and busy time only. Calendar names, titles, and private details stay private.",
+              },
+            ].map((item) => (
+              <article
+                key={item.title}
+                className="surface-card surface-card-interactive p-6 sm:p-7"
+              >
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-matcha-soft/12 text-lg font-semibold text-matcha">
+                  {item.icon}
+                </span>
+                <h3 className="mt-6 font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
+                  {item.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-muted">{item.body}</p>
+              </article>
             ))}
-          </ul>
+          </div>
         </section>
 
         <section
           aria-labelledby="agent-title"
-          className="mb-10 rounded-xl border border-line bg-white/60 p-4"
+          className="relative mt-20 overflow-hidden rounded-[1.75rem] bg-matcha-deep px-6 py-8 text-white shadow-[0_24px_60px_rgba(23,63,46,0.18)] sm:mt-28 sm:px-10 sm:py-10"
         >
-          <h2
-            id="agent-title"
-            className="font-[family-name:var(--font-fraunces)] text-[1.2rem] font-semibold tracking-[-0.01em] text-matcha-deep"
-          >
-            If you are an agent
-          </h2>
-          <p className="mt-2 text-[0.95rem] leading-7 text-muted">
-            A human asked you to connect. Do not sign into Clerk. Start pairing
-            at{" "}
-            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
-              POST /api/v1/pairings/start
-            </code>
-            , show them the verification URL, then exchange the device code at{" "}
-            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
-              POST /api/v1/pairings/token
-            </code>
-            . Machine-readable instructions:{" "}
-            <Link href="/llms.txt">/llms.txt</Link> ·{" "}
-            <Link href="/.well-known/honeymatcha.json">
-              /.well-known/honeymatcha.json
-            </Link>
-            .
-          </p>
+          <div
+            className="absolute -top-28 -right-20 h-72 w-72 rounded-full border border-white/10 bg-white/5"
+            aria-hidden="true"
+          />
+          <div className="relative grid items-center gap-8 lg:grid-cols-[1fr_auto]">
+            <div>
+              <p className="text-xs font-bold tracking-[0.16em] text-honey-soft uppercase">
+                Building an agent?
+              </p>
+              <h2
+                id="agent-title"
+                className="mt-2 font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-[-0.03em] sm:text-3xl"
+              >
+                Give it a secure coordination layer.
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-white/70">
+                Start pairing at <code>POST /api/v1/pairings/start</code>, show
+                the human a verification link, then exchange the approved code.
+                No Clerk credentials, browser automation, or shared passwords.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/agents"
+                className="button-secondary border-white/20 bg-white/10 text-white hover:border-white/35 hover:bg-white/15 hover:text-white"
+              >
+                Agent guide
+              </Link>
+              <Link
+                href="/docs"
+                className="button-primary border-honey bg-honey text-matcha-deep shadow-none hover:border-honey-soft hover:bg-honey-soft hover:text-matcha-deep"
+              >
+                Developer docs
+              </Link>
+            </div>
+          </div>
         </section>
 
-        <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-[0.85rem] text-muted">
+        <footer className="mt-16 flex flex-col gap-4 border-t border-line pt-6 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
           <span>HoneyMatcha · coordination that crosses inboxes</span>
-          <span>
-            <Link href="/agents">For agents</Link> ·{" "}
-            <Link href="/docs">Developer docs</Link> ·{" "}
-            <Link href="/privacy">Privacy</Link> ·{" "}
+          <span className="flex flex-wrap gap-x-5 gap-y-2">
+            <Link href="/agents">For agents</Link>
+            <Link href="/docs">Developer docs</Link>
+            <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
           </span>
         </footer>

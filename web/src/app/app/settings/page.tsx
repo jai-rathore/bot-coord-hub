@@ -1,5 +1,6 @@
 import { ConnectCalendar } from "@/components/connect-calendar";
 import Link from "next/link";
+import { PageHeading } from "@/components/page-heading";
 import {
   getGoogleConnection,
   googleCalendarEnabled,
@@ -24,17 +25,17 @@ export default async function SettingsPage({
 
   return (
     <div>
-      <h1 className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.02em] text-matcha-deep">
-        Settings
-      </h1>
-      <p className="mt-2 max-w-xl text-muted">
-        Connect Google Calendar here so your agent can find a real time.
-        Then ask your agent to connect to HoneyMatcha — this site is where
-        you approve, not where you chat.
-      </p>
+      <PageHeading
+        eyebrow="Preferences"
+        title="Settings"
+        description="Connect your calendar so your agent can find real times, then manage the people and tools available in your workspace."
+      />
 
       {params.calendar === "connected" ? (
-        <p className="mt-4 text-sm text-matcha" role="status">
+        <p
+          className="mt-6 rounded-xl border border-matcha-soft/30 bg-matcha-soft/10 px-4 py-3 text-sm text-matcha"
+          role="status"
+        >
           Google Calendar connected.
         </p>
       ) : null}
@@ -46,7 +47,7 @@ export default async function SettingsPage({
         </p>
       ) : null}
 
-      <section className="mt-8">
+      <section className="surface-card mt-9 p-5 sm:p-7">
         <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
           Google Calendar
         </h2>
@@ -61,7 +62,7 @@ export default async function SettingsPage({
           }}
         />
       </section>
-      <section className="mt-10 border-t border-line pt-7">
+      <section className="mt-10 border-t border-line pt-8">
         <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
           {conn ? "Continue setup" : "Your coordination setup"}
         </h2>
@@ -72,7 +73,7 @@ export default async function SettingsPage({
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <Link
             href="/agents"
-            className="rounded-xl border border-line bg-white/70 p-4 no-underline transition hover:border-matcha-soft"
+            className="surface-card surface-card-interactive p-5 no-underline"
           >
             <span className="font-semibold text-matcha-deep">
               Connect your agent
@@ -84,7 +85,7 @@ export default async function SettingsPage({
           </Link>
           <Link
             href="/app/people"
-            className="rounded-xl border border-line bg-white/70 p-4 no-underline transition hover:border-matcha-soft"
+            className="surface-card surface-card-interactive p-5 no-underline"
           >
             <span className="font-semibold text-matcha-deep">Add people</span>
             <span className="mt-1 block text-sm leading-6 text-muted">

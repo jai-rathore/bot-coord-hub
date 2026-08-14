@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { LinksManager } from "@/components/links-manager";
+import { PageHeading } from "@/components/page-heading";
 import { listLinksForUser } from "@/lib/links";
 import { ensureCurrentUser } from "@/lib/users";
 
@@ -24,14 +25,12 @@ export default async function PeoplePage() {
 
   return (
     <div>
-      <h1 className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.02em] text-matcha-deep">
-        People
-      </h1>
-      <p className="mt-2 max-w-xl text-muted">
-        People your agent can coordinate with. Relationship invitations are
-        targeted, expire automatically, and can be revoked by either person.
-      </p>
-      <div className="mt-7">
+      <PageHeading
+        eyebrow="Your network"
+        title="People"
+        description="People your agent can coordinate with. Invitations are private, expire automatically, and can be revoked by either person."
+      />
+      <div className="mt-9">
         <LinksManager initialLinks={links} />
       </div>
     </div>

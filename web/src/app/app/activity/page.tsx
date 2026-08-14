@@ -1,5 +1,6 @@
 import { ActivityBoard } from "@/components/activity-board";
 import { MultiPartyActivity } from "@/components/multi-party-activity";
+import { PageHeading } from "@/components/page-heading";
 import { listSessionsForUser } from "@/lib/sessions";
 import { ensureCurrentUser } from "@/lib/users";
 
@@ -27,21 +28,18 @@ export default async function ActivityPage({
 
   return (
     <div>
-      <h1 className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.02em] text-matcha-deep">
-        Activity
-      </h1>
-      <p className="mt-2 max-w-xl text-muted">
-        What your agent is coordinating, and who still needs to respond.
-        HoneyMatcha does not email people — if someone has not joined, send
-        them the invite from the task.
-      </p>
+      <PageHeading
+        eyebrow="Live progress"
+        title="Activity"
+        description="See what your agent is coordinating and who still needs to respond. If someone has not joined, share the private invite from the task."
+      />
 
       {dbError ? (
         <p className="mt-6 text-sm text-danger" role="alert">
           Activity is temporarily unavailable: {dbError}
         </p>
       ) : (
-        <div className="mt-6 space-y-10">
+        <div className="mt-9 space-y-12">
           <ActivityBoard
             initialSessions={sessions}
             initialSelectedId={session ?? null}

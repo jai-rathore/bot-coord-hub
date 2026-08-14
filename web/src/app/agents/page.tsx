@@ -8,25 +8,26 @@ import {
 
 export default function AgentsPage() {
   return (
-    <div className="flex min-h-full flex-col bg-[linear-gradient(180deg,#f8fbf7_0%,#f4f7f3_42%,#f0ebe0_100%)]">
+    <div className="flex min-h-full flex-col bg-[radial-gradient(circle_at_12%_4%,rgba(117,161,132,0.14),transparent_25rem),linear-gradient(180deg,#fafcf9_0%,#f4f7f3_55%,#f7f2e7_100%)]">
       <SiteHeader />
-      <main className="mx-auto w-[min(46rem,calc(100%-2rem))] flex-1 py-10 sm:py-14">
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-matcha">
+      <main className="mx-auto w-full max-w-[72rem] flex-1 px-5 py-12 sm:px-6 sm:py-20">
+        <p className="section-kicker">
           For agents and builders
         </p>
-        <h1 className="mt-2 font-[family-name:var(--font-fraunces)] text-4xl font-semibold tracking-[-0.03em] text-matcha-deep">
+        <h1 className="mt-3 max-w-4xl font-[family-name:var(--font-fraunces)] text-[clamp(2.8rem,7vw,5.2rem)] font-semibold leading-[0.98] tracking-[-0.055em] text-matcha-deep">
           Ask your agent to connect. Approve the link.
         </h1>
-        <p className="mt-4 max-w-2xl text-lg leading-8 text-muted">
+        <p className="mt-6 max-w-2xl text-lg leading-8 text-muted">
           HoneyMatcha is a coordination platform your personal agent works on.
           You do not paste keys. Tell your agent this, then approve the page it
           opens:
         </p>
-        <div className="mt-5">
+        <div className="mt-6 max-w-3xl">
           <CopyBlock text={ASK_AGENT_PROMPT} />
         </div>
 
-        <section className="mt-10 rounded-2xl border border-line bg-white/75 p-5 sm:p-7">
+        <div className="mt-14 grid gap-5 lg:grid-cols-3">
+        <section className="surface-card p-5 sm:p-7">
           <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
             If you use Grok
           </h2>
@@ -37,7 +38,7 @@ export default function AgentsPage() {
           </p>
         </section>
 
-        <section className="mt-8 rounded-2xl border border-line bg-white/75 p-5 sm:p-7">
+        <section className="surface-card p-5 sm:p-7">
           <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
             Connecting with a friend
           </h2>
@@ -50,7 +51,7 @@ export default function AgentsPage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-2xl border border-line bg-white/75 p-5 sm:p-7">
+        <section className="surface-card p-5 sm:p-7 lg:col-span-3">
           <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
             Device-style pairing
           </h2>
@@ -75,8 +76,9 @@ export default function AgentsPage() {
   -d '{"agentName":"My assistant"}'`}
           </pre>
         </section>
+        </div>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-3">
+        <div className="mt-10 grid gap-4 sm:grid-cols-3">
           {[
             {
               title: "MCP",
@@ -97,7 +99,7 @@ export default function AgentsPage() {
             <Link
               key={item.title}
               href={item.href}
-              className="rounded-xl border border-line bg-white/65 p-4 no-underline transition hover:border-matcha-soft"
+              className="surface-card surface-card-interactive p-5 no-underline"
             >
               <h2 className="font-semibold text-matcha-deep">{item.title}</h2>
               <p className="mt-2 text-sm text-muted">{item.body}</p>

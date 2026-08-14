@@ -27,15 +27,26 @@ export default async function AppHomePage() {
   const setupComplete = isSetupComplete(status);
 
   return (
-    <div className="space-y-10">
-      <h1 className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.02em] text-matcha-deep">
-        {setupComplete ? `Good to see you, ${name}` : `Welcome, ${name}`}
-      </h1>
-      <p className="mt-2 max-w-xl text-muted">
-        {setupComplete
-          ? "Your agent handles coordination. You will see progress here and step in only when something needs your say."
-          : "HoneyMatcha is where your personal agent works. Connect a calendar, then ask your agent to connect. After that, you talk to the agent — not this site — unless something needs your say."}
-      </p>
+    <div className="space-y-12">
+      <section className="relative overflow-hidden rounded-[1.75rem] border border-matcha-soft/20 bg-[linear-gradient(135deg,rgba(255,255,252,0.96),rgba(235,244,237,0.9))] px-6 py-7 shadow-[0_20px_55px_rgba(23,63,46,0.09)] sm:px-8 sm:py-9">
+        <div
+          className="absolute -top-24 -right-20 h-64 w-64 rounded-full border border-matcha-soft/15 bg-matcha-soft/8"
+          aria-hidden="true"
+        />
+        <div className="relative">
+          <p className="section-kicker">
+            {setupComplete ? "Workspace overview" : "Let’s get you connected"}
+          </p>
+          <h1 className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.04em] text-matcha-deep sm:text-4xl">
+            {setupComplete ? `Good to see you, ${name}` : `Welcome, ${name}`}
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-muted sm:text-base">
+            {setupComplete
+              ? "Your agent handles the coordination. Follow progress here and step in only when something needs your say."
+              : "Connect your calendar and personal agent once. After that, your agent handles the work while HoneyMatcha keeps you in control."}
+          </p>
+        </div>
+      </section>
 
       <SetupGuide
         calendar={{
@@ -53,35 +64,60 @@ export default async function AppHomePage() {
 
       <section>
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
-            Recent tasks
-          </h2>
-          <Link href="/app/tasks" className="text-sm font-medium">
+          <div>
+            <p className="section-kicker">What’s happening</p>
+            <h2 className="mt-1 font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-[-0.03em] text-matcha-deep">
+              Recent tasks
+            </h2>
+          </div>
+          <Link
+            href="/app/tasks"
+            className="rounded-lg px-3 py-2 text-sm font-semibold no-underline transition hover:bg-white/75"
+          >
             View all
           </Link>
         </div>
         {status.recentTasks.length ? (
-          <ul className="mt-4 divide-y divide-line rounded-2xl border border-line bg-white/65 px-4">
+          <ul className="surface-card mt-5 divide-y divide-line px-5">
             {status.recentTasks.map((task) => (
               <li
                 key={task.id}
-                className="flex flex-wrap items-center justify-between gap-3 py-4"
+                className="flex flex-wrap items-center justify-between gap-4 py-5"
               >
-                <div>
-                  <p className="font-medium text-ink">
-                    {intentLabel(task.intentType)}
-                  </p>
-                  <p className="mt-1 text-sm text-muted">
-                    {taskStatusLabel(task.status)} · updated{" "}
-                    {new Date(task.updatedAt).toLocaleString()}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-matcha-soft/12 text-matcha">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      aria-hidden="true"
+                    >
+                      <path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" />
+                    </svg>
+                  </span>
+                  <div>
+                    <p className="font-medium text-ink">
+                      {intentLabel(task.intentType)}
+                    </p>
+                    <p className="mt-1 text-sm text-muted">
+                      {taskStatusLabel(task.status)} · updated{" "}
+                      {new Date(task.updatedAt).toLocaleString()}
+                    </p>
+                  </div>
                 </div>
-                <Link href={`/app/activity?session=${task.id}`}>Open</Link>
+                <Link
+                  href={`/app/activity?session=${task.id}`}
+                  className="text-sm font-semibold"
+                >
+                  Open
+                </Link>
               </li>
             ))}
           </ul>
         ) : (
-          <div className="mt-4 rounded-2xl border border-dashed border-line bg-white/40 p-6">
+          <div className="mt-5 rounded-2xl border border-dashed border-matcha-soft/40 bg-white/45 p-7">
             <p className="font-medium text-ink">No tasks yet.</p>
             <p className="mt-2 max-w-xl text-sm text-muted">
               {setupComplete

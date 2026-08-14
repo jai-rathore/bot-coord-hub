@@ -18,15 +18,33 @@ export function CopyBlock({
   }
 
   return (
-    <div className="relative">
-      <pre className="overflow-x-auto rounded-md border border-line bg-[rgba(255,252,246,0.75)] p-4 pr-24 text-[0.82rem] leading-relaxed text-ink whitespace-pre-wrap">
+    <div className="group relative">
+      <pre className="overflow-x-auto rounded-xl border border-line bg-white/72 p-4 pr-24 text-[0.78rem] leading-relaxed text-ink whitespace-pre-wrap shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
         {text}
       </pre>
       <button
         type="button"
         onClick={() => void copy()}
-        className="absolute right-2 top-2 cursor-pointer rounded-md border border-line bg-white/90 px-2.5 py-1 text-xs font-medium text-matcha-deep"
+        aria-live="polite"
+        className="absolute top-2 right-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-white/95 px-2.5 py-1.5 text-[0.7rem] font-semibold text-matcha-deep shadow-sm transition hover:border-matcha-soft"
       >
+        <svg
+          viewBox="0 0 24 24"
+          className="h-3 w-3"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          aria-hidden="true"
+        >
+          {copied ? (
+            <path d="m5 12 4 4L19 6" />
+          ) : (
+            <>
+              <rect x="8" y="8" width="11" height="11" rx="2" />
+              <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+            </>
+          )}
+        </svg>
         {copied ? "Copied" : label}
       </button>
     </div>

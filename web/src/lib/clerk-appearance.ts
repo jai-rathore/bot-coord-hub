@@ -6,18 +6,22 @@ type ClerkProviderProps = ComponentProps<typeof ClerkProvider>;
 /** Shared Clerk UI branding for HoneyMatcha (embedded SignIn / SignUp / UserButton). */
 export const clerkAppearance = {
   variables: {
-    colorPrimary: "#1f4a36",
-    colorBackground: "#fffcf6",
-    colorForeground: "#1c2420",
-    colorMutedForeground: "#5a685f",
-    colorMuted: "#e4ede6",
-    colorBorder: "#d5e0d6",
+    colorPrimary: "#173f2e",
+    colorBackground: "#fffffc",
+    colorForeground: "#17211c",
+    colorMutedForeground: "#5c6a62",
+    colorMuted: "#e7eee8",
+    colorBorder: "#d9e2da",
     colorInput: "#ffffff",
-    colorInputForeground: "#1c2420",
-    colorNeutral: "#1c2420",
-    colorRing: "#2f6b4a",
-    colorPrimaryForeground: "#f7faf6",
-    borderRadius: "0.5rem",
+    colorInputForeground: "#17211c",
+    colorNeutral: "#17211c",
+    colorRing: "#286445",
+    colorShadow: "#173f2e",
+    colorPrimaryForeground: "#fbfdf9",
+    fontFamily: "var(--font-sora), 'Segoe UI', sans-serif",
+    fontFamilyButtons: "var(--font-sora), 'Segoe UI', sans-serif",
+    borderRadius: "0.8rem",
+    spacing: "0.95rem",
   },
   options: {
     // Absolute production URL so Clerk’s hosted assets resolve the mark

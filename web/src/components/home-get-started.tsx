@@ -15,55 +15,80 @@ export function HomeGetStarted({
     <section
       id="how-it-works"
       aria-labelledby="get-started-title"
-      className="mb-10 scroll-mt-6"
+      className="scroll-mt-24"
     >
-      <h2
-        id="get-started-title"
-        className="font-[family-name:var(--font-fraunces)] text-[1.2rem] font-semibold tracking-[-0.01em] text-matcha-deep"
-      >
-        {signedIn ? "Finish setup" : "How to start"}
-      </h2>
-      <p className="mt-2 mb-4 text-[0.95rem] text-muted">
-        {signedIn
-          ? "Two steps left. After that, you talk to your agent."
-          : "Two steps. After that, you talk to your agent."}
-      </p>
-      <ol className="m-0 grid list-none gap-3 p-0">
-        <li className="grid grid-cols-[auto_1fr] gap-3">
-          <span className="mt-0.5 grid h-[1.55rem] w-[1.55rem] place-items-center rounded-full bg-honey-soft text-[0.78rem] font-semibold text-matcha-deep">
-            1
-          </span>
-          <span>
-            <strong className="font-semibold text-ink">
-              Connect Google Calendar.
-            </strong>{" "}
-            HoneyMatcha will ask you to do this after you sign in. Only free/busy
-            is used.
-          </span>
+      <div className="mb-7 max-w-2xl">
+        <p className="section-kicker">
+          {signedIn ? "Finish setup" : "Simple by design"}
+        </p>
+        <h2
+          id="get-started-title"
+          className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.035em] text-matcha-deep sm:text-4xl"
+        >
+          Two steps, then your agent takes it from here.
+        </h2>
+      </div>
+      <ol className="m-0 grid list-none gap-4 p-0 lg:grid-cols-2">
+        <li className="surface-card relative overflow-hidden p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-matcha-deep text-sm font-bold text-white shadow-[0_8px_18px_rgba(23,63,46,0.2)]">
+              01
+            </span>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-6 w-6 text-matcha-soft"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              aria-hidden="true"
+            >
+              <path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" />
+            </svg>
+          </div>
+          <h3 className="mt-7 font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
+            Connect your calendar
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            HoneyMatcha checks free/busy availability only. Your event titles
+            and details always stay private.
+          </p>
         </li>
-        <li className="grid grid-cols-[auto_1fr] gap-3">
-          <span className="mt-0.5 grid h-[1.55rem] w-[1.55rem] place-items-center rounded-full bg-honey-soft text-[0.78rem] font-semibold text-matcha-deep">
-            2
-          </span>
-          <span>
-            <strong className="font-semibold text-ink">
-              Tell your agent to connect.
-            </strong>{" "}
-            Paste this, then approve the link it shows you.
+        <li className="surface-card relative overflow-hidden p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-honey text-sm font-bold text-white shadow-[0_8px_18px_rgba(200,146,45,0.22)]">
+              02
+            </span>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-6 w-6 text-honey"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              aria-hidden="true"
+            >
+              <path d="M8 12h8m-4-4v8M5 4h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9l-5 3V6a2 2 0 0 1 2-2Z" />
+            </svg>
+          </div>
+          <h3 className="mt-7 font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
+            Invite your agent
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            Paste this prompt into the assistant you already use, then approve
+            its secure connection.
+          </p>
             <div className="mt-3">
               <CopyBlock text={ASK_AGENT_PROMPT} />
             </div>
-          </span>
         </li>
       </ol>
-      <p className="mt-4 text-[0.92rem] text-muted">
+      <p className="mt-5 text-sm text-muted">
         {signedIn ? (
           <>
             Finish these in{" "}
             <Link href="/app">your HoneyMatcha home</Link>.
           </>
         ) : (
-          "That is the whole setup. Then ask your agent to invite someone or find a meeting time."
+          "That’s the whole setup. Ask your agent to invite someone or find a meeting time whenever you’re ready."
         )}
       </p>
     </section>

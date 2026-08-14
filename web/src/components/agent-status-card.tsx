@@ -72,28 +72,37 @@ export function AgentStatusCard({ status }: { status: HomeStatus }) {
     <section aria-labelledby="status-title">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-matcha">
-            At a glance
-          </p>
+          <p className="section-kicker">At a glance</p>
           <h2
             id="status-title"
-            className="mt-1 font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep"
+            className="mt-1 font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-[-0.03em] text-matcha-deep"
           >
             Ready when you are
           </h2>
         </div>
       </div>
-      <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-white/70">
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rows.map((row) => (
-          <div
+          <article
             key={row.label}
-            className="grid gap-2 border-b border-line px-4 py-4 last:border-b-0 sm:grid-cols-[10rem_1fr_auto] sm:items-center"
+            className="surface-card surface-card-interactive flex min-h-44 flex-col p-5"
           >
-            <p className="font-medium text-ink">{row.label}</p>
-            <p className="flex items-center gap-2 text-sm text-muted">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-ink">{row.label}</p>
+              <span
+                className={`rounded-full px-2 py-1 text-[0.62rem] font-bold tracking-[0.06em] uppercase ${
+                  row.ok
+                    ? "bg-matcha-soft/12 text-matcha"
+                    : "bg-honey-soft/45 text-[#8a6013]"
+                }`}
+              >
+                {row.ok ? "Ready" : "Action"}
+              </span>
+            </div>
+            <p className="mt-5 flex items-start gap-2 text-sm leading-6 text-muted">
               <span
                 aria-hidden="true"
-                className={`h-2 w-2 rounded-full ${
+                className={`mt-2 h-2 w-2 shrink-0 rounded-full ${
                   row.ok ? "bg-matcha" : "bg-honey"
                 }`}
               />
@@ -101,11 +110,12 @@ export function AgentStatusCard({ status }: { status: HomeStatus }) {
             </p>
             <Link
               href={row.href}
-              className="text-sm font-semibold text-matcha-deep no-underline hover:underline"
+              className="mt-auto inline-flex items-center gap-1 pt-5 text-sm font-semibold text-matcha-deep no-underline hover:underline"
             >
               {row.action}
+              <span aria-hidden="true">→</span>
             </Link>
-          </div>
+          </article>
         ))}
       </div>
     </section>
