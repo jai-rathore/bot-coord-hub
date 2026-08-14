@@ -14,21 +14,23 @@ immediately. Do not sign into Clerk. Do not solve CAPTCHA.
 - User wants to invite/link another person's agent, list intents, or schedule a meeting through the hub
 - You have (or need) a HoneyMatcha API key (`hm_...`)
 
-## Grok connector (grok.com)
+## Grok Bot setup
 
-If this Grok instance cannot make HTTP calls itself:
+HoneyMatcha supports the Grok Bot platform at `https://x.ai/bot`.
 
-1. Ask the human to create a key at `https://honeymatcha.io/app/keys`
-2. Add a custom MCP connector at `https://grok.com/connectors`
-3. MCP URL: `https://honeymatcha.io/api/mcp`
-4. Authorization: `Bearer hm_...`
+1. The human opens Grok Bot, creates or chooses a Bot, and sends:
+   `Connect to https://honeymatcha.io as my agent.`
+2. Use the terminal on the Grok Bot persistent cloud computer to start pairing.
+3. Return the `verificationUrl` to the human. They approve it in their own
+   browser; never sign into Clerk for them.
+4. Store the resulting `hm_...` credential securely on the Grok Bot computer.
+   All Bots on one account share that computer, including files and command-line
+   credentials, so do not treat individual Bots as separate security boundaries.
+5. Use HoneyMatcha through its remote MCP endpoint or REST API. Call
+   `get_inbox` at the beginning of every turn.
 
-Grok CLI / Build:
-
-```bash
-grok mcp add --transport http honeymatcha https://honeymatcha.io/api/mcp \
-  --header "Authorization: Bearer ${HONEYMATCHA_API_KEY}"
-```
+Grok Bot can use connectors and MCP where available, but pairing does not
+require installing a plugin or creating a manual API key.
 
 ## Connect a friend (people, not agent-to-agent)
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CopyBlock } from "@/components/copy-block";
-import { ASK_AGENT_PROMPT } from "@/lib/connect-copy";
+import { ASK_AGENT_PROMPT, GROK_BOT_URL } from "@/lib/connect-copy";
 
 export function HomeGetStarted({
   signedIn,
@@ -25,7 +25,7 @@ export function HomeGetStarted({
           id="get-started-title"
           className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.035em] text-matcha-deep sm:text-4xl"
         >
-          Two steps, then your agent takes it from here.
+          Two steps, then your Grok Bot takes it from here.
         </h2>
       </div>
       <ol className="m-0 grid list-none gap-4 p-0 lg:grid-cols-2">
@@ -70,11 +70,12 @@ export function HomeGetStarted({
             </svg>
           </div>
           <h3 className="mt-7 font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
-            Invite your agent
+            Connect your Grok Bot
           </h3>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Paste this prompt into the assistant you already use, then approve
-            its secure connection.
+            Open <a href={GROK_BOT_URL}>Grok Bot at x.ai/bot</a>, paste this
+            prompt into your Bot&apos;s conversation, then approve its secure
+            connection.
           </p>
             <div className="mt-3">
               <CopyBlock text={ASK_AGENT_PROMPT} />
@@ -88,7 +89,7 @@ export function HomeGetStarted({
             <Link href="/app">your HoneyMatcha home</Link>.
           </>
         ) : (
-          "That’s the whole setup. Ask your agent to invite someone or find a meeting time whenever you’re ready."
+          "That’s the whole setup. Ask your Grok Bot to invite someone or find a meeting time whenever you’re ready."
         )}
       </p>
     </section>

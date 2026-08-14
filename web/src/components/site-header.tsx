@@ -12,7 +12,7 @@ import { BrandLink } from "@/components/brand-link";
 
 const SECONDARY_LINKS = [
   { href: "/#how-it-works", label: "How to start" },
-  { href: "/agents", label: "For agents" },
+  { href: "/agents", label: "For Grok Bot" },
 ] as const;
 
 export function SiteHeader({

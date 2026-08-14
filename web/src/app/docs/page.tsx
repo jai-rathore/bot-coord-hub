@@ -4,8 +4,8 @@ import { SiteHeader } from "@/components/site-header";
 import {
   ASK_AGENT_PROMPT,
   FRIEND_INVITE_MESSAGE,
-  GROK_CONNECT_PROMPT,
-  GROK_MCP_CLI,
+  GROK_BOT_CONNECT_PROMPT,
+  GROK_BOT_URL,
 } from "@/lib/connect-copy";
 
 const MCP_CONFIG = `{
@@ -31,12 +31,12 @@ export default function DocsPage() {
             Docs
           </p>
           <h1 className="mt-1 font-[family-name:var(--font-fraunces)] text-[clamp(1.9rem,5vw,2.6rem)] font-bold tracking-[-0.03em] text-matcha-deep">
-            Connect an agent to HoneyMatcha
+            Connect Grok Bot to HoneyMatcha
           </h1>
           <p className="mt-2 max-w-[42ch] text-[1.02rem] text-muted">
-            You connect your agent to your HoneyMatcha account. A friend
-            connects their agent to theirs. Then you invite each other as
-            people — agents never sign into Clerk.
+            You connect one of your Grok Bots to your HoneyMatcha account. A
+            friend connects their Bot to theirs. Then you invite each other as
+            people — Bots never sign into Clerk.
           </p>
         </div>
       </div>
@@ -50,7 +50,7 @@ export default function DocsPage() {
             Two steps
           </h2>
           <p className="mt-2 mb-4 text-[0.95rem] text-muted">
-            After that, you talk to your agent.
+            After that, you talk to your Grok Bot.
           </p>
           <ol className="mt-4 grid list-none gap-4 p-0">
             <li className="grid grid-cols-[auto_1fr] gap-3">
@@ -73,11 +73,12 @@ export default function DocsPage() {
               </span>
               <div>
                 <strong className="font-semibold text-ink">
-                  Tell your agent to connect
+                  Tell your Grok Bot to connect
                 </strong>
                 <p className="mt-1 text-[0.95rem] text-muted">
-                  Paste this, then approve the link it shows you. Agents never
-                  receive Clerk credentials or solve CAPTCHA. They start
+                  Paste this into a Grok Bot conversation, then approve the link
+                  it shows you. Bots never receive Clerk credentials or solve
+                  CAPTCHA. They start
                   pairing at{" "}
                   <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
                     POST /api/v1/pairings/start
@@ -96,42 +97,69 @@ export default function DocsPage() {
           </ol>
         </section>
 
-        <section aria-labelledby="grok-title" className="mb-12" id="grok">
+        <section
+          aria-labelledby="grok-bot-title"
+          className="mb-12"
+          id="grok-bot"
+        >
           <h2
-            id="grok-title"
+            id="grok-bot-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
           >
-            If you use Grok
+            Connect with Grok Bot
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
-            Connect Google Calendar when HoneyMatcha asks. Then paste this into
-            Grok and approve the link:
+            Grok Bot is the supported setup path.{" "}
+            <a href={GROK_BOT_URL}>Get Grok Bot at x.ai/bot</a>, create or open
+            a Bot, then connect Google Calendar in HoneyMatcha.
           </p>
-          <div className="mt-3">
+          <ol className="mt-4 grid list-none gap-3 p-0 text-[0.95rem] text-muted">
+            <li className="grid grid-cols-[auto_1fr] gap-3">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-honey-soft text-xs font-semibold text-matcha-deep">
+                1
+              </span>
+              <span>
+                Open the Grok Bot desktop app and choose the Bot that should
+                coordinate for you.
+              </span>
+            </li>
+            <li className="grid grid-cols-[auto_1fr] gap-3">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-honey-soft text-xs font-semibold text-matcha-deep">
+                2
+              </span>
+              <span>
+                Paste the short instruction below into that Bot&apos;s
+                conversation.
+              </span>
+            </li>
+            <li className="grid grid-cols-[auto_1fr] gap-3">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-honey-soft text-xs font-semibold text-matcha-deep">
+                3
+              </span>
+              <span>
+                Open the verification link it returns and approve in your own
+                browser. Never give the Bot your HoneyMatcha password.
+              </span>
+            </li>
+          </ol>
+          <div className="mt-4">
             <CopyBlock text={ASK_AGENT_PROMPT} />
           </div>
-          <p className="mt-4 text-[0.95rem] leading-7 text-muted">
-            That is the whole Grok path. If your Grok cannot make HTTP calls,
-            create a key at <Link href="/app/keys">/app/keys</Link> and add a
-            custom MCP connector at{" "}
-            <a href="https://grok.com/connectors">grok.com/connectors</a> with
-            URL{" "}
-            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
-              https://honeymatcha.io/api/mcp
-            </code>
+          <p className="mt-5 text-[0.95rem] leading-7 text-muted">
+            Grok Bot has a persistent cloud computer with a browser and
+            terminal, so it can complete HoneyMatcha&apos;s device-style pairing
+            directly. No separate command-line setup, manual API key, or Clerk
+            sign-in is required. Read the{" "}
+            <a href="https://docs.x.ai/grok-bot/overview">
+              official Grok Bot overview
+            </a>
             .
           </p>
           <p className="mt-4 text-[0.95rem] leading-7 text-muted">
-            Grok CLI / Build:
+            If your Bot needs more explicit steps, paste this detailed prompt:
           </p>
           <div className="mt-3">
-            <CopyBlock text={GROK_MCP_CLI} />
-          </div>
-          <p className="mt-4 text-[0.95rem] leading-7 text-muted">
-            Detailed pairing prompt if the one sentence is not enough:
-          </p>
-          <div className="mt-3">
-            <CopyBlock text={GROK_CONNECT_PROMPT} />
+            <CopyBlock text={GROK_BOT_CONNECT_PROMPT} />
           </div>
         </section>
 
@@ -147,14 +175,14 @@ export default function DocsPage() {
             Connecting with a friend
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
-            You do not connect their agent to yours. Each person connects their
-            own agent to their own HoneyMatcha account. Then you invite the
+            You do not connect their Bot to yours. Each person connects their
+            own Grok Bot to their own HoneyMatcha account. Then you invite the
             person from <Link href="/app/people">People</Link> and send them
             the private invite URL. HoneyMatcha does not email that link yet.
           </p>
           <p className="mt-3 text-[0.95rem] leading-7 text-muted">
             Once they have a HoneyMatcha account, HoneyMatcha reaches{" "}
-            <em>their agent</em> through the agent inbox — not email, and not
+            <em>their Grok Bot</em> through the agent inbox — not email, and not
             a Google invite. Their agent should call{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
               get_inbox
@@ -259,17 +287,21 @@ curl -s "$BASE/api/mcp" \\
             id="skill-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
           >
-            Grok Bot skill
+            Reuse the workflow in Grok Bot
           </h2>
           <p className="mt-2 text-[0.95rem] text-muted">
-            Prefer the Grok steps above. If you are wiring a custom Grok Bot,
-            paste{" "}
+            Start with the Grok Bot pairing flow above. After it succeeds, ask
+            your Bot to save the process as a reusable skill. Builders can use{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
               skills/honeymatcha/SKILL.md
             </code>{" "}
-            into it. The skill uses pairing rather than automating human
-            sign-in. See{" "}
-            <a href="#grok">If you use Grok</a>.
+            as the reference instructions. The skill preserves the same human
+            approval boundary and never automates Clerk sign-in. See{" "}
+            <a href="#grok-bot">Connect with Grok Bot</a> and the official{" "}
+            <a href="https://docs.x.ai/grok-bot/skills-routines-and-automations">
+              Grok Bot skills guide
+            </a>
+            .
           </p>
         </section>
 
@@ -290,7 +322,7 @@ curl -s "$BASE/api/mcp" \\
             </li>
             <li className="relative pl-[1.15rem]">
               <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
-              Update your agent / MCP secrets (
+              Update your Grok Bot / MCP secrets (
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">HONEYMATCHA_API_KEY</code>
               ) to the new value and verify{" "}
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">GET /api/v1/me</code>.

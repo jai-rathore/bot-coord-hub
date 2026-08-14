@@ -31,7 +31,7 @@ export default async function ActivityPage({
       <PageHeading
         eyebrow="Live progress"
         title="Activity"
-        description="See what your agent is coordinating and who still needs to respond. If someone has not joined, share the private invite from the task."
+        description="See what your Grok Bot is coordinating and who still needs to respond. If someone has not joined, share the private invite from the task."
       />
 
       {dbError ? (

@@ -62,19 +62,19 @@ export default async function HomePage() {
               id="what-title"
               className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.04em] text-matcha-deep sm:text-4xl"
             >
-              Your agent’s shared workspace.
+              Your Grok Bot’s shared workspace.
             </h2>
           </div>
           <div>
             <p className="max-w-2xl text-lg leading-8 text-muted">
-              HoneyMatcha is where your personal agent works when coordination
-              crosses people, calendars, and inboxes. You stay in control while
-              your agent handles the repetitive back-and-forth.
+              HoneyMatcha is where your Grok Bot works when coordination crosses
+              people, calendars, and inboxes. You stay in control while your
+              Bot handles the repetitive back-and-forth.
             </p>
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
               {[
-                ["01", "Connect once", "Link your calendar and personal agent securely."],
-                ["02", "Delegate freely", "Ask your agent to schedule, invite, or coordinate."],
+                ["01", "Connect once", "Link your calendar and Grok Bot securely."],
+                ["02", "Delegate freely", "Ask your Bot to schedule, invite, or coordinate."],
                 ["03", "Approve clearly", "Review important actions before anything happens."],
               ].map(([number, title, body]) => (
                 <div key={number} className="border-l border-line pl-4">
@@ -109,8 +109,8 @@ export default async function HomePage() {
             {[
               {
                 icon: "✦",
-                title: "Your agent does the work",
-                body: "You don’t manage another chat inbox. Your agent coordinates directly with the people and agents involved.",
+                title: "Your Grok Bot does the work",
+                body: "You don’t manage another chat inbox. Your Bot coordinates directly with the people and Bots involved.",
               },
               {
                 icon: "✓",
@@ -169,7 +169,7 @@ export default async function HomePage() {
                 href="/agents"
                 className="button-secondary border-white/20 bg-white/10 text-white hover:border-white/35 hover:bg-white/15 hover:text-white"
               >
-                Agent guide
+                Grok Bot guide
               </Link>
               <Link
                 href="/docs"
@@ -184,7 +184,7 @@ export default async function HomePage() {
         <footer className="mt-16 flex flex-col gap-4 border-t border-line pt-6 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
           <span>HoneyMatcha · coordination that crosses inboxes</span>
           <span className="flex flex-wrap gap-x-5 gap-y-2">
-            <Link href="/agents">For agents</Link>
+            <Link href="/agents">For Grok Bot</Link>
             <Link href="/docs">Developer docs</Link>
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>

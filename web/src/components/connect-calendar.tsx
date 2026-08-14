@@ -79,7 +79,7 @@ export function ConnectCalendar({
       ) : (
         <>
           <p className="text-sm text-muted">
-            Connect Google Calendar so your agent can compare free/busy and
+            Connect Google Calendar so your Grok Bot can compare free/busy and
             create an event with Meet after everyone approves.
           </p>
           <a

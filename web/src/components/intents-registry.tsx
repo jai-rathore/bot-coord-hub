@@ -125,13 +125,13 @@ export function IntentsRegistry({
         </h2>
         {!canPropose ? (
           <p className="mt-2 text-sm text-muted">
-            Sign in to tell us what you want your agent to handle next.
+            Sign in to tell us what you want your Grok Bot to handle next.
           </p>
         ) : (
           <form onSubmit={submitProposal} className="mt-4 max-w-lg space-y-3">
             <label className="grid gap-1 text-sm">
               <span className="font-medium">
-                What should your agent handle?
+                What should your Grok Bot handle?
               </span>
               <input
                 required

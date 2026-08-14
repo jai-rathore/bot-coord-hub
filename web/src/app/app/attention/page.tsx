@@ -17,7 +17,7 @@ export default async function AttentionPage() {
       <PageHeading
         eyebrow="Human approval"
         title="Needs your attention"
-        description="Things your agent paused for you to approve or decline. An agent credential can never decide these in your place."
+        description="Things your Grok Bot paused for you to approve or decline. A Bot credential can never decide these in your place."
       />
       <div className="mt-9">
         <ConfirmQueue initialConfirms={confirms} />
