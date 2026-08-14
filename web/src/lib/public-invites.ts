@@ -230,7 +230,6 @@ export async function redeemPublicInvite(opts: {
           eq(publicInvites.id, publicInviteId),
           eq(publicInvites.status, "active"),
           gt(publicInvites.expiresAt, now),
-          lt(publicInvites.redemptionCount, publicInvites.maxRedemptions),
         ),
       )
       .limit(1);
