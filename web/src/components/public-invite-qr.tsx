@@ -16,8 +16,6 @@ export function PublicInviteQr({
 
   useEffect(() => {
     let active = true;
-    setDataUrl(null);
-    setError(false);
     void QRCode.toDataURL(inviteUrl, {
       width: 240,
       margin: 2,
