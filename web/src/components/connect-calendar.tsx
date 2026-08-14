@@ -71,7 +71,7 @@ export function ConnectCalendar({
             type="button"
             onClick={disconnect}
             disabled={pending}
-            className="rounded-md border border-danger/40 px-3 py-1.5 text-sm text-danger hover:bg-danger/5"
+            className="inline-flex min-h-10 items-center justify-center rounded-xl border border-danger/35 bg-white/60 px-3.5 py-2 text-sm font-semibold text-danger transition hover:bg-danger/5 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Disconnect
           </button>
@@ -84,7 +84,7 @@ export function ConnectCalendar({
           </p>
           <a
             href="/api/google/start"
-            className="inline-flex items-center justify-center rounded-md border border-matcha-deep bg-matcha-deep px-3 py-1.5 text-sm font-semibold text-[#f7faf6] no-underline transition hover:border-matcha hover:bg-matcha hover:text-[#f7faf6]"
+            className="button-primary mt-1"
           >
             Connect Google Calendar
           </a>

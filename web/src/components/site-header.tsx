@@ -59,17 +59,18 @@ export function SiteHeader({
   }, []);
 
   return (
-    <header className="relative z-30 flex min-w-0 items-center justify-between gap-2 px-3 py-4 sm:gap-4 sm:px-6">
-      <div className="min-w-0">
-        <BrandLink />
-      </div>
-      <nav className="flex shrink-0 items-center gap-1.5 text-sm font-medium sm:gap-3">
+    <header className="relative z-30 px-4 py-4 sm:px-6 sm:py-5">
+      <div className="mx-auto flex w-full max-w-[72rem] min-w-0 items-center justify-between gap-3 rounded-2xl border border-white/75 bg-white/62 px-3 py-2.5 shadow-[0_8px_30px_rgba(23,63,46,0.07)] backdrop-blur-xl sm:px-4">
+        <div className="min-w-0">
+          <BrandLink />
+        </div>
+        <nav className="flex shrink-0 items-center gap-1.5 text-sm font-medium sm:gap-2">
         <div className="hidden items-center gap-3 sm:flex">
           {secondaryLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="text-muted no-underline hover:text-matcha-deep"
+              className="rounded-lg px-2.5 py-2 text-muted no-underline transition hover:bg-matcha-soft/10 hover:text-matcha-deep"
             >
               {link.label}
             </Link>
@@ -83,7 +84,7 @@ export function SiteHeader({
             aria-controls={menuId}
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             onClick={() => setMenuOpen((open) => !open)}
-            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-line bg-transparent text-matcha-deep transition hover:border-matcha-soft hover:bg-[rgba(255,252,246,0.55)]"
+            className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-line bg-white/70 text-matcha-deep transition hover:border-matcha-soft hover:bg-white"
           >
             <svg
               width="16"
@@ -113,7 +114,7 @@ export function SiteHeader({
             <div
               id={menuId}
               role="menu"
-              className="absolute right-0 z-40 mt-2 min-w-[10.5rem] rounded-md border border-line bg-[rgba(255,252,246,0.98)] p-1 shadow-[0_8px_24px_rgba(31,74,54,0.16)] backdrop-blur-sm"
+              className="absolute right-0 z-40 mt-2 min-w-[11rem] rounded-xl border border-line bg-[rgba(255,255,252,0.98)] p-1.5 shadow-[0_18px_48px_rgba(23,63,46,0.18)] backdrop-blur-xl"
             >
               {secondaryLinks.map((link) => (
                 <Link
@@ -121,7 +122,7 @@ export function SiteHeader({
                   href={link.href}
                   role="menuitem"
                   onClick={() => setMenuOpen(false)}
-                  className="block rounded-md px-3 py-2 text-muted no-underline hover:bg-[rgba(111,154,124,0.12)] hover:text-matcha-deep"
+                  className="block rounded-lg px-3 py-2.5 text-muted no-underline hover:bg-matcha-soft/10 hover:text-matcha-deep"
                 >
                   {link.label}
                 </Link>
@@ -134,7 +135,7 @@ export function SiteHeader({
           <SignInButton mode="redirect">
             <button
               type="button"
-              className="cursor-pointer whitespace-nowrap rounded-md border border-line bg-transparent px-2 py-1.5 text-matcha-deep transition hover:border-matcha-soft hover:bg-[rgba(255,252,246,0.55)] sm:px-3"
+              className="button-secondary min-h-10 cursor-pointer whitespace-nowrap px-2.5 py-1.5 sm:px-3.5"
             >
               Sign in
             </button>
@@ -142,7 +143,7 @@ export function SiteHeader({
           <SignUpButton mode="redirect">
             <button
               type="button"
-              className="cursor-pointer whitespace-nowrap rounded-md border border-matcha-deep bg-matcha-deep px-2 py-1.5 text-[#f7faf6] transition hover:border-matcha hover:bg-matcha sm:px-3"
+              className="button-primary min-h-10 cursor-pointer whitespace-nowrap px-2.5 py-1.5 sm:px-3.5"
             >
               Get started
             </button>
@@ -151,13 +152,14 @@ export function SiteHeader({
         <Show when="signed-in">
           <Link
             href="/app"
-            className="whitespace-nowrap rounded-md border border-matcha-deep bg-matcha-deep px-2 py-1.5 text-[#f7faf6] no-underline transition hover:border-matcha hover:bg-matcha hover:text-[#f7faf6] sm:px-3"
+            className="button-primary min-h-10 whitespace-nowrap px-2.5 py-1.5 sm:px-3.5"
           >
             Dashboard
           </Link>
           <UserButton />
         </Show>
       </nav>
+      </div>
     </header>
   );
 }

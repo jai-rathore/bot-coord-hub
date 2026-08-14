@@ -1,4 +1,5 @@
 import { ConfirmQueue } from "@/components/confirm-queue";
+import { PageHeading } from "@/components/page-heading";
 import { listConfirmsForUser } from "@/lib/confirms";
 import { ensureCurrentUser } from "@/lib/users";
 
@@ -13,14 +14,12 @@ export default async function AttentionPage() {
 
   return (
     <div>
-      <h1 className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.02em] text-matcha-deep">
-        Needs your attention
-      </h1>
-      <p className="mt-2 max-w-xl text-muted">
-        Things your agent paused for you to approve or decline. An agent
-        credential cannot decide these in your place.
-      </p>
-      <div className="mt-7">
+      <PageHeading
+        eyebrow="Human approval"
+        title="Needs your attention"
+        description="Things your agent paused for you to approve or decline. An agent credential can never decide these in your place."
+      />
+      <div className="mt-9">
         <ConfirmQueue initialConfirms={confirms} />
       </div>
     </div>

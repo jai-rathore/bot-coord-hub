@@ -1,21 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --matcha-deep: #1f4a36;
-  --matcha: #3a6b4f;
-  --matcha-soft: #6f9a7c;
-  --honey: #c49a3c;
-  --honey-soft: #e8d29a;
-  --ink: #1c2420;
-  --muted: #5a685f;
-  --line: #d5e0d6;
-  --bg: #eef4ef;
-  --panel: rgba(255, 252, 246, 0.72);
-  --code-bg: #e4ede6;
-  --focus: #2f6b4a;
-  --danger: #9b3b3b;
-  --background: #f4f7f3;
+  --matcha-deep: #173f2e;
+  --matcha: #2f694a;
+  --matcha-soft: #75a184;
+  --honey: #c8922d;
+  --honey-soft: #f0dca8;
+  --ink: #17211c;
+  --muted: #5c6a62;
+  --line: #d9e2da;
+  --bg: #edf3ee;
+  --panel: rgba(255, 255, 252, 0.78);
+  --code-bg: #e7eee8;
+  --focus: #286445;
+  --danger: #a33f43;
+  --background: #f7f9f6;
   --foreground: var(--ink);
+  --shadow-sm: 0 1px 2px rgba(23, 63, 46, 0.05),
+    0 6px 18px rgba(23, 63, 46, 0.04);
+  --shadow-md: 0 2px 4px rgba(23, 63, 46, 0.05),
+    0 18px 50px rgba(23, 63, 46, 0.1);
 }
 
 @theme inline {
@@ -43,14 +47,28 @@
 
 html {
   scroll-behavior: smooth;
+  background: var(--background);
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(circle at 8% 4%, rgba(117, 161, 132, 0.11), transparent 26rem),
+    radial-gradient(circle at 92% 18%, rgba(240, 220, 168, 0.16), transparent 24rem),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-sora), "Segoe UI", sans-serif;
   line-height: 1.55;
   min-height: 100vh;
+}
+
+::selection {
+  background: var(--honey-soft);
+  color: var(--matcha-deep);
+}
+
+:where(a, button, input, textarea, select):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--focus) 28%, transparent);
+  outline-offset: 3px;
 }
 
 /* Keep link defaults in @layer base so Tailwind text-* utilities win on CTAs.
@@ -64,6 +82,101 @@ body {
 
   a:hover {
     color: var(--matcha-deep);
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .surface-card {
+    border: 1px solid color-mix(in srgb, var(--line) 86%, white);
+    border-radius: 1.25rem;
+    background: rgba(255, 255, 252, 0.82);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(14px);
+  }
+
+  .surface-card-interactive {
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .surface-card-interactive:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--matcha-soft) 70%, white);
+    box-shadow: var(--shadow-md);
+  }
+
+  .section-kicker {
+    color: var(--matcha);
+    font-size: 0.73rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .page-title {
+    color: var(--matcha-deep);
+    font-family: var(--font-fraunces), Georgia, serif;
+    font-size: clamp(2rem, 5vw, 3.35rem);
+    font-weight: 650;
+    letter-spacing: -0.04em;
+    line-height: 1.04;
+  }
+
+  .button-primary,
+  .button-secondary {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.8rem;
+    padding: 0.65rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 650;
+    text-decoration: none;
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      background 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .button-primary {
+    border: 1px solid var(--matcha-deep);
+    background: var(--matcha-deep);
+    color: #fbfdf9;
+    box-shadow: 0 8px 22px rgba(23, 63, 46, 0.18);
+  }
+
+  .button-primary:hover {
+    transform: translateY(-1px);
+    border-color: var(--matcha);
+    background: var(--matcha);
+    color: white;
+    box-shadow: 0 12px 28px rgba(23, 63, 46, 0.22);
+  }
+
+  .button-secondary {
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 252, 0.72);
+    color: var(--matcha-deep);
+  }
+
+  .button-secondary:hover {
+    transform: translateY(-1px);
+    border-color: var(--matcha-soft);
+    background: rgba(255, 255, 252, 0.96);
+    color: var(--matcha-deep);
+    box-shadow: var(--shadow-sm);
   }
 }
 
@@ -116,5 +229,11 @@ body {
   *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .surface-card {
+    border-radius: 1rem;
   }
 }

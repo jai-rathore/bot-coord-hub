@@ -30,9 +30,9 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-[linear-gradient(180deg,#f8fbf7_0%,#f4f7f3_40%,#f0ebe0_100%)]">
+    <div className="flex min-h-full flex-col bg-[radial-gradient(circle_at_8%_0%,rgba(117,161,132,0.12),transparent_25rem),radial-gradient(circle_at_94%_20%,rgba(240,220,168,0.15),transparent_24rem),linear-gradient(180deg,#f9fbf8_0%,#f4f7f3_55%,#f6f3eb_100%)]">
       <AppNav attentionCount={attentionCount} />
-      <main className="mx-auto w-[min(64rem,calc(100%-2rem))] flex-1 py-8">
+      <main className="mx-auto w-full max-w-[72rem] flex-1 px-5 py-8 sm:px-6 sm:py-12">
         {children}
       </main>
     </div>

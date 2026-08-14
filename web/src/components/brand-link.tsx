@@ -20,19 +20,21 @@ export function BrandLink({
   return (
     <Link
       href={href}
-      className={`inline-flex min-w-0 items-center gap-1.5 text-matcha-deep no-underline transition hover:text-matcha sm:gap-2 ${className}`}
+      className={`group inline-flex min-w-0 items-center gap-2.5 text-matcha-deep no-underline ${className}`}
     >
-      <Image
-        src="/logo-mark.png"
-        alt=""
-        width={32}
-        height={32}
-        className="h-7 w-7 shrink-0 rounded-full sm:h-8 sm:w-8"
-        priority
-      />
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-matcha-soft/25 bg-white/75 shadow-[0_5px_16px_rgba(23,63,46,0.09)] transition duration-200 group-hover:-rotate-2 group-hover:scale-[1.04] group-hover:border-matcha-soft/60">
+        <Image
+          src="/logo-mark.png"
+          alt=""
+          width={32}
+          height={32}
+          className="h-7 w-7 rounded-full"
+          priority
+        />
+      </span>
       {showWordmark ? (
-        <span className="hidden whitespace-nowrap font-[family-name:var(--font-fraunces)] text-lg font-semibold sm:inline">
-          HoneyMatcha
+        <span className="hidden whitespace-nowrap font-[family-name:var(--font-fraunces)] text-xl font-semibold tracking-[-0.03em] sm:inline">
+          Honey<span className="text-honey">Matcha</span>
         </span>
       ) : null}
       <span className={showWordmark ? "sr-only sm:hidden" : "sr-only"}>
