@@ -15,7 +15,7 @@ export default async function DiscoveryPage() {
     return <p className="text-danger">Unable to resolve your account.</p>;
   }
   const [intents, interests, audit] = await Promise.all([
-    listDiscoveryCatalog(user.id),
+    listDiscoveryCatalog(user.id, { includeOwnerReview: true }),
     listDiscoveryInterests(user.id),
     listUserDiscoveryAudit(user.id),
   ]);

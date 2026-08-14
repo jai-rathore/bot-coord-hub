@@ -28,7 +28,7 @@ export async function GET() {
   if (user instanceof Response) return user;
   try {
     const [intents, interests, audit] = await Promise.all([
-      listDiscoveryCatalog(user.id),
+      listDiscoveryCatalog(user.id, { includeOwnerReview: true }),
       listDiscoveryInterests(user.id),
       listUserDiscoveryAudit(user.id),
     ]);
@@ -71,6 +71,7 @@ export async function POST(request: Request) {
       location?: CoarseLocationInput | null;
       requestActivation?: unknown;
       enrollmentId?: unknown;
+      snapshotHash?: unknown;
       decision?: unknown;
       interestId?: unknown;
       reasonCode?: unknown;
@@ -106,6 +107,10 @@ export async function POST(request: Request) {
             user,
             enrollmentId: body.enrollmentId,
             decision: body.decision as "approve" | "pause" | "revoke",
+            snapshotHash:
+              typeof body.snapshotHash === "string"
+                ? body.snapshotHash
+                : undefined,
           }),
         });
       case "decide_interest":

@@ -7,6 +7,7 @@ import {
   discoveryHandles,
   discoveryInterests,
   intentTypes,
+  purposeEnrollments,
   safetyReports,
   sessions,
   users,
@@ -18,9 +19,11 @@ import {
 } from "../src/lib/intent-definitions";
 import {
   blockDiscoveryParticipant,
+  cleanupExpiredDiscoveryData,
   decideDiscoveryEnrollment,
   decideDiscoveryInterest,
   getAgentCapabilityManifest,
+  listDiscoveryCatalog,
   listDiscoveryInterests,
   reportDiscoveryParticipant,
   requestDiscoveryIntroduction,
@@ -29,6 +32,7 @@ import {
   submitDiscoveryEnrollment,
   upsertAgentCapabilityManifest,
 } from "../src/lib/discovery-service";
+import { listSessionsForUser } from "../src/lib/sessions";
 
 process.env.TOKEN_ENCRYPTION_KEY =
   process.env.TOKEN_ENCRYPTION_KEY ??
@@ -126,6 +130,23 @@ async function main() {
   const manifest = await getAgentCapabilityManifest(key.id);
   assert.equal(manifest?.supportedIntents.local_meetup, 1);
 
+  await assert.rejects(
+    () =>
+      submitDiscoveryEnrollment(
+        { user: moderator, kind: "user" },
+        {
+          intentSlug: "local_meetup",
+          claims: {
+            participantType: "attendee",
+            interests: ["walking"],
+            timeWindows: ["sunday morning"],
+          },
+          requestActivation: true,
+        },
+      ),
+    /location is required/,
+  );
+
   const pending = await submitDiscoveryEnrollment(
     { user: seeker, kind: "agent", apiKeyId: key.id },
     {
@@ -155,10 +176,37 @@ async function main() {
     },
   );
   assert.equal(pending.status, "pending_approval");
+  const agentCatalog = await listDiscoveryCatalog(seeker.id);
+  assert.equal(
+    agentCatalog.find((intent) => intent.slug === "local_meetup")
+      ?.currentEnrollment.ownerReview,
+    null,
+  );
+  const ownerCatalog = await listDiscoveryCatalog(seeker.id, {
+    includeOwnerReview: true,
+  });
+  const pendingOwnerReview = ownerCatalog.find(
+    (intent) => intent.slug === "local_meetup",
+  )?.currentEnrollment;
+  assert.equal(
+    pendingOwnerReview?.ownerReview?.claims.private.timeWindows instanceof Array,
+    true,
+  );
+  await assert.rejects(
+    () =>
+      decideDiscoveryEnrollment({
+        user: seeker,
+        enrollmentId: pending.id!,
+        decision: "approve",
+        snapshotHash: "stale-snapshot",
+      }),
+    /changed or was not reviewed/,
+  );
   await decideDiscoveryEnrollment({
     user: seeker,
     enrollmentId: pending.id!,
     decision: "approve",
+    snapshotHash: pendingOwnerReview?.reviewSnapshotHash ?? undefined,
   });
 
   await submitDiscoveryEnrollment(
@@ -192,11 +240,13 @@ async function main() {
   assert.equal(firstSearch.candidates.length, 1);
   const firstCandidate = firstSearch.candidates[0]!;
   assert.match(firstCandidate.candidateHandle, /^dc_/);
-  assert.equal(firstCandidate.compatibility.verdict, "compatible");
+  assert.equal(firstCandidate.compatibility.verdict, "potential");
   const serializedCandidate = JSON.stringify(firstCandidate);
   assert.equal(serializedCandidate.includes(host.id), false);
   assert.equal(serializedCandidate.includes(host.email), false);
   assert.equal(serializedCandidate.includes("capacity"), false);
+  assert.equal(serializedCandidate.includes("timeWindow"), false);
+  assert.equal(serializedCandidate.includes("location"), false);
 
   const secondSearch = await searchDiscovery({
     actor: { user: seeker, kind: "agent", apiKeyId: key.id },
@@ -225,11 +275,27 @@ async function main() {
   });
   assert.equal(accepted.status, "accepted");
   assert.ok(accepted.sessionId);
-  assert.equal(JSON.stringify(accepted.disclosure).includes(seeker.email), false);
+  assert.equal(accepted.disclosure, null);
+  const acceptedForHost = await listDiscoveryInterests(host.id);
+  const authorizedDisclosure = acceptedForHost.find(
+    (item) => item.id === request.interestId,
+  )?.disclosure;
   assert.equal(
-    accepted.disclosure.introductionSummary,
+    JSON.stringify(authorizedDisclosure).includes(seeker.email),
+    false,
+  );
+  assert.equal(
+    authorizedDisclosure?.introductionSummary,
     "Enjoys small, friendly strategy-game meetups.",
   );
+  const publicSessions = await listSessionsForUser(seeker);
+  const publicMeetup = publicSessions.find(
+    (session) => session.id === accepted.sessionId,
+  );
+  assert.equal(publicMeetup?.peer, null);
+  assert.equal(publicMeetup?.peerUserId, null);
+  assert.equal(JSON.stringify(publicMeetup).includes(host.email), false);
+  assert.equal(JSON.stringify(publicMeetup).includes(host.id), false);
   const [meetupSession] = await db
     .select()
     .from(sessions)
@@ -260,6 +326,11 @@ async function main() {
     interestId: request.interestId,
     reasonCode: "idempotent_test",
   });
+  const deletedSessions = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, accepted.sessionId!));
+  assert.equal(deletedSessions.length, 0);
 
   await setDiscoverySafetyStatus({
     moderator,
@@ -287,14 +358,25 @@ async function main() {
     .select()
     .from(discoveryInterests)
     .where(eq(discoveryInterests.id, request.interestId));
-  assert.equal(interestRows[0]?.status, "accepted");
+  assert.equal(interestRows[0]?.status, "withdrawn");
   const handleRows = await db
     .select()
     .from(discoveryHandles)
     .where(eq(discoveryHandles.requesterUserId, seeker.id));
   assert.ok(handleRows.length >= 2);
+  await db
+    .update(purposeEnrollments)
+    .set({ expiresAt: new Date(Date.now() - 60_000) })
+    .where(inArray(purposeEnrollments.userId, [seeker.id, host.id]));
+  const cleanup = await cleanupExpiredDiscoveryData();
+  assert.equal(cleanup.deletedEnrollments, 2);
+  const retainedInterest = await db
+    .select()
+    .from(discoveryInterests)
+    .where(eq(discoveryInterests.id, request.interestId));
+  assert.equal(retainedInterest.length, 0);
   console.log(
-    "Discovery E2E passed: agent approval, opaque search, mutual disclosure, meetup handoff, block/report, and suspension.",
+    "Discovery E2E passed: reviewed agent approval, opaque search, selective disclosure, privacy-safe meetup handoff, block/report, suspension, and retention cleanup.",
   );
 }
 
@@ -313,7 +395,10 @@ main()
       );
     }
   })
+  .then(() => {
+    process.exit(0);
+  })
   .catch((error) => {
     console.error(error);
-    process.exitCode = 1;
+    process.exit(1);
   });

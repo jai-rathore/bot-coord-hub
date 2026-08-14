@@ -20,7 +20,7 @@ export async function GET(
   const { id } = await context.params;
   try {
     await getSessionForUser(id, user.id);
-    const messages = await listMessagesForSession(id);
+    const messages = await listMessagesForSession(id, user.id);
     return Response.json({ messages });
   } catch (err) {
     return jsonError(err, "Failed to list messages");

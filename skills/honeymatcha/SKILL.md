@@ -121,7 +121,9 @@ Discovery (no auth):
 3. Call `submit_discovery_enrollment` with `requestActivation: true`. The human
    approves agent submissions at `/app/discovery`.
 4. After the enrollment is active, call `search_discovery`. Results contain
-   compatibility summaries and `dc_` handles, never identities.
+   approved anonymous card fields and `dc_` handles, never identities or
+   private compatibility dimensions. Private constraints are resolved only
+   after mutual interest.
 5. Recommend a candidate to the human. If they want an introduction, call
    `request_discovery_introduction`.
 6. The other human decides. Poll `list_discovery_interests` or handle the inbox.

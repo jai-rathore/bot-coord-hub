@@ -13,12 +13,14 @@
     "db:preflight": "tsx scripts/preflight.ts",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
+    "discovery:cleanup": "tsx scripts/cleanup-discovery.ts",
     "db:studio": "drizzle-kit studio",
     "mcp": "node mcp/server.mjs",
     "test:e2e-lib": "tsx scripts/e2e-lib.ts",
     "test:e2e-api": "node scripts/e2e-api.mjs",
     "test:e2e-platform": "node scripts/e2e-platform.mjs",
-    "test:e2e-discovery": "tsx scripts/e2e-discovery.ts"
+    "test:e2e-discovery": "tsx scripts/e2e-discovery.ts",
+    "test:e2e-discovery-api": "node scripts/e2e-discovery-api.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.4",

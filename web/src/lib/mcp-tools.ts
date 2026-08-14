@@ -322,7 +322,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "search_discovery",
     description:
-      "Search globally within one active, human-approved purpose enrollment. Returns short-lived opaque handles and compatibility summaries, never identities or raw private claims.",
+      "Search globally within one active, human-approved purpose enrollment. Returns short-lived opaque handles and approved anonymous card fields, never identities, raw private claims, or probeable private compatibility dimensions.",
     inputSchema: {
       type: "object",
       properties: {

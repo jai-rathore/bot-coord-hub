@@ -1,0 +1,1 @@
+DROP INDEX "user_locations_primary_uidx";

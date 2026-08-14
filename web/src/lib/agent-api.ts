@@ -46,6 +46,7 @@ import {
   listSessionsForUser,
   messageToPlainEnglish,
   postSessionMessage,
+  isDiscoveryMediatedSession,
 } from "@/lib/sessions";
 import {
   decideConfirm,
@@ -88,13 +89,24 @@ async function assertDiscoveryRate(
   limit: number,
 ) {
   const result = await distributedRateLimit(
-    `${action}:${auth.user.id}:${auth.apiKey.id}`,
+    `${action}:${auth.user.id}`,
     limit,
   );
   if (!result.ok) {
     throw new AgentApiError(429, "Discovery rate limit exceeded", {
       code: "rate_limited",
       retryAfterSec: result.retryAfterSec,
+    });
+  }
+  const daily = await distributedRateLimit(
+    `${action}:daily:${auth.user.id}`,
+    limit * 20,
+    24 * 60 * 60 * 1000,
+  );
+  if (!daily.ok) {
+    throw new AgentApiError(429, "Daily discovery privacy budget exceeded", {
+      code: "privacy_budget_exceeded",
+      retryAfterSec: daily.retryAfterSec,
     });
   }
 }
@@ -507,17 +519,23 @@ export async function readBoard(auth: AgentAuth, sessionId: string) {
   assertAgentScope(auth, "tasks:read");
   try {
     const session = await getSessionForUser(sessionId, auth.user.id);
-    const messages = await listMessagesForSession(sessionId);
+    const messages = await listMessagesForSession(sessionId, auth.user.id);
+    const discoveryPrivate = isDiscoveryMediatedSession(session);
     return {
       ok: true,
       session: {
         id: session.id,
         intentType: session.intentType,
         status: session.status,
-        payload: session.payload,
-        initiatorUserId: session.initiatorUserId,
-        peerUserId: session.peerUserId,
-        linkId: session.linkId,
+        payload: discoveryPrivate
+          ? {
+              privacyMode: "discovery",
+              disclosureStage: "mutual_interest",
+            }
+          : session.payload,
+        initiatorUserId: discoveryPrivate ? null : session.initiatorUserId,
+        peerUserId: discoveryPrivate ? null : session.peerUserId,
+        linkId: discoveryPrivate ? null : session.linkId,
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
       },
@@ -539,7 +557,7 @@ export async function listBoardMessages(auth: AgentAuth, sessionId: string) {
   assertAgentScope(auth, "tasks:read");
   try {
     await getSessionForUser(sessionId, auth.user.id);
-    const messages = await listMessagesForSession(sessionId);
+    const messages = await listMessagesForSession(sessionId, auth.user.id);
     return { ok: true, messages };
   } catch (err) {
     rethrowAsAgentError(err);

@@ -1,14 +1,19 @@
 import { config } from "dotenv";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { getDb } from "../src/db";
 import {
   agentPairings,
+  agentCapabilities,
   apiKeys,
   calendarConnections,
   guestTasks,
   intentTypes,
   links,
   publicInvites,
+  purposeEnrollments,
+  discoveryInterests,
+  discoveryBlocks,
+  userLocations,
 } from "../src/db/schema";
 
 config({ path: ".env.local" });
@@ -64,6 +69,16 @@ async function main() {
         : "disabled",
   });
 
+  checks.push({
+    name: "Discovery rate limiter",
+    ok: !production || Boolean(process.env.REDIS_URL),
+    detail: process.env.REDIS_URL
+      ? "shared Valkey configured"
+      : production
+        ? "REDIS_URL is required"
+        : "in-memory fallback active locally",
+  });
+
   const googleEnabled =
     process.env.GOOGLE_CALENDAR_ENABLED === "true" ||
     process.env.GOOGLE_CALENDAR_ENABLED === "1";
@@ -101,12 +116,26 @@ async function main() {
           .select({ publicInviteId: links.publicInviteId })
           .from(links)
           .limit(1),
+        db
+          .select({ id: purposeEnrollments.id })
+          .from(purposeEnrollments)
+          .limit(1),
+        db
+          .select({ id: discoveryInterests.id })
+          .from(discoveryInterests)
+          .limit(1),
+        db.select({ id: discoveryBlocks.id }).from(discoveryBlocks).limit(1),
+        db.select({ id: userLocations.id }).from(userLocations).limit(1),
+        db
+          .select({ id: agentCapabilities.id })
+          .from(agentCapabilities)
+          .limit(1),
       ]);
       checks.push({
         name: "Current schema",
         ok: true,
         detail:
-          "guest tasks, pairings, scoped credentials, and public invites available",
+          "guest, pairing, invite, discovery, location, safety, and capability tables available",
       });
     } catch (error) {
       checks.push({
@@ -117,21 +146,29 @@ async function main() {
     }
 
     try {
-      const [scheduleIntent] = await db
-        .select({ id: intentTypes.id })
+      const seededIntents = await db
+        .select({
+          slug: intentTypes.slug,
+          definition: intentTypes.definition,
+          discoveryEnabled: intentTypes.discoveryEnabled,
+        })
         .from(intentTypes)
-        .where(
-          and(
-            eq(intentTypes.slug, "schedule_meeting"),
-            eq(intentTypes.status, "live"),
-          ),
-        )
-        .limit(1);
+        .where(eq(intentTypes.status, "live"));
+      const scheduleIntent = seededIntents.find(
+        (intent) => intent.slug === "schedule_meeting",
+      );
+      const hiringIntent = seededIntents.find(
+        (intent) =>
+          intent.slug === "hiring_compatibility" && intent.discoveryEnabled,
+      );
+      const meetupIntent = seededIntents.find(
+        (intent) => intent.slug === "local_meetup" && intent.discoveryEnabled,
+      );
       checks.push({
         name: "Supported task seed",
-        ok: Boolean(scheduleIntent),
-        detail: scheduleIntent
-          ? "schedule_meeting is live"
+        ok: Boolean(scheduleIntent && hiringIntent && meetupIntent),
+        detail: scheduleIntent && hiringIntent && meetupIntent
+          ? "schedule_meeting, hiring discovery, and local meetup discovery are live"
           : "run npm run db:seed",
       });
     } catch (error) {

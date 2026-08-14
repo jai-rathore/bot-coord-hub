@@ -9,10 +9,12 @@ import {
   lt,
   ne,
   or,
+  sql,
 } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   agentCapabilities,
+  agentInbox,
   auditLogs,
   discoveryBlocks,
   discoveryDisclosures,
@@ -27,6 +29,7 @@ import {
   users,
   type PurposeEnrollment,
   type User,
+  type UserLocation,
 } from "@/db/schema";
 import { AgentApiError } from "@/lib/agent-errors";
 import { deliverDiscoveryInbox } from "@/lib/agent-inbox";
@@ -184,15 +187,64 @@ async function getDiscoveryIntent(slug: string) {
   return { row, definition };
 }
 
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function enrollmentSnapshotHash(
+  enrollment: PurposeEnrollment,
+  location?: UserLocation | null,
+) {
+  return createHash("sha256")
+    .update(
+      stableJson({
+        id: enrollment.id,
+        definitionVersion: enrollment.definitionVersion,
+        publicClaims: enrollment.publicClaims,
+        privateClaims: decryptJson(enrollment.privateClaimsEncrypted),
+        disclosureClaims: enrollment.disclosureClaims,
+        claimProvenance: enrollment.claimProvenance,
+        location: location
+          ? {
+              countryCode: location.countryCode,
+              region: location.region,
+              locality: location.locality,
+              neighborhood: location.neighborhood,
+              granularity: location.granularity,
+              visibility: location.visibility,
+            }
+          : null,
+        updatedAt: enrollment.updatedAt.toISOString(),
+      }),
+    )
+    .digest("hex");
+}
+
 function safeEnrollmentView(
   enrollment: PurposeEnrollment | undefined,
   definition: IntentDefinition,
+  options: {
+    includeOwnerReview?: boolean;
+    location?: UserLocation | null;
+  } = {},
 ) {
   const publicClaims =
     (enrollment?.publicClaims as Record<string, unknown> | undefined) ?? {};
   const disclosureClaims =
     (enrollment?.disclosureClaims as Record<string, unknown> | undefined) ?? {};
   const combined = { ...publicClaims, ...disclosureClaims };
+  const privateClaims = enrollment
+    ? decryptJson(enrollment.privateClaimsEncrypted)
+    : {};
   return {
     id: enrollment?.id ?? null,
     status: enrollment?.status ?? "not_enrolled",
@@ -201,15 +253,45 @@ function safeEnrollmentView(
     disclosureClaims,
     missingFields: missingEnrollmentFields(definition, {
       ...combined,
-      ...(enrollment ? decryptJson(enrollment.privateClaimsEncrypted) : {}),
+      ...privateClaims,
     }).map((field) => field.key),
     consentedAt: enrollment?.consentedAt?.toISOString() ?? null,
     expiresAt: enrollment?.expiresAt?.toISOString() ?? null,
     locationId: enrollment?.locationId ?? null,
+    reviewSnapshotHash:
+      options.includeOwnerReview && enrollment
+        ? enrollmentSnapshotHash(enrollment, options.location)
+        : null,
+    ownerReview:
+      options.includeOwnerReview && enrollment
+        ? {
+            claims: {
+              public: publicClaims,
+              private: privateClaims,
+              disclosureAfterMatch: disclosureClaims,
+            },
+            provenance:
+              (enrollment.claimProvenance as Record<string, unknown>) ?? {},
+            location: options.location
+              ? {
+                  label: options.location.label,
+                  countryCode: options.location.countryCode,
+                  region: options.location.region,
+                  locality: options.location.locality,
+                  neighborhood: options.location.neighborhood,
+                  granularity: options.location.granularity,
+                  visibility: options.location.visibility,
+                }
+              : null,
+          }
+        : null,
   };
 }
 
-export async function listDiscoveryCatalog(userId: string) {
+export async function listDiscoveryCatalog(
+  userId: string,
+  options: { includeOwnerReview?: boolean } = {},
+) {
   const db = getDb();
   const rows = await db
     .select()
@@ -226,6 +308,18 @@ export async function listDiscoveryCatalog(userId: string) {
     .where(eq(purposeEnrollments.userId, userId));
   const bySlug = new Map(
     enrollments.map((enrollment) => [enrollment.intentSlug, enrollment]),
+  );
+  const locationIds = enrollments
+    .map((enrollment) => enrollment.locationId)
+    .filter((id): id is string => Boolean(id));
+  const locations = locationIds.length
+    ? await db
+        .select()
+        .from(userLocations)
+        .where(inArray(userLocations.id, locationIds))
+    : [];
+  const locationsById = new Map(
+    locations.map((location) => [location.id, location]),
   );
   return rows.flatMap((row) => {
     try {
@@ -260,6 +354,12 @@ export async function listDiscoveryCatalog(userId: string) {
           currentEnrollment: safeEnrollmentView(
             bySlug.get(row.slug),
             definition,
+            {
+              includeOwnerReview: options.includeOwnerReview,
+              location: bySlug.get(row.slug)?.locationId
+                ? locationsById.get(bySlug.get(row.slug)!.locationId!)
+                : null,
+            },
           ),
         },
       ];
@@ -368,8 +468,14 @@ async function upsertCoarseLocation(
       `granularity must be one of: ${allowed.join(", ")}`,
     );
   }
-  const location = {
-    label: normalizedText(input.label, "location.label", 160),
+  if (granularity !== requiredGranularity) {
+    throw new AgentApiError(
+      400,
+      `This intent requires ${requiredGranularity} location granularity`,
+    );
+  }
+  const typedGranularity = granularity as LocationGranularity;
+  const provided = {
     countryCode: normalizedText(input.countryCode, "location.countryCode", 2),
     region: normalizedText(input.region, "location.region", 120),
     locality: normalizedText(input.locality, "location.locality", 120),
@@ -378,7 +484,35 @@ async function upsertCoarseLocation(
       "location.neighborhood",
       120,
     ),
-    granularity: granularity as LocationGranularity,
+  };
+  const required = locationFieldsForGranularity(typedGranularity);
+  const missing = required.filter((key) => !provided[key]);
+  if (missing.length) {
+    throw new AgentApiError(
+      400,
+      `Location is missing: ${missing.join(", ")}`,
+    );
+  }
+  const label =
+    typedGranularity === "neighborhood"
+      ? provided.neighborhood!
+      : typedGranularity === "city"
+        ? provided.locality!
+        : typedGranularity === "region"
+          ? provided.region!
+          : provided.countryCode!;
+  const location = {
+    label,
+    countryCode: provided.countryCode,
+    region:
+      typedGranularity === "country" ? null : provided.region,
+    locality:
+      typedGranularity === "country" || typedGranularity === "region"
+        ? null
+        : provided.locality,
+    neighborhood:
+      typedGranularity === "neighborhood" ? provided.neighborhood : null,
+    granularity: typedGranularity,
     visibility:
       normalizedText(input.visibility, "location.visibility", 40) ??
       "private_match",
@@ -391,33 +525,9 @@ async function upsertCoarseLocation(
       "location.visibility must be private_match or disclose_after_match",
     );
   }
-  const required = locationFieldsForGranularity(location.granularity);
-  const missing = required.filter((key) => !location[key]);
-  if (missing.length || !location.label) {
-    throw new AgentApiError(
-      400,
-      `Location is missing: ${["label", ...missing].join(", ")}`,
-    );
-  }
-  const db = getDb();
-  const [existing] = await db
-    .select()
-    .from(userLocations)
-    .where(
-      and(eq(userLocations.userId, userId), eq(userLocations.isPrimary, true)),
-    )
-    .limit(1);
-  if (existing) {
-    const [updated] = await db
-      .update(userLocations)
-      .set({ ...location, label: location.label!, updatedAt: new Date() })
-      .where(eq(userLocations.id, existing.id))
-      .returning();
-    return updated;
-  }
-  const [created] = await db
+  const [created] = await getDb()
     .insert(userLocations)
-    .values({ userId, ...location, label: location.label! })
+    .values({ userId, ...location, isPrimary: false })
     .returning();
   return created;
 }
@@ -567,6 +677,45 @@ export async function submitDiscoveryEnrollment(
             submission.location,
             definition.discovery.locationGranularity,
           );
+  const effectiveLocationId = location?.id ?? existing?.locationId ?? null;
+  if (
+    activationRequested &&
+    definition.discovery.locationGranularity !== "none" &&
+    !effectiveLocationId
+  ) {
+    throw new AgentApiError(
+      400,
+      `${definition.discovery.locationGranularity} location is required before activation`,
+      { code: "location_required" },
+    );
+  }
+  if (
+    activationRequested &&
+    effectiveLocationId &&
+    !location &&
+    definition.discovery.locationGranularity !== "none"
+  ) {
+    const [savedLocation] = await db
+      .select()
+      .from(userLocations)
+      .where(
+        and(
+          eq(userLocations.id, effectiveLocationId),
+          eq(userLocations.userId, actor.user.id),
+        ),
+      )
+      .limit(1);
+    if (
+      !savedLocation ||
+      savedLocation.granularity !== definition.discovery.locationGranularity
+    ) {
+      throw new AgentApiError(
+        400,
+        `${definition.discovery.locationGranularity} location is required before activation`,
+        { code: "location_required" },
+      );
+    }
+  }
   const status =
     activationRequested && actor.kind === "user"
       ? ("active" as const)
@@ -582,7 +731,7 @@ export async function submitDiscoveryEnrollment(
     privateClaimsEncrypted: encryptJson(merged.privateClaims),
     disclosureClaims: merged.disclosureClaims,
     claimProvenance: merged.claimProvenance,
-    locationId: location?.id ?? existing?.locationId ?? null,
+    locationId: effectiveLocationId,
     submittedByApiKeyId: actor.apiKeyId ?? null,
     consentedAt: status === "active" ? new Date() : null,
     expiresAt: earliestProvenanceExpiry(merged.claimProvenance),
@@ -602,6 +751,22 @@ export async function submitDiscoveryEnrollment(
           ...values,
         })
         .returning();
+  if (
+    location &&
+    existing?.locationId &&
+    existing.locationId !== location.id
+  ) {
+    const [stillReferenced] = await db
+      .select({ id: purposeEnrollments.id })
+      .from(purposeEnrollments)
+      .where(eq(purposeEnrollments.locationId, existing.locationId))
+      .limit(1);
+    if (!stillReferenced) {
+      await db
+        .delete(userLocations)
+        .where(eq(userLocations.id, existing.locationId));
+    }
+  }
   await writeAudit({
     actorUserId: actor.user.id,
     actorApiKeyId: actor.apiKeyId,
@@ -617,7 +782,10 @@ export async function submitDiscoveryEnrollment(
     },
   });
   return {
-    ...safeEnrollmentView(enrollment, definition),
+    ...safeEnrollmentView(enrollment, definition, {
+      includeOwnerReview: actor.kind === "user",
+      location,
+    }),
     approvalRequired: status === "pending_approval",
     message:
       status === "active"
@@ -632,6 +800,7 @@ export async function decideDiscoveryEnrollment(opts: {
   user: User;
   enrollmentId: string;
   decision: "approve" | "pause" | "revoke";
+  snapshotHash?: string;
 }) {
   const db = getDb();
   const [enrollment] = await db
@@ -646,7 +815,27 @@ export async function decideDiscoveryEnrollment(opts: {
     .limit(1);
   if (!enrollment) throw new AgentApiError(404, "Enrollment not found");
   const { definition } = await getDiscoveryIntent(enrollment.intentSlug);
+  const [location] = enrollment.locationId
+    ? await db
+        .select()
+        .from(userLocations)
+        .where(
+          and(
+            eq(userLocations.id, enrollment.locationId),
+            eq(userLocations.userId, opts.user.id),
+          ),
+        )
+        .limit(1)
+    : [];
   if (opts.decision === "approve") {
+    const expectedHash = enrollmentSnapshotHash(enrollment, location);
+    if (!opts.snapshotHash || opts.snapshotHash !== expectedHash) {
+      throw new AgentApiError(
+        409,
+        "Enrollment changed or was not reviewed. Refresh and review the current snapshot.",
+        { code: "enrollment_snapshot_changed" },
+      );
+    }
     const combined = {
       ...(enrollment.publicClaims as Record<string, unknown>),
       ...decryptJson(enrollment.privateClaimsEncrypted),
@@ -668,16 +857,35 @@ export async function decideDiscoveryEnrollment(opts: {
           new Date().toISOString();
       }
     }
-    const [updated] = await db
-      .update(purposeEnrollments)
-      .set({
-        status: "active",
-        claimProvenance: provenance,
-        consentedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(purposeEnrollments.id, enrollment.id))
-      .returning();
+    const [updated] = await db.transaction(async (tx) =>
+      tx
+        .update(purposeEnrollments)
+        .set({
+          status: "active",
+          claimProvenance: provenance,
+          consentedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(purposeEnrollments.id, enrollment.id),
+            eq(purposeEnrollments.userId, opts.user.id),
+            eq(purposeEnrollments.status, "pending_approval"),
+            eq(purposeEnrollments.updatedAt, enrollment.updatedAt),
+            enrollment.locationId
+              ? eq(purposeEnrollments.locationId, enrollment.locationId)
+              : isNull(purposeEnrollments.locationId),
+          ),
+        )
+        .returning(),
+    );
+    if (!updated) {
+      throw new AgentApiError(
+        409,
+        "Enrollment changed while it was being approved. Refresh and review again.",
+        { code: "enrollment_snapshot_changed" },
+      );
+    }
     await writeAudit({
       actorUserId: opts.user.id,
       action: "discovery.enrollment_decided",
@@ -685,9 +893,71 @@ export async function decideDiscoveryEnrollment(opts: {
       entityId: enrollment.id,
       metadata: { decision: "approve", intentSlug: enrollment.intentSlug },
     });
-    return safeEnrollmentView(updated, definition);
+    return safeEnrollmentView(updated, definition, {
+      includeOwnerReview: true,
+      location,
+    });
   }
-  const status = opts.decision === "pause" ? "paused" : "revoked";
+  if (opts.decision === "revoke") {
+    const related = await db
+      .select()
+      .from(discoveryInterests)
+      .where(
+        or(
+          eq(discoveryInterests.requesterEnrollmentId, enrollment.id),
+          eq(discoveryInterests.recipientEnrollmentId, enrollment.id),
+        ),
+      );
+    await db.transaction(async (tx) => {
+      for (const interest of related) {
+        await tx
+          .delete(agentInbox)
+          .where(sql`${agentInbox.body}->>'interestId' = ${interest.id}`);
+      }
+      const sessionIds = related
+        .map((interest) => interest.sessionId)
+        .filter((id): id is string => Boolean(id));
+      if (sessionIds.length) {
+        await tx.delete(sessions).where(inArray(sessions.id, sessionIds));
+      }
+      await tx
+        .delete(purposeEnrollments)
+        .where(eq(purposeEnrollments.id, enrollment.id));
+      if (location) {
+        const [remaining] = await tx
+          .select({ id: purposeEnrollments.id })
+          .from(purposeEnrollments)
+          .where(eq(purposeEnrollments.locationId, location.id))
+          .limit(1);
+        if (!remaining) {
+          await tx
+            .delete(userLocations)
+            .where(eq(userLocations.id, location.id));
+        }
+      }
+    });
+    await writeAudit({
+      actorUserId: opts.user.id,
+      action: "discovery.enrollment_decided",
+      entityType: "purpose_enrollment",
+      entityId: enrollment.id,
+      metadata: { decision: "revoke", intentSlug: enrollment.intentSlug },
+    });
+    return {
+      id: enrollment.id,
+      status: "revoked" as const,
+      definitionVersion: enrollment.definitionVersion,
+      publicClaims: {},
+      disclosureClaims: {},
+      missingFields: definition.eligibility.requiredFields,
+      consentedAt: null,
+      expiresAt: null,
+      locationId: null,
+      reviewSnapshotHash: null,
+      ownerReview: null,
+    };
+  }
+  const status = "paused" as const;
   const [updated] = await db
     .update(purposeEnrollments)
     .set({ status, updatedAt: new Date() })
@@ -700,7 +970,10 @@ export async function decideDiscoveryEnrollment(opts: {
     entityId: enrollment.id,
     metadata: { decision: opts.decision, intentSlug: enrollment.intentSlug },
   });
-  return safeEnrollmentView(updated, definition);
+  return safeEnrollmentView(updated, definition, {
+    includeOwnerReview: true,
+    location,
+  });
 }
 
 async function assertSafetyActive(userId: string) {
@@ -739,6 +1012,10 @@ function hashDiscoveryToken(token: string) {
 
 function createDiscoveryToken() {
   return `${DISCOVERY_TOKEN_PREFIX}${randomBytes(24).toString("base64url")}`;
+}
+
+function canonicalDiscoveryPair(leftUserId: string, rightUserId: string) {
+  return [leftUserId, rightUserId].sort().join(":");
 }
 
 async function activeEnrollment(userId: string, intentSlug: string) {
@@ -807,7 +1084,7 @@ export async function searchDiscovery(opts: {
         ),
       ),
     )
-    .orderBy(desc(purposeEnrollments.updatedAt))
+    .orderBy(sql`random()`)
     .limit(100);
   const [seekerLocation] = seeker.locationId
     ? await db
@@ -844,7 +1121,6 @@ export async function searchDiscovery(opts: {
       seekerLocation,
       candidateLocation: candidate.location,
     });
-    if (compatibility.verdict === "incompatible") continue;
     const projection: Record<string, unknown> = {};
     for (const key of definition.discovery.projectionFields) {
       const value = (
@@ -869,7 +1145,11 @@ export async function searchDiscovery(opts: {
     });
     results.push({
       candidateHandle: token,
-      compatibility,
+      compatibility: {
+        verdict: "potential",
+        note:
+          "Private constraints are not exposed or probeable during search. Compatibility is resolved only after mutual interest.",
+      },
       projection,
       expiresAt: expiresAt.toISOString(),
     });
@@ -887,9 +1167,8 @@ export async function searchDiscovery(opts: {
   return {
     intentSlug: opts.intentSlug,
     candidates: results,
-    hasMore: candidates.length > results.length && results.length === limit,
     privacy:
-      "Results are pseudonymous and search-scoped. No stable user identifier, contact information, raw private claim, or exact result count is returned.",
+      "Results are pseudonymous, randomized, and search-scoped. No stable user identifier, contact information, raw private claim, private compatibility dimension, or exact result count is returned.",
   };
 }
 
@@ -950,8 +1229,13 @@ export async function requestDiscoveryIntroduction(opts: {
     .where(
       and(
         eq(discoveryInterests.intentSlug, handle.intentSlug),
-        eq(discoveryInterests.requesterUserId, opts.actor.user.id),
-        eq(discoveryInterests.recipientUserId, handle.candidateUserId),
+        eq(
+          discoveryInterests.pairKey,
+          canonicalDiscoveryPair(
+            opts.actor.user.id,
+            handle.candidateUserId,
+          ),
+        ),
       ),
     )
     .limit(1);
@@ -960,6 +1244,9 @@ export async function requestDiscoveryIntroduction(opts: {
       interestId: existing.id,
       status: existing.status,
       message: "An introduction request already exists for this candidate.",
+      requiresHumanDecision:
+        existing.recipientUserId === opts.actor.user.id &&
+        existing.status === "pending",
     };
   }
   const [interest] = await db
@@ -970,11 +1257,45 @@ export async function requestDiscoveryIntroduction(opts: {
       recipientUserId: handle.candidateUserId,
       requesterEnrollmentId: handle.requesterEnrollmentId,
       recipientEnrollmentId: handle.candidateEnrollmentId,
+      pairKey: canonicalDiscoveryPair(
+        opts.actor.user.id,
+        handle.candidateUserId,
+      ),
       compatibility: handle.compatibility,
       idempotencyKey:
         normalizedText(opts.idempotencyKey, "idempotencyKey", 160) ?? null,
     })
+    .onConflictDoNothing()
     .returning();
+  if (!interest) {
+    const [raced] = await db
+      .select()
+      .from(discoveryInterests)
+      .where(
+        and(
+          eq(discoveryInterests.intentSlug, handle.intentSlug),
+          eq(
+            discoveryInterests.pairKey,
+            canonicalDiscoveryPair(
+              opts.actor.user.id,
+              handle.candidateUserId,
+            ),
+          ),
+        ),
+      )
+      .limit(1);
+    if (!raced) {
+      throw new AgentApiError(409, "Introduction request could not be created");
+    }
+    return {
+      interestId: raced.id,
+      status: raced.status,
+      message: "An introduction request already exists for this candidate.",
+      requiresHumanDecision:
+        raced.recipientUserId === opts.actor.user.id &&
+        raced.status === "pending",
+    };
+  }
   await db
     .update(discoveryHandles)
     .set({ usedAt: new Date() })
@@ -986,9 +1307,8 @@ export async function requestDiscoveryIntroduction(opts: {
     body: {
       interestId: interest.id,
       intentSlug: handle.intentSlug,
-      compatibility: handle.compatibility,
       instructions:
-        "Explain the compatibility summary to your human. Identity is still hidden. The human must approve or decline in HoneyMatcha.",
+        "Tell your human an anonymous participant expressed interest. Identity and private compatibility are still hidden. The human must approve or decline in HoneyMatcha.",
     },
   });
   await writeAudit({
@@ -1051,8 +1371,16 @@ export async function decideDiscoveryInterest(opts: {
     const [updated] = await db
       .update(discoveryInterests)
       .set({ status: "declined", decidedAt: new Date(), updatedAt: new Date() })
-      .where(eq(discoveryInterests.id, interest.id))
+      .where(
+        and(
+          eq(discoveryInterests.id, interest.id),
+          eq(discoveryInterests.status, "pending"),
+        ),
+      )
       .returning();
+    if (!updated) {
+      throw new AgentApiError(409, "Introduction decision changed");
+    }
     await writeAudit({
       actorUserId: opts.user.id,
       action: "discovery.interest_decided",
@@ -1084,6 +1412,34 @@ export async function decideDiscoveryInterest(opts: {
   if (!requesterUser) {
     throw new AgentApiError(409, "Requester is no longer available");
   }
+  const [[requesterLocation], [recipientLocation]] = await Promise.all([
+    requesterEnrollment.locationId
+      ? db
+          .select()
+          .from(userLocations)
+          .where(eq(userLocations.id, requesterEnrollment.locationId))
+          .limit(1)
+      : Promise.resolve([]),
+    recipientEnrollment.locationId
+      ? db
+          .select()
+          .from(userLocations)
+          .where(eq(userLocations.id, recipientEnrollment.locationId))
+          .limit(1)
+      : Promise.resolve([]),
+  ]);
+  const privateCompatibility = registeredIntentHandler(definition)({
+    seekerClaims: {
+      ...(requesterEnrollment.publicClaims as Record<string, unknown>),
+      ...decryptJson(requesterEnrollment.privateClaimsEncrypted),
+    },
+    candidateClaims: {
+      ...(recipientEnrollment.publicClaims as Record<string, unknown>),
+      ...decryptJson(recipientEnrollment.privateClaimsEncrypted),
+    },
+    seekerLocation: requesterLocation,
+    candidateLocation: recipientLocation,
+  });
   const requesterFields = disclosureFields(
     requesterEnrollment,
     requesterUser,
@@ -1094,79 +1450,202 @@ export async function decideDiscoveryInterest(opts: {
     opts.user,
     definition,
   );
-  await db.insert(discoveryDisclosures).values([
-    {
-      interestId: interest.id,
-      grantorUserId: requesterUser.id,
-      granteeUserId: opts.user.id,
-      fields: requesterFields,
-    },
-    {
-      interestId: interest.id,
-      grantorUserId: opts.user.id,
-      granteeUserId: requesterUser.id,
-      fields: recipientFields,
-    },
-  ]);
-  let sessionId: string | null = null;
-  if (interest.intentSlug === "local_meetup") {
-    const [session] = await db
-      .insert(sessions)
-      .values({
-        intentType: "local_meetup",
-        initiatorUserId: interest.requesterUserId,
-        peerUserId: interest.recipientUserId,
-        status: "open",
-        payload: {
-          discoveryInterestId: interest.id,
-          disclosureStage: "mutual_interest",
-        },
+  const privateVerdict = privateCompatibility.verdict;
+  if (privateVerdict === "incompatible") {
+    const [closed] = await db
+      .update(discoveryInterests)
+      .set({
+        status: "declined",
+        compatibility: privateCompatibility,
+        decidedAt: new Date(),
+        updatedAt: new Date(),
       })
+      .where(
+        and(
+          eq(discoveryInterests.id, interest.id),
+          eq(discoveryInterests.status, "pending"),
+        ),
+      )
       .returning();
-    sessionId = session.id;
+    if (!closed) {
+      throw new AgentApiError(409, "Introduction decision changed");
+    }
+    await Promise.all([
+      deliverDiscoveryInbox({
+        userId: interest.requesterUserId,
+        kind: "discovery.private_mismatch",
+        summary:
+          "The anonymous introduction did not pass the private compatibility gate.",
+        body: {
+          interestId: interest.id,
+          intentSlug: interest.intentSlug,
+          instructions:
+            "Tell your human only that the private constraints did not overlap. Do not infer or disclose which constraint.",
+        },
+      }),
+      deliverDiscoveryInbox({
+        userId: interest.recipientUserId,
+        kind: "discovery.private_mismatch",
+        summary:
+          "The anonymous introduction did not pass the private compatibility gate.",
+        body: {
+          interestId: interest.id,
+          intentSlug: interest.intentSlug,
+          instructions:
+            "Tell your human only that the private constraints did not overlap. Do not infer or disclose which constraint.",
+        },
+      }),
+    ]);
+    return {
+      interestId: closed.id,
+      status: closed.status,
+      sessionId: null,
+      disclosure: null,
+      message:
+        "Private constraints did not overlap. No identity or match dimension was disclosed.",
+    };
   }
-  const [updated] = await db
-    .update(discoveryInterests)
-    .set({
-      status: "accepted",
-      decidedAt: new Date(),
-      updatedAt: new Date(),
-      sessionId,
-    })
-    .where(eq(discoveryInterests.id, interest.id))
-    .returning();
-  await Promise.all([
-    deliverDiscoveryInbox({
-      userId: interest.requesterUserId,
-      sessionId,
-      kind: "discovery.introduction_accepted",
-      summary:
-        "Mutual interest confirmed. Only the approved introduction fields are now available.",
-      body: {
+
+  const { updated, sessionId } = await db.transaction(async (tx) => {
+    const pairKey = canonicalDiscoveryPair(
+      interest.requesterUserId,
+      interest.recipientUserId,
+    );
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${pairKey}))`,
+    );
+    for (const enrollment of [
+      requesterEnrollment,
+      recipientEnrollment,
+    ]) {
+      const [locked] = await tx
+        .update(purposeEnrollments)
+        .set({ updatedAt: enrollment.updatedAt })
+        .where(
+          and(
+            eq(purposeEnrollments.id, enrollment.id),
+            eq(purposeEnrollments.status, "active"),
+            eq(purposeEnrollments.updatedAt, enrollment.updatedAt),
+            gt(purposeEnrollments.expiresAt, new Date()),
+          ),
+        )
+        .returning({ id: purposeEnrollments.id });
+      if (!locked) {
+        throw new AgentApiError(
+          409,
+          "Discovery enrollment changed. Re-run matching before introduction.",
+          { code: "enrollment_changed" },
+        );
+      }
+    }
+    const [block] = await tx
+      .select({ id: discoveryBlocks.id })
+      .from(discoveryBlocks)
+      .where(
+        or(
+          and(
+            eq(discoveryBlocks.blockerUserId, interest.requesterUserId),
+            eq(discoveryBlocks.blockedUserId, interest.recipientUserId),
+          ),
+          and(
+            eq(discoveryBlocks.blockerUserId, interest.recipientUserId),
+            eq(discoveryBlocks.blockedUserId, interest.requesterUserId),
+          ),
+        ),
+      )
+      .limit(1);
+    if (block) {
+      throw new AgentApiError(404, "Introduction is no longer available");
+    }
+    const [claimed] = await tx
+      .update(discoveryInterests)
+      .set({
+        status: "accepted",
+        compatibility: privateCompatibility,
+        decidedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(discoveryInterests.id, interest.id),
+          eq(discoveryInterests.status, "pending"),
+        ),
+      )
+      .returning();
+    if (!claimed) {
+      throw new AgentApiError(409, "Introduction decision changed");
+    }
+    await tx.insert(discoveryDisclosures).values([
+      {
         interestId: interest.id,
-        intentSlug: interest.intentSlug,
-        sessionId,
-        disclosure: recipientFields,
-        instructions:
-          "Tell your human mutual interest is confirmed. Do not infer or request undisclosed details.",
+        grantorUserId: requesterUser.id,
+        granteeUserId: opts.user.id,
+        fields: requesterFields,
       },
-    }),
-    deliverDiscoveryInbox({
-      userId: interest.recipientUserId,
-      sessionId,
-      kind: "discovery.introduction_accepted",
-      summary:
-        "Mutual interest confirmed. Only the approved introduction fields are now available.",
-      body: {
+      {
         interestId: interest.id,
-        intentSlug: interest.intentSlug,
-        sessionId,
-        disclosure: requesterFields,
-        instructions:
-          "Tell your human mutual interest is confirmed. Do not infer or request undisclosed details.",
+        grantorUserId: opts.user.id,
+        granteeUserId: requesterUser.id,
+        fields: recipientFields,
       },
-    }),
-  ]);
+    ]);
+    let createdSessionId: string | null = null;
+    if (interest.intentSlug === "local_meetup") {
+      const [session] = await tx
+        .insert(sessions)
+        .values({
+          intentType: "local_meetup",
+          initiatorUserId: interest.requesterUserId,
+          peerUserId: interest.recipientUserId,
+          status: "open",
+          payload: {
+            discoveryInterestId: interest.id,
+            disclosureStage: "mutual_interest",
+            privacyMode: "discovery",
+          },
+        })
+        .returning();
+      createdSessionId = session.id;
+      await tx
+        .update(discoveryInterests)
+        .set({ sessionId: createdSessionId })
+        .where(eq(discoveryInterests.id, interest.id));
+    }
+    await tx.insert(agentInbox).values([
+      {
+        userId: interest.requesterUserId,
+        sessionId: createdSessionId,
+        kind: "discovery.introduction_accepted",
+        summary:
+          "Mutual interest confirmed. Only currently authorized introduction fields are available.",
+        body: {
+          interestId: interest.id,
+          intentSlug: interest.intentSlug,
+          sessionId: createdSessionId,
+          instructions:
+            "Call list_discovery_interests to read the currently authorized disclosure. Do not infer or request undisclosed details.",
+        },
+      },
+      {
+        userId: interest.recipientUserId,
+        sessionId: createdSessionId,
+        kind: "discovery.introduction_accepted",
+        summary:
+          "Mutual interest confirmed. Only currently authorized introduction fields are available.",
+        body: {
+          interestId: interest.id,
+          intentSlug: interest.intentSlug,
+          sessionId: createdSessionId,
+          instructions:
+            "Call list_discovery_interests to read the currently authorized disclosure. Do not infer or request undisclosed details.",
+        },
+      },
+    ]);
+    return {
+      updated: { ...claimed, sessionId: createdSessionId },
+      sessionId: createdSessionId,
+    };
+  });
   await writeAudit({
     actorUserId: opts.user.id,
     action: "discovery.interest_decided",
@@ -1183,9 +1662,9 @@ export async function decideDiscoveryInterest(opts: {
     interestId: updated.id,
     status: updated.status,
     sessionId,
-    disclosure: requesterFields,
+    disclosure: null,
     message:
-      "Mutual interest confirmed. Only approved introduction fields were disclosed.",
+      "Mutual interest confirmed. Call list_discovery_interests to read the currently authorized disclosure.",
   };
 }
 
@@ -1226,7 +1705,19 @@ export async function listDiscoveryInterests(userId: string) {
         ? ("outgoing" as const)
         : ("incoming" as const),
     status: row.status,
-    compatibility: row.compatibility,
+    compatibility: {
+      verdict:
+        row.status === "accepted"
+          ? String(
+              (row.compatibility as Record<string, unknown>).verdict ??
+                "human_review",
+            )
+          : "private_until_mutual_interest",
+      note:
+        row.status === "accepted"
+          ? "Private matching found no hard mismatch. Raw values and dimensions remain private."
+          : "Private compatibility is not revealed before mutual interest.",
+    },
     disclosure:
       row.status === "accepted"
         ? (disclosureByInterest.get(row.id) ?? {})
@@ -1269,25 +1760,58 @@ export async function blockDiscoveryParticipant(opts: {
     opts.interestId,
   );
   const reasonCode = normalizedText(opts.reasonCode, "reasonCode", 80);
-  const [block] = await getDb()
-    .insert(discoveryBlocks)
-    .values({
-      blockerUserId: opts.actor.user.id,
-      blockedUserId: otherUserId,
-      reasonCode,
-    })
-    .onConflictDoUpdate({
-      target: [
-        discoveryBlocks.blockerUserId,
-        discoveryBlocks.blockedUserId,
-      ],
-      set: { reasonCode },
-    })
-    .returning();
-  await getDb()
-    .update(discoveryDisclosures)
-    .set({ revokedAt: new Date() })
-    .where(eq(discoveryDisclosures.interestId, interest.id));
+  const pairKey = canonicalDiscoveryPair(opts.actor.user.id, otherUserId);
+  const [block] = await getDb().transaction(async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${pairKey}))`,
+    );
+    const rows = await tx
+      .insert(discoveryBlocks)
+      .values({
+        blockerUserId: opts.actor.user.id,
+        blockedUserId: otherUserId,
+        reasonCode,
+      })
+      .onConflictDoUpdate({
+        target: [
+          discoveryBlocks.blockerUserId,
+          discoveryBlocks.blockedUserId,
+        ],
+        set: { reasonCode },
+      })
+      .returning();
+    const pairInterests = await tx
+      .select()
+      .from(discoveryInterests)
+      .where(eq(discoveryInterests.pairKey, pairKey));
+    const pairInterestIds = pairInterests.map((row) => row.id);
+    if (pairInterestIds.length) {
+      await tx
+        .delete(discoveryDisclosures)
+        .where(inArray(discoveryDisclosures.interestId, pairInterestIds));
+    }
+    const withdrawn = await tx
+      .update(discoveryInterests)
+      .set({
+        status: "withdrawn",
+        decidedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(discoveryInterests.pairKey, pairKey))
+      .returning({ sessionId: discoveryInterests.sessionId });
+    for (const pairInterest of pairInterests) {
+      await tx
+        .delete(agentInbox)
+        .where(sql`${agentInbox.body}->>'interestId' = ${pairInterest.id}`);
+    }
+    const sessionIds = withdrawn
+      .map((row) => row.sessionId)
+      .filter((id): id is string => Boolean(id));
+    if (sessionIds.length) {
+      await tx.delete(sessions).where(inArray(sessions.id, sessionIds));
+    }
+    return rows;
+  });
   await writeAudit({
     actorUserId: opts.actor.user.id,
     actorApiKeyId: opts.actor.apiKeyId,
@@ -1371,7 +1895,8 @@ export async function setDiscoverySafetyStatus(opts: {
   status: "active" | "restricted" | "suspended";
   reasonCode?: string;
 }) {
-  const [row] = await getDb()
+  const db = getDb();
+  const [row] = await db
     .insert(userSafety)
     .values({
       userId: opts.subjectUserId,
@@ -1392,10 +1917,46 @@ export async function setDiscoverySafetyStatus(opts: {
     })
     .returning();
   if (opts.status !== "active") {
-    await getDb()
+    await db
       .update(purposeEnrollments)
       .set({ status: "paused", updatedAt: new Date() })
       .where(eq(purposeEnrollments.userId, opts.subjectUserId));
+    const interests = await db
+      .select()
+      .from(discoveryInterests)
+      .where(
+        or(
+          eq(discoveryInterests.requesterUserId, opts.subjectUserId),
+          eq(discoveryInterests.recipientUserId, opts.subjectUserId),
+        ),
+      );
+    await db.transaction(async (tx) => {
+      for (const interest of interests) {
+        await tx
+          .delete(agentInbox)
+          .where(sql`${agentInbox.body}->>'interestId' = ${interest.id}`);
+      }
+      const sessionIds = interests
+        .map((interest) => interest.sessionId)
+        .filter((id): id is string => Boolean(id));
+      if (sessionIds.length) {
+        await tx.delete(sessions).where(inArray(sessions.id, sessionIds));
+      }
+      const interestIds = interests.map((interest) => interest.id);
+      if (interestIds.length) {
+        await tx
+          .delete(discoveryDisclosures)
+          .where(inArray(discoveryDisclosures.interestId, interestIds));
+        await tx
+          .update(discoveryInterests)
+          .set({
+            status: "withdrawn",
+            decidedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(inArray(discoveryInterests.id, interestIds));
+      }
+    });
   }
   await writeAudit({
     actorUserId: opts.moderator.id,
@@ -1409,61 +1970,74 @@ export async function setDiscoverySafetyStatus(opts: {
 
 export async function cleanupExpiredDiscoveryData(now = new Date()) {
   const db = getDb();
-  const expiredHandles = await db
-    .delete(discoveryHandles)
-    .where(lt(discoveryHandles.expiresAt, now))
-    .returning({ id: discoveryHandles.id });
-  const dueEnrollments = await db
-    .select()
-    .from(purposeEnrollments)
-    .where(lt(purposeEnrollments.expiresAt, now));
-  let redactedClaims = 0;
-  for (const enrollment of dueEnrollments) {
-    const publicClaims = {
-      ...(enrollment.publicClaims as Record<string, unknown>),
-    };
-    const privateClaims = decryptJson(enrollment.privateClaimsEncrypted);
-    const disclosureClaims = {
-      ...(enrollment.disclosureClaims as Record<string, unknown>),
-    };
-    const provenance = {
-      ...(enrollment.claimProvenance as Record<string, unknown>),
-    };
-    for (const [key, value] of Object.entries(provenance)) {
-      const expiresAt =
-        value &&
-        typeof value === "object" &&
-        !Array.isArray(value) &&
-        typeof (value as Record<string, unknown>).expiresAt === "string"
-          ? new Date(String((value as Record<string, unknown>).expiresAt))
-          : null;
-      if (expiresAt && expiresAt <= now) {
-        delete publicClaims[key];
-        delete privateClaims[key];
-        delete disclosureClaims[key];
-        delete provenance[key];
-        redactedClaims += 1;
-      }
-    }
-    await db
+  const retentionCutoff = new Date(
+    now.getTime() - 365 * 24 * 60 * 60 * 1000,
+  );
+  const result = await db.transaction(async (tx) => {
+    const dueEnrollments = await tx
       .update(purposeEnrollments)
-      .set({
-        status: "paused",
-        publicClaims,
-        privateClaimsEncrypted: encryptJson(privateClaims),
-        disclosureClaims,
-        claimProvenance: provenance,
-        expiresAt:
-          Object.keys(provenance).length > 0
-            ? earliestProvenanceExpiry(provenance)
-            : null,
-        updatedAt: now,
-      })
-      .where(eq(purposeEnrollments.id, enrollment.id));
-  }
+      .set({ status: "revoked", updatedAt: now })
+      .where(lt(purposeEnrollments.expiresAt, now))
+      .returning();
+    const enrollmentIds = dueEnrollments.map((row) => row.id);
+    const relatedInterests = enrollmentIds.length
+      ? await tx
+          .select()
+          .from(discoveryInterests)
+          .where(
+            or(
+              inArray(discoveryInterests.requesterEnrollmentId, enrollmentIds),
+              inArray(discoveryInterests.recipientEnrollmentId, enrollmentIds),
+            ),
+          )
+      : [];
+    const interestIds = relatedInterests.map((row) => row.id);
+    const sessionIds = relatedInterests
+      .map((row) => row.sessionId)
+      .filter((id): id is string => Boolean(id));
+    const expiredHandles = await tx
+      .delete(discoveryHandles)
+      .where(lt(discoveryHandles.expiresAt, now))
+      .returning({ id: discoveryHandles.id });
+    for (const interestId of interestIds) {
+      await tx
+        .delete(agentInbox)
+        .where(sql`${agentInbox.body}->>'interestId' = ${interestId}`);
+    }
+    if (sessionIds.length) {
+      await tx.delete(sessions).where(inArray(sessions.id, sessionIds));
+    }
+    const deletedEnrollments = enrollmentIds.length
+      ? await tx
+          .delete(purposeEnrollments)
+          .where(inArray(purposeEnrollments.id, enrollmentIds))
+          .returning({ id: purposeEnrollments.id })
+      : [];
+    const expiredReports = await tx
+      .delete(safetyReports)
+      .where(lt(safetyReports.createdAt, retentionCutoff))
+      .returning({ id: safetyReports.id });
+    const orphanLocations = await tx
+      .delete(userLocations)
+      .where(
+        sql`not exists (
+          select 1 from ${purposeEnrollments}
+          where ${purposeEnrollments.locationId} = ${userLocations.id}
+        )`,
+      )
+      .returning({ id: userLocations.id });
+    return {
+      expiredHandles: expiredHandles.length,
+      deletedEnrollments: deletedEnrollments.length,
+      deletedInterests: interestIds.length,
+      deletedSessions: sessionIds.length,
+      expiredReports: expiredReports.length,
+      deletedOrphanLocations: orphanLocations.length,
+    };
+  });
   return {
-    expiredHandles: expiredHandles.length,
-    pausedEnrollments: dueEnrollments.length,
-    redactedClaims,
+    ...result,
+    retentionPolicy:
+      "Expired purpose enrollments and all derived introductions, disclosures, inbox copies, and meetup sessions are deleted. Safety reports are retained for 365 days.",
   };
 }

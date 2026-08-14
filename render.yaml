@@ -54,3 +54,17 @@ services:
     region: oregon
     maxmemoryPolicy: allkeys-lru
     ipAllowList: []
+  - type: cron
+    name: honeymatcha-discovery-cleanup
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: web
+    schedule: "0 * * * *"
+    buildCommand: npm install
+    startCommand: npm run discovery:cleanup
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false

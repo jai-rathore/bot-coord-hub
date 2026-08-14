@@ -28,6 +28,16 @@ type IntentItem = {
     missingFields: string[];
     consentedAt: string | null;
     expiresAt: string | null;
+    reviewSnapshotHash: string | null;
+    ownerReview: {
+      claims: {
+        public: Record<string, unknown>;
+        private: Record<string, unknown>;
+        disclosureAfterMatch: Record<string, unknown>;
+      };
+      provenance: Record<string, unknown>;
+      location: Record<string, unknown> | null;
+    } | null;
   };
 };
 
@@ -233,6 +243,7 @@ export function DiscoveryManager({
         action: "decide_enrollment",
         enrollmentId: selected.currentEnrollment.id,
         decision,
+        snapshotHash: selected.currentEnrollment.reviewSnapshotHash,
       });
       setIntents((current) =>
         current.map((intent) =>
@@ -377,16 +388,31 @@ export function DiscoveryManager({
                   </p>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {[
-                      ["label", "Label, e.g. Downtown Brooklyn"],
-                      ["countryCode", "Country code"],
-                      ["region", "State or region"],
-                      ["locality", "City"],
-                      ["neighborhood", "Neighborhood"],
-                    ].map(([key, placeholder]) => (
+                      ["countryCode", "Country code", 0],
+                      ["region", "State or region", 1],
+                      ["locality", "City", 2],
+                      ["neighborhood", "Neighborhood", 3],
+                    ]
+                      .filter(([, , level]) => {
+                        const requiredLevel = {
+                          country: 0,
+                          region: 1,
+                          city: 2,
+                          neighborhood: 3,
+                        }[
+                          selected.discovery.locationGranularity as
+                            | "country"
+                            | "region"
+                            | "city"
+                            | "neighborhood"
+                        ];
+                        return Number(level) <= requiredLevel;
+                      })
+                      .map(([key, placeholder]) => (
                       <input
-                        key={key}
+                        key={String(key)}
                         className="rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none focus:border-matcha"
-                        placeholder={placeholder}
+                        placeholder={String(placeholder)}
                         value={location[key as keyof typeof location]}
                         onChange={(event) =>
                           setLocation((current) => ({
@@ -398,6 +424,26 @@ export function DiscoveryManager({
                     ))}
                   </div>
                 </fieldset>
+              ) : null}
+
+              {selected.currentEnrollment.status === "pending_approval" &&
+              selected.currentEnrollment.ownerReview ? (
+                <section className="mt-6 rounded-2xl border border-honey/60 bg-honey/10 p-4">
+                  <h3 className="text-sm font-semibold text-matcha-deep">
+                    Review exactly what your agent submitted
+                  </h3>
+                  <p className="mt-1 text-xs leading-5 text-muted">
+                    Approval is bound to this snapshot. If any value, source, or
+                    location changes, HoneyMatcha requires a fresh review.
+                  </p>
+                  <pre className="mt-3 max-h-80 overflow-auto rounded-xl bg-white p-3 text-xs leading-5 text-muted">
+                    {JSON.stringify(
+                      selected.currentEnrollment.ownerReview,
+                      null,
+                      2,
+                    )}
+                  </pre>
+                </section>
               ) : null}
 
               {message ? (

@@ -2,7 +2,6 @@ import { createClient, type RedisClientType } from "redis";
 import { rateLimit, type RateLimitResult } from "@/lib/rate-limit";
 
 declare global {
-  // eslint-disable-next-line no-var
   var __honeymatchaRedisClient: RedisClientType | undefined;
 }
 

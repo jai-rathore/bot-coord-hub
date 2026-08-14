@@ -173,6 +173,7 @@ test("A2A card advertises the v1 interface and scoped auth", () => {
     "https://honeymatcha.io/api/a2a",
   );
   assert.ok(card.skills.some((skill) => skill.id === "guest-task"));
+  assert.deepEqual(card.security, [{ honeymatchaBearer: [] }]);
 });
 
 test("production never enables a simulated calendar by default", () => {

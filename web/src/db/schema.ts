@@ -395,9 +395,6 @@ export const userLocations = pgTable(
       t.locality,
       t.neighborhood,
     ),
-    uniqueIndex("user_locations_primary_uidx")
-      .on(t.userId)
-      .where(sql`${t.isPrimary} = true`),
     check(
       "user_locations_granularity_check",
       sql`${t.granularity} in ('country', 'region', 'city', 'neighborhood')`,
@@ -554,6 +551,8 @@ export const discoveryInterests = pgTable(
     recipientEnrollmentId: uuid("recipient_enrollment_id")
       .notNull()
       .references(() => purposeEnrollments.id, { onDelete: "cascade" }),
+    /** Canonical sorted user-id pair; prevents reciprocal duplicate intros. */
+    pairKey: text("pair_key"),
     status: discoveryInterestStatusEnum("status").notNull().default("pending"),
     compatibility: jsonb("compatibility")
       .$type<Record<string, unknown>>()
@@ -577,6 +576,9 @@ export const discoveryInterests = pgTable(
       t.requesterUserId,
       t.recipientUserId,
     ),
+    uniqueIndex("discovery_interests_canonical_pair_uidx")
+      .on(t.intentSlug, t.pairKey)
+      .where(sql`${t.pairKey} is not null`),
     uniqueIndex("discovery_interests_idempotency_uidx")
       .on(t.requesterUserId, t.idempotencyKey)
       .where(sql`${t.idempotencyKey} is not null`),

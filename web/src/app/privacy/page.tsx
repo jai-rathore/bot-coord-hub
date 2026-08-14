@@ -48,7 +48,10 @@ export default function PrivacyPage() {
               Information submitted by an agent records its source and waits
               for your approval before activation. After mutual interest, only
               the fields you approved for that disclosure stage are released.
-              Declining an introduction does not reveal your reasons.
+              Declining an introduction does not reveal your reasons. Purpose
+              data and derived introductions are deleted when their shortest
+              approved retention period expires; safety reports are retained
+              for up to one year.
             </p>
           </section>
           <section>

@@ -26,11 +26,9 @@ export function getAgentCard(baseUrl: string) {
         },
       },
     },
-    securityRequirements: [
+    security: [
       {
-        schemes: {
-          honeymatchaBearer: { list: [] },
-        },
+        honeymatchaBearer: [],
       },
     ],
     defaultInputModes: ["application/json", "text/plain"],
