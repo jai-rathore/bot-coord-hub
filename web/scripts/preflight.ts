@@ -12,9 +12,11 @@ import {
   publicInvites,
   purposeEnrollments,
   discoveryInterests,
+  discoveryPairHistory,
   discoveryBlocks,
   userLocations,
 } from "../src/db/schema";
+import { discoveryFeatureEnabled } from "../src/lib/discovery-feature";
 
 config({ path: ".env.local" });
 config();
@@ -79,6 +81,14 @@ async function main() {
         : "in-memory fallback active locally",
   });
 
+  checks.push({
+    name: "Discovery feature flag",
+    ok: true,
+    detail: discoveryFeatureEnabled()
+      ? "enabled"
+      : "disabled (safe deployment default)",
+  });
+
   const googleEnabled =
     process.env.GOOGLE_CALENDAR_ENABLED === "true" ||
     process.env.GOOGLE_CALENDAR_ENABLED === "1";
@@ -123,6 +133,10 @@ async function main() {
         db
           .select({ id: discoveryInterests.id })
           .from(discoveryInterests)
+          .limit(1),
+        db
+          .select({ id: discoveryPairHistory.id })
+          .from(discoveryPairHistory)
           .limit(1),
         db.select({ id: discoveryBlocks.id }).from(discoveryBlocks).limit(1),
         db.select({ id: userLocations.id }).from(userLocations).limit(1),

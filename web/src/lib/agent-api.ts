@@ -30,7 +30,7 @@ import {
 import { runScheduleMeeting } from "@/lib/schedule-meeting";
 import type { AllowedHours } from "@/db/schema";
 import { writeAudit } from "@/lib/audit";
-import { assertAgentScope } from "@/lib/scopes";
+import { assertAgentScope, hasAgentScope } from "@/lib/scopes";
 import { boundedText } from "@/lib/validation";
 import {
   ackInboxItem,
@@ -120,7 +120,13 @@ function rethrowAsAgentError(err: unknown): never {
       : message.includes("DATABASE_URL")
         ? 503
         : 500;
-  throw new AgentApiError(status, message);
+  if (status >= 500) {
+    console.error("[agent-api] unexpected domain error", err);
+  }
+  throw new AgentApiError(
+    status,
+    status >= 500 ? "Internal server error" : message,
+  );
 }
 
 export async function whoami(auth: AgentAuth) {
@@ -596,10 +602,19 @@ export async function listIntents(query?: string) {
 }
 
 export async function listDiscoveryCapabilities(auth: AgentAuth) {
-  assertAgentScope(auth, "discovery:read");
+  assertAgentScope(auth, "intents:read");
   return {
     ok: true,
     intents: await listDiscoveryCatalog(auth.user.id),
+    agentAccess: {
+      canSearch: hasAgentScope(auth, "discovery:read"),
+      canEnrollOrRequest: hasAgentScope(auth, "discovery:write"),
+      instructions:
+        hasAgentScope(auth, "discovery:read") &&
+        hasAgentScope(auth, "discovery:write")
+          ? "This agent connection can use discovery after declaring supported intent versions."
+          : "This existing agent connection predates discovery scopes. Ask the human to re-pair the agent before using discovery.",
+    },
     trustModel: {
       discoverableDoesNotMeanIdentifiable: true,
       rawPrivateClaimsSharedBeforeIntroduction: false,
@@ -617,7 +632,7 @@ export async function setDiscoveryCapabilityManifest(
     metadata?: unknown;
   },
 ) {
-  assertAgentScope(auth, "profile:read");
+  assertAgentScope(auth, "discovery:write");
   return {
     ok: true,
     capabilityManifest: await upsertAgentCapabilityManifest({
@@ -834,7 +849,8 @@ export async function proposeIntent(
     if (message.includes("unique") || message.includes("duplicate")) {
       throw new AgentApiError(409, "Slug already taken", { hits });
     }
-    throw new AgentApiError(503, message);
+    console.error("[agent-api] intent proposal database error", err);
+    throw new AgentApiError(503, "Intent proposal is temporarily unavailable");
   }
 }
 

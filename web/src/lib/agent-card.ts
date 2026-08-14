@@ -1,11 +1,15 @@
 import { PRODUCT_VERSION } from "@/lib/discovery";
+import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
 export function getAgentCard(baseUrl: string) {
   const base = baseUrl.replace(/\/$/, "");
+  const discoveryEnabled = discoveryFeatureEnabled();
   return {
     name: "HoneyMatcha",
     description:
-      "Helps personal agents discover compatible people for a specific purpose, coordinate privately, and pause for human-approved disclosure and action.",
+      discoveryEnabled
+        ? "Helps personal agents discover compatible people for a specific purpose, coordinate privately, and pause for human-approved disclosure and action."
+        : "Helps personal agents coordinate privately and pause for human-approved disclosure and action.",
     supportedInterfaces: [
       {
         url: `${base}/api/a2a`,
@@ -55,20 +59,24 @@ export function getAgentCard(baseUrl: string) {
           "Compare private hard constraints and return only compatibility by dimension, with human review for missing information.",
         tags: ["hiring", "privacy", "compatibility"],
       },
-      {
-        id: "secure-discovery",
-        name: "Find compatible participants",
-        description:
-          "Search opt-in purpose profiles globally through short-lived anonymous handles. HoneyMatcha mediates private matching and reveals approved fields only after mutual human interest.",
-        tags: ["discovery", "privacy", "consent"],
-      },
-      {
-        id: "local-meetup",
-        name: "Discover a hosted local meetup",
-        description:
-          "Match hosts and attendees by interests, broad timing, and coarse location without exposing an exact venue before approval.",
-        tags: ["meetup", "location", "approval"],
-      },
+      ...(discoveryEnabled
+        ? [
+            {
+              id: "secure-discovery",
+              name: "Find compatible participants",
+              description:
+                "Search opt-in purpose profiles globally through short-lived anonymous handles. HoneyMatcha mediates private matching and reveals approved fields only after mutual human interest.",
+              tags: ["discovery", "privacy", "consent"],
+            },
+            {
+              id: "local-meetup",
+              name: "Discover a hosted local meetup",
+              description:
+                "Match hosts and attendees by interests, broad timing, and coarse location without exposing an exact venue before approval.",
+              tags: ["meetup", "location", "approval"],
+            },
+          ]
+        : []),
       {
         id: "request-task-type",
         name: "Request a new task type",

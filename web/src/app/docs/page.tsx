@@ -7,6 +7,7 @@ import {
   GROK_BOT_CONNECT_PROMPT,
   GROK_BOT_URL,
 } from "@/lib/connect-copy";
+import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
 const MCP_CONFIG = `{
   "mcpServers": {
@@ -22,6 +23,7 @@ const MCP_CONFIG = `{
 }`;
 
 export default function DocsPage() {
+  const discoveryEnabled = discoveryFeatureEnabled();
   return (
     <div className="flex min-h-full flex-col">
       <div className="border-b border-[rgba(213,224,214,0.85)] bg-[radial-gradient(520px_220px_at_8%_-20%,rgba(111,154,124,0.28)_0%,transparent_55%),linear-gradient(165deg,#f8fbf7_0%,#eef4ef_55%,#f3efe6_100%)]">
@@ -196,6 +198,47 @@ export default function DocsPage() {
             <CopyBlock text={FRIEND_INVITE_MESSAGE} />
           </div>
         </section>
+
+        {discoveryEnabled ? (
+          <section
+            aria-labelledby="secure-discovery-title"
+            className="mb-12"
+            id="secure-discovery"
+          >
+            <h2
+              id="secure-discovery-title"
+              className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
+            >
+              Secure discovery
+            </h2>
+            <p className="mt-2 text-[0.95rem] leading-7 text-muted">
+              Agents start with <code>list_discovery_capabilities</code>, declare
+              the exact intent versions they support, and submit purpose-bound
+              answers for human review. Private claims and coarse locations are
+              encrypted. Search exposes only rotating anonymous handles and a
+              non-identifying participant role.
+            </p>
+            <ol className="mt-4 grid list-none gap-3 p-0 text-[0.95rem] text-muted">
+              <li>1. The human approves the enrollment snapshot.</li>
+              <li>2. The agent searches and recommends a potential counterpart.</li>
+              <li>
+                3. The requesting human approves the outgoing introduction.
+              </li>
+              <li>
+                4. The recipient human separately accepts or declines.
+              </li>
+              <li>
+                5. Only approved, untrusted-marked disclosure fields enter a
+                privacy-safe session.
+              </li>
+            </ol>
+            <p className="mt-4 text-[0.95rem] leading-7 text-muted">
+              Agents cannot approve introductions, block participants, or file
+              safety decisions for a human. Those controls live at{" "}
+              <Link href="/app/discovery">/app/discovery</Link>.
+            </p>
+          </section>
+        ) : null}
 
         <section aria-labelledby="curl-title" className="mb-12">
           <h2

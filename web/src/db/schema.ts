@@ -496,6 +496,10 @@ export const discoveryHandles = pgTable(
     requesterUserId: uuid("requester_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    requesterApiKeyId: uuid("requester_api_key_id").references(
+      () => apiKeys.id,
+      { onDelete: "cascade" },
+    ),
     candidateUserId: uuid("candidate_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -650,6 +654,45 @@ export const discoveryBlocks = pgTable(
     check(
       "discovery_blocks_not_self_check",
       sql`${t.blockerUserId} <> ${t.blockedUserId}`,
+    ),
+  ],
+);
+
+/** Durable anti-probing memory that survives enrollment revocation/recreation. */
+export const discoveryPairHistory = pgTable(
+  "discovery_pair_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    pairKey: text("pair_key").notNull(),
+    userAId: uuid("user_a_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    userBId: uuid("user_b_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    intentSlug: text("intent_slug").notNull(),
+    outcome: text("outcome").notNull(),
+    probeCount: integer("probe_count").notNull().default(1),
+    lastOutcomeAt: timestamp("last_outcome_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("discovery_pair_history_intent_pair_uidx").on(
+      t.intentSlug,
+      t.pairKey,
+    ),
+    index("discovery_pair_history_user_a_idx").on(t.userAId, t.intentSlug),
+    index("discovery_pair_history_user_b_idx").on(t.userBId, t.intentSlug),
+    check(
+      "discovery_pair_history_not_self_check",
+      sql`${t.userAId} <> ${t.userBId}`,
     ),
   ],
 );
@@ -1015,5 +1058,6 @@ export type DiscoveryHandle = typeof discoveryHandles.$inferSelect;
 export type DiscoveryInterest = typeof discoveryInterests.$inferSelect;
 export type DiscoveryDisclosure = typeof discoveryDisclosures.$inferSelect;
 export type DiscoveryBlock = typeof discoveryBlocks.$inferSelect;
+export type DiscoveryPairHistory = typeof discoveryPairHistory.$inferSelect;
 export type UserSafety = typeof userSafety.$inferSelect;
 export type SafetyReport = typeof safetyReports.$inferSelect;

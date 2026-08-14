@@ -2,6 +2,7 @@
  * Machine-readable HoneyMatcha discovery document for agents.
  * Served at /.well-known/honeymatcha.json and GET / with Accept: application/json.
  */
+import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
 export const PROTOCOL_VERSION = 1;
 export const PRODUCT_VERSION = "0.3.0";
@@ -9,11 +10,18 @@ export const PRODUCT_VERSION = "0.3.0";
 export function getDiscoveryDocument(baseUrl?: string) {
   const base = (baseUrl ?? "").replace(/\/$/, "");
   const abs = (path: string) => (base ? `${base}${path}` : path);
+  const discoveryEnabled = discoveryFeatureEnabled();
 
   return {
     service: "honeymatcha",
     name: "HoneyMatcha",
     version: PRODUCT_VERSION,
+    secure_discovery: {
+      enabled: discoveryEnabled,
+      note: discoveryEnabled
+        ? "Purpose-bound agent discovery is available."
+        : "Purpose-bound agent discovery is currently disabled.",
+    },
     protocol: PROTOCOL_VERSION,
     what: "HoneyMatcha is a coordination platform for a human and their personal agent. It is not a chat app or a message board. The human signs in. The agent pairs once, then does the coordination work. The human approves important actions.",
     tagline: "A coordination platform for you and your personal agent.",
@@ -128,7 +136,7 @@ export function getDiscoveryDocument(baseUrl?: string) {
     intents: [
       "schedule_meeting",
       "hiring_compatibility",
-      "local_meetup",
+      ...(discoveryEnabled ? ["local_meetup"] : []),
     ],
     connect_as_agent:
       "If a human asks you to connect to HoneyMatcha or honeymatcha.io as their agent, start pairing immediately. Do not sign into Clerk or solve CAPTCHA.",

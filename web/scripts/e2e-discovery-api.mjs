@@ -42,14 +42,16 @@ async function main() {
   const suffix = randomBytes(4).toString("hex");
   const seekerKey = keyMaterial();
   const hostKey = keyMaterial();
-  const [seeker, host] = await sql`
+  const host2Key = keyMaterial();
+  const [seeker, host, host2] = await sql`
     insert into users (clerk_user_id, email, name)
     values
       (${`clerk_discovery_api_seeker_${suffix}`}, ${`api-seeker-${suffix}@example.com`}, ${"API Seeker"}),
-      (${`clerk_discovery_api_host_${suffix}`}, ${`api-host-${suffix}@example.com`}, ${"API Host"})
+      (${`clerk_discovery_api_host_${suffix}`}, ${`api-host-${suffix}@example.com`}, ${"API Host"}),
+      (${`clerk_discovery_api_host2_${suffix}`}, ${`api-host2-${suffix}@example.com`}, ${"API Host Two"})
     returning *
   `;
-  cleanupUserIds = [seeker.id, host.id];
+  cleanupUserIds = [seeker.id, host.id, host2.id];
   await sql`
     insert into api_keys (user_id, name, key_prefix, key_hash, scopes)
     values
@@ -60,6 +62,7 @@ async function main() {
         ${seekerKey.hash},
         ${sql.json([
           "profile:read",
+          "intents:read",
           "tasks:read",
           "discovery:read",
           "discovery:write",
@@ -73,9 +76,22 @@ async function main() {
         ${hostKey.hash},
         ${sql.json([
           "profile:read",
+          "intents:read",
           "discovery:read",
           "discovery:write",
           "approvals:write",
+        ])}
+      ),
+      (
+        ${host2.id},
+        ${"Discovery API host two"},
+        ${host2Key.prefix},
+        ${host2Key.hash},
+        ${sql.json([
+          "profile:read",
+          "intents:read",
+          "discovery:read",
+          "discovery:write",
         ])}
       )
   `;
@@ -107,6 +123,15 @@ async function main() {
     },
   });
   assert(hostCapability.response.ok, JSON.stringify(hostCapability.data));
+  const host2Capability = await jsonFetch("/api/v1/me/capabilities", {
+    method: "PUT",
+    bearer: host2Key.raw,
+    body: {
+      supportedIntents: { local_meetup: 1 },
+      platforms: ["e2e-api"],
+    },
+  });
+  assert(host2Capability.response.ok, JSON.stringify(host2Capability.data));
 
   const commonLocation = {
     label: "Park Slope",
@@ -168,12 +193,38 @@ async function main() {
     },
   });
   assert(hostEnrollment.response.status === 201, JSON.stringify(hostEnrollment.data));
+  const host2Enrollment = await jsonFetch("/api/v1/discovery/enrollments", {
+    method: "POST",
+    bearer: host2Key.raw,
+    body: {
+      intentSlug: "local_meetup",
+      claims: {
+        participantType: "host",
+        interests: ["coffee"],
+        timeWindows: ["saturday afternoon"],
+        introductionSummary: "Hosts another small meetup.",
+      },
+      provenance: {
+        participantType: { source: "human conversation" },
+        interests: { source: "human conversation" },
+        timeWindows: { source: "human conversation" },
+        introductionSummary: { source: "human conversation" },
+      },
+      location: commonLocation,
+      requestActivation: true,
+    },
+  });
+  assert(
+    host2Enrollment.response.status === 201,
+    JSON.stringify(host2Enrollment.data),
+  );
   await sql`
     update purpose_enrollments
     set status = 'active', consented_at = now()
     where id in (
       ${seekerEnrollment.data.enrollment.id},
-      ${hostEnrollment.data.enrollment.id}
+      ${hostEnrollment.data.enrollment.id},
+      ${host2Enrollment.data.enrollment.id}
     )
   `;
 
@@ -183,8 +234,24 @@ async function main() {
     body: { intentSlug: "local_meetup" },
   });
   assert(search.response.ok, JSON.stringify(search.data));
-  assert(search.data.candidates.length === 1, "one anonymous candidate expected");
-  const candidate = search.data.candidates[0];
+  assert(search.data.candidates.length === 2, "two anonymous candidates expected");
+  const candidateRows = await sql`
+    select candidate_user_id, token_hash
+    from discovery_handles
+    where requester_user_id = ${seeker.id}
+  `;
+  const handleForUser = (userId) =>
+    search.data.candidates.find((item) => {
+      const hash = createHash("sha256")
+        .update(item.candidateHandle)
+        .digest("hex");
+      return candidateRows.some(
+        (row) => row.candidate_user_id === userId && row.token_hash === hash,
+      );
+    });
+  const candidate = handleForUser(host.id);
+  const secondCandidate = handleForUser(host2.id);
+  assert(candidate && secondCandidate, "candidate handles should map internally");
   assert(String(candidate.candidateHandle).startsWith("dc_"), "opaque handle expected");
   assert(candidate.compatibility.verdict === "potential", "search must not expose private matching");
   const serializedCandidate = JSON.stringify(candidate);
@@ -192,14 +259,26 @@ async function main() {
   assert(!serializedCandidate.includes(host.email), "candidate email leaked");
   assert(!serializedCandidate.includes("board games"), "private interests leaked");
 
+  const idempotencyKey = randomUUID();
   const request = await jsonFetch("/api/v1/discovery/interests", {
     method: "POST",
     bearer: seekerKey.raw,
-    headers: { "idempotency-key": randomUUID() },
+    headers: { "idempotency-key": idempotencyKey },
     body: { candidateHandle: candidate.candidateHandle },
   });
   assert(request.response.status === 201, JSON.stringify(request.data));
   assert(request.data.interestId === null, "agent response leaked stable interest id");
+  const collision = await jsonFetch("/api/v1/discovery/interests", {
+    method: "POST",
+    bearer: seekerKey.raw,
+    headers: { "idempotency-key": idempotencyKey },
+    body: { candidateHandle: secondCandidate.candidateHandle },
+  });
+  const serializedCollision = JSON.stringify(collision.data);
+  assert(collision.response.status === 201, serializedCollision);
+  assert(!serializedCollision.includes(host2.id), "collision leaked candidate id");
+  assert(!serializedCollision.includes(seeker.id), "collision leaked requester id");
+  assert(!serializedCollision.includes("dimensions"), "collision leaked private match");
   const [storedInterest] = await sql`
     select id
     from discovery_interests
@@ -213,12 +292,26 @@ async function main() {
     body: { intentSlug: "local_meetup" },
   });
   assert(reciprocalSearch.response.ok, JSON.stringify(reciprocalSearch.data));
+  const reciprocalRows = await sql`
+    select candidate_user_id, token_hash
+    from discovery_handles
+    where requester_user_id = ${host.id}
+  `;
+  const seekerCandidate = reciprocalSearch.data.candidates.find((item) => {
+    const hash = createHash("sha256")
+      .update(item.candidateHandle)
+      .digest("hex");
+    return reciprocalRows.some(
+      (row) =>
+        row.candidate_user_id === seeker.id && row.token_hash === hash,
+    );
+  });
+  assert(seekerCandidate, "reciprocal seeker handle should exist");
   const reciprocalRequest = await jsonFetch("/api/v1/discovery/interests", {
     method: "POST",
     bearer: hostKey.raw,
     body: {
-      candidateHandle:
-        reciprocalSearch.data.candidates[0].candidateHandle,
+      candidateHandle: seekerCandidate.candidateHandle,
     },
   });
   assert(reciprocalRequest.response.status === 201, JSON.stringify(reciprocalRequest.data));
@@ -361,7 +454,7 @@ async function main() {
       2,
     ),
   );
-  await sql`delete from users where id in (${seeker.id}, ${host.id})`;
+  await sql`delete from users where id in (${seeker.id}, ${host.id}, ${host2.id})`;
   cleanupUserIds = [];
   await sql.end();
 }

@@ -7,12 +7,14 @@ import {
   LOCAL_MEETUP_DEFINITION,
   SCHEDULE_MEETING_DEFINITION,
 } from "../lib/intent-definitions";
+import { discoveryFeatureEnabled } from "../lib/discovery-feature";
 
 config({ path: ".env.local" });
 config();
 
 async function seed() {
   const db = getDb();
+  const discoveryEnabled = discoveryFeatureEnabled();
 
   const existing = await db
     .select()
@@ -96,7 +98,7 @@ async function seed() {
         ],
         definitionVersion: HIRING_DISCOVERY_DEFINITION.version,
         definition: HIRING_DISCOVERY_DEFINITION,
-        discoveryEnabled: HIRING_DISCOVERY_DEFINITION.discovery.enabled,
+        discoveryEnabled,
         handler: HIRING_DISCOVERY_DEFINITION.discovery.handler,
         schema: hiringSchema,
         updatedAt: new Date(),
@@ -117,7 +119,7 @@ async function seed() {
       ],
       definitionVersion: HIRING_DISCOVERY_DEFINITION.version,
       definition: HIRING_DISCOVERY_DEFINITION,
-      discoveryEnabled: HIRING_DISCOVERY_DEFINITION.discovery.enabled,
+      discoveryEnabled,
       handler: HIRING_DISCOVERY_DEFINITION.discovery.handler,
       schema: hiringSchema,
     });
@@ -142,7 +144,7 @@ async function seed() {
         requiredScopes: ["discovery:read", "discovery:write"],
         definitionVersion: LOCAL_MEETUP_DEFINITION.version,
         definition: LOCAL_MEETUP_DEFINITION,
-        discoveryEnabled: LOCAL_MEETUP_DEFINITION.discovery.enabled,
+        discoveryEnabled,
         handler: LOCAL_MEETUP_DEFINITION.discovery.handler,
         schema: {
           enrollment: "purpose-bound",
@@ -163,7 +165,7 @@ async function seed() {
       requiredScopes: ["discovery:read", "discovery:write"],
       definitionVersion: LOCAL_MEETUP_DEFINITION.version,
       definition: LOCAL_MEETUP_DEFINITION,
-      discoveryEnabled: LOCAL_MEETUP_DEFINITION.discovery.enabled,
+      discoveryEnabled,
       handler: LOCAL_MEETUP_DEFINITION.discovery.handler,
       schema: {
         enrollment: "purpose-bound",

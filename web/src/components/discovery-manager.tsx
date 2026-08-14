@@ -204,9 +204,15 @@ export function DiscoveryManager({
                 ? raw === "true"
                 : raw;
       }
+      const hasLocationInput = [
+        location.countryCode,
+        location.region,
+        location.locality,
+        location.neighborhood,
+      ].some((value) => value.trim());
       const locationBody =
         selected.discovery.locationGranularity === "none" ||
-        !location.label.trim()
+        !hasLocationInput
           ? undefined
           : {
               ...location,

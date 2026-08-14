@@ -11,7 +11,7 @@ import {
   type CoarseLocationInput,
 } from "@/lib/discovery-service";
 import { distributedRateLimit } from "@/lib/distributed-rate-limit";
-import { errorMessage, errorStatus } from "@/lib/http";
+import { jsonError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -45,10 +45,7 @@ export async function GET() {
       })),
     });
   } catch (error) {
-    return Response.json(
-      { error: errorMessage(error) },
-      { status: errorStatus(error) },
-    );
+    return jsonError(error, "Failed to load discovery");
   }
 }
 
@@ -56,13 +53,6 @@ export async function POST(request: Request) {
   const user = await currentUserOrResponse();
   if (user instanceof Response) return user;
   try {
-    const rate = await distributedRateLimit(`human:${user.id}`, 30);
-    if (!rate.ok) {
-      return Response.json(
-        { error: "Rate limit exceeded", retryAfterSec: rate.retryAfterSec },
-        { status: 429 },
-      );
-    }
     const body = (await request.json()) as {
       action?: unknown;
       intentSlug?: unknown;
@@ -78,6 +68,15 @@ export async function POST(request: Request) {
       details?: unknown;
       block?: boolean;
     };
+    if (body.action === "submit_enrollment") {
+      const rate = await distributedRateLimit(`human:${user.id}`, 30);
+      if (!rate.ok) {
+        return Response.json(
+          { error: "Rate limit exceeded", retryAfterSec: rate.retryAfterSec },
+          { status: 429 },
+        );
+      }
+    }
     switch (body.action) {
       case "submit_enrollment":
         return Response.json({
@@ -169,9 +168,6 @@ export async function POST(request: Request) {
         return Response.json({ error: "Unknown action" }, { status: 400 });
     }
   } catch (error) {
-    return Response.json(
-      { error: errorMessage(error) },
-      { status: errorStatus(error) },
-    );
+    return jsonError(error, "Discovery action failed");
   }
 }

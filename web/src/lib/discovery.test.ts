@@ -11,6 +11,8 @@ import {
 } from "./intent-contract";
 import { registeredIntentHandler } from "./discovery-match";
 import { decryptJson, encryptJson } from "./secret-crypto";
+import { distributedRateLimit } from "./distributed-rate-limit";
+import { jsonFromAgentError } from "./http";
 
 test("canonical discovery definitions enforce staged disclosure", () => {
   for (const definition of [
@@ -130,4 +132,38 @@ test("private discovery claims use authenticated encryption", () => {
     compensationMinimum: 175_000,
     socialSource: "human-approved",
   });
+});
+
+test("production discovery limiter fails closed quickly", async () => {
+  const mutableEnv = process.env as Record<string, string | undefined>;
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousRedisUrl = process.env.REDIS_URL;
+  mutableEnv.NODE_ENV = "production";
+  mutableEnv.REDIS_URL = "redis://127.0.0.1:1";
+  const startedAt = Date.now();
+  try {
+    await assert.rejects(
+      () => distributedRateLimit("unreachable-test", 1),
+      /temporarily unavailable/,
+    );
+    assert.ok(Date.now() - startedAt < 5_000);
+  } finally {
+    if (previousNodeEnv === undefined) delete mutableEnv.NODE_ENV;
+    else mutableEnv.NODE_ENV = previousNodeEnv;
+    if (previousRedisUrl === undefined) delete mutableEnv.REDIS_URL;
+    else mutableEnv.REDIS_URL = previousRedisUrl;
+  }
+});
+
+test("unexpected agent errors never expose SQL parameters", async () => {
+  const response = jsonFromAgentError(
+    new Error(
+      'Failed query: insert into discovery_interests params: ["user-secret-id",{"verdict":"compatible"}]',
+    ),
+  );
+  const body = (await response.json()) as { error: string };
+  assert.equal(response.status, 500);
+  assert.equal(body.error, "Internal server error");
+  assert.equal(JSON.stringify(body).includes("user-secret-id"), false);
+  assert.equal(JSON.stringify(body).includes("compatible"), false);
 });

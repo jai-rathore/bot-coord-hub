@@ -3,6 +3,7 @@ services:
     name: honeymatcha-web
     runtime: node
     plan: starter
+    region: oregon
     rootDir: web
     buildCommand: npm install && npm run build
     preDeployCommand: npm run db:migrate && npm run db:seed && PREFLIGHT_PRODUCTION=true npm run db:preflight
@@ -11,6 +12,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: ENABLE_DISCOVERY
+        value: "false"
       - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
         sync: false
       - key: CLERK_SECRET_KEY

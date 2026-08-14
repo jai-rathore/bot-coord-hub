@@ -18,6 +18,9 @@ export async function requireSupportedIntent(slug: string) {
       { code: "unsupported_task_type", taskType: slug },
     );
   }
+  if (!intent.discoveryEnabled) {
+    return { ...intent, validatedDefinition: null };
+  }
   try {
     return {
       ...intent,

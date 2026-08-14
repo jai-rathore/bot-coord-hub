@@ -67,10 +67,17 @@ export function jsonFromAgentError(err: unknown) {
       { status: err.status },
     );
   }
-  const message = err instanceof Error ? err.message : "Server error";
-  const status =
-    errorStatus(err, message.includes("DATABASE_URL") ? 503 : 500);
-  return Response.json({ error: message }, { status });
+  console.error("[http] unexpected agent API error", err);
+  const status = errorStatus(err, 500);
+  return Response.json(
+    {
+      error:
+        status >= 500
+          ? "Internal server error"
+          : errorMessage(err, "Request failed"),
+    },
+    { status },
+  );
 }
 
 export function requestBaseUrl(request: Request): string {
@@ -108,8 +115,15 @@ export function errorMessage(err: unknown, fallback = "Request failed"): string 
 }
 
 export function jsonError(err: unknown, fallbackMessage = "Request failed") {
+  const status = errorStatus(err);
+  if (status >= 500) {
+    console.error("[http] unexpected human API error", err);
+  }
   return Response.json(
-    { error: errorMessage(err, fallbackMessage) },
-    { status: errorStatus(err) },
+    {
+      error:
+        status >= 500 ? "Internal server error" : errorMessage(err, fallbackMessage),
+    },
+    { status },
   );
 }

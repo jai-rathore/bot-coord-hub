@@ -13,7 +13,14 @@ async function redisClient(): Promise<RedisClientType | null> {
   const url = redisUrl();
   if (!url) return null;
   if (!globalThis.__honeymatchaRedisClient) {
-    globalThis.__honeymatchaRedisClient = createClient({ url });
+    globalThis.__honeymatchaRedisClient = createClient({
+      url,
+      disableOfflineQueue: true,
+      socket: {
+        connectTimeout: 1_500,
+        reconnectStrategy: false,
+      },
+    });
     globalThis.__honeymatchaRedisClient.on("error", (error) => {
       console.error("[rate-limit] shared limiter error", error);
     });
@@ -21,6 +28,23 @@ async function redisClient(): Promise<RedisClientType | null> {
   const client = globalThis.__honeymatchaRedisClient;
   if (!client.isOpen) await client.connect();
   return client;
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs = 2_000) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("Shared rate limiter timed out")),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /**
@@ -33,18 +57,18 @@ export async function distributedRateLimit(
   limit: number,
   windowMs = 60_000,
 ): Promise<RateLimitResult> {
-  const client = await redisClient();
-  if (!client) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("REDIS_URL is required for discovery operations");
-    }
-    return rateLimit(`discovery:${key}`, limit, windowMs);
-  }
   try {
+    const client = await withTimeout(redisClient());
+    if (!client) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("Shared rate limiter is not configured");
+      }
+      return rateLimit(`discovery:${key}`, limit, windowMs);
+    }
     const bucket = `hm:rate:${key}:${Math.floor(Date.now() / windowMs)}`;
-    const count = await client.incr(bucket);
-    if (count === 1) await client.pExpire(bucket, windowMs);
-    const ttl = Math.max(await client.pTTL(bucket), 1);
+    const count = await withTimeout(client.incr(bucket));
+    if (count === 1) await withTimeout(client.pExpire(bucket, windowMs));
+    const ttl = Math.max(await withTimeout(client.pTTL(bucket)), 1);
     const resetAt = Date.now() + ttl;
     if (count > limit) {
       return {
@@ -60,7 +84,15 @@ export async function distributedRateLimit(
       resetAt,
     };
   } catch (error) {
-    if (process.env.NODE_ENV === "production") throw error;
+    const client = globalThis.__honeymatchaRedisClient;
+    if (client) {
+      if (client.isOpen) client.destroy();
+      globalThis.__honeymatchaRedisClient = undefined;
+    }
+    if (process.env.NODE_ENV === "production") {
+      console.error("[rate-limit] discovery limiter unavailable", error);
+      throw new Error("Discovery rate limiter is temporarily unavailable");
+    }
     return rateLimit(`discovery:${key}`, limit, windowMs);
   }
 }
