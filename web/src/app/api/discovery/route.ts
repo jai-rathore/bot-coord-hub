@@ -29,7 +29,7 @@ export async function GET() {
   try {
     const [intents, interests, audit] = await Promise.all([
       listDiscoveryCatalog(user.id, { includeOwnerReview: true }),
-      listDiscoveryInterests(user.id),
+      listDiscoveryInterests(user.id, { includeStableIds: true }),
       listUserDiscoveryAudit(user.id),
     ]);
     return Response.json({
@@ -116,7 +116,9 @@ export async function POST(request: Request) {
       case "decide_interest":
         if (
           typeof body.interestId !== "string" ||
-          !["accept", "decline"].includes(String(body.decision))
+          !["confirm_request", "accept", "decline"].includes(
+            String(body.decision),
+          )
         ) {
           return Response.json(
             { error: "interestId and a valid decision are required" },
@@ -127,7 +129,10 @@ export async function POST(request: Request) {
           interest: await decideDiscoveryInterest({
             user,
             interestId: body.interestId,
-            decision: body.decision as "accept" | "decline",
+            decision: body.decision as
+              | "confirm_request"
+              | "accept"
+              | "decline",
           }),
         });
       case "block":

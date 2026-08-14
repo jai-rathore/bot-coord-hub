@@ -66,16 +66,13 @@ import {
   revokePublicInvite as revokeShareablePublicInvite,
 } from "@/lib/public-invites";
 import {
-  blockDiscoveryParticipant,
   getAgentCapabilityManifest,
   listDiscoveryCatalog,
   listDiscoveryInterests,
-  reportDiscoveryParticipant,
   requestDiscoveryIntroduction,
   searchDiscovery,
   submitDiscoveryEnrollment,
   upsertAgentCapabilityManifest,
-  decideDiscoveryInterest,
   type CoarseLocationInput,
 } from "@/lib/discovery-service";
 import { distributedRateLimit } from "@/lib/distributed-rate-limit";
@@ -712,9 +709,23 @@ export async function requestDiscoveryInterest(
 
 export async function listDiscoveryRequests(auth: AgentAuth) {
   assertAgentScope(auth, "discovery:read");
+  const [manifest, catalog] = await Promise.all([
+    getAgentCapabilityManifest(auth.apiKey.id),
+    listDiscoveryCatalog(auth.user.id),
+  ]);
+  const supported = manifest?.supportedIntents ?? {};
+  const allowed = new Set(
+    catalog
+      .filter(
+        (intent) => supported[intent.slug] === intent.definitionVersion,
+      )
+      .map((intent) => intent.slug),
+  );
   return {
     ok: true,
-    interests: await listDiscoveryInterests(auth.user.id),
+    interests: (await listDiscoveryInterests(auth.user.id)).filter((interest) =>
+      allowed.has(interest.intentSlug),
+    ),
   };
 }
 
@@ -722,50 +733,26 @@ export async function respondDiscoveryInterest(
   auth: AgentAuth,
   body: { interestId?: unknown; decision?: unknown },
 ) {
-  assertAgentScope(auth, "approvals:write");
-  await assertDiscoveryRate(auth, "interest-decision", 20);
-  const interestId =
-    typeof body.interestId === "string" ? body.interestId.trim() : "";
-  const decision =
-    body.decision === "accept" || body.decision === "decline"
-      ? body.decision
-      : null;
-  if (!interestId || !decision) {
-    throw new AgentApiError(
-      400,
-      "interestId and decision (accept or decline) are required",
-    );
-  }
-  return {
-    ok: true,
-    ...(await decideDiscoveryInterest({
-      user: auth.user,
-      interestId,
-      decision,
-    })),
-  };
+  void body;
+  assertAgentScope(auth, "discovery:read");
+  throw new AgentApiError(
+    403,
+    "Discovery introduction decisions are human-only. Direct the human to /app/discovery.",
+    { code: "human_approval_required" },
+  );
 }
 
 export async function blockDiscoveryMatch(
   auth: AgentAuth,
   body: { interestId?: unknown; reasonCode?: unknown },
 ) {
-  assertAgentScope(auth, "discovery:write");
-  const interestId =
-    typeof body.interestId === "string" ? body.interestId.trim() : "";
-  if (!interestId) throw new AgentApiError(400, "interestId is required");
-  return {
-    ok: true,
-    ...(await blockDiscoveryParticipant({
-      actor: {
-        user: auth.user,
-        kind: "agent",
-        apiKeyId: auth.apiKey.id,
-      },
-      interestId,
-      reasonCode: body.reasonCode,
-    })),
-  };
+  void body;
+  assertAgentScope(auth, "discovery:read");
+  throw new AgentApiError(
+    403,
+    "Discovery safety decisions are human-only. Direct the human to /app/discovery.",
+    { code: "human_approval_required" },
+  );
 }
 
 export async function reportDiscoveryMatch(
@@ -777,25 +764,13 @@ export async function reportDiscoveryMatch(
     block?: boolean;
   },
 ) {
-  assertAgentScope(auth, "discovery:write");
-  await assertDiscoveryRate(auth, "report", 10);
-  const interestId =
-    typeof body.interestId === "string" ? body.interestId.trim() : "";
-  if (!interestId) throw new AgentApiError(400, "interestId is required");
-  return {
-    ok: true,
-    ...(await reportDiscoveryParticipant({
-      actor: {
-        user: auth.user,
-        kind: "agent",
-        apiKeyId: auth.apiKey.id,
-      },
-      interestId,
-      reasonCode: body.reasonCode,
-      details: body.details,
-      block: body.block,
-    })),
-  };
+  void body;
+  assertAgentScope(auth, "discovery:read");
+  throw new AgentApiError(
+    403,
+    "Discovery safety decisions are human-only. Direct the human to /app/discovery.",
+    { code: "human_approval_required" },
+  );
 }
 
 export async function proposeIntent(

@@ -173,7 +173,7 @@ export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
     locationGranularity: "city",
     pageLimit: 10,
     handleTtlMinutes: 30,
-    projectionFields: ["participantType", "headline"],
+    projectionFields: ["participantType"],
   },
   disclosure: {
     requiresMutualInterest: true,
@@ -209,7 +209,7 @@ export const LOCAL_MEETUP_DEFINITION = validateIntentDefinition({
         prompt: "Which topics or activities are you interested in?",
         type: "string_list",
         required: true,
-        sensitivity: "discoverable",
+        sensitivity: "private",
         sourcePolicy: humanApprovedSource,
         retentionDays: 180,
       },
@@ -261,12 +261,12 @@ export const LOCAL_MEETUP_DEFINITION = validateIntentDefinition({
     locationGranularity: "neighborhood",
     pageLimit: 10,
     handleTtlMinutes: 30,
-    projectionFields: ["participantType", "interests"],
+    projectionFields: ["participantType"],
   },
   disclosure: {
     requiresMutualInterest: true,
     requiresHumanConfirmation: true,
-    fields: ["interests", "introductionSummary"],
+    fields: ["introductionSummary"],
   },
   safety: {
     blockingRequired: true,

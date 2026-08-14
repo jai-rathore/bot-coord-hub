@@ -16,7 +16,7 @@ export default async function DiscoveryPage() {
   }
   const [intents, interests, audit] = await Promise.all([
     listDiscoveryCatalog(user.id, { includeOwnerReview: true }),
-    listDiscoveryInterests(user.id),
+    listDiscoveryInterests(user.id, { includeStableIds: true }),
     listUserDiscoveryAudit(user.id),
   ]);
   return (

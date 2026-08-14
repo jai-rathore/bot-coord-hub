@@ -63,6 +63,7 @@ async function main() {
           "tasks:read",
           "discovery:read",
           "discovery:write",
+          "approvals:write",
         ])}
       ),
       (
@@ -97,6 +98,15 @@ async function main() {
     },
   });
   assert(capability.response.ok, JSON.stringify(capability.data));
+  const hostCapability = await jsonFetch("/api/v1/me/capabilities", {
+    method: "PUT",
+    bearer: hostKey.raw,
+    body: {
+      supportedIntents: { local_meetup: 1 },
+      platforms: ["e2e-api"],
+    },
+  });
+  assert(hostCapability.response.ok, JSON.stringify(hostCapability.data));
 
   const commonLocation = {
     label: "Park Slope",
@@ -180,6 +190,7 @@ async function main() {
   const serializedCandidate = JSON.stringify(candidate);
   assert(!serializedCandidate.includes(host.id), "candidate user id leaked");
   assert(!serializedCandidate.includes(host.email), "candidate email leaked");
+  assert(!serializedCandidate.includes("board games"), "private interests leaked");
 
   const request = await jsonFetch("/api/v1/discovery/interests", {
     method: "POST",
@@ -188,47 +199,99 @@ async function main() {
     body: { candidateHandle: candidate.candidateHandle },
   });
   assert(request.response.status === 201, JSON.stringify(request.data));
+  assert(request.data.interestId === null, "agent response leaked stable interest id");
+  const [storedInterest] = await sql`
+    select id
+    from discovery_interests
+    where requester_user_id = ${seeker.id}
+      and recipient_user_id = ${host.id}
+  `;
+  const interestId = storedInterest.id;
+  const reciprocalSearch = await jsonFetch("/api/v1/discovery/search", {
+    method: "POST",
+    bearer: hostKey.raw,
+    body: { intentSlug: "local_meetup" },
+  });
+  assert(reciprocalSearch.response.ok, JSON.stringify(reciprocalSearch.data));
+  const reciprocalRequest = await jsonFetch("/api/v1/discovery/interests", {
+    method: "POST",
+    bearer: hostKey.raw,
+    body: {
+      candidateHandle:
+        reciprocalSearch.data.candidates[0].candidateHandle,
+    },
+  });
+  assert(reciprocalRequest.response.status === 201, JSON.stringify(reciprocalRequest.data));
+  assert(
+    reciprocalRequest.data.interestId === null,
+    "reciprocal request leaked stable interest linkage",
+  );
+  const [pairCount] = await sql`
+    select count(*)::int as count
+    from discovery_interests
+    where pair_key = ${[seeker.id, host.id].sort().join(":")}
+  `;
+  assert(pairCount.count === 1, "reciprocal request created a duplicate interest");
 
+  const hiddenPending = await jsonFetch("/api/v1/discovery/interests", {
+    bearer: hostKey.raw,
+  });
+  assert(hiddenPending.response.ok, JSON.stringify(hiddenPending.data));
+  assert(
+    hiddenPending.data.interests.length === 0,
+    "recipient must not see an unapproved requester draft",
+  );
+  const requesterApproval = await jsonFetch(
+    `/api/v1/discovery/interests/${interestId}/decision`,
+    {
+      method: "POST",
+      bearer: seekerKey.raw,
+      body: { decision: "confirm_request" },
+    },
+  );
+  assert(
+    requesterApproval.response.status === 403 &&
+      requesterApproval.data.code === "human_approval_required",
+    "agents must not confirm outgoing discovery requests",
+  );
+  await sql`
+    update discovery_interests
+    set requester_confirmed_at = now()
+    where id = ${interestId}
+  `;
   const pending = await jsonFetch("/api/v1/discovery/interests", {
     bearer: hostKey.raw,
   });
   assert(pending.response.ok, JSON.stringify(pending.data));
   assert(pending.data.interests[0].disclosure === null, "one-sided interest leaked");
+  assert(pending.data.interests[0].id === null, "agent interest list leaked stable id");
+  await sql`
+    delete from agent_capabilities
+    where api_key_id = (
+      select id from api_keys where key_hash = ${hostKey.hash}
+    )
+  `;
+  const undeclaredList = await jsonFetch("/api/v1/discovery/interests", {
+    bearer: hostKey.raw,
+  });
+  assert(
+    undeclaredList.response.ok && undeclaredList.data.interests.length === 0,
+    "undeclared agent consumed contract-bound discovery data",
+  );
 
   const accepted = await jsonFetch(
-    `/api/v1/discovery/interests/${request.data.interestId}/decision`,
+    `/api/v1/discovery/interests/${interestId}/decision`,
     {
       method: "POST",
       bearer: hostKey.raw,
       body: { decision: "accept" },
     },
   );
-  assert(accepted.response.ok, JSON.stringify(accepted.data));
-  assert(accepted.data.status === "accepted", "introduction was not accepted");
-  assert(accepted.data.sessionId, "meetup should hand off to a session");
-  assert(accepted.data.disclosure === null, "decision response must not copy disclosure");
-  const authorizedInterests = await jsonFetch("/api/v1/discovery/interests", {
-    bearer: hostKey.raw,
-  });
-  const authorizedDisclosure = authorizedInterests.data.interests.find(
-    (interest) => interest.id === request.data.interestId,
-  )?.disclosure;
-  assert(authorizedDisclosure, "authorized disclosure should be readable by polling");
   assert(
-    !JSON.stringify(authorizedDisclosure).includes(seeker.email),
-    "email must not be disclosed",
+    accepted.response.status === 403 &&
+      accepted.data.code === "human_approval_required",
+    "agents must not accept discovery introductions",
   );
-  const sessionList = await jsonFetch("/api/v1/sessions", {
-    bearer: seekerKey.raw,
-  });
-  assert(sessionList.response.ok, JSON.stringify(sessionList.data));
-  const publicMeetup = sessionList.data.sessions.find(
-    (session) => session.id === accepted.data.sessionId,
-  );
-  assert(publicMeetup?.peer === null, "discovery session peer identity leaked");
-  assert(publicMeetup?.peerUserId === null, "discovery session peer id leaked");
-  assert(!JSON.stringify(publicMeetup).includes(host.id), "stable host id leaked");
-  assert(!JSON.stringify(publicMeetup).includes(host.email), "host email leaked");
 
   const mcp = await jsonFetch("/api/mcp", {
     method: "POST",
@@ -268,14 +331,18 @@ async function main() {
   assert(a2a.response.ok && a2a.data.result?.message, JSON.stringify(a2a.data));
 
   const blocked = await jsonFetch(
-    `/api/v1/discovery/interests/${request.data.interestId}/safety`,
+    `/api/v1/discovery/interests/${interestId}/safety`,
     {
       method: "POST",
       bearer: seekerKey.raw,
       body: { action: "block", reasonCode: "e2e_complete" },
     },
   );
-  assert(blocked.response.ok, JSON.stringify(blocked.data));
+  assert(
+    blocked.response.status === 403 &&
+      blocked.data.code === "human_approval_required",
+    "agents must not perform discovery safety decisions",
+  );
 
   console.log(
     JSON.stringify(
@@ -284,11 +351,11 @@ async function main() {
         catalog: "local_meetup",
         enrollment: "human approval required",
         candidate: "opaque",
-        introduction: accepted.data.status,
-        disclosure: "selective",
+        introduction: "human-only decisions enforced",
+        disclosure: "not released to agents",
         mcp: "discovery catalog available",
         a2a: "discovery interests available",
-        safety: "blocked",
+        safety: "human-only boundary enforced",
       },
       null,
       2,

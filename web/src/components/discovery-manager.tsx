@@ -42,10 +42,12 @@ type IntentItem = {
 };
 
 type InterestItem = {
-  id: string;
+  id: string | null;
   intentSlug: string;
   direction: "incoming" | "outgoing";
   status: string;
+  requesterConfirmed: boolean;
+  awaitingYourApproval: boolean;
   compatibility: Record<string, unknown>;
   disclosure: Record<string, unknown> | null;
   sessionId: string | null;
@@ -156,6 +158,7 @@ export function DiscoveryManager({
     initialIntents[0]?.slug ?? "",
   );
   const [values, setValues] = useState<Record<string, string>>({});
+  const [clearFields, setClearFields] = useState<Set<string>>(new Set());
   const [location, setLocation] = useState({
     label: "",
     countryCode: "",
@@ -183,6 +186,10 @@ export function DiscoveryManager({
     try {
       const claims: Record<string, unknown> = {};
       for (const question of selected.enrollment.questions) {
+        if (clearFields.has(question.key)) {
+          claims[question.key] = null;
+          continue;
+        }
         const raw = values[question.key]?.trim();
         if (!raw) continue;
         claims[question.key] =
@@ -222,6 +229,7 @@ export function DiscoveryManager({
             : intent,
         ),
       );
+      setClearFields(new Set());
       setMessage(
         "Enrollment activated. Your agent can now search this purpose without exposing your identity or private answers.",
       );
@@ -264,13 +272,20 @@ export function DiscoveryManager({
 
   async function interestAction(
     interestId: string,
-    action: "accept" | "decline" | "block" | "report",
+    action:
+      | "confirm_request"
+      | "accept"
+      | "decline"
+      | "block"
+      | "report",
   ) {
     setBusy(true);
     setError(null);
     try {
       await discoveryAction(
-        action === "accept" || action === "decline"
+        action === "confirm_request" ||
+        action === "accept" ||
+        action === "decline"
           ? {
               action: "decide_interest",
               interestId,
@@ -288,13 +303,33 @@ export function DiscoveryManager({
       setInterests((current) =>
         current.map((interest) =>
           interest.id === interestId &&
-          (action === "accept" || action === "decline")
-            ? { ...interest, status: action === "accept" ? "accepted" : "declined" }
+          (action === "confirm_request" ||
+            action === "accept" ||
+            action === "decline")
+            ? {
+                ...interest,
+                status:
+                  action === "accept"
+                    ? "accepted"
+                    : action === "decline"
+                      ? "declined"
+                      : interest.status,
+                requesterConfirmed:
+                  action === "confirm_request"
+                    ? true
+                    : interest.requesterConfirmed,
+                awaitingYourApproval:
+                  action === "confirm_request"
+                    ? false
+                    : interest.awaitingYourApproval,
+              }
             : interest,
         ),
       );
       setMessage(
-        action === "accept"
+        action === "confirm_request"
+          ? "Your introduction request is approved. The anonymous participant has been notified."
+          : action === "accept"
           ? "Mutual interest confirmed. Only approved introduction fields were released."
           : action === "report"
             ? "Report submitted and participant blocked."
@@ -322,6 +357,7 @@ export function DiscoveryManager({
                 onClick={() => {
                   setSelectedSlug(intent.slug);
                   setValues({});
+                  setClearFields(new Set());
                   setMessage(null);
                   setError(null);
                 }}
@@ -373,6 +409,33 @@ export function DiscoveryManager({
                         }))
                       }
                     />
+                    {selected.currentEnrollment.ownerReview &&
+                    Object.values(
+                      selected.currentEnrollment.ownerReview.claims,
+                    ).some(
+                      (claims) => claims[question.key] !== undefined,
+                    ) ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setClearFields((current) => {
+                            const next = new Set(current);
+                            if (next.has(question.key)) next.delete(question.key);
+                            else next.add(question.key);
+                            return next;
+                          })
+                        }
+                        className={`mt-2 text-xs font-semibold ${
+                          clearFields.has(question.key)
+                            ? "text-danger"
+                            : "text-muted"
+                        }`}
+                      >
+                        {clearFields.has(question.key)
+                          ? "This saved value will be removed"
+                          : "Clear saved value"}
+                      </button>
+                    ) : null}
                   </label>
                 ))}
               </div>
@@ -513,7 +576,7 @@ export function DiscoveryManager({
             {interests.length ? (
               interests.map((interest) => (
                 <article
-                  key={interest.id}
+                  key={interest.id ?? `${interest.intentSlug}-${interest.createdAt}`}
                   className="rounded-2xl border border-line bg-white/70 p-4"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -526,12 +589,13 @@ export function DiscoveryManager({
                       </p>
                     </div>
                     {interest.direction === "incoming" &&
-                    interest.status === "pending" ? (
+                    interest.status === "pending" &&
+                    interest.id ? (
                       <div className="flex gap-2">
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() => interestAction(interest.id, "accept")}
+                          onClick={() => interestAction(interest.id!, "accept")}
                           className="rounded-lg bg-matcha-deep px-3 py-2 text-xs font-semibold text-white"
                         >
                           Approve introduction
@@ -539,12 +603,27 @@ export function DiscoveryManager({
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() => interestAction(interest.id, "decline")}
+                          onClick={() => interestAction(interest.id!, "decline")}
                           className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-muted"
                         >
                           Decline
                         </button>
                       </div>
+                    ) : null}
+                    {interest.direction === "outgoing" &&
+                    interest.status === "pending" &&
+                    !interest.requesterConfirmed &&
+                    interest.id ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          interestAction(interest.id!, "confirm_request")
+                        }
+                        className="rounded-lg bg-matcha-deep px-3 py-2 text-xs font-semibold text-white"
+                      >
+                        Approve request
+                      </button>
                     ) : null}
                   </div>
                   <pre className="mt-3 overflow-x-auto rounded-xl bg-mist p-3 text-xs leading-5 text-muted">
@@ -556,22 +635,24 @@ export function DiscoveryManager({
                       2,
                     )}
                   </pre>
-                  <div className="mt-3 flex gap-3 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => interestAction(interest.id, "block")}
-                      className="font-semibold text-muted"
-                    >
-                      Block
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => interestAction(interest.id, "report")}
-                      className="font-semibold text-danger"
-                    >
-                      Report and block
-                    </button>
-                  </div>
+                  {interest.id ? (
+                    <div className="mt-3 flex gap-3 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => interestAction(interest.id!, "block")}
+                        className="font-semibold text-muted"
+                      >
+                        Block
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => interestAction(interest.id!, "report")}
+                        className="font-semibold text-danger"
+                      >
+                        Report and block
+                      </button>
+                    </div>
+                  ) : null}
                 </article>
               ))
             ) : (

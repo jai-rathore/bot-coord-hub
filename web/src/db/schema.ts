@@ -379,6 +379,7 @@ export const userLocations = pgTable(
     neighborhood: text("neighborhood"),
     granularity: text("granularity").notNull().default("city"),
     visibility: text("visibility").notNull().default("private_match"),
+    privateValueEncrypted: text("private_value_encrypted"),
     isPrimary: boolean("is_primary").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -389,12 +390,6 @@ export const userLocations = pgTable(
   },
   (t) => [
     index("user_locations_user_id_idx").on(t.userId),
-    index("user_locations_coarse_idx").on(
-      t.countryCode,
-      t.region,
-      t.locality,
-      t.neighborhood,
-    ),
     check(
       "user_locations_granularity_check",
       sql`${t.granularity} in ('country', 'region', 'city', 'neighborhood')`,
@@ -558,6 +553,12 @@ export const discoveryInterests = pgTable(
       .$type<Record<string, unknown>>()
       .notNull()
       .default({}),
+    requesterConfirmedAt: timestamp("requester_confirmed_at", {
+      withTimezone: true,
+    }),
+    requesterConfirmedByApiKeyId: uuid(
+      "requester_confirmed_by_api_key_id",
+    ).references(() => apiKeys.id, { onDelete: "set null" }),
     idempotencyKey: text("idempotency_key"),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
     sessionId: uuid("session_id").references(() => sessions.id, {
@@ -711,6 +712,9 @@ export const safetyReports = pgTable(
       t.createdAt,
     ),
     index("safety_reports_reporter_idx").on(t.reporterUserId, t.createdAt),
+    uniqueIndex("safety_reports_reporter_interest_uidx")
+      .on(t.reporterUserId, t.interestId)
+      .where(sql`${t.interestId} is not null`),
     check(
       "safety_reports_not_self_check",
       sql`${t.reporterUserId} <> ${t.subjectUserId}`,
@@ -968,6 +972,10 @@ export const agentInbox = pgTable(
     sessionId: uuid("session_id").references(() => sessions.id, {
       onDelete: "cascade",
     }),
+    discoveryInterestId: uuid("discovery_interest_id").references(
+      () => discoveryInterests.id,
+      { onDelete: "cascade" },
+    ),
     kind: text("kind").notNull(),
     summary: text("summary").notNull(),
     body: jsonb("body").$type<Record<string, unknown>>().notNull().default({}),
@@ -980,6 +988,7 @@ export const agentInbox = pgTable(
     index("agent_inbox_user_created_idx").on(t.userId, t.createdAt),
     index("agent_inbox_user_unacked_idx").on(t.userId, t.ackedAt),
     index("agent_inbox_session_kind_idx").on(t.sessionId, t.kind),
+    index("agent_inbox_discovery_interest_idx").on(t.discoveryInterestId),
   ],
 );
 

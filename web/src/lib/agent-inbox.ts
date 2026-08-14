@@ -234,12 +234,14 @@ export async function deliverDiscoveryInbox(opts: {
   summary: string;
   body: Record<string, unknown>;
   sessionId?: string | null;
+  discoveryInterestId?: string | null;
 }): Promise<{ inboxId: string; callback: "delivered" | "failed" | "none" }> {
   const [created] = await getDb()
     .insert(agentInbox)
     .values({
       userId: opts.userId,
       sessionId: opts.sessionId ?? null,
+      discoveryInterestId: opts.discoveryInterestId ?? null,
       kind: opts.kind,
       summary: opts.summary,
       body: opts.body,

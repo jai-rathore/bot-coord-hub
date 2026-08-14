@@ -10,6 +10,7 @@ import {
   purposeEnrollments,
   safetyReports,
   sessions,
+  userLocations,
   users,
 } from "../src/db/schema";
 import {
@@ -146,7 +147,6 @@ async function main() {
       ),
     /location is required/,
   );
-
   const pending = await submitDiscoveryEnrollment(
     { user: seeker, kind: "agent", apiKeyId: key.id },
     {
@@ -232,6 +232,13 @@ async function main() {
       requestActivation: true,
     },
   );
+  const [storedLocation] = await db
+    .select()
+    .from(userLocations)
+    .where(eq(userLocations.userId, host.id));
+  assert.match(storedLocation.privateValueEncrypted ?? "", /^enc:v1:/);
+  assert.equal(storedLocation.neighborhood, null);
+  assert.equal(storedLocation.locality, null);
 
   const firstSearch = await searchDiscovery({
     actor: { user: seeker, kind: "agent", apiKeyId: key.id },
@@ -241,6 +248,13 @@ async function main() {
   const firstCandidate = firstSearch.candidates[0]!;
   assert.match(firstCandidate.candidateHandle, /^dc_/);
   assert.equal(firstCandidate.compatibility.verdict, "potential");
+  assert.deepEqual(firstCandidate.untrustedParticipantData, {
+    participantType: "host",
+  });
+  assert.equal(
+    firstCandidate.contentPolicy.includes("untrusted"),
+    true,
+  );
   const serializedCandidate = JSON.stringify(firstCandidate);
   assert.equal(serializedCandidate.includes(host.id), false);
   assert.equal(serializedCandidate.includes(host.email), false);
@@ -263,22 +277,44 @@ async function main() {
     idempotencyKey: `intro-${suffix}`,
   });
   assert.equal(request.status, "pending");
-  const beforeApproval = await listDiscoveryInterests(host.id);
+  assert.equal(request.interestId, null);
+  assert.equal(request.requesterConfirmed, false);
+  const [storedInterest] = await db
+    .select()
+    .from(discoveryInterests)
+    .where(eq(discoveryInterests.requesterUserId, seeker.id));
+  const interestId = storedInterest.id;
+  const hiddenBeforeRequesterApproval = await listDiscoveryInterests(host.id);
+  assert.equal(hiddenBeforeRequesterApproval.length, 0);
+  const outgoingDraft = await listDiscoveryInterests(seeker.id, {
+    includeStableIds: true,
+  });
+  assert.equal(outgoingDraft[0]?.awaitingYourApproval, true);
+  await decideDiscoveryInterest({
+    user: seeker,
+    interestId,
+    decision: "confirm_request",
+  });
+  const beforeApproval = await listDiscoveryInterests(host.id, {
+    includeStableIds: true,
+  });
   assert.equal(beforeApproval[0]?.direction, "incoming");
   assert.equal(beforeApproval[0]?.disclosure, null);
   assert.equal(JSON.stringify(beforeApproval).includes(seeker.email), false);
 
   const accepted = await decideDiscoveryInterest({
     user: host,
-    interestId: request.interestId,
+    interestId,
     decision: "accept",
   });
   assert.equal(accepted.status, "accepted");
   assert.ok(accepted.sessionId);
   assert.equal(accepted.disclosure, null);
-  const acceptedForHost = await listDiscoveryInterests(host.id);
+  const acceptedForHost = await listDiscoveryInterests(host.id, {
+    includeStableIds: true,
+  });
   const authorizedDisclosure = acceptedForHost.find(
-    (item) => item.id === request.interestId,
+    (item) => item.id === interestId,
   )?.disclosure;
   assert.equal(
     JSON.stringify(authorizedDisclosure).includes(seeker.email),
@@ -304,16 +340,24 @@ async function main() {
 
   await reportDiscoveryParticipant({
     actor: { user: seeker, kind: "user" },
-    interestId: request.interestId,
+    interestId,
     reasonCode: "e2e_safety_test",
     details: "Integration test report.",
     block: true,
   });
-  const [report] = await db
+  await reportDiscoveryParticipant({
+    actor: { user: seeker, kind: "user" },
+    interestId,
+    reasonCode: "e2e_safety_test",
+    details: "Updated integration test report.",
+    block: true,
+  });
+  const reports = await db
     .select()
     .from(safetyReports)
-    .where(eq(safetyReports.interestId, request.interestId));
-  assert.equal(report.status, "open");
+    .where(eq(safetyReports.interestId, interestId));
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0]?.status, "open");
 
   const afterBlock = await searchDiscovery({
     actor: { user: seeker, kind: "user" },
@@ -323,7 +367,7 @@ async function main() {
 
   await blockDiscoveryParticipant({
     actor: { user: seeker, kind: "user" },
-    interestId: request.interestId,
+    interestId,
     reasonCode: "idempotent_test",
   });
   const deletedSessions = await db
@@ -331,6 +375,14 @@ async function main() {
     .from(sessions)
     .where(eq(sessions.id, accepted.sessionId!));
   assert.equal(deletedSessions.length, 0);
+  await assert.rejects(
+    () =>
+      requestDiscoveryIntroduction({
+        actor: { user: seeker, kind: "agent", apiKeyId: key.id },
+        candidateHandle: secondSearch.candidates[0]!.candidateHandle,
+      }),
+    /no longer available/,
+  );
 
   await setDiscoverySafetyStatus({
     moderator,
@@ -357,7 +409,7 @@ async function main() {
   const interestRows = await db
     .select()
     .from(discoveryInterests)
-    .where(eq(discoveryInterests.id, request.interestId));
+    .where(eq(discoveryInterests.id, interestId));
   assert.equal(interestRows[0]?.status, "withdrawn");
   const handleRows = await db
     .select()
@@ -373,7 +425,7 @@ async function main() {
   const retainedInterest = await db
     .select()
     .from(discoveryInterests)
-    .where(eq(discoveryInterests.id, request.interestId));
+    .where(eq(discoveryInterests.id, interestId));
   assert.equal(retainedInterest.length, 0);
   console.log(
     "Discovery E2E passed: reviewed agent approval, opaque search, selective disclosure, privacy-safe meetup handoff, block/report, suspension, and retention cleanup.",
