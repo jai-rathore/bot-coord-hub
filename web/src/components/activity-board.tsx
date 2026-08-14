@@ -20,12 +20,15 @@ export function ActivityBoard({
 }) {
   const [pending, startTransition] = useTransition();
   const [showStopped, setShowStopped] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(
+  const [requestedSelectedId, setRequestedSelectedId] = useState<string | null>(
     initialSessions.some((session) => session.id === initialSelectedId)
       ? (initialSelectedId ?? null)
       : (initialSessions[0]?.id ?? null),
   );
-  const [messages, setMessages] = useState<PublicMessage[]>([]);
+  const [loadedMessages, setLoadedMessages] = useState<{
+    sessionId: string;
+    items: PublicMessage[];
+  } | null>(null);
   const [showRaw, setShowRaw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -39,25 +42,19 @@ export function ActivityBoard({
     (session) => session.status === "cancelled",
   ).length;
 
-  useEffect(() => {
-    setSelectedId((current) => {
-      if (current && visibleSessions.some((session) => session.id === current)) {
-        return current;
-      }
-      return (
-        visibleSessions.find((session) => session.id === initialSelectedId)
-          ?.id ??
-        visibleSessions[0]?.id ??
-        null
-      );
-    });
-  }, [initialSelectedId, visibleSessions]);
+  const selectedId =
+    (requestedSelectedId &&
+    visibleSessions.some((session) => session.id === requestedSelectedId)
+      ? requestedSelectedId
+      : null) ??
+    visibleSessions.find((session) => session.id === initialSelectedId)?.id ??
+    visibleSessions[0]?.id ??
+    null;
+  const messages =
+    loadedMessages?.sessionId === selectedId ? loadedMessages.items : [];
 
   useEffect(() => {
-    if (!selectedId) {
-      setMessages([]);
-      return;
-    }
+    if (!selectedId) return;
     let cancelled = false;
     startTransition(async () => {
       setError(null);
@@ -66,10 +63,10 @@ export function ActivityBoard({
       if (cancelled) return;
       if (!res.ok) {
         setError(data.error ?? "Failed to load messages");
-        setMessages([]);
+        setLoadedMessages({ sessionId: selectedId, items: [] });
         return;
       }
-      setMessages(data.messages ?? []);
+      setLoadedMessages({ sessionId: selectedId, items: data.messages ?? [] });
     });
     return () => {
       cancelled = true;
@@ -91,7 +88,13 @@ export function ActivityBoard({
       return;
     }
     setNote("");
-    setMessages((prev) => [...prev, data.message]);
+    setLoadedMessages((current) => ({
+      sessionId: selectedId,
+      items:
+        current?.sessionId === selectedId
+          ? [...current.items, data.message]
+          : [data.message],
+    }));
   }
 
   const selected = initialSessions.find((s) => s.id === selectedId) ?? null;
@@ -127,7 +130,7 @@ export function ActivityBoard({
                 <li key={session.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedId(session.id)}
+                    onClick={() => setRequestedSelectedId(session.id)}
                     className={`w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm transition ${
                       active
                         ? "bg-matcha-deep text-[#f7faf6]"
