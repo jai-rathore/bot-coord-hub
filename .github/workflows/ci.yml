@@ -29,6 +29,7 @@ jobs:
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
       CLERK_SECRET_KEY: sk_test_00000000000000000000000000000000
       GUEST_TOKEN_PEPPER: ci-guest-token-pepper
+      PUBLIC_INVITE_SECRET: ci-public-invite-secret-with-at-least-32-characters
       TOKEN_ENCRYPTION_KEY: ci-token-encryption-key
       OAUTH_STATE_SECRET: ci-oauth-state-secret
       GOOGLE_CALENDAR_ENABLED: "false"
