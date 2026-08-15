@@ -10,6 +10,7 @@ import {
   submitDiscoveryEnrollment,
   type CoarseLocationInput,
 } from "@/lib/discovery-service";
+import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { distributedRateLimit } from "@/lib/distributed-rate-limit";
 import { jsonError } from "@/lib/http";
 
@@ -69,6 +70,15 @@ export async function POST(request: Request) {
       block?: boolean;
     };
     if (body.action === "submit_enrollment") {
+      if (!discoveryFeatureEnabled()) {
+        return Response.json(
+          {
+            error: "Discovery is temporarily unavailable",
+            code: "discovery_disabled",
+          },
+          { status: 503 },
+        );
+      }
       let rate: Awaited<ReturnType<typeof distributedRateLimit>>;
       try {
         rate = await distributedRateLimit(`human:${user.id}`, 30);
