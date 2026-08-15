@@ -111,6 +111,34 @@ export async function POST(request: Request) {
           { status: 429 },
         );
       }
+      if (body.action === "resolve_location") {
+        let daily: Awaited<ReturnType<typeof distributedRateLimit>>;
+        try {
+          daily = await distributedRateLimit(
+            `human-location:daily:${user.id}`,
+            600,
+            24 * 60 * 60 * 1000,
+          );
+        } catch {
+          return Response.json(
+            {
+              error: "Discovery is temporarily unavailable",
+              code: "rate_limiter_unavailable",
+              retryAfterSec: 5,
+            },
+            { status: 503, headers: { "Retry-After": "5" } },
+          );
+        }
+        if (!daily.ok) {
+          return Response.json(
+            {
+              error: "Daily location lookup limit exceeded",
+              retryAfterSec: daily.retryAfterSec,
+            },
+            { status: 429 },
+          );
+        }
+      }
     }
     switch (body.action) {
       case "resolve_location":

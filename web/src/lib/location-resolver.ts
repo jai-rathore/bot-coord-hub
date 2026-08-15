@@ -461,10 +461,38 @@ export async function resolveLocationSuggestions(opts: {
     );
   }
   const granularity = opts.granularity as CanonicalLocationGranularity;
-  const query =
-    typeof opts.query === "string" ? opts.query.trim().slice(0, MAX_QUERY_LENGTH) : "";
+  const query = typeof opts.query === "string" ? opts.query.trim() : "";
   if (query.length < 2) {
     throw new AgentApiError(400, "query must contain at least 2 characters");
+  }
+  if (query.length > MAX_QUERY_LENGTH) {
+    throw new AgentApiError(
+      400,
+      `query must be ${MAX_QUERY_LENGTH} characters or fewer`,
+    );
+  }
+  if (
+    /https?:\/\/|www\.|@/i.test(query) ||
+    /^\s*[-+]?\d{1,3}(?:\.\d+)?\s*[,/]\s*[-+]?\d{1,3}(?:\.\d+)?\s*$/.test(
+      query,
+    ) ||
+    /^\s*(?:p\.?\s*o\.?\s*box|unit|apt\.?|apartment|suite)\b/i.test(query) ||
+    (/^\s*\d{1,6}[a-z]?\s+\S+/i.test(query) &&
+      /\b(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr|court|ct|highway|hwy|way|place|pl|terrace|ter|circle|cir|parkway|pkwy)\b\.?/i.test(
+        query,
+      )) ||
+    /^\s*[-+]?\d{1,3}(?:\.\d+)?\s+[-+]?\d{1,3}(?:\.\d+)?\s*$/.test(
+      query,
+    ) ||
+    /(?:\d{1,3}(?:\.\d+)?\s*°|\b[NS]\s*\d{1,3}|\d{1,3}\s*[NS]\b).*(?:\d{1,3}(?:\.\d+)?\s*°|\b[EW]\s*\d{1,3}|\d{1,3}\s*[EW]\b)/i.test(
+      query,
+    )
+  ) {
+    throw new AgentApiError(
+      400,
+      "Use only a coarse place name, not an address, URL, contact, or coordinates",
+      { code: "coarse_location_required" },
+    );
   }
   const countryCode =
     typeof opts.countryCode === "string" ? opts.countryCode : undefined;

@@ -39,6 +39,7 @@ import {
   createSessionForUser,
   listSessionsForUser,
 } from "../src/lib/sessions";
+import { issueLocationResolutionToken } from "../src/lib/location-resolver";
 
 process.env.TOKEN_ENCRYPTION_KEY =
   process.env.TOKEN_ENCRYPTION_KEY ??
@@ -54,6 +55,26 @@ const clerkIds = [
   `e2e-discovery-probe-seeker-${suffix}`,
   `e2e-discovery-probe-host-${suffix}`,
 ];
+
+function resolvedNeighborhood(userId: string, neighborhood: string) {
+  const providerPlaceId = neighborhood.toLowerCase().replaceAll(" ", "-");
+  return {
+    resolutionToken: issueLocationResolutionToken(userId, {
+      schemaVersion: 1,
+      canonicalKey: `geoapify:neighborhood:${providerPlaceId}`,
+      provider: "geoapify",
+      providerPlaceId,
+      granularity: "neighborhood",
+      label: `${neighborhood}, Brooklyn, NY, United States`,
+      countryCode: "US",
+      country: "United States",
+      regionCode: "US-NY",
+      region: "New York",
+      locality: "Brooklyn",
+      neighborhood,
+    }),
+  };
+}
 
 async function seedDiscoveryIntents() {
   for (const intent of [
@@ -173,13 +194,7 @@ async function main() {
         interests: ["chess"],
         timeWindows: ["saturday afternoon"],
       },
-      location: {
-        countryCode: "US",
-        region: "NY",
-        locality: "Brooklyn",
-        neighborhood: "Park Slope",
-        granularity: "neighborhood",
-      },
+      location: resolvedNeighborhood(probeSeeker.id, "Park Slope"),
       requestActivation: true,
     },
   );
@@ -192,13 +207,7 @@ async function main() {
         interests: ["chess"],
         timeWindows: ["saturday afternoon"],
       },
-      location: {
-        countryCode: "US",
-        region: "NY",
-        locality: "Brooklyn",
-        neighborhood: "Williamsburg",
-        granularity: "neighborhood",
-      },
+      location: resolvedNeighborhood(probeHost.id, "Williamsburg"),
       requestActivation: true,
     },
   );
@@ -231,13 +240,7 @@ async function main() {
         interests: ["chess"],
         timeWindows: ["saturday afternoon"],
       },
-      location: {
-        countryCode: "US",
-        region: "NY",
-        locality: "Brooklyn",
-        neighborhood: "Park Slope",
-        granularity: "neighborhood",
-      },
+      location: resolvedNeighborhood(probeSeeker.id, "Park Slope"),
       requestActivation: true,
     },
   );
@@ -305,11 +308,7 @@ async function main() {
         introductionSummary: { source: "human conversation" },
       },
       location: {
-        countryCode: "US",
-        region: "NY",
-        locality: "Brooklyn",
-        neighborhood: "Park Slope",
-        granularity: "neighborhood",
+        ...resolvedNeighborhood(seeker.id, "Park Slope"),
         visibility: "private_match",
       },
       requestActivation: true,
@@ -381,11 +380,7 @@ async function main() {
         introductionSummary: "Hosts an accessible monthly game afternoon.",
       },
       location: {
-        countryCode: "US",
-        region: "NY",
-        locality: "Brooklyn",
-        neighborhood: "Park Slope",
-        granularity: "neighborhood",
+        ...resolvedNeighborhood(host.id, "Park Slope"),
         visibility: "private_match",
       },
       requestActivation: true,
@@ -586,13 +581,7 @@ async function main() {
         interests: ["walking"],
         timeWindows: ["sunday morning"],
       },
-      location: {
-        countryCode: "US",
-        region: "NY",
-        locality: "Brooklyn",
-        neighborhood: "Cobble Hill",
-        granularity: "neighborhood",
-      },
+      location: resolvedNeighborhood(moderator.id, "Cobble Hill"),
       requestActivation: true,
     },
   );

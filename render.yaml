@@ -6,13 +6,15 @@ services:
     region: oregon
     rootDir: web
     buildCommand: npm install && npm run build
-    preDeployCommand: npm run db:migrate && npm run db:seed && PREFLIGHT_PRODUCTION=true npm run db:preflight
+    preDeployCommand: PREFLIGHT_PRODUCTION=true npm run db:preflight-env && npm run db:migrate && npm run db:seed && PREFLIGHT_PRODUCTION=true npm run db:preflight
     startCommand: npm run start
     healthCheckPath: /api/v1/health
     envVars:
       - key: NODE_ENV
         value: production
       - key: ENABLE_DISCOVERY
+        value: "false"
+      - key: ENABLE_CANONICAL_LOCATIONS
         value: "false"
       - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
         sync: false

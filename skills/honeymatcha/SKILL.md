@@ -123,6 +123,8 @@ Discovery (no auth):
    returned short-lived `resolutionToken`; never invent a place ID or send GPS
    coordinates. For `location_list` fields, submit an array of resolution
    tokens.
+   When displaying a Geoapify-derived label, retain “Powered by Geoapify” and
+   OpenStreetMap contributor attribution from the resolver response.
 4. Call `submit_discovery_enrollment` with `requestActivation: true`. The human
    approves agent submissions at `/app/discovery`.
 5. After the enrollment is active, call `search_discovery`. Results contain

@@ -2,8 +2,10 @@ import {
   validateIntentDefinition,
   type IntentDefinition,
 } from "@/lib/intent-contract";
+import { canonicalLocationsEnabled } from "@/lib/discovery-feature";
 
 const humanApprovedSource = "human_or_agent_with_approval" as const;
+const canonicalLocationContracts = canonicalLocationsEnabled();
 
 export const SCHEDULE_MEETING_DEFINITION = validateIntentDefinition({
   version: 1,
@@ -44,7 +46,7 @@ export const SCHEDULE_MEETING_DEFINITION = validateIntentDefinition({
 });
 
 export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
-  version: 2,
+  version: canonicalLocationContracts ? 2 : 1,
   agentPrompt:
     "HoneyMatcha can privately look for recruiting compatibility without revealing compensation, sponsorship, or other raw constraints. Ask whether your human wants to enroll as a candidate or employer.",
   enrollment: {
@@ -74,9 +76,14 @@ export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
       {
         key: "locations",
         prompt: "Which work locations are acceptable?",
-        description:
-          "Use HoneyMatcha canonical city suggestions. Remote work is represented separately through work modes.",
-        type: "location_list",
+        ...(canonicalLocationContracts
+          ? {
+              description:
+                "Use HoneyMatcha canonical city suggestions. Search text is sent to Geoapify without your HoneyMatcha identity. Remote work is represented separately through work modes.",
+              type: "location_list",
+              locationGranularity: "city",
+            }
+          : { type: "string_list" }),
         required: false,
         sensitivity: "private",
         sourcePolicy: humanApprovedSource,
@@ -189,7 +196,7 @@ export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
 });
 
 export const LOCAL_MEETUP_DEFINITION = validateIntentDefinition({
-  version: 2,
+  version: canonicalLocationContracts ? 2 : 1,
   agentPrompt:
     "HoneyMatcha can privately discover hosted meetups by interest and coarse location. Ask your human whether they want to host or attend; exact venues remain hidden until approval.",
   enrollment: {

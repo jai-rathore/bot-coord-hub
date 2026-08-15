@@ -10,6 +10,7 @@
     "test": "tsx --test src/lib/*.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
+    "db:preflight-env": "tsx scripts/preflight-env.ts",
     "db:preflight": "tsx scripts/preflight.ts",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",

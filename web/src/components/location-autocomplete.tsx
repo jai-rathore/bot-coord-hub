@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 export type CanonicalLocationSuggestion = {
   resolutionToken: string;
@@ -41,10 +41,18 @@ export function LocationAutocomplete({
   const [attribution, setAttribution] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestSequence = useRef(0);
 
   useEffect(() => {
     const normalized = query.trim();
-    if (normalized.length < 2) return;
+    if (
+      normalized.length < 2 ||
+      (!multiple && selected[0]?.place.label === normalized)
+    ) {
+      return;
+    }
+    const requestId = requestSequence.current + 1;
+    requestSequence.current = requestId;
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {
       setBusy(true);
@@ -69,27 +77,38 @@ export function LocationAutocomplete({
         if (!response.ok) {
           throw new Error(data.error ?? "Location suggestions failed");
         }
-        setSuggestions(data.suggestions ?? []);
-        setAttribution(data.attribution ?? null);
+        if (requestSequence.current === requestId) {
+          setSuggestions(data.suggestions ?? []);
+          setAttribution(data.attribution ?? null);
+        }
       } catch (requestError) {
         if (controller.signal.aborted) return;
-        setSuggestions([]);
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "Location suggestions failed",
-        );
+        if (requestSequence.current === requestId) {
+          setSuggestions([]);
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Location suggestions failed",
+          );
+        }
       } finally {
-        if (!controller.signal.aborted) setBusy(false);
+        if (
+          !controller.signal.aborted &&
+          requestSequence.current === requestId
+        ) {
+          setBusy(false);
+        }
       }
     }, 400);
     return () => {
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [granularity, query]);
+  }, [granularity, multiple, query, selected]);
 
   function select(suggestion: CanonicalLocationSuggestion) {
+    requestSequence.current += 1;
+    setBusy(false);
     if (multiple) {
       if (
         !selected.some(
@@ -151,10 +170,12 @@ export function LocationAutocomplete({
           placeholder={`Start typing a ${granularity}…`}
           onChange={(event) => {
             const nextQuery = event.target.value;
+            requestSequence.current += 1;
             setQuery(nextQuery);
             if (nextQuery.trim().length < 2) {
               setSuggestions([]);
               setError(null);
+              setBusy(false);
             }
             if (!multiple && selected.length) onChange([]);
           }}

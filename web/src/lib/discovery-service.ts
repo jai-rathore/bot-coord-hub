@@ -34,7 +34,7 @@ import {
   type UserLocation,
 } from "@/db/schema";
 import { AgentApiError } from "@/lib/agent-errors";
-import { deliverDiscoveryInbox } from "@/lib/agent-inbox";
+import { postDiscoveryInboxCallback } from "@/lib/agent-inbox";
 import { writeAudit } from "@/lib/audit";
 import {
   fieldMap,
@@ -200,7 +200,10 @@ function validateClaimValue(field: IntentFieldDefinition, value: unknown) {
           (item as Partial<CanonicalLocation>).schemaVersion !== 1 ||
           typeof (item as Partial<CanonicalLocation>).canonicalKey !== "string" ||
           typeof (item as Partial<CanonicalLocation>).label !== "string" ||
-          typeof (item as Partial<CanonicalLocation>).countryCode !== "string"
+          typeof (item as Partial<CanonicalLocation>).countryCode !== "string" ||
+          (field.locationGranularity &&
+            (item as Partial<CanonicalLocation>).granularity !==
+              field.locationGranularity)
         ) {
           throw new AgentApiError(
             400,
@@ -235,6 +238,17 @@ function validateClaimValue(field: IntentFieldDefinition, value: unknown) {
       }
       return value;
     }
+  }
+}
+
+function validateCombinedClaims(
+  definition: IntentDefinition,
+  claims: Record<string, unknown>,
+) {
+  for (const field of definition.enrollment.fields) {
+    if (claims[field.key] === undefined) continue;
+    const value = validateClaimValue(field, claims[field.key]);
+    assertSafeSharedContent(field, value);
   }
 }
 
@@ -466,6 +480,7 @@ export async function listDiscoveryCatalog(
               sensitivity: field.sensitivity,
               sourcePolicy: field.sourcePolicy,
               options: field.options ?? null,
+              locationGranularity: field.locationGranularity ?? null,
               retentionDays: field.retentionDays,
             })),
           },
@@ -598,15 +613,16 @@ async function upsertCoarseLocation(
   userId: string,
   input: CoarseLocationInput,
   requiredGranularity: LocationGranularity,
+  requireCanonical: boolean,
 ) {
   if (requiredGranularity === "none") return null;
   const visibility =
     normalizedText(input.visibility, "location.visibility", 40) ??
     "private_match";
-  if (!["private_match", "disclose_after_match"].includes(visibility)) {
+  if (visibility !== "private_match") {
     throw new AgentApiError(
       400,
-      "location.visibility must be private_match or disclose_after_match",
+      "location.visibility must be private_match",
     );
   }
   if (input.resolutionToken !== undefined) {
@@ -632,6 +648,14 @@ async function upsertCoarseLocation(
       })
       .returning();
     return created;
+  }
+
+  if (requireCanonical) {
+    throw new AgentApiError(
+      400,
+      "Resolve the location first and submit its resolutionToken",
+      { code: "location_resolution_required" },
+    );
   }
 
   // Compatibility path for v1 clients. Current catalog contracts direct agents
@@ -729,6 +753,7 @@ function resolveLocationClaims(
       continue;
     }
     const tokens = resolved[field.key];
+    if (tokens === null) continue;
     if (!Array.isArray(tokens) || tokens.length > 20) {
       throw new AgentApiError(
         400,
@@ -736,7 +761,11 @@ function resolveLocationClaims(
       );
     }
     resolved[field.key] = tokens.map((token) =>
-      consumeLocationResolutionToken(userId, token),
+      consumeLocationResolutionToken(
+        userId,
+        token,
+        field.locationGranularity,
+      ),
     );
   }
   return resolved;
@@ -887,6 +916,7 @@ export async function submitDiscoveryEnrollment(
     provenance,
     actorKind: actor.kind,
   });
+  validateCombinedClaims(definition, merged.combined);
   const missing = missingEnrollmentFields(definition, merged.combined);
   const activationRequested = submission.requestActivation === true;
   if (activationRequested && missing.length) {
@@ -904,8 +934,23 @@ export async function submitDiscoveryEnrollment(
             actor.user.id,
             submission.location,
             definition.discovery.locationGranularity,
+            definition.version >= 2,
           );
   const effectiveLocationId = location?.id ?? existing?.locationId ?? null;
+  if (
+    activationRequested &&
+    definition.version >= 2 &&
+    definition.discovery.locationGranularity !== "none" &&
+    existing &&
+    existing.definitionVersion < definition.version &&
+    !location
+  ) {
+    throw new AgentApiError(
+      400,
+      "Resolve the location again before approving the current intent contract",
+      { code: "location_resolution_required" },
+    );
+  }
   if (
     activationRequested &&
     definition.discovery.locationGranularity !== "none" &&
@@ -935,7 +980,9 @@ export async function submitDiscoveryEnrollment(
       .limit(1);
     if (
       !savedLocation ||
-      savedLocation.granularity !== definition.discovery.locationGranularity
+      savedLocation.granularity !== definition.discovery.locationGranularity ||
+      (definition.version >= 2 &&
+        !privateLocationValue(savedLocation)?.canonicalKey)
     ) {
       throw new AgentApiError(
         400,
@@ -962,6 +1009,34 @@ export async function submitDiscoveryEnrollment(
           ? ("pending_approval" as const)
           : ("active" as const)
         : (existing?.status ?? ("draft" as const));
+  if (
+    status === "active" &&
+    definition.version >= 2 &&
+    definition.discovery.locationGranularity !== "none"
+  ) {
+    const activeLocation =
+      location ??
+      (effectiveLocationId
+        ? await db
+            .select()
+            .from(userLocations)
+            .where(
+              and(
+                eq(userLocations.id, effectiveLocationId),
+                eq(userLocations.userId, actor.user.id),
+              ),
+            )
+            .limit(1)
+            .then((rows) => rows[0])
+        : null);
+    if (!activeLocation || !privateLocationValue(activeLocation)?.canonicalKey) {
+      throw new AgentApiError(
+        400,
+        "Resolve the location again before saving an active enrollment",
+        { code: "location_resolution_required" },
+      );
+    }
+  }
   const values = {
     definitionVersion: definition.version,
     status,
@@ -975,20 +1050,57 @@ export async function submitDiscoveryEnrollment(
     expiresAt: earliestProvenanceExpiry(merged.claimProvenance),
     updatedAt: new Date(),
   };
-  const [enrollment] = existing
-    ? await db
+  const enrollment = await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${`discovery-contract:${intentSlug}`}))`,
+    );
+    const [currentIntent] = await tx
+      .select({ definitionVersion: intentTypes.definitionVersion })
+      .from(intentTypes)
+      .where(eq(intentTypes.slug, intentSlug))
+      .limit(1);
+    if (currentIntent?.definitionVersion !== definition.version) {
+      throw new AgentApiError(
+        409,
+        "The discovery contract changed. Refresh the catalog and resubmit.",
+        { code: "intent_contract_changed" },
+      );
+    }
+    if (existing) {
+      const [updated] = await tx
         .update(purposeEnrollments)
         .set(values)
-        .where(eq(purposeEnrollments.id, existing.id))
-        .returning()
-    : await db
-        .insert(purposeEnrollments)
-        .values({
-          userId: actor.user.id,
-          intentSlug,
-          ...values,
-        })
+        .where(
+          and(
+            eq(purposeEnrollments.id, existing.id),
+            eq(purposeEnrollments.userId, actor.user.id),
+            eq(purposeEnrollments.updatedAt, existing.updatedAt),
+            eq(
+              purposeEnrollments.definitionVersion,
+              existing.definitionVersion,
+            ),
+          ),
+        )
         .returning();
+      if (!updated) {
+        throw new AgentApiError(
+          409,
+          "Enrollment changed while it was being saved. Refresh and try again.",
+          { code: "enrollment_snapshot_changed" },
+        );
+      }
+      return updated;
+    }
+    const [created] = await tx
+      .insert(purposeEnrollments)
+      .values({
+        userId: actor.user.id,
+        intentSlug,
+        ...values,
+      })
+      .returning();
+    return created;
+  });
   if (
     location &&
     existing?.locationId &&
@@ -1068,6 +1180,17 @@ export async function decideDiscoveryEnrollment(opts: {
         .limit(1)
     : [];
   if (opts.decision === "approve") {
+    if (enrollment.definitionVersion !== definition.version) {
+      throw new AgentApiError(
+        409,
+        "This enrollment uses an older contract. Refresh it with current answers before approval.",
+        {
+          code: "stale_enrollment_contract",
+          enrollmentVersion: enrollment.definitionVersion,
+          requiredVersion: definition.version,
+        },
+      );
+    }
     const expectedHash = enrollmentSnapshotHash(enrollment, location);
     if (!opts.snapshotHash || opts.snapshotHash !== expectedHash) {
       throw new AgentApiError(
@@ -1081,6 +1204,18 @@ export async function decideDiscoveryEnrollment(opts: {
       ...decryptJson(enrollment.privateClaimsEncrypted),
       ...(enrollment.disclosureClaims as Record<string, unknown>),
     };
+    validateCombinedClaims(definition, combined);
+    if (
+      definition.version >= 2 &&
+      definition.discovery.locationGranularity !== "none" &&
+      !privateLocationValue(location)?.canonicalKey
+    ) {
+      throw new AgentApiError(
+        409,
+        "Resolve the location again before approving the current contract",
+        { code: "location_resolution_required" },
+      );
+    }
     const missing = missingEnrollmentFields(definition, combined);
     if (missing.length) {
       throw new AgentApiError(400, "Enrollment is incomplete", {
@@ -1097,8 +1232,26 @@ export async function decideDiscoveryEnrollment(opts: {
           new Date().toISOString();
       }
     }
-    const [updated] = await db.transaction(async (tx) =>
-      tx
+    const [updated] = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`discovery-contract:${enrollment.intentSlug}`}))`,
+      );
+      const [currentIntent] = await tx
+        .select({ definitionVersion: intentTypes.definitionVersion })
+        .from(intentTypes)
+        .where(eq(intentTypes.slug, enrollment.intentSlug))
+        .limit(1);
+      if (
+        currentIntent?.definitionVersion !== definition.version ||
+        enrollment.definitionVersion !== definition.version
+      ) {
+        throw new AgentApiError(
+          409,
+          "The discovery contract changed. Refresh the enrollment before approval.",
+          { code: "stale_enrollment_contract" },
+        );
+      }
+      return tx
         .update(purposeEnrollments)
         .set({
           status: "active",
@@ -1121,8 +1274,8 @@ export async function decideDiscoveryEnrollment(opts: {
               : isNull(purposeEnrollments.locationId),
           ),
         )
-        .returning(),
-    );
+        .returning();
+    });
     if (!updated) {
       throw new AgentApiError(
         409,
@@ -1294,25 +1447,11 @@ function canonicalDiscoveryUsers(leftUserId: string, rightUserId: string) {
   return [leftUserId, rightUserId].sort() as [string, string];
 }
 
-async function notifyDiscoveryInterestRecipient(interest: {
-  id: string;
-  recipientUserId: string;
-  intentSlug: string;
-}) {
-  await deliverDiscoveryInbox({
-    userId: interest.recipientUserId,
-    discoveryInterestId: interest.id,
-    kind: "discovery.interest_received",
-    summary: `An anonymous participant requested a ${interest.intentSlug.replaceAll("_", " ")} introduction.`,
-    body: {
-      intentSlug: interest.intentSlug,
-      instructions:
-        "Tell your human an anonymous participant expressed interest. Identity and private compatibility are hidden. The human must approve or decline in HoneyMatcha.",
-    },
-  });
-}
-
-async function activeEnrollment(userId: string, intentSlug: string) {
+async function activeEnrollment(
+  userId: string,
+  intentSlug: string,
+  definitionVersion: number,
+) {
   const [enrollment] = await getDb()
     .select()
     .from(purposeEnrollments)
@@ -1320,6 +1459,7 @@ async function activeEnrollment(userId: string, intentSlug: string) {
       and(
         eq(purposeEnrollments.userId, userId),
         eq(purposeEnrollments.intentSlug, intentSlug),
+        eq(purposeEnrollments.definitionVersion, definitionVersion),
         eq(purposeEnrollments.status, "active"),
         or(
           isNull(purposeEnrollments.expiresAt),
@@ -1354,6 +1494,7 @@ export async function searchDiscovery(opts: {
   const seeker = await activeEnrollment(
     opts.actor.user.id,
     opts.intentSlug,
+    definition.version,
   );
   const blocked = await blockedUserIds(opts.actor.user.id);
   const priorPairRows = await getDb()
@@ -1393,6 +1534,7 @@ export async function searchDiscovery(opts: {
     .where(
       and(
         eq(purposeEnrollments.intentSlug, opts.intentSlug),
+        eq(purposeEnrollments.definitionVersion, definition.version),
         eq(purposeEnrollments.status, "active"),
         ne(purposeEnrollments.userId, opts.actor.user.id),
         or(
@@ -1570,18 +1712,57 @@ export async function requestDiscoveryIntroduction(opts: {
     );
   }
   await assertSafetyActive(handle.candidateUserId);
-  await activeEnrollment(opts.actor.user.id, handle.intentSlug);
-  await activeEnrollment(handle.candidateUserId, handle.intentSlug);
+  const { definition } = await getDiscoveryIntent(handle.intentSlug);
+  await activeEnrollment(
+    opts.actor.user.id,
+    handle.intentSlug,
+    definition.version,
+  );
+  await activeEnrollment(
+    handle.candidateUserId,
+    handle.intentSlug,
+    definition.version,
+  );
   const pairKey = canonicalDiscoveryPair(
     opts.actor.user.id,
     handle.candidateUserId,
   );
   const idempotencyKey =
     normalizedText(opts.idempotencyKey, "idempotencyKey", 160) ?? null;
-  const { interest, alreadyExisted } = await db.transaction(async (tx) => {
+  const { interest, alreadyExisted, inboxId } = await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${`discovery-contract:${handle.intentSlug}`}))`,
+    );
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${pairKey}))`,
     );
+    const [currentIntent] = await tx
+      .select({ definitionVersion: intentTypes.definitionVersion })
+      .from(intentTypes)
+      .where(eq(intentTypes.slug, handle.intentSlug))
+      .limit(1);
+    const currentEnrollments = await tx
+      .select({ id: purposeEnrollments.id })
+      .from(purposeEnrollments)
+      .where(
+        and(
+          inArray(purposeEnrollments.id, [
+            handle.requesterEnrollmentId,
+            handle.candidateEnrollmentId,
+          ]),
+          eq(purposeEnrollments.status, "active"),
+          eq(
+            purposeEnrollments.definitionVersion,
+            definition.version,
+          ),
+        ),
+      );
+    if (
+      currentIntent?.definitionVersion !== definition.version ||
+      currentEnrollments.length !== 2
+    ) {
+      throw new AgentApiError(404, "Candidate is no longer available");
+    }
     const [block] = await tx
       .select()
       .from(discoveryBlocks)
@@ -1612,7 +1793,9 @@ export async function requestDiscoveryIntroduction(opts: {
           ),
         )
         .limit(1);
-      if (replay) return { interest: replay, alreadyExisted: true };
+      if (replay) {
+        return { interest: replay, alreadyExisted: true, inboxId: null };
+      }
     }
     const [priorPair] = await tx
       .select({ id: discoveryPairHistory.id })
@@ -1641,7 +1824,9 @@ export async function requestDiscoveryIntroduction(opts: {
         ),
       )
       .limit(1);
-    if (existing) return { interest: existing, alreadyExisted: true };
+    if (existing) {
+      return { interest: existing, alreadyExisted: true, inboxId: null };
+    }
     const recentInbound = await tx
       .select({ id: discoveryInterests.id })
       .from(discoveryInterests)
@@ -1695,7 +1880,9 @@ export async function requestDiscoveryIntroduction(opts: {
               ),
         )
         .limit(1);
-      if (replay) return { interest: replay, alreadyExisted: true };
+      if (replay) {
+        return { interest: replay, alreadyExisted: true, inboxId: null };
+      }
       throw new AgentApiError(
         409,
         "Introduction request could not be created",
@@ -1710,8 +1897,29 @@ export async function requestDiscoveryIntroduction(opts: {
           isNull(discoveryHandles.usedAt),
         ),
       );
-    return { interest: created, alreadyExisted: false };
+    let inboxId: string | null = null;
+    if (created.requesterConfirmedAt) {
+      const [inbox] = await tx
+        .insert(agentInbox)
+        .values({
+          userId: created.recipientUserId,
+          discoveryInterestId: created.id,
+          kind: "discovery.interest_received",
+          summary: `An anonymous participant requested a ${created.intentSlug.replaceAll("_", " ")} introduction.`,
+          body: {
+            intentSlug: created.intentSlug,
+            instructions:
+              "Tell your human an anonymous participant expressed interest. Identity and private compatibility are hidden. The human must approve or decline in HoneyMatcha.",
+          },
+        })
+        .returning({ id: agentInbox.id });
+      inboxId = inbox?.id ?? null;
+    }
+    return { interest: created, alreadyExisted: false, inboxId };
   });
+  if (inboxId) {
+    await postDiscoveryInboxCallback(inboxId);
+  }
   if (alreadyExisted) {
     return {
       interestId: opts.actor.kind === "user" ? interest.id : null,
@@ -1723,9 +1931,6 @@ export async function requestDiscoveryIntroduction(opts: {
       message:
         AGENT_INTEREST_RECEIPT,
     };
-  }
-  if (interest.requesterConfirmedAt) {
-    await notifyDiscoveryInterestRecipient(interest);
   }
   await writeAudit({
     actorUserId: opts.actor.user.id,
@@ -1774,29 +1979,105 @@ export async function decideDiscoveryInterest(opts: {
 }) {
   const db = getDb();
   if (opts.decision === "confirm_request") {
-    const [confirmed] = await db
-      .update(discoveryInterests)
-      .set({
-        requesterConfirmedAt: new Date(),
-        requesterConfirmedByApiKeyId: null,
-        updatedAt: new Date(),
-      })
+    const [draft] = await db
+      .select()
+      .from(discoveryInterests)
       .where(
         and(
           eq(discoveryInterests.id, opts.interestId),
           eq(discoveryInterests.requesterUserId, opts.user.id),
-          eq(discoveryInterests.status, "pending"),
-          isNull(discoveryInterests.requesterConfirmedAt),
         ),
       )
-      .returning();
-    if (!confirmed) {
+      .limit(1);
+    if (!draft) {
       throw new AgentApiError(
         409,
         "Introduction request is unavailable or already confirmed",
       );
     }
-    await notifyDiscoveryInterestRecipient(confirmed);
+    const { definition } = await getDiscoveryIntent(draft.intentSlug);
+    const pairKey = canonicalDiscoveryPair(
+      draft.requesterUserId,
+      draft.recipientUserId,
+    );
+    const { confirmed, inboxId } = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`discovery-contract:${draft.intentSlug}`}))`,
+      );
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${pairKey}))`,
+      );
+      const [currentIntent] = await tx
+        .select({ definitionVersion: intentTypes.definitionVersion })
+        .from(intentTypes)
+        .where(eq(intentTypes.slug, draft.intentSlug))
+        .limit(1);
+      const currentEnrollments = await tx
+        .select({ id: purposeEnrollments.id })
+        .from(purposeEnrollments)
+        .where(
+          and(
+            inArray(purposeEnrollments.id, [
+              draft.requesterEnrollmentId,
+              draft.recipientEnrollmentId,
+            ]),
+            eq(purposeEnrollments.status, "active"),
+            eq(
+              purposeEnrollments.definitionVersion,
+              definition.version,
+            ),
+          ),
+        );
+      if (
+        currentIntent?.definitionVersion !== definition.version ||
+        currentEnrollments.length !== 2
+      ) {
+        throw new AgentApiError(
+          409,
+          "Introduction request is unavailable after a contract change",
+          { code: "stale_enrollment_contract" },
+        );
+      }
+      const [updated] = await tx
+        .update(discoveryInterests)
+        .set({
+          requesterConfirmedAt: new Date(),
+          requesterConfirmedByApiKeyId: null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(discoveryInterests.id, draft.id),
+            eq(discoveryInterests.status, "pending"),
+            isNull(discoveryInterests.requesterConfirmedAt),
+          ),
+        )
+        .returning();
+      if (!updated) {
+        throw new AgentApiError(
+          409,
+          "Introduction request is unavailable or already confirmed",
+        );
+      }
+      const [inbox] = await tx
+        .insert(agentInbox)
+        .values({
+          userId: updated.recipientUserId,
+          discoveryInterestId: updated.id,
+          kind: "discovery.interest_received",
+          summary: `An anonymous participant requested a ${updated.intentSlug.replaceAll("_", " ")} introduction.`,
+          body: {
+            intentSlug: updated.intentSlug,
+            instructions:
+              "Tell your human an anonymous participant expressed interest. Identity and private compatibility are hidden. The human must approve or decline in HoneyMatcha.",
+          },
+        })
+        .returning({ id: agentInbox.id });
+      return { confirmed: updated, inboxId: inbox?.id ?? null };
+    });
+    if (inboxId) {
+      await postDiscoveryInboxCallback(inboxId);
+    }
     await writeAudit({
       actorUserId: opts.user.id,
       actorKind: "user",
@@ -1910,8 +2191,16 @@ export async function decideDiscoveryInterest(opts: {
   const { definition } = await getDiscoveryIntent(interest.intentSlug);
   const [requesterEnrollment, recipientEnrollment, requesterUser] =
     await Promise.all([
-      activeEnrollment(interest.requesterUserId, interest.intentSlug),
-      activeEnrollment(interest.recipientUserId, interest.intentSlug),
+      activeEnrollment(
+        interest.requesterUserId,
+        interest.intentSlug,
+        definition.version,
+      ),
+      activeEnrollment(
+        interest.recipientUserId,
+        interest.intentSlug,
+        definition.version,
+      ),
       db
         .select()
         .from(users)
@@ -1968,8 +2257,23 @@ export async function decideDiscoveryInterest(opts: {
         interest.recipientUserId,
       );
       await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`discovery-contract:${interest.intentSlug}`}))`,
+      );
+      await tx.execute(
         sql`select pg_advisory_xact_lock(hashtext(${pairKey}))`,
       );
+      const [currentIntent] = await tx
+        .select({ definitionVersion: intentTypes.definitionVersion })
+        .from(intentTypes)
+        .where(eq(intentTypes.slug, interest.intentSlug))
+        .limit(1);
+      if (currentIntent?.definitionVersion !== definition.version) {
+        throw new AgentApiError(
+          409,
+          "The discovery contract changed. Re-run matching.",
+          { code: "intent_contract_changed" },
+        );
+      }
       const [block] = await tx
         .select({ id: discoveryBlocks.id })
         .from(discoveryBlocks)
@@ -2076,8 +2380,23 @@ export async function decideDiscoveryInterest(opts: {
       interest.recipientUserId,
     );
     await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${`discovery-contract:${interest.intentSlug}`}))`,
+    );
+    await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${pairKey}))`,
     );
+    const [currentIntent] = await tx
+      .select({ definitionVersion: intentTypes.definitionVersion })
+      .from(intentTypes)
+      .where(eq(intentTypes.slug, interest.intentSlug))
+      .limit(1);
+    if (currentIntent?.definitionVersion !== definition.version) {
+      throw new AgentApiError(
+        409,
+        "The discovery contract changed. Re-run matching.",
+        { code: "intent_contract_changed" },
+      );
+    }
     for (const enrollment of [
       requesterEnrollment,
       recipientEnrollment,
@@ -2089,6 +2408,10 @@ export async function decideDiscoveryInterest(opts: {
           and(
             eq(purposeEnrollments.id, enrollment.id),
             eq(purposeEnrollments.status, "active"),
+            eq(
+              purposeEnrollments.definitionVersion,
+              definition.version,
+            ),
             eq(purposeEnrollments.updatedAt, enrollment.updatedAt),
             gt(purposeEnrollments.expiresAt, new Date()),
           ),

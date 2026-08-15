@@ -21,6 +21,12 @@ type Question = {
   required: boolean;
   sensitivity: "discoverable" | "private" | "disclose_after_match";
   options: string[] | null;
+  locationGranularity:
+    | "country"
+    | "region"
+    | "city"
+    | "neighborhood"
+    | null;
   retentionDays: number;
 };
 
@@ -416,6 +422,11 @@ export function DiscoveryManager({
                       {question.prompt}
                       {question.required ? " *" : ""}
                     </span>
+                    {question.description ? (
+                      <span className="mt-1 block text-xs leading-5 text-muted">
+                        {question.description}
+                      </span>
+                    ) : null}
                     <span className="mt-1 block text-xs text-muted">
                       {sensitivityLabel(question.sensitivity)} · retained up to{" "}
                       {question.retentionDays} days
@@ -423,7 +434,8 @@ export function DiscoveryManager({
                     {question.type === "location_list" ? (
                       <div className="mt-2">
                         <LocationAutocomplete
-                          granularity="city"
+                          key={`${selected.slug}:${question.key}`}
+                          granularity={question.locationGranularity ?? "city"}
                           multiple
                           label={question.prompt}
                           selected={locationValues[question.key] ?? []}
@@ -487,19 +499,46 @@ export function DiscoveryManager({
                     HoneyMatcha does not accept GPS coordinates. This location
                     remains private until your disclosure policy allows it.
                     Choose a canonical suggestion so spelling and aliases do
-                    not create false mismatches.
+                    not create false mismatches. City and neighborhood search
+                    text is sent to Geoapify without your HoneyMatcha identity.
                   </p>
                   {selected.currentEnrollment.ownerReview?.location &&
                   !coarseLocation.length ? (
-                    <p className="mb-3 rounded-xl bg-white px-3 py-2 text-xs text-muted">
-                      Saved:{" "}
-                      {String(
-                        selected.currentEnrollment.ownerReview.location.label ??
-                          "canonical coarse location",
-                      )}
-                    </p>
+                    <div className="mb-3 rounded-xl bg-white px-3 py-2 text-xs text-muted">
+                      <p>
+                        Saved:{" "}
+                        {String(
+                          selected.currentEnrollment.ownerReview.location
+                            .label ?? "canonical coarse location",
+                        )}
+                      </p>
+                      {selected.currentEnrollment.ownerReview.location
+                        .provider === "geoapify" ? (
+                        <p className="mt-1 text-[0.68rem]">
+                          Powered by{" "}
+                          <a
+                            href="https://www.geoapify.com/"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline"
+                          >
+                            Geoapify
+                          </a>
+                          ; ©{" "}
+                          <a
+                            href="https://www.openstreetmap.org/copyright"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline"
+                          >
+                            OpenStreetMap contributors
+                          </a>
+                        </p>
+                      ) : null}
+                    </div>
                   ) : null}
                   <LocationAutocomplete
+                    key={`${selected.slug}:${selected.discovery.locationGranularity}`}
                     granularity={
                       selected.discovery.locationGranularity as
                         | "country"
@@ -531,6 +570,30 @@ export function DiscoveryManager({
                       2,
                     )}
                   </pre>
+                  {JSON.stringify(
+                    selected.currentEnrollment.ownerReview,
+                  ).includes('"provider":"geoapify"') ? (
+                    <p className="mt-2 text-[0.68rem] text-muted">
+                      Location data powered by{" "}
+                      <a
+                        href="https://www.geoapify.com/"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline"
+                      >
+                        Geoapify
+                      </a>
+                      ; ©{" "}
+                      <a
+                        href="https://www.openstreetmap.org/copyright"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline"
+                      >
+                        OpenStreetMap contributors
+                      </a>
+                    </p>
+                  ) : null}
                 </section>
               ) : null}
 

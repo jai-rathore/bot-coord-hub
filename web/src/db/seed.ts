@@ -1,7 +1,13 @@
 import { config } from "dotenv";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, lt, or, sql } from "drizzle-orm";
 import { getDb } from "./index";
-import { intentTypes } from "./schema";
+import {
+  agentInbox,
+  discoveryHandles,
+  discoveryInterests,
+  intentTypes,
+  purposeEnrollments,
+} from "./schema";
 import {
   HIRING_DISCOVERY_DEFINITION,
   LOCAL_MEETUP_DEFINITION,
@@ -15,6 +21,88 @@ config();
 async function seed() {
   const db = getDb();
   const discoveryEnabled = discoveryFeatureEnabled();
+  type SeedTransaction = Parameters<
+    Parameters<typeof db.transaction>[0]
+  >[0];
+
+  async function pauseStaleEnrollments(
+    tx: SeedTransaction,
+    slug: string,
+    version: number,
+  ) {
+    const stale = await tx
+        .select({ id: purposeEnrollments.id })
+        .from(purposeEnrollments)
+        .where(
+          and(
+            eq(purposeEnrollments.intentSlug, slug),
+            lt(purposeEnrollments.definitionVersion, version),
+          ),
+        );
+    const staleIds = stale.map((enrollment) => enrollment.id);
+    if (!staleIds.length) return;
+    const pendingInterests = await tx
+        .select({ id: discoveryInterests.id })
+        .from(discoveryInterests)
+        .where(
+          and(
+            eq(discoveryInterests.status, "pending"),
+            or(
+              inArray(discoveryInterests.requesterEnrollmentId, staleIds),
+              inArray(discoveryInterests.recipientEnrollmentId, staleIds),
+            ),
+          ),
+        );
+    const pendingInterestIds = pendingInterests.map((interest) => interest.id);
+    if (pendingInterestIds.length) {
+      await tx
+        .delete(agentInbox)
+        .where(inArray(agentInbox.discoveryInterestId, pendingInterestIds));
+    }
+    await tx
+        .delete(discoveryHandles)
+        .where(
+          or(
+            inArray(discoveryHandles.requesterEnrollmentId, staleIds),
+            inArray(discoveryHandles.candidateEnrollmentId, staleIds),
+          ),
+        );
+    await tx
+        .update(discoveryInterests)
+        .set({
+          status: "withdrawn",
+          decidedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(discoveryInterests.status, "pending"),
+            or(
+              inArray(discoveryInterests.requesterEnrollmentId, staleIds),
+              inArray(discoveryInterests.recipientEnrollmentId, staleIds),
+            ),
+          ),
+        );
+    await tx
+        .update(purposeEnrollments)
+        .set({
+          status: "paused",
+          consentedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            inArray(purposeEnrollments.id, staleIds),
+            inArray(purposeEnrollments.status, [
+              "active",
+              "pending_approval",
+            ]),
+          ),
+        );
+    console.log(
+      `Paused ${staleIds.length} stale ${slug} enrollment(s) for contract v${version} review`,
+    );
+  }
 
   const existing = await db
     .select()
@@ -84,26 +172,47 @@ async function seed() {
     .where(eq(intentTypes.slug, "hiring_compatibility"))
     .limit(1);
   if (existingHiring) {
-    await db
-      .update(intentTypes)
-      .set({
-        name: "Check hiring compatibility",
-        description: hiringDescription,
-        status: "live",
-        category: "hiring",
-        requiredScopes: [
-          "guest_tasks:write",
-          "discovery:read",
-          "discovery:write",
-        ],
-        definitionVersion: HIRING_DISCOVERY_DEFINITION.version,
-        definition: HIRING_DISCOVERY_DEFINITION,
-        discoveryEnabled,
-        handler: HIRING_DISCOVERY_DEFINITION.discovery.handler,
-        schema: hiringSchema,
-        updatedAt: new Date(),
-      })
-      .where(eq(intentTypes.id, existingHiring.id));
+    const hiringValues = {
+      name: "Check hiring compatibility",
+      description: hiringDescription,
+      status: "live" as const,
+      category: "hiring",
+      requiredScopes: [
+        "guest_tasks:write",
+        "discovery:read",
+        "discovery:write",
+      ],
+      definitionVersion: HIRING_DISCOVERY_DEFINITION.version,
+      definition: HIRING_DISCOVERY_DEFINITION,
+      discoveryEnabled,
+      handler: HIRING_DISCOVERY_DEFINITION.discovery.handler,
+      schema: hiringSchema,
+      updatedAt: new Date(),
+    };
+    const upgrading =
+      existingHiring.definitionVersion <
+      HIRING_DISCOVERY_DEFINITION.version;
+    if (upgrading) {
+      await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${"discovery-contract:hiring_compatibility"}))`,
+        );
+        await pauseStaleEnrollments(
+          tx,
+          "hiring_compatibility",
+          HIRING_DISCOVERY_DEFINITION.version,
+        );
+        await tx
+          .update(intentTypes)
+          .set(hiringValues)
+          .where(eq(intentTypes.id, existingHiring.id));
+      });
+    } else {
+      await db
+        .update(intentTypes)
+        .set(hiringValues)
+        .where(eq(intentTypes.id, existingHiring.id));
+    }
     console.log("Updated intent_types: hiring_compatibility");
   } else {
     await db.insert(intentTypes).values({
@@ -134,26 +243,46 @@ async function seed() {
     .where(eq(intentTypes.slug, "local_meetup"))
     .limit(1);
   if (existingMeetup) {
-    await db
-      .update(intentTypes)
-      .set({
-        name: "Discover a local meetup",
-        description: meetupDescription,
-        status: "live",
-        category: "social_coordination",
-        requiredScopes: ["discovery:read", "discovery:write"],
-        definitionVersion: LOCAL_MEETUP_DEFINITION.version,
-        definition: LOCAL_MEETUP_DEFINITION,
-        discoveryEnabled,
-        handler: LOCAL_MEETUP_DEFINITION.discovery.handler,
-        schema: {
-          enrollment: "purpose-bound",
-          location: "country/region/city/neighborhood",
-          exactVenueDisclosure: "after_mutual_approval",
-        },
-        updatedAt: new Date(),
-      })
-      .where(eq(intentTypes.id, existingMeetup.id));
+    const meetupValues = {
+      name: "Discover a local meetup",
+      description: meetupDescription,
+      status: "live" as const,
+      category: "social_coordination",
+      requiredScopes: ["discovery:read", "discovery:write"],
+      definitionVersion: LOCAL_MEETUP_DEFINITION.version,
+      definition: LOCAL_MEETUP_DEFINITION,
+      discoveryEnabled,
+      handler: LOCAL_MEETUP_DEFINITION.discovery.handler,
+      schema: {
+        enrollment: "purpose-bound",
+        location: "country/region/city/neighborhood",
+        exactVenueDisclosure: "after_mutual_approval",
+      },
+      updatedAt: new Date(),
+    };
+    const upgrading =
+      existingMeetup.definitionVersion < LOCAL_MEETUP_DEFINITION.version;
+    if (upgrading) {
+      await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${"discovery-contract:local_meetup"}))`,
+        );
+        await pauseStaleEnrollments(
+          tx,
+          "local_meetup",
+          LOCAL_MEETUP_DEFINITION.version,
+        );
+        await tx
+          .update(intentTypes)
+          .set(meetupValues)
+          .where(eq(intentTypes.id, existingMeetup.id));
+      });
+    } else {
+      await db
+        .update(intentTypes)
+        .set(meetupValues)
+        .where(eq(intentTypes.id, existingMeetup.id));
+    }
     console.log("Updated intent_types: local_meetup");
   } else {
     await db.insert(intentTypes).values({

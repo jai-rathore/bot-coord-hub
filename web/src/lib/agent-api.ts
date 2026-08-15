@@ -664,7 +664,7 @@ export async function resolveDiscoveryLocation(
     limit?: unknown;
   },
 ) {
-  assertAgentScope(auth, "discovery:read");
+  assertAgentScope(auth, "discovery:write");
   assertDiscoveryEnabled();
   await assertDiscoveryRate(auth, "location", 30);
   return {

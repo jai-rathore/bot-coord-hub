@@ -280,7 +280,7 @@ export const MCP_TOOLS: McpToolDef[] = [
         supportedIntents: {
           type: "object",
           description:
-            'Map intent slugs to supported contract versions, for example {"hiring_compatibility":2}.',
+            'Map intent slugs to the exact versions returned by list_discovery_capabilities.',
           additionalProperties: true,
         },
         platforms: {
@@ -340,7 +340,7 @@ export const MCP_TOOLS: McpToolDef[] = [
             resolutionToken: { type: "string" },
             visibility: {
               type: "string",
-              enum: ["private_match", "disclose_after_match"],
+              enum: ["private_match"],
             },
           },
           required: ["resolutionToken"],

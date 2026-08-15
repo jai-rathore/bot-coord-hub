@@ -146,6 +146,105 @@ test("Geoapify normalization omits coordinates and creates canonical hierarchy",
   assert.equal("lon" in (place ?? {}), false);
 });
 
+test("city typeahead uses the server-side Geoapify adapter and returns no coordinates", async () => {
+  const mutableEnv = process.env as Record<string, string | undefined>;
+  const previousApiKey = process.env.GEOAPIFY_API_KEY;
+  const previousEncryptionKey = process.env.TOKEN_ENCRYPTION_KEY;
+  const previousFetch = globalThis.fetch;
+  mutableEnv.GEOAPIFY_API_KEY = "test-geoapify-key";
+  mutableEnv.TOKEN_ENCRYPTION_KEY =
+    "test-location-resolution-key-with-sufficient-entropy";
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+    assert.equal(url.hostname, "api.geoapify.com");
+    assert.equal(url.searchParams.get("type"), "city");
+    assert.ok(
+      ["countrycode:us", "countrycode:ca"].includes(
+        String(url.searchParams.get("filter")),
+      ),
+    );
+    assert.equal(url.searchParams.get("apiKey"), "test-geoapify-key");
+    return new Response(
+      JSON.stringify({
+        features: [
+          {
+            properties: {
+              place_id: "geo-place-1",
+              result_type: "city",
+              formatted: "New York, NY, United States",
+              country: "United States",
+              country_code: "us",
+              state: "New York",
+              state_code: "NY",
+              city: "New York",
+              lat: 40.7,
+              lon: -74,
+            },
+          },
+        ],
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  };
+  try {
+    const result = await resolveLocationSuggestions({
+      userId: "user-a",
+      query: "New York",
+      granularity: "city",
+      countryCode: "US",
+    });
+    assert.equal(result.suggestions[0]?.place.locality, "New York");
+    assert.equal("lat" in (result.suggestions[0]?.place ?? {}), false);
+    assert.equal(
+      result.suggestions[0]?.resolutionToken.includes("New York"),
+      false,
+    );
+    const numericPlaceName = await resolveLocationSuggestions({
+      userId: "user-a",
+      query: "100 Mile House",
+      granularity: "city",
+      countryCode: "CA",
+    });
+    assert.equal(numericPlaceName.suggestions.length, 1);
+    await assert.rejects(
+      () =>
+        resolveLocationSuggestions({
+          userId: "user-a",
+          query: "40,-74",
+          granularity: "city",
+        }),
+      /coarse place name/,
+    );
+    for (const privateQuery of [
+      "1600 Pennsylvania Avenue",
+      "221B Baker Street",
+      "1 Microsoft Way",
+      "P.O. Box 123",
+      "40.7128 -74.0060",
+      "40° N, 74° W",
+    ]) {
+      await assert.rejects(
+        () =>
+          resolveLocationSuggestions({
+            userId: "user-a",
+            query: privateQuery,
+            granularity: "city",
+          }),
+        /coarse place name/,
+      );
+    }
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousApiKey === undefined) delete mutableEnv.GEOAPIFY_API_KEY;
+    else mutableEnv.GEOAPIFY_API_KEY = previousApiKey;
+    if (previousEncryptionKey === undefined) {
+      delete mutableEnv.TOKEN_ENCRYPTION_KEY;
+    } else {
+      mutableEnv.TOKEN_ENCRYPTION_KEY = previousEncryptionKey;
+    }
+  }
+});
+
 test("location resolution tokens are encrypted, user-bound, and expiring", () => {
   const mutableEnv = process.env as Record<string, string | undefined>;
   const previousKey = process.env.TOKEN_ENCRYPTION_KEY;
