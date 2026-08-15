@@ -30,7 +30,7 @@ import {
 import { runScheduleMeeting } from "@/lib/schedule-meeting";
 import type { AllowedHours } from "@/db/schema";
 import { writeAudit } from "@/lib/audit";
-import { assertAgentScope } from "@/lib/scopes";
+import { assertAgentScope, hasAgentScope } from "@/lib/scopes";
 import { boundedText } from "@/lib/validation";
 import {
   ackInboxItem,
@@ -46,6 +46,7 @@ import {
   listSessionsForUser,
   messageToPlainEnglish,
   postSessionMessage,
+  isDiscoveryMediatedSession,
 } from "@/lib/sessions";
 import {
   decideConfirm,
@@ -64,9 +65,75 @@ import {
   redeemPublicInvite as redeemShareablePublicInvite,
   revokePublicInvite as revokeShareablePublicInvite,
 } from "@/lib/public-invites";
+import {
+  getAgentCapabilityManifest,
+  listDiscoveryCatalog,
+  listDiscoveryInterests,
+  requestDiscoveryIntroduction,
+  searchDiscovery,
+  submitDiscoveryEnrollment,
+  upsertAgentCapabilityManifest,
+  type CoarseLocationInput,
+} from "@/lib/discovery-service";
+import { distributedRateLimit } from "@/lib/distributed-rate-limit";
+import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
 import { AgentApiError } from "@/lib/agent-errors";
 export { AgentApiError } from "@/lib/agent-errors";
+
+async function assertDiscoveryRate(
+  auth: AgentAuth,
+  action: string,
+  limit: number,
+) {
+  let result: Awaited<ReturnType<typeof distributedRateLimit>>;
+  try {
+    result = await distributedRateLimit(
+      `${action}:${auth.user.id}`,
+      limit,
+    );
+  } catch {
+    throw new AgentApiError(
+      503,
+      "Discovery is temporarily unavailable",
+      { code: "rate_limiter_unavailable", retryAfterSec: 5 },
+    );
+  }
+  if (!result.ok) {
+    throw new AgentApiError(429, "Discovery rate limit exceeded", {
+      code: "rate_limited",
+      retryAfterSec: result.retryAfterSec,
+    });
+  }
+  let daily: Awaited<ReturnType<typeof distributedRateLimit>>;
+  try {
+    daily = await distributedRateLimit(
+      `${action}:daily:${auth.user.id}`,
+      limit * 20,
+      24 * 60 * 60 * 1000,
+    );
+  } catch {
+    throw new AgentApiError(
+      503,
+      "Discovery is temporarily unavailable",
+      { code: "rate_limiter_unavailable", retryAfterSec: 5 },
+    );
+  }
+  if (!daily.ok) {
+    throw new AgentApiError(429, "Daily discovery privacy budget exceeded", {
+      code: "privacy_budget_exceeded",
+      retryAfterSec: daily.retryAfterSec,
+    });
+  }
+}
+
+function assertDiscoveryEnabled() {
+  if (!discoveryFeatureEnabled()) {
+    throw new AgentApiError(503, "Discovery is temporarily unavailable", {
+      code: "discovery_disabled",
+    });
+  }
+}
 
 function rethrowAsAgentError(err: unknown): never {
   if (err instanceof AgentApiError) throw err;
@@ -80,7 +147,13 @@ function rethrowAsAgentError(err: unknown): never {
       : message.includes("DATABASE_URL")
         ? 503
         : 500;
-  throw new AgentApiError(status, message);
+  if (status >= 500) {
+    console.error("[agent-api] unexpected domain error", err);
+  }
+  throw new AgentApiError(
+    status,
+    status >= 500 ? "Internal server error" : message,
+  );
 }
 
 export async function whoami(auth: AgentAuth) {
@@ -94,6 +167,7 @@ export async function whoami(auth: AgentAuth) {
     inbox = [];
   }
   const pendingInbox = inbox.length;
+  const capabilityManifest = await getAgentCapabilityManifest(auth.apiKey.id);
   return {
     ok: true,
     user: {
@@ -108,6 +182,7 @@ export async function whoami(auth: AgentAuth) {
       scopes: auth.apiKey.scopes,
       expiresAt: auth.apiKey.expiresAt,
       lastUsedAt: auth.apiKey.lastUsedAt,
+      capabilityManifest,
     },
     inbox: {
       pending: pendingInbox,
@@ -474,17 +549,23 @@ export async function readBoard(auth: AgentAuth, sessionId: string) {
   assertAgentScope(auth, "tasks:read");
   try {
     const session = await getSessionForUser(sessionId, auth.user.id);
-    const messages = await listMessagesForSession(sessionId);
+    const messages = await listMessagesForSession(sessionId, auth.user.id);
+    const discoveryPrivate = isDiscoveryMediatedSession(session);
     return {
       ok: true,
       session: {
         id: session.id,
         intentType: session.intentType,
         status: session.status,
-        payload: session.payload,
-        initiatorUserId: session.initiatorUserId,
-        peerUserId: session.peerUserId,
-        linkId: session.linkId,
+        payload: discoveryPrivate
+          ? {
+              privacyMode: "discovery",
+              disclosureStage: "mutual_interest",
+            }
+          : session.payload,
+        initiatorUserId: discoveryPrivate ? null : session.initiatorUserId,
+        peerUserId: discoveryPrivate ? null : session.peerUserId,
+        linkId: discoveryPrivate ? null : session.linkId,
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
       },
@@ -506,7 +587,7 @@ export async function listBoardMessages(auth: AgentAuth, sessionId: string) {
   assertAgentScope(auth, "tasks:read");
   try {
     await getSessionForUser(sessionId, auth.user.id);
-    const messages = await listMessagesForSession(sessionId);
+    const messages = await listMessagesForSession(sessionId, auth.user.id);
     return { ok: true, messages };
   } catch (err) {
     rethrowAsAgentError(err);
@@ -545,6 +626,200 @@ export async function listIntents(query?: string) {
     (i) => i.status === "live",
   );
   return { ok: true, intents };
+}
+
+export async function listDiscoveryCapabilities(auth: AgentAuth) {
+  assertAgentScope(auth, "intents:read");
+  const enabled = discoveryFeatureEnabled();
+  return {
+    ok: true,
+    intents: await listDiscoveryCatalog(auth.user.id),
+    agentAccess: {
+      canSearch: enabled && hasAgentScope(auth, "discovery:read"),
+      canEnrollOrRequest: enabled && hasAgentScope(auth, "discovery:write"),
+      instructions:
+        !enabled
+          ? "Secure discovery is currently disabled."
+          : hasAgentScope(auth, "discovery:read") &&
+        hasAgentScope(auth, "discovery:write")
+          ? "This agent connection can use discovery after declaring supported intent versions."
+          : "This existing agent connection predates discovery scopes. Ask the human to re-pair the agent before using discovery.",
+    },
+    trustModel: {
+      discoverableDoesNotMeanIdentifiable: true,
+      rawPrivateClaimsSharedBeforeIntroduction: false,
+      mutualHumanApprovalRequired: true,
+      exactLocationShared: false,
+    },
+  };
+}
+
+export async function setDiscoveryCapabilityManifest(
+  auth: AgentAuth,
+  body: {
+    supportedIntents?: unknown;
+    platforms?: unknown;
+    metadata?: unknown;
+  },
+) {
+  assertAgentScope(auth, "discovery:write");
+  assertDiscoveryEnabled();
+  return {
+    ok: true,
+    capabilityManifest: await upsertAgentCapabilityManifest({
+      apiKeyId: auth.apiKey.id,
+      supportedIntents: body.supportedIntents,
+      platforms: body.platforms,
+      metadata: body.metadata,
+    }),
+  };
+}
+
+export async function submitDiscoveryProfile(
+  auth: AgentAuth,
+  body: {
+    intentSlug?: unknown;
+    claims?: unknown;
+    provenance?: unknown;
+    location?: CoarseLocationInput | null;
+    requestActivation?: unknown;
+  },
+) {
+  assertAgentScope(auth, "discovery:write");
+  assertDiscoveryEnabled();
+  await assertDiscoveryRate(auth, "enroll", 20);
+  return {
+    ok: true,
+    enrollment: await submitDiscoveryEnrollment(
+      {
+        user: auth.user,
+        kind: "agent",
+        apiKeyId: auth.apiKey.id,
+      },
+      body,
+    ),
+  };
+}
+
+export async function searchDiscoveryCandidates(
+  auth: AgentAuth,
+  body: { intentSlug?: unknown; limit?: unknown },
+) {
+  assertAgentScope(auth, "discovery:read");
+  assertDiscoveryEnabled();
+  await assertDiscoveryRate(auth, "search", 15);
+  const intentSlug =
+    typeof body.intentSlug === "string" ? body.intentSlug.trim() : "";
+  if (!intentSlug) throw new AgentApiError(400, "intentSlug is required");
+  return {
+    ok: true,
+    ...(await searchDiscovery({
+      actor: {
+        user: auth.user,
+        kind: "agent",
+        apiKeyId: auth.apiKey.id,
+      },
+      intentSlug,
+      limit: typeof body.limit === "number" ? body.limit : undefined,
+    })),
+  };
+}
+
+export async function requestDiscoveryInterest(
+  auth: AgentAuth,
+  body: { candidateHandle?: unknown; idempotencyKey?: unknown },
+) {
+  assertAgentScope(auth, "discovery:write");
+  assertDiscoveryEnabled();
+  await assertDiscoveryRate(auth, "interest", 10);
+  const candidateHandle =
+    typeof body.candidateHandle === "string"
+      ? body.candidateHandle.trim()
+      : "";
+  if (!candidateHandle) {
+    throw new AgentApiError(400, "candidateHandle is required");
+  }
+  return {
+    ok: true,
+    ...(await requestDiscoveryIntroduction({
+      actor: {
+        user: auth.user,
+        kind: "agent",
+        apiKeyId: auth.apiKey.id,
+      },
+      candidateHandle,
+      idempotencyKey:
+        typeof body.idempotencyKey === "string"
+          ? body.idempotencyKey
+          : undefined,
+    })),
+  };
+}
+
+export async function listDiscoveryRequests(auth: AgentAuth) {
+  assertAgentScope(auth, "discovery:read");
+  const [manifest, catalog] = await Promise.all([
+    getAgentCapabilityManifest(auth.apiKey.id),
+    listDiscoveryCatalog(auth.user.id),
+  ]);
+  const supported = manifest?.supportedIntents ?? {};
+  const allowed = new Set(
+    catalog
+      .filter(
+        (intent) => supported[intent.slug] === intent.definitionVersion,
+      )
+      .map((intent) => intent.slug),
+  );
+  return {
+    ok: true,
+    interests: (await listDiscoveryInterests(auth.user.id)).filter((interest) =>
+      allowed.has(interest.intentSlug),
+    ),
+  };
+}
+
+export async function respondDiscoveryInterest(
+  auth: AgentAuth,
+  body: { interestId?: unknown; decision?: unknown },
+) {
+  void body;
+  assertAgentScope(auth, "discovery:read");
+  throw new AgentApiError(
+    403,
+    "Discovery introduction decisions are human-only. Direct the human to /app/discovery.",
+    { code: "human_approval_required" },
+  );
+}
+
+export async function blockDiscoveryMatch(
+  auth: AgentAuth,
+  body: { interestId?: unknown; reasonCode?: unknown },
+) {
+  void body;
+  assertAgentScope(auth, "discovery:read");
+  throw new AgentApiError(
+    403,
+    "Discovery safety decisions are human-only. Direct the human to /app/discovery.",
+    { code: "human_approval_required" },
+  );
+}
+
+export async function reportDiscoveryMatch(
+  auth: AgentAuth,
+  body: {
+    interestId?: unknown;
+    reasonCode?: unknown;
+    details?: unknown;
+    block?: boolean;
+  },
+) {
+  void body;
+  assertAgentScope(auth, "discovery:read");
+  throw new AgentApiError(
+    403,
+    "Discovery safety decisions are human-only. Direct the human to /app/discovery.",
+    { code: "human_approval_required" },
+  );
 }
 
 export async function proposeIntent(
@@ -608,7 +883,8 @@ export async function proposeIntent(
     if (message.includes("unique") || message.includes("duplicate")) {
       throw new AgentApiError(409, "Slug already taken", { hits });
     }
-    throw new AgentApiError(503, message);
+    console.error("[agent-api] intent proposal database error", err);
+    throw new AgentApiError(503, "Intent proposal is temporarily unavailable");
   }
 }
 

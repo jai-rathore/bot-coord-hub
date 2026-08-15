@@ -71,6 +71,48 @@
       "when": 1786695396093,
       "tag": "0009_harsh_nekra",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786737621111,
+      "tag": "0010_brainy_true_believers",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786739975779,
+      "tag": "0011_even_matthew_murdock",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786740591141,
+      "tag": "0012_mysterious_tattoo",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786741723953,
+      "tag": "0013_hard_greymalkin",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786743653882,
+      "tag": "0014_omniscient_medusa",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1786747310656,
+      "tag": "0015_robust_switch",
+      "breakpoints": true
     }
   ]
 }

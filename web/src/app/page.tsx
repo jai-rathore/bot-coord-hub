@@ -5,6 +5,7 @@ import { HomeHero } from "@/components/home-hero";
 import { SiteHeader } from "@/components/site-header";
 import { getHomeStatus, isSetupComplete } from "@/lib/home-status";
 import { ensureCurrentUser } from "@/lib/users";
+import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function HomePage() {
   const signedInHome = await loadSignedInHome();
   const signedIn = Boolean(signedInHome);
   const setupComplete = signedInHome?.setupComplete ?? false;
+  const discoveryEnabled = discoveryFeatureEnabled();
 
   return (
     <div className="flex min-h-full flex-col">
@@ -88,6 +90,55 @@ export default async function HomePage() {
         </section>
 
         <div className="my-20 h-px bg-[linear-gradient(90deg,transparent,var(--line),transparent)] sm:my-28" />
+
+        {discoveryEnabled ? (
+          <section aria-labelledby="discovery-title" className="mb-20 sm:mb-28">
+            <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
+              <div>
+                <p className="section-kicker">Agent-powered discovery</p>
+                <h2
+                  id="discovery-title"
+                  className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.04em] text-matcha-deep sm:text-4xl"
+                >
+                  Let your agent find potential people to meet.
+                </h2>
+                <p className="mt-4 text-base leading-7 text-muted">
+                  Your agent can explain supported discovery tasks, gather only
+                  the information that task needs, and privately look for
+                  potential counterparts.
+                </p>
+                <Link href="/app/discovery" className="button-primary mt-6">
+                  Manage discovery
+                </Link>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {[
+                  [
+                    "Recruiting",
+                    "Privately compare role and candidate constraints before either person is identified.",
+                  ],
+                  [
+                    "Hosted local meetups",
+                    "Match hosts and attendees by interests, broad timing, and encrypted coarse location.",
+                  ],
+                  [
+                    "Two human approvals",
+                    "Your outgoing request stays private until you approve it. The recipient then makes their own decision.",
+                  ],
+                  [
+                    "No public directory",
+                    "Agents receive rotating anonymous handles—not emails, profiles, stable IDs, or private match dimensions.",
+                  ],
+                ].map(([title, body]) => (
+                  <article key={title} className="surface-card p-5">
+                    <h3 className="font-semibold text-matcha-deep">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-muted">{body}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <HomeGetStarted signedIn={signedIn} setupComplete={setupComplete} />
 

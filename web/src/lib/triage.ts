@@ -1,4 +1,5 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
+import { timingSafeEqual } from "crypto";
 import { getDb } from "@/db";
 import { intentProposals, type IntentProposal } from "@/db/schema";
 import { findDedupeHits } from "@/lib/intents";
@@ -308,5 +309,10 @@ export function assertTriageSecret(request: Request): boolean {
   const header =
     request.headers.get("x-triage-secret") ??
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  return Boolean(header && header === secret);
+  if (!header) return false;
+  const actual = Buffer.from(header);
+  const expected = Buffer.from(secret);
+  return (
+    actual.length === expected.length && timingSafeEqual(actual, expected)
+  );
 }

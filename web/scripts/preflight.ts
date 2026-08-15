@@ -1,15 +1,22 @@
 import { config } from "dotenv";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { getDb } from "../src/db";
 import {
   agentPairings,
+  agentCapabilities,
   apiKeys,
   calendarConnections,
   guestTasks,
   intentTypes,
   links,
   publicInvites,
+  purposeEnrollments,
+  discoveryInterests,
+  discoveryPairHistory,
+  discoveryBlocks,
+  userLocations,
 } from "../src/db/schema";
+import { discoveryFeatureEnabled } from "../src/lib/discovery-feature";
 
 config({ path: ".env.local" });
 config();
@@ -64,6 +71,37 @@ async function main() {
         : "disabled",
   });
 
+  checks.push({
+    name: "Discovery rate limiter",
+    ok: !production || Boolean(process.env.REDIS_URL),
+    detail: process.env.REDIS_URL
+      ? "shared Valkey configured"
+      : production
+        ? "REDIS_URL is required"
+        : "in-memory fallback active locally",
+  });
+
+  checks.push({
+    name: "Discovery feature flag",
+    ok: true,
+    detail: discoveryFeatureEnabled()
+      ? "enabled"
+      : "disabled (safe deployment default)",
+  });
+
+  const safetyAdminsConfigured = Boolean(
+    process.env.INTENT_ADMIN_EMAILS?.trim(),
+  );
+  checks.push({
+    name: "Discovery safety admins",
+    ok: !production || !discoveryFeatureEnabled() || safetyAdminsConfigured,
+    detail: safetyAdminsConfigured
+      ? "configured"
+      : production && discoveryFeatureEnabled()
+        ? "INTENT_ADMIN_EMAILS is required before enabling discovery"
+        : "not required for local/CI or while discovery is disabled",
+  });
+
   const googleEnabled =
     process.env.GOOGLE_CALENDAR_ENABLED === "true" ||
     process.env.GOOGLE_CALENDAR_ENABLED === "1";
@@ -101,12 +139,30 @@ async function main() {
           .select({ publicInviteId: links.publicInviteId })
           .from(links)
           .limit(1),
+        db
+          .select({ id: purposeEnrollments.id })
+          .from(purposeEnrollments)
+          .limit(1),
+        db
+          .select({ id: discoveryInterests.id })
+          .from(discoveryInterests)
+          .limit(1),
+        db
+          .select({ id: discoveryPairHistory.id })
+          .from(discoveryPairHistory)
+          .limit(1),
+        db.select({ id: discoveryBlocks.id }).from(discoveryBlocks).limit(1),
+        db.select({ id: userLocations.id }).from(userLocations).limit(1),
+        db
+          .select({ id: agentCapabilities.id })
+          .from(agentCapabilities)
+          .limit(1),
       ]);
       checks.push({
         name: "Current schema",
         ok: true,
         detail:
-          "guest tasks, pairings, scoped credentials, and public invites available",
+          "guest, pairing, invite, discovery, location, safety, and capability tables available",
       });
     } catch (error) {
       checks.push({
@@ -117,21 +173,34 @@ async function main() {
     }
 
     try {
-      const [scheduleIntent] = await db
-        .select({ id: intentTypes.id })
+      const seededIntents = await db
+        .select({
+          slug: intentTypes.slug,
+          definition: intentTypes.definition,
+          discoveryEnabled: intentTypes.discoveryEnabled,
+        })
         .from(intentTypes)
-        .where(
-          and(
-            eq(intentTypes.slug, "schedule_meeting"),
-            eq(intentTypes.status, "live"),
-          ),
-        )
-        .limit(1);
+        .where(eq(intentTypes.status, "live"));
+      const scheduleIntent = seededIntents.find(
+        (intent) => intent.slug === "schedule_meeting",
+      );
+      const hiringIntent = seededIntents.find(
+        (intent) => intent.slug === "hiring_compatibility",
+      );
+      const meetupIntent = seededIntents.find(
+        (intent) => intent.slug === "local_meetup",
+      );
+      const discoverySeedMatchesFlag =
+        Boolean(hiringIntent && meetupIntent) &&
+        hiringIntent!.discoveryEnabled === discoveryFeatureEnabled() &&
+        meetupIntent!.discoveryEnabled === discoveryFeatureEnabled();
       checks.push({
         name: "Supported task seed",
-        ok: Boolean(scheduleIntent),
-        detail: scheduleIntent
-          ? "schedule_meeting is live"
+        ok: Boolean(scheduleIntent && discoverySeedMatchesFlag),
+        detail: scheduleIntent && discoverySeedMatchesFlag
+          ? discoveryFeatureEnabled()
+            ? "schedule_meeting is live; hiring and meetup discovery are enabled"
+            : "schedule_meeting is live; discovery seeds are safely disabled"
           : "run npm run db:seed",
       });
     } catch (error) {

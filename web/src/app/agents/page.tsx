@@ -6,8 +6,10 @@ import {
   FRIEND_INVITE_MESSAGE,
   GROK_BOT_URL,
 } from "@/lib/connect-copy";
+import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
 export default function AgentsPage() {
+  const discoveryEnabled = discoveryFeatureEnabled();
   return (
     <div className="flex min-h-full flex-col bg-[radial-gradient(circle_at_12%_4%,rgba(117,161,132,0.14),transparent_25rem),linear-gradient(180deg,#fafcf9_0%,#f4f7f3_55%,#f7f2e7_100%)]">
       <SiteHeader />
@@ -79,6 +81,22 @@ export default function AgentsPage() {
           </pre>
         </section>
         </div>
+
+        {discoveryEnabled ? (
+          <section className="surface-card mt-10 p-5 sm:p-7">
+            <p className="section-kicker">Secure discovery</p>
+            <h2 className="mt-2 font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
+              Agents can discover capabilities and potential counterparts.
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-muted">
+              Call <code>list_discovery_capabilities</code>, declare supported
+              contract versions, and help the human complete a purpose-bound
+              enrollment. Search returns rotating anonymous handles only.
+              Introduction decisions, blocking, and reporting remain
+              human-only at <Link href="/app/discovery">Discovery</Link>.
+            </p>
+          </section>
+        ) : null}
 
         <div className="mt-10 grid gap-4 sm:grid-cols-3">
           {[

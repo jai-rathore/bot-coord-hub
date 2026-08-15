@@ -3,13 +3,17 @@ services:
     name: honeymatcha-web
     runtime: node
     plan: starter
+    region: oregon
     rootDir: web
     buildCommand: npm install && npm run build
+    preDeployCommand: npm run db:migrate && npm run db:seed && PREFLIGHT_PRODUCTION=true npm run db:preflight
     startCommand: npm run start
     healthCheckPath: /api/v1/health
     envVars:
       - key: NODE_ENV
         value: production
+      - key: ENABLE_DISCOVERY
+        value: "false"
       - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
         sync: false
       - key: CLERK_SECRET_KEY
@@ -38,7 +42,32 @@ services:
         sync: false
       - key: TRIAGE_SECRET
         generateValue: true
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: honeymatcha-rate-limit
+          property: connectionString
       - key: NEXT_PUBLIC_CLERK_SIGN_IN_URL
         value: /sign-in
       - key: NEXT_PUBLIC_CLERK_SIGN_UP_URL
         value: /sign-up
+  - type: keyvalue
+    name: honeymatcha-rate-limit
+    plan: starter
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+  - type: cron
+    name: honeymatcha-discovery-cleanup
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: web
+    schedule: "0 * * * *"
+    buildCommand: npm install
+    startCommand: npm run discovery:cleanup
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false

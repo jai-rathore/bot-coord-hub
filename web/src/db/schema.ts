@@ -72,6 +72,29 @@ export const publicInviteStatusEnum = pgEnum("public_invite_status", [
   "revoked",
 ]);
 
+export const discoveryEnrollmentStatusEnum = pgEnum(
+  "discovery_enrollment_status",
+  ["draft", "pending_approval", "active", "paused", "revoked"],
+);
+
+export const discoveryInterestStatusEnum = pgEnum(
+  "discovery_interest_status",
+  ["pending", "accepted", "declined", "withdrawn"],
+);
+
+export const userSafetyStatusEnum = pgEnum("user_safety_status", [
+  "active",
+  "restricted",
+  "suspended",
+]);
+
+export const safetyReportStatusEnum = pgEnum("safety_report_status", [
+  "open",
+  "reviewed",
+  "actioned",
+  "dismissed",
+]);
+
 /** Optional working-hours policy on a link. */
 export type AllowedHours = {
   start: string;
@@ -322,6 +345,10 @@ export const intentTypes = pgTable(
     description: text("description"),
     status: intentStatusEnum("status").notNull().default("pending"),
     schema: jsonb("schema").$type<Record<string, unknown>>().default({}),
+    definitionVersion: integer("definition_version").notNull().default(1),
+    definition: jsonb("definition").$type<Record<string, unknown>>().default({}),
+    discoveryEnabled: boolean("discovery_enabled").notNull().default(false),
+    handler: text("handler").notNull().default("none"),
     category: text("category").notNull().default("coordination"),
     requiredScopes: jsonb("required_scopes").$type<string[]>().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -332,6 +359,410 @@ export const intentTypes = pgTable(
       .notNull(),
   },
   (t) => [uniqueIndex("intent_types_slug_uidx").on(t.slug)],
+);
+
+/**
+ * Coarse, human-approved location. Exact coordinates are intentionally absent
+ * from the first discovery release.
+ */
+export const userLocations = pgTable(
+  "user_locations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    countryCode: text("country_code"),
+    region: text("region"),
+    locality: text("locality"),
+    neighborhood: text("neighborhood"),
+    granularity: text("granularity").notNull().default("city"),
+    visibility: text("visibility").notNull().default("private_match"),
+    privateValueEncrypted: text("private_value_encrypted"),
+    isPrimary: boolean("is_primary").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("user_locations_user_id_idx").on(t.userId),
+    check(
+      "user_locations_granularity_check",
+      sql`${t.granularity} in ('country', 'region', 'city', 'neighborhood')`,
+    ),
+    check(
+      "user_locations_visibility_check",
+      sql`${t.visibility} in ('private_match', 'disclose_after_match')`,
+    ),
+  ],
+);
+
+export const purposeEnrollments = pgTable(
+  "purpose_enrollments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    intentSlug: text("intent_slug").notNull(),
+    definitionVersion: integer("definition_version").notNull(),
+    status: discoveryEnrollmentStatusEnum("status")
+      .notNull()
+      .default("draft"),
+    publicClaims: jsonb("public_claims")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    privateClaimsEncrypted: text("private_claims_encrypted"),
+    disclosureClaims: jsonb("disclosure_claims")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    claimProvenance: jsonb("claim_provenance")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    locationId: uuid("location_id").references(() => userLocations.id, {
+      onDelete: "set null",
+    }),
+    submittedByApiKeyId: uuid("submitted_by_api_key_id").references(
+      () => apiKeys.id,
+      { onDelete: "set null" },
+    ),
+    consentedAt: timestamp("consented_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("purpose_enrollments_user_intent_uidx").on(
+      t.userId,
+      t.intentSlug,
+    ),
+    index("purpose_enrollments_discovery_idx").on(
+      t.intentSlug,
+      t.status,
+      t.expiresAt,
+    ),
+    index("purpose_enrollments_location_idx").on(t.locationId),
+  ],
+);
+
+export const agentCapabilities = pgTable(
+  "agent_capabilities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    apiKeyId: uuid("api_key_id")
+      .notNull()
+      .references(() => apiKeys.id, { onDelete: "cascade" }),
+    supportedIntents: jsonb("supported_intents")
+      .$type<Record<string, number>>()
+      .notNull()
+      .default({}),
+    platforms: jsonb("platforms").$type<string[]>().notNull().default([]),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("agent_capabilities_api_key_uidx").on(t.apiKeyId),
+  ],
+);
+
+/**
+ * Search-scoped opaque handles. Raw dc_ tokens are returned once and only
+ * their hashes are stored.
+ */
+export const discoveryHandles = pgTable(
+  "discovery_handles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tokenHash: text("token_hash").notNull(),
+    requesterUserId: uuid("requester_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requesterApiKeyId: uuid("requester_api_key_id").references(
+      () => apiKeys.id,
+      { onDelete: "cascade" },
+    ),
+    candidateUserId: uuid("candidate_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requesterEnrollmentId: uuid("requester_enrollment_id")
+      .notNull()
+      .references(() => purposeEnrollments.id, { onDelete: "cascade" }),
+    candidateEnrollmentId: uuid("candidate_enrollment_id")
+      .notNull()
+      .references(() => purposeEnrollments.id, { onDelete: "cascade" }),
+    intentSlug: text("intent_slug").notNull(),
+    compatibility: jsonb("compatibility")
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    projection: jsonb("projection")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("discovery_handles_token_hash_uidx").on(t.tokenHash),
+    index("discovery_handles_requester_expires_idx").on(
+      t.requesterUserId,
+      t.expiresAt,
+    ),
+    index("discovery_handles_candidate_idx").on(t.candidateUserId),
+  ],
+);
+
+export const discoveryInterests = pgTable(
+  "discovery_interests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    intentSlug: text("intent_slug").notNull(),
+    requesterUserId: uuid("requester_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    recipientUserId: uuid("recipient_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requesterEnrollmentId: uuid("requester_enrollment_id")
+      .notNull()
+      .references(() => purposeEnrollments.id, { onDelete: "cascade" }),
+    recipientEnrollmentId: uuid("recipient_enrollment_id")
+      .notNull()
+      .references(() => purposeEnrollments.id, { onDelete: "cascade" }),
+    /** Canonical sorted user-id pair; prevents reciprocal duplicate intros. */
+    pairKey: text("pair_key"),
+    status: discoveryInterestStatusEnum("status").notNull().default("pending"),
+    compatibility: jsonb("compatibility")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    requesterConfirmedAt: timestamp("requester_confirmed_at", {
+      withTimezone: true,
+    }),
+    requesterConfirmedByApiKeyId: uuid(
+      "requester_confirmed_by_api_key_id",
+    ).references(() => apiKeys.id, { onDelete: "set null" }),
+    idempotencyKey: text("idempotency_key"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    sessionId: uuid("session_id").references(() => sessions.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("discovery_interests_pair_uidx").on(
+      t.intentSlug,
+      t.requesterUserId,
+      t.recipientUserId,
+    ),
+    uniqueIndex("discovery_interests_canonical_pair_uidx")
+      .on(t.intentSlug, t.pairKey)
+      .where(sql`${t.pairKey} is not null`),
+    uniqueIndex("discovery_interests_idempotency_uidx")
+      .on(t.requesterUserId, t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} is not null`),
+    index("discovery_interests_recipient_status_idx").on(
+      t.recipientUserId,
+      t.status,
+      t.createdAt,
+    ),
+    index("discovery_interests_requester_idx").on(
+      t.requesterUserId,
+      t.createdAt,
+    ),
+  ],
+);
+
+export const discoveryDisclosures = pgTable(
+  "discovery_disclosures",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    interestId: uuid("interest_id")
+      .notNull()
+      .references(() => discoveryInterests.id, { onDelete: "cascade" }),
+    grantorUserId: uuid("grantor_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    granteeUserId: uuid("grantee_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    fields: jsonb("fields")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    grantedAt: timestamp("granted_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("discovery_disclosures_interest_grantor_uidx").on(
+      t.interestId,
+      t.grantorUserId,
+    ),
+    index("discovery_disclosures_grantee_idx").on(t.granteeUserId),
+  ],
+);
+
+export const discoveryBlocks = pgTable(
+  "discovery_blocks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    blockerUserId: uuid("blocker_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    blockedUserId: uuid("blocked_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reasonCode: text("reason_code"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("discovery_blocks_pair_uidx").on(
+      t.blockerUserId,
+      t.blockedUserId,
+    ),
+    index("discovery_blocks_blocked_idx").on(t.blockedUserId),
+    check(
+      "discovery_blocks_not_self_check",
+      sql`${t.blockerUserId} <> ${t.blockedUserId}`,
+    ),
+  ],
+);
+
+/** Durable anti-probing memory that survives enrollment revocation/recreation. */
+export const discoveryPairHistory = pgTable(
+  "discovery_pair_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    pairKey: text("pair_key").notNull(),
+    userAId: uuid("user_a_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    userBId: uuid("user_b_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    intentSlug: text("intent_slug").notNull(),
+    outcome: text("outcome").notNull(),
+    probeCount: integer("probe_count").notNull().default(1),
+    lastOutcomeAt: timestamp("last_outcome_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("discovery_pair_history_intent_pair_uidx").on(
+      t.intentSlug,
+      t.pairKey,
+    ),
+    index("discovery_pair_history_user_a_idx").on(t.userAId, t.intentSlug),
+    index("discovery_pair_history_user_b_idx").on(t.userBId, t.intentSlug),
+    check(
+      "discovery_pair_history_not_self_check",
+      sql`${t.userAId} <> ${t.userBId}`,
+    ),
+  ],
+);
+
+export const userSafety = pgTable(
+  "user_safety",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: userSafetyStatusEnum("status").notNull().default("active"),
+    reasonCode: text("reason_code"),
+    decidedByUserId: uuid("decided_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [uniqueIndex("user_safety_user_uidx").on(t.userId)],
+);
+
+export const safetyReports = pgTable(
+  "safety_reports",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reporterUserId: uuid("reporter_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    subjectUserId: uuid("subject_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    interestId: uuid("interest_id").references(() => discoveryInterests.id, {
+      onDelete: "set null",
+    }),
+    reasonCode: text("reason_code").notNull(),
+    details: text("details"),
+    status: safetyReportStatusEnum("status").notNull().default("open"),
+    moderatorNotes: text("moderator_notes"),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("safety_reports_subject_status_idx").on(
+      t.subjectUserId,
+      t.status,
+      t.createdAt,
+    ),
+    index("safety_reports_reporter_idx").on(t.reporterUserId, t.createdAt),
+    uniqueIndex("safety_reports_reporter_interest_uidx")
+      .on(t.reporterUserId, t.interestId)
+      .where(sql`${t.interestId} is not null`),
+    check(
+      "safety_reports_not_self_check",
+      sql`${t.reporterUserId} <> ${t.subjectUserId}`,
+    ),
+  ],
 );
 
 export const triageRecommendationEnum = pgEnum("triage_recommendation", [
@@ -584,6 +1015,10 @@ export const agentInbox = pgTable(
     sessionId: uuid("session_id").references(() => sessions.id, {
       onDelete: "cascade",
     }),
+    discoveryInterestId: uuid("discovery_interest_id").references(
+      () => discoveryInterests.id,
+      { onDelete: "cascade" },
+    ),
     kind: text("kind").notNull(),
     summary: text("summary").notNull(),
     body: jsonb("body").$type<Record<string, unknown>>().notNull().default({}),
@@ -596,6 +1031,7 @@ export const agentInbox = pgTable(
     index("agent_inbox_user_created_idx").on(t.userId, t.createdAt),
     index("agent_inbox_user_unacked_idx").on(t.userId, t.ackedAt),
     index("agent_inbox_session_kind_idx").on(t.sessionId, t.kind),
+    index("agent_inbox_discovery_interest_idx").on(t.discoveryInterestId),
   ],
 );
 
@@ -615,3 +1051,13 @@ export type GuestTask = typeof guestTasks.$inferSelect;
 export type GuestResponse = typeof guestResponses.$inferSelect;
 export type AgentPairing = typeof agentPairings.$inferSelect;
 export type AgentInbox = typeof agentInbox.$inferSelect;
+export type UserLocation = typeof userLocations.$inferSelect;
+export type PurposeEnrollment = typeof purposeEnrollments.$inferSelect;
+export type AgentCapability = typeof agentCapabilities.$inferSelect;
+export type DiscoveryHandle = typeof discoveryHandles.$inferSelect;
+export type DiscoveryInterest = typeof discoveryInterests.$inferSelect;
+export type DiscoveryDisclosure = typeof discoveryDisclosures.$inferSelect;
+export type DiscoveryBlock = typeof discoveryBlocks.$inferSelect;
+export type DiscoveryPairHistory = typeof discoveryPairHistory.$inferSelect;
+export type UserSafety = typeof userSafety.$inferSelect;
+export type SafetyReport = typeof safetyReports.$inferSelect;

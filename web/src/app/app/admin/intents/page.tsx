@@ -52,9 +52,10 @@ export default async function IntentAdministrationPage() {
           Review demand and safety requirements before publishing executable
           agent capabilities.
         </p>
-        <Link href="/agents/tasks" className="mt-4 inline-flex text-sm">
-          Open supported task catalog →
-        </Link>
+        <div className="mt-4 flex flex-wrap gap-4 text-sm">
+          <Link href="/agents/tasks">Open supported task catalog →</Link>
+          <Link href="/app/admin/safety">Review discovery safety reports →</Link>
+        </div>
       </div>
       <IntentModeration initialPending={pending} canRunTriage />
     </div>

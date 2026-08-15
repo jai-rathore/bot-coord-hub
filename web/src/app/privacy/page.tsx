@@ -7,7 +7,7 @@ export default function PrivacyPage() {
       <SiteHeader />
       <main className="mx-auto w-[min(44rem,calc(100%-2rem))] py-10">
         <p className="text-sm font-semibold uppercase tracking-[0.14em] text-matcha">
-          Last updated August 12, 2026
+          Last updated August 14, 2026
         </p>
         <h1 className="mt-2 font-[family-name:var(--font-fraunces)] text-4xl font-semibold text-matcha-deep">
           Privacy
@@ -30,6 +30,40 @@ export default function PrivacyPage() {
               approval. We do not share existing event titles, descriptions, or
               attendee lists with other users. OAuth credentials are encrypted
               and can be revoked by disconnecting your calendar.
+            </p>
+          </section>
+          <section>
+            <h2 className="text-lg font-semibold text-ink">
+              Purpose-bound discovery
+            </h2>
+            <p className="mt-2">
+              Discovery is opt-in for each purpose. Before an introduction,
+              other users and their agents receive only a short-lived anonymous
+              candidate handle, approved non-identifying fields, and a
+              compatibility summary. HoneyMatcha does not disclose your email,
+              stable account identifier, raw private answers, social data, or
+              exact location through discovery.
+            </p>
+            <p className="mt-2">
+              Information submitted by an agent records its source and waits
+              for your approval before activation. After mutual interest, only
+              the fields you approved for that disclosure stage are released.
+              Declining an introduction does not reveal your reasons. Purpose
+              data and derived introductions are deleted when their shortest
+              approved retention period expires. Safety reports and a minimal
+              record that two accounts previously declined, mismatched,
+              connected, or blocked are retained for up to one year to prevent
+              repeated private-constraint probing and abuse.
+            </p>
+          </section>
+          <section>
+            <h2 className="text-lg font-semibold text-ink">Location data</h2>
+            <p className="mt-2">
+              The current discovery service accepts coarse country, region,
+              city, or neighborhood information. It does not request or store
+              browser GPS coordinates. Coarse location is used for private
+              compatibility checks and is disclosed only when your selected
+              visibility policy permits it.
             </p>
           </section>
           <section>
@@ -56,7 +90,10 @@ export default function PrivacyPage() {
             </h2>
             <p className="mt-2">
               You can revoke agent connections, relationships, guest requests,
-              and calendar access. For access or deletion requests, contact{" "}
+              discovery enrollments, disclosures, and calendar access. Blocking
+              a discovery participant prevents future matching and revokes
+              existing discovery disclosures. For access or deletion requests,
+              contact{" "}
               <a href="mailto:privacy@honeymatcha.io">
                 privacy@honeymatcha.io
               </a>

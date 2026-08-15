@@ -8,6 +8,7 @@ import { BrandLink } from "@/components/brand-link";
 const NAV: Array<{ href: string; label: string; exact?: boolean }> = [
   { href: "/app", label: "Home", exact: true },
   { href: "/app/tasks", label: "Tasks" },
+  { href: "/app/discovery", label: "Discovery" },
   { href: "/app/people", label: "People" },
   { href: "/app/attention", label: "Needs your attention" },
   { href: "/app/activity", label: "Activity" },
@@ -21,6 +22,12 @@ function NavIcon({ href }: { href: string }) {
       <>
         <rect x="5" y="4" width="14" height="16" rx="2" />
         <path d="M9 9h6M9 13h6M9 17h4" />
+      </>
+    ),
+    "/app/discovery": (
+      <>
+        <circle cx="11" cy="11" r="6" />
+        <path d="m16 16 4 4M11 8v6M8 11h6" />
       </>
     ),
     "/app/people": (
@@ -65,8 +72,17 @@ function NavIcon({ href }: { href: string }) {
   );
 }
 
-export function AppNav({ attentionCount = 0 }: { attentionCount?: number }) {
+export function AppNav({
+  attentionCount = 0,
+  discoveryEnabled = false,
+}: {
+  attentionCount?: number;
+  discoveryEnabled?: boolean;
+}) {
   const pathname = usePathname();
+  const visibleNav = discoveryEnabled
+    ? NAV
+    : NAV.filter((item) => item.href !== "/app/discovery");
 
   return (
     <header className="sticky top-0 z-40 border-b border-line/80 bg-[rgba(247,249,246,0.82)] px-4 backdrop-blur-xl sm:px-6">
@@ -85,7 +101,7 @@ export function AppNav({ attentionCount = 0 }: { attentionCount?: number }) {
           aria-label="HoneyMatcha"
           className="mt-3 flex snap-x gap-1 overflow-x-auto pb-1 text-sm [scrollbar-width:none]"
         >
-          {NAV.map((item) => {
+          {visibleNav.map((item) => {
             const active = item.exact
               ? pathname === item.href
               : pathname.startsWith(item.href);

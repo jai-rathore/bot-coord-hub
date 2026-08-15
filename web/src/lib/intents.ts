@@ -16,6 +16,10 @@ export type IntentRegistryItem = {
   triagedAt: Date | null;
   proposedByUserId: string | null;
   createdAt: Date;
+  definitionVersion: number | null;
+  definition: Record<string, unknown> | null;
+  discoveryEnabled: boolean;
+  handler: string | null;
 };
 
 export async function listRegistryIntents(
@@ -41,6 +45,10 @@ export async function listRegistryIntents(
       triagedAt: null as Date | null,
       proposedByUserId: null as string | null,
       createdAt: t.createdAt,
+      definitionVersion: t.definitionVersion,
+      definition: (t.definition as Record<string, unknown>) ?? {},
+      discoveryEnabled: t.discoveryEnabled,
+      handler: t.handler,
     })),
     ...proposals.map((p) => ({
       id: p.id,
@@ -55,6 +63,10 @@ export async function listRegistryIntents(
       triagedAt: p.triagedAt,
       proposedByUserId: p.proposedByUserId,
       createdAt: p.createdAt,
+      definitionVersion: null,
+      definition: null,
+      discoveryEnabled: false,
+      handler: null,
     })),
   ];
 
