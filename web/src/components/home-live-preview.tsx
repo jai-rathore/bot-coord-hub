@@ -35,7 +35,8 @@ const SCENES = [
 export function HomeLivePreview() {
   const [scene, setScene] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const current = SCENES[scene];
+  const displayedScene = reduceMotion ? SCENES.length - 1 : scene;
+  const current = SCENES[displayedScene];
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -46,10 +47,7 @@ export function HomeLivePreview() {
   }, []);
 
   useEffect(() => {
-    if (reduceMotion) {
-      setScene(SCENES.length - 1);
-      return;
-    }
+    if (reduceMotion) return;
     const id = window.setInterval(() => {
       setScene((value) => (value + 1) % SCENES.length);
     }, 3200);
@@ -182,7 +180,7 @@ export function HomeLivePreview() {
             <span
               key={item.title}
               className={`h-1 rounded-full transition-all duration-300 ${
-                index === scene ? "w-5 bg-matcha" : "w-1.5 bg-line"
+                index === displayedScene ? "w-5 bg-matcha" : "w-1.5 bg-line"
               }`}
             />
           ))}
