@@ -218,7 +218,7 @@ export default function DocsPage() {
               purpose-bound answers for human review. Private claims and
               canonical coarse locations are encrypted. Search exposes only
               rotating anonymous handles and a non-identifying participant
-              card. Dating introductions are adult-only: age and relationship
+              role. Dating introductions are adult-only: age and relationship
               intent must come from the human, and both people confirm before
               anyone is identified.
             </p>
