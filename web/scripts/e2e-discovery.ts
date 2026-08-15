@@ -147,7 +147,7 @@ async function main() {
     metadata: { mode: "test" },
   });
   const manifest = await getAgentCapabilityManifest(key.id);
-  assert.equal(manifest?.supportedIntents.local_meetup, 1);
+  assert.equal(manifest?.supportedIntents.local_meetup, 2);
 
   await db.insert(intentTypes).values({
     slug: customIntentSlug,
