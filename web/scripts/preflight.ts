@@ -73,12 +73,15 @@ async function main() {
 
   checks.push({
     name: "Discovery rate limiter",
-    ok: !production || Boolean(process.env.REDIS_URL),
+    ok:
+      !production ||
+      !discoveryFeatureEnabled() ||
+      Boolean(process.env.REDIS_URL),
     detail: process.env.REDIS_URL
       ? "shared Valkey configured"
-      : production
-        ? "REDIS_URL is required"
-        : "in-memory fallback active locally",
+      : production && discoveryFeatureEnabled()
+        ? "REDIS_URL is required before enabling discovery"
+        : "not required while discovery is disabled",
   });
 
   checks.push({
