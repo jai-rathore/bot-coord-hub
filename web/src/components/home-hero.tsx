@@ -86,11 +86,11 @@ export function HomeHero({
       <div>
         <div className="animate-rise inline-flex items-center gap-2 rounded-full border border-matcha-soft/25 bg-white/70 px-3 py-1.5 text-[0.7rem] font-semibold tracking-[0.1em] text-matcha uppercase backdrop-blur-sm">
           <span className="live-dot animate-pulse-live" />
-          Your Grok Bot handles the rest
+          You keep the yes
         </div>
         <h1 className="display-title animate-rise mt-5 text-[clamp(3.35rem,8.6vw,6.1rem)]">
-          Come together,
-          <span className="display-accent mt-1 block">effortlessly.</span>
+          Let your Bot
+          <span className="display-accent mt-1 block">take it from here.</span>
         </h1>
         {signedIn ? (
           <SignedInHero firstName={firstName} setupComplete={setupComplete} />
