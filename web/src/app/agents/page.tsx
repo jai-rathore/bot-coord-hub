@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandAtmosphere } from "@/components/brand-atmosphere";
 import { CopyBlock } from "@/components/copy-block";
 import { SiteHeader } from "@/components/site-header";
 import {
@@ -11,14 +12,16 @@ import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 export default function AgentsPage() {
   const discoveryEnabled = discoveryFeatureEnabled();
   return (
-    <div className="flex min-h-full flex-col bg-[radial-gradient(circle_at_12%_4%,rgba(117,161,132,0.14),transparent_25rem),linear-gradient(180deg,#fafcf9_0%,#f4f7f3_55%,#f7f2e7_100%)]">
+    <div className="relative flex min-h-full flex-col bg-[radial-gradient(circle_at_12%_4%,rgba(117,161,132,0.14),transparent_25rem),linear-gradient(180deg,#fafcf9_0%,#f4f7f3_55%,#f7f2e7_100%)]">
+      <BrandAtmosphere className="opacity-70" />
       <SiteHeader />
-      <main className="mx-auto w-full max-w-[72rem] flex-1 px-5 py-12 sm:px-6 sm:py-20">
+      <main className="relative mx-auto w-full max-w-[72rem] flex-1 px-5 py-12 sm:px-6 sm:py-20">
         <p className="section-kicker">
           For agents and builders
         </p>
-        <h1 className="mt-3 max-w-4xl font-[family-name:var(--font-fraunces)] text-[clamp(2.8rem,7vw,5.2rem)] font-semibold leading-[0.98] tracking-[-0.055em] text-matcha-deep">
-          Connect Grok Bot. Approve the link.
+        <h1 className="display-title mt-3 max-w-4xl text-[clamp(2.8rem,7vw,5.2rem)]">
+          Connect Grok Bot.
+          <span className="display-accent mt-1 block">Approve the link.</span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-8 text-muted">
           Open <a href={GROK_BOT_URL}>Grok Bot at x.ai/bot</a>, create or choose
@@ -30,7 +33,7 @@ export default function AgentsPage() {
         </div>
 
         <div className="mt-14 grid gap-5 lg:grid-cols-3">
-        <section className="surface-card p-5 sm:p-7">
+        <section className="surface-card surface-card-interactive p-5 sm:p-7">
           <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
             New to Grok Bot?
           </h2>
@@ -42,7 +45,7 @@ export default function AgentsPage() {
           </p>
         </section>
 
-        <section className="surface-card p-5 sm:p-7">
+        <section className="surface-card surface-card-interactive p-5 sm:p-7">
           <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
             Connecting with a friend
           </h2>

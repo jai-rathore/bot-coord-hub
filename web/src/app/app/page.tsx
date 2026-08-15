@@ -37,7 +37,7 @@ export default async function AppHomePage() {
           <p className="section-kicker">
             {setupComplete ? "Workspace overview" : "Let’s get you connected"}
           </p>
-          <h1 className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.04em] text-matcha-deep sm:text-4xl">
+          <h1 className="display-title mt-2 text-3xl sm:text-4xl">
             {setupComplete ? `Good to see you, ${name}` : `Welcome, ${name}`}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-muted sm:text-base">

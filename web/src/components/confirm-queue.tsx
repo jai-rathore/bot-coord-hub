@@ -77,7 +77,7 @@ export function ConfirmQueue({
                   type="button"
                   disabled={pending}
                   onClick={() => decide(confirm.id, "approved")}
-                  className="cursor-pointer rounded-md border border-matcha-deep bg-matcha-deep px-3 py-1.5 text-sm font-semibold text-[#f7faf6] disabled:opacity-60"
+                  className="button-primary min-h-9 cursor-pointer px-3 py-1.5 text-sm disabled:opacity-60"
                 >
                   Approve
                 </button>

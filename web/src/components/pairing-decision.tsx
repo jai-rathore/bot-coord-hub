@@ -40,7 +40,7 @@ export function PairingDecision({ userCode }: { userCode: string }) {
           type="button"
           disabled={pending !== null}
           onClick={() => decide("approved")}
-          className="rounded-md bg-matcha-deep px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          className="button-primary cursor-pointer disabled:opacity-60"
         >
           {pending === "approved" ? "Connecting…" : "Connect this agent"}
         </button>

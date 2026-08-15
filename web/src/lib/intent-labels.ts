@@ -2,6 +2,7 @@ const LABELS: Record<string, string> = {
   schedule_meeting: "Schedule a meeting",
   coordinate_interviews: "Coordinate interviews",
   hiring_compatibility: "Check hiring compatibility",
+  local_meetup: "Discover a local meetup",
 };
 
 export function intentLabel(slug: string): string {

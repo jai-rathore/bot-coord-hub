@@ -239,7 +239,7 @@ export function ActivityBoard({
               <button
                 type="submit"
                 disabled={pending || !note.trim()}
-                className="cursor-pointer rounded-md border border-matcha-deep bg-matcha-deep px-4 py-2 text-sm font-semibold text-[#f7faf6] disabled:opacity-60"
+                className="button-primary cursor-pointer disabled:opacity-60"
               >
                 Post
               </button>

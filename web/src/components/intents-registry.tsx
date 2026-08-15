@@ -95,7 +95,7 @@ export function IntentsRegistry({
           onChange={(e) => setQuery(e.target.value)}
           name="task-search"
           placeholder="For example: scheduling"
-          className="rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
+          className="field"
         />
       </label>
 
@@ -143,7 +143,7 @@ export function IntentsRegistry({
                 }}
                 name="requested-task"
                 placeholder="For example: coordinate an interview panel"
-                className="rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
+                className="field"
               />
             </label>
             <label className="grid gap-1 text-sm">
@@ -156,7 +156,7 @@ export function IntentsRegistry({
                 rows={3}
                 name="requested-task-outcome"
                 maxLength={2_000}
-                className="rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
+                className="field"
               />
             </label>
 
@@ -195,7 +195,7 @@ export function IntentsRegistry({
             <button
               type="submit"
               disabled={pending}
-              className="cursor-pointer rounded-md border border-matcha-deep bg-matcha-deep px-4 py-2 text-sm font-semibold text-[#f7faf6] transition hover:bg-matcha disabled:opacity-60"
+              className="button-primary cursor-pointer disabled:opacity-60"
             >
               Request this task
             </button>

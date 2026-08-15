@@ -34,7 +34,7 @@ export default async function InviteAcceptPage({
     <div className="flex min-h-full flex-col bg-[linear-gradient(180deg,#f8fbf7_0%,#f4f7f3_40%,#f0ebe0_100%)]">
       <SiteHeader />
       <main className="mx-auto w-[min(36rem,calc(100%-2rem))] flex-1 py-10">
-        <h1 className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.02em] text-matcha-deep">
+        <h1 className="display-title text-3xl">
           Connect on HoneyMatcha
         </h1>
         <p className="mt-2 text-muted">

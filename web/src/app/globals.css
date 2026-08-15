@@ -20,6 +20,8 @@
     0 6px 18px rgba(23, 63, 46, 0.04);
   --shadow-md: 0 2px 4px rgba(23, 63, 46, 0.05),
     0 18px 50px rgba(23, 63, 46, 0.1);
+  --glow-matcha: 0 18px 50px rgba(47, 105, 74, 0.22);
+  --glow-honey: 0 16px 40px rgba(200, 146, 45, 0.22);
 }
 
 @theme inline {
@@ -52,8 +54,8 @@ html {
 
 body {
   background:
-    radial-gradient(circle at 8% 4%, rgba(117, 161, 132, 0.11), transparent 26rem),
-    radial-gradient(circle at 92% 18%, rgba(240, 220, 168, 0.16), transparent 24rem),
+    radial-gradient(circle at 8% 4%, rgba(117, 161, 132, 0.14), transparent 26rem),
+    radial-gradient(circle at 92% 18%, rgba(240, 220, 168, 0.2), transparent 24rem),
     var(--background);
   color: var(--foreground);
   font-family: var(--font-sora), "Segoe UI", sans-serif;
@@ -109,9 +111,49 @@ body {
   }
 
   .surface-card-interactive:hover {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
     border-color: color-mix(in srgb, var(--matcha-soft) 70%, white);
     box-shadow: var(--shadow-md);
+  }
+
+  .display-title {
+    color: var(--matcha-deep);
+    font-family: var(--font-fraunces), Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.05em;
+    line-height: 1.06;
+    overflow: visible;
+    padding-bottom: 0.12em;
+  }
+
+  .display-accent {
+    background: linear-gradient(110deg, #2f694a 5%, #739b72 48%, #c8922d 95%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    display: inline-block;
+    font-style: italic;
+    line-height: 1.18;
+    overflow: visible;
+    padding-bottom: 0.28em;
+  }
+
+  .live-dot {
+    background: var(--honey);
+    border-radius: 999px;
+    box-shadow: 0 0 0 0 rgba(200, 146, 45, 0.55);
+    display: inline-block;
+    height: 0.42rem;
+    width: 0.42rem;
+  }
+
+  .brand-grain {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+    inset: 0;
+    mix-blend-mode: multiply;
+    opacity: 0.07;
+    pointer-events: none;
+    position: absolute;
   }
 
   .section-kicker {
@@ -120,6 +162,20 @@ body {
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
+  }
+
+  .field {
+    border: 1px solid var(--line);
+    border-radius: 0.8rem;
+    background: rgba(255, 255, 252, 0.86);
+    outline: none;
+    padding: 0.6rem 0.8rem;
+  }
+
+  .field:focus,
+  .field:focus-visible {
+    border-color: var(--matcha-soft);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 16%, transparent);
   }
 
   .page-title {
@@ -158,11 +214,11 @@ body {
   }
 
   .button-primary:hover {
-    transform: translateY(-1px);
+    transform: translateY(-2px);
     border-color: var(--matcha);
     background: var(--matcha);
     color: white;
-    box-shadow: 0 12px 28px rgba(23, 63, 46, 0.22);
+    box-shadow: 0 14px 32px rgba(23, 63, 46, 0.26);
   }
 
   .button-secondary {
@@ -183,7 +239,7 @@ body {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
@@ -196,28 +252,112 @@ body {
     transform: translate3d(0, 0, 0) scale(1);
   }
   to {
-    transform: translate3d(-1.5%, 1.2%, 0) scale(1.03);
+    transform: translate3d(-2.4%, 1.8%, 0) scale(1.06);
+  }
+}
+
+@keyframes drift-alt {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2.2%, -1.6%, 0) scale(1.05);
+  }
+}
+
+@keyframes pulse-live {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(200, 146, 45, 0.5);
+    transform: scale(1);
+  }
+  55% {
+    box-shadow: 0 0 0 8px rgba(200, 146, 45, 0);
+    transform: scale(1.08);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes scene-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float-soft {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-8px);
   }
 }
 
 .animate-rise {
-  animation: rise 0.7s ease both;
+  animation: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .animate-rise-delay-1 {
-  animation: rise 0.75s ease 0.08s both;
+  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
 }
 
 .animate-rise-delay-2 {
-  animation: rise 0.75s ease 0.16s both;
+  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.16s both;
 }
 
 .animate-rise-delay-3 {
-  animation: rise 0.75s ease 0.24s both;
+  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
 }
 
 .animate-drift {
-  animation: drift 12s ease-in-out infinite alternate;
+  animation: drift 14s ease-in-out infinite alternate;
+}
+
+.animate-drift-alt {
+  animation: drift-alt 16s ease-in-out infinite alternate;
+}
+
+.animate-pulse-live {
+  animation: pulse-live 1.8s ease-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 7s linear infinite;
+  background-size: 200% 100%;
+}
+
+.animate-marquee {
+  animation: marquee 28s linear infinite;
+}
+
+.animate-scene-in {
+  animation: scene-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-float-soft {
+  animation: float-soft 3.6s ease-in-out infinite alternate;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -236,4 +376,11 @@ body {
   .surface-card {
     border-radius: 1rem;
   }
+}
+
+/* Keep vendor auth branding off the product surface. */
+a[href^="https://clerk.com"],
+a[href^="https://www.clerk.com"],
+a[href^="https://go.clerk.com"] {
+  display: none !important;
 }

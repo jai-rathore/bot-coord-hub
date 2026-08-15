@@ -60,7 +60,7 @@ export function SiteHeader({
 
   return (
     <header className="relative z-30 px-4 py-4 sm:px-6 sm:py-5">
-      <div className="mx-auto flex w-full max-w-[72rem] min-w-0 items-center justify-between gap-3 rounded-2xl border border-white/75 bg-white/62 px-3 py-2.5 shadow-[0_8px_30px_rgba(23,63,46,0.07)] backdrop-blur-xl sm:px-4">
+      <div className="mx-auto flex w-full max-w-[72rem] min-w-0 items-center justify-between gap-3 rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-[0_10px_36px_rgba(23,63,46,0.08)] backdrop-blur-xl sm:px-4">
         <div className="min-w-0">
           <BrandLink />
         </div>

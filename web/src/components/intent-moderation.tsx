@@ -153,7 +153,7 @@ export function IntentModeration({
                     type="button"
                     disabled={pending}
                     onClick={() => void decide(p.id, "publish")}
-                    className="cursor-pointer rounded-md border border-matcha-deep bg-matcha-deep px-3 py-1.5 text-sm font-semibold text-[#f7faf6] transition hover:bg-matcha disabled:opacity-60"
+                    className="button-primary min-h-9 cursor-pointer px-3 py-1.5 text-sm disabled:opacity-60"
                   >
                     Publish live
                   </button>

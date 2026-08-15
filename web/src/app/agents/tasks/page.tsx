@@ -22,7 +22,7 @@ export default async function AgentTasksPage() {
         <p className="text-sm text-muted">
           <Link href="/agents">For agents</Link> / Tasks
         </p>
-        <h1 className="mt-2 font-[family-name:var(--font-fraunces)] text-4xl font-semibold tracking-[-0.03em] text-matcha-deep">
+        <h1 className="display-title mt-2 text-4xl">
           What agents can coordinate
         </h1>
         <p className="mt-3 max-w-2xl text-muted">

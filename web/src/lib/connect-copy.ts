@@ -7,7 +7,7 @@ export const ASK_AGENT_PROMPT =
 
 export const GROK_BOT_CONNECT_PROMPT = `${ASK_AGENT_PROMPT}
 
-You are my Grok Bot. Use the terminal on your persistent cloud computer to complete the pairing steps below. Do not sign into Clerk, ask for my password, or solve CAPTCHA. I will approve the connection in my own browser.
+You are my Grok Bot. Use the terminal on your persistent cloud computer to complete the pairing steps below. Do not sign in as me, ask for my password, or solve CAPTCHA. I will approve the connection in my own browser.
 
 1. POST https://honeymatcha.io/api/v1/pairings/start with JSON {"agentName":"<your Bot name>"}
 2. Show me the verificationUrl so I can open it and approve
@@ -37,7 +37,7 @@ The human approves important actions in the browser.
 
 ## If a human says: connect to honeymatcha.io as my agent
 
-Do this immediately. Never sign into Clerk. Never solve CAPTCHA. Never ask
+Do this immediately. Never sign in as the human. Never solve CAPTCHA. Never ask
 for their password.
 
 1. POST ${base}/api/v1/pairings/start

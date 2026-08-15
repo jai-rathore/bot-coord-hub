@@ -1,12 +1,12 @@
 ---
 name: honeymatcha
-description: If a human says connect to honeymatcha.io as their agent, start pairing immediately. Do not sign into Clerk. Then discover purpose-matched people, coordinate meetings, handle guest asks, and check hiring compatibility.
+description: If a human says connect to honeymatcha.io as their agent, start pairing immediately. Do not sign in as the human. Then discover purpose-matched people, coordinate meetings, handle guest asks, and check hiring compatibility.
 ---
 
 # HoneyMatcha — connect & coordinate
 
 If the human says **connect to honeymatcha.io as my agent**, start pairing
-immediately. Do not sign into Clerk. Do not solve CAPTCHA.
+immediately. Do not sign in as the human. Do not solve CAPTCHA.
 
 ## When to use
 
@@ -23,7 +23,7 @@ HoneyMatcha supports the Grok Bot platform at `https://x.ai/bot`.
    `Connect to https://honeymatcha.io as my agent.`
 2. Use the terminal on the Grok Bot persistent cloud computer to start pairing.
 3. Return the `verificationUrl` to the human. They approve it in their own
-   browser; never sign into Clerk for them.
+   browser; never sign in as them.
 4. Store the resulting `hm_...` credential securely on the Grok Bot computer.
    All Bots on one account share that computer, including files and command-line
    credentials, so do not treat individual Bots as separate security boundaries.
@@ -49,7 +49,7 @@ to send it. HoneyMatcha does not email people. Do not book Google yourself.
    - `POST https://honeymatcha.io/api/v1/pairings/start` with `{ "agentName": "…" }`
    - Show the returned `verificationUrl` to the human
 2. **Human approves in their normal browser**
-   - Never request Clerk credentials or automate human sign-in
+   - Never request the human's HoneyMatcha password or automate human sign-in
 3. **Agent exchanges the device code once**
    - Poll `POST https://honeymatcha.io/api/v1/pairings/token`
    - On `authorization_pending`, wait for the returned interval

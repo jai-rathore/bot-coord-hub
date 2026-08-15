@@ -91,7 +91,7 @@ export function AppNav({
           <BrandLink href="/app" />
           <div className="flex items-center gap-3">
             <span className="hidden items-center gap-2 rounded-full border border-line bg-white/65 px-3 py-1.5 text-[0.68rem] font-semibold text-muted sm:flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-matcha" />
+              <span className="live-dot animate-pulse-live bg-matcha" />
               Agent workspace
             </span>
             <UserButton />

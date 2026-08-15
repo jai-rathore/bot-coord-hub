@@ -193,7 +193,7 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
       <p className="text-sm font-semibold uppercase tracking-[0.14em] text-matcha">
         Private request
       </p>
-      <h1 className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.02em] text-matcha-deep">
+      <h1 className="display-title mt-2 text-3xl">
         {task.title}
       </h1>
       {task.description ? (
@@ -416,7 +416,7 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
         <button
           type="submit"
           disabled={status === "submitting"}
-          className="w-full rounded-md bg-matcha-deep px-4 py-3 text-sm font-semibold text-white transition hover:bg-matcha disabled:opacity-60"
+          className="button-primary w-full cursor-pointer disabled:opacity-60"
         >
           {status === "submitting" ? "Sending…" : "Send response"}
         </button>

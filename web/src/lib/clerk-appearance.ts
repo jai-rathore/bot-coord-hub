@@ -36,6 +36,9 @@ export const clerkAppearance = {
     // The Clerk Dev banner itself only goes away with pk_live_ (env, not code).
     unsafe_disableDevelopmentModeWarnings: true,
   },
+  elements: {
+    footerPages: { display: "none" },
+  },
 } satisfies NonNullable<ClerkProviderProps["appearance"]>;
 
 /** Application-looking copy so auth does not read as generic Clerk. */
@@ -44,14 +47,14 @@ export const clerkLocalization = {
     start: {
       title: "Sign in to HoneyMatcha",
       titleCombined: "Continue to HoneyMatcha",
-      subtitle: "Welcome back — continue to your handshake dashboard.",
+      subtitle: "Welcome back — your Grok Bot is waiting.",
     },
   },
   signUp: {
     start: {
       title: "Create your HoneyMatcha account",
       titleCombined: "Create your HoneyMatcha account",
-      subtitle: "Get a handshake URL for your bots — Google or email.",
+      subtitle: "Connect your calendar, then let your Grok Bot handle the rest.",
     },
   },
 } satisfies NonNullable<ClerkProviderProps["localization"]>;

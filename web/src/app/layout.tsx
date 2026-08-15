@@ -8,6 +8,7 @@ const fraunces = Fraunces({
   variable: "--font-fraunces",
   subsets: ["latin"],
   weight: ["500", "600", "700"],
+  style: ["normal", "italic"],
 });
 
 const sora = Sora({
@@ -19,7 +20,7 @@ const sora = Sora({
 export const metadata: Metadata = {
   title: "HoneyMatcha",
   description:
-    "HoneyMatcha is a coordination platform for you and your Grok Bot. Sign in, connect your calendar, then tell your Bot to connect to honeymatcha.io.",
+    "Give your Grok Bot a trusted place to schedule, invite, and coordinate — while you stay in control of every important decision.",
   alternates: {
     types: {
       "application/json": "/.well-known/honeymatcha.json",

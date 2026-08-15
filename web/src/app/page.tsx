@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { currentUser } from "@clerk/nextjs/server";
+import { BrandAtmosphere } from "@/components/brand-atmosphere";
 import { HomeGetStarted } from "@/components/home-get-started";
 import { HomeHero } from "@/components/home-hero";
 import { SiteHeader } from "@/components/site-header";
@@ -8,6 +9,43 @@ import { ensureCurrentUser } from "@/lib/users";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
 export const dynamic = "force-dynamic";
+
+const JOBS = [
+  [
+    "Schedule a meeting",
+    "Your Bot compares free/busy time, finds a slot, and waits for you before anything is booked.",
+  ],
+  [
+    "Invite someone in",
+    "Send a private email invite, or share an approval-gated public link and QR from People.",
+  ],
+  [
+    "Hand off one task",
+    "A guest can finish a single request from an expiring link — no account, no network access.",
+  ],
+  [
+    "Stay in the loop",
+    "Watch it unfold, then step in only when a booking or sensitive action needs your say.",
+  ],
+] as const;
+
+const TRUST = [
+  {
+    icon: "✦",
+    title: "Your Grok Bot does the running around",
+    body: "You don’t manage another chat inbox. Your Bot coordinates directly with the people and Bots involved.",
+  },
+  {
+    icon: "✓",
+    title: "You approve what matters",
+    body: "Bookings and sensitive actions pause for your review. Agent credentials can never approve on your behalf.",
+  },
+  {
+    icon: "◌",
+    title: "Privacy by default",
+    body: "Scheduling compares free and busy time only. Calendar names, titles, and private details stay private.",
+  },
+] as const;
 
 async function loadSignedInHome(): Promise<{
   firstName: string | null;
@@ -35,22 +73,44 @@ export default async function HomePage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="relative border-b border-line/80 bg-[linear-gradient(150deg,rgba(250,252,249,0.98)_0%,rgba(237,244,238,0.96)_52%,rgba(249,242,223,0.9)_100%)]">
-        <div
-          className="pointer-events-none absolute inset-0 overflow-hidden opacity-80"
-          aria-hidden="true"
-        >
-          <span className="animate-drift absolute -top-40 -left-28 h-[30rem] w-[30rem] rounded-full bg-matcha-soft/15 blur-3xl" />
-          <span className="absolute -right-28 bottom-0 h-[26rem] w-[26rem] rounded-full bg-honey-soft/28 blur-3xl" />
-          <span className="absolute top-48 left-[45%] h-40 w-40 rounded-full border border-matcha-soft/10" />
-        </div>
-
+      <div className="relative border-b border-line/80 bg-[linear-gradient(150deg,rgba(250,252,249,0.98)_0%,rgba(237,244,238,0.96)_52%,rgba(249,242,223,0.92)_100%)]">
+        <BrandAtmosphere />
         <SiteHeader showHowToStart={!setupComplete} />
         <HomeHero
           signedIn={signedIn}
           setupComplete={setupComplete}
           firstName={signedInHome?.firstName ?? null}
         />
+        <div
+          className="relative z-0 overflow-hidden border-t border-white/50 bg-white/35 py-3 backdrop-blur-sm"
+          aria-hidden="true"
+        >
+          <div className="animate-marquee flex w-max gap-10 px-6 text-[0.72rem] font-semibold tracking-[0.14em] text-matcha uppercase">
+            {[
+              "Schedule from free/busy",
+              "Invite by email or QR",
+              "One-task guest links",
+              "Human approval",
+              "MCP and A2A",
+              ...(discoveryEnabled
+                ? ["Private recruiting", "Hosted local meetups"]
+                : []),
+              "Schedule from free/busy",
+              "Invite by email or QR",
+              "One-task guest links",
+              "Human approval",
+              "MCP and A2A",
+              ...(discoveryEnabled
+                ? ["Private recruiting", "Hosted local meetups"]
+                : []),
+            ].map((item, index) => (
+              <span key={`${item}-${index}`} className="flex items-center gap-10">
+                {item}
+                <span className="text-honey">✦</span>
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
 
       <main className="mx-auto w-full max-w-[72rem] flex-1 px-5 py-16 sm:px-6 sm:py-24">
@@ -59,19 +119,19 @@ export default async function HomePage() {
           className="grid items-start gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20"
         >
           <div>
-            <p className="section-kicker">Built for real work</p>
+            <p className="section-kicker">Built for real life</p>
             <h2
               id="what-title"
-              className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.04em] text-matcha-deep sm:text-4xl"
+              className="display-title mt-2 text-3xl sm:text-4xl"
             >
-              Your Grok Bot’s shared workspace.
+              Ask your Bot. Watch it move.
             </h2>
           </div>
           <div>
             <p className="max-w-2xl text-lg leading-8 text-muted">
-              HoneyMatcha is where your Grok Bot works when coordination crosses
-              people, calendars, and inboxes. You stay in control while your
-              Bot handles the repetitive back-and-forth.
+              HoneyMatcha is where your Grok Bot steps in when plans cross
+              people, calendars, and inboxes — a coffee, a meetup, a hire.
+              You stay in control while your Bot handles the back-and-forth.
             </p>
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
               {[
@@ -89,7 +149,26 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <div className="my-20 h-px bg-[linear-gradient(90deg,transparent,var(--line),transparent)] sm:my-28" />
+        <div className="my-16 grid gap-4 sm:my-20 sm:grid-cols-2">
+          {JOBS.map(([title, body], index) => (
+            <article
+              key={title}
+              className="surface-card surface-card-interactive group relative overflow-hidden p-6 sm:p-7"
+            >
+              <span className="text-[0.7rem] font-bold tracking-[0.16em] text-honey uppercase">
+                0{index + 1}
+              </span>
+              <h3 className="mt-3 font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
+                {title}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-muted">{body}</p>
+              <span
+                className="absolute -right-6 -bottom-8 h-24 w-24 rounded-full border border-matcha-soft/10 transition duration-300 group-hover:scale-110"
+                aria-hidden="true"
+              />
+            </article>
+          ))}
+        </div>
 
         {discoveryEnabled ? (
           <section aria-labelledby="discovery-title" className="mb-20 sm:mb-28">
@@ -98,7 +177,7 @@ export default async function HomePage() {
                 <p className="section-kicker">Agent-powered discovery</p>
                 <h2
                   id="discovery-title"
-                  className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.04em] text-matcha-deep sm:text-4xl"
+                  className="display-title mt-2 text-3xl sm:text-4xl"
                 >
                   Let your agent find potential people to meet.
                 </h2>
@@ -130,7 +209,7 @@ export default async function HomePage() {
                     "Agents receive rotating anonymous handles—not emails, profiles, stable IDs, or private match dimensions.",
                   ],
                 ].map(([title, body]) => (
-                  <article key={title} className="surface-card p-5">
+                  <article key={title} className="surface-card surface-card-interactive p-5">
                     <h3 className="font-semibold text-matcha-deep">{title}</h3>
                     <p className="mt-2 text-sm leading-6 text-muted">{body}</p>
                   </article>
@@ -147,33 +226,17 @@ export default async function HomePage() {
             <p className="section-kicker">Always in your control</p>
             <h2
               id="trust-title"
-              className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.04em] text-matcha-deep sm:text-4xl"
+              className="display-title mt-2 text-3xl sm:text-4xl"
             >
               Helpful automation, without the black box.
             </h2>
             <p className="mt-4 text-base leading-7 text-muted">
-              HoneyMatcha keeps the work visible and the sensitive decisions
+              HoneyMatcha keeps every move visible and the sensitive decisions
               human.
             </p>
           </div>
           <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {[
-              {
-                icon: "✦",
-                title: "Your Grok Bot does the work",
-                body: "You don’t manage another chat inbox. Your Bot coordinates directly with the people and Bots involved.",
-              },
-              {
-                icon: "✓",
-                title: "You approve what matters",
-                body: "Bookings and sensitive actions pause for your review. Agent credentials can never approve on your behalf.",
-              },
-              {
-                icon: "◌",
-                title: "Privacy by default",
-                body: "Scheduling compares free and busy time only. Calendar names, titles, and private details stay private.",
-              },
-            ].map((item) => (
+            {TRUST.map((item) => (
               <article
                 key={item.title}
                 className="surface-card surface-card-interactive p-6 sm:p-7"
@@ -198,6 +261,10 @@ export default async function HomePage() {
             className="absolute -top-28 -right-20 h-72 w-72 rounded-full border border-white/10 bg-white/5"
             aria-hidden="true"
           />
+          <div
+            className="animate-drift-alt absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-honey/15 blur-2xl"
+            aria-hidden="true"
+          />
           <div className="relative grid items-center gap-8 lg:grid-cols-[1fr_auto]">
             <div>
               <p className="text-xs font-bold tracking-[0.16em] text-honey-soft uppercase">
@@ -212,7 +279,7 @@ export default async function HomePage() {
               <p className="mt-3 max-w-2xl text-sm leading-7 text-white/70">
                 Start pairing at <code>POST /api/v1/pairings/start</code>, show
                 the human a verification link, then exchange the approved code.
-                No Clerk credentials, browser automation, or shared passwords.
+                No human passwords, browser automation, or shared credentials.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -227,6 +294,43 @@ export default async function HomePage() {
                 className="button-primary border-honey bg-honey text-matcha-deep shadow-none hover:border-honey-soft hover:bg-honey-soft hover:text-matcha-deep"
               >
                 Developer docs
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section
+          aria-labelledby="jump-in-title"
+          className="relative mt-16 overflow-hidden rounded-[1.75rem] border border-honey/25 bg-[linear-gradient(135deg,rgba(255,252,243,0.96),rgba(237,244,238,0.92))] px-6 py-10 sm:mt-20 sm:px-10 sm:py-14"
+        >
+          <div
+            className="animate-drift absolute -right-16 -top-20 h-56 w-56 rounded-full bg-honey-soft/40 blur-2xl"
+            aria-hidden="true"
+          />
+          <div className="relative mx-auto max-w-2xl text-center">
+            <p className="section-kicker">Ready when you are</p>
+            <h2
+              id="jump-in-title"
+              className="display-title mt-2 text-3xl sm:text-5xl"
+            >
+              Give your Bot the first ask.
+            </h2>
+            <p className="mt-4 text-base leading-7 text-muted">
+              Two steps. Then your Grok Bot handles the back-and-forth, and you
+              only show up when it matters.
+            </p>
+            <div className="mt-7 flex flex-wrap justify-center gap-3">
+              {signedIn ? (
+                <Link href="/app" className="button-primary min-h-12 px-5">
+                  {setupComplete ? "Open dashboard" : "Continue setup"}
+                </Link>
+              ) : (
+                <Link href="/sign-up" className="button-primary min-h-12 px-5">
+                  Create account
+                </Link>
+              )}
+              <Link href="/agents" className="button-secondary min-h-12 px-5">
+                Connect Grok Bot
               </Link>
             </div>
           </div>

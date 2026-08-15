@@ -176,7 +176,7 @@ export function LinksManager({
               onChange={(event) => setPublicLabel(event.target.value)}
               maxLength={80}
               placeholder="Conference QR"
-              className="min-w-[16rem] rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus:border-matcha"
+              className="field min-w-[16rem]"
             />
           </label>
           <label className="grid gap-1 text-sm">
@@ -186,7 +186,7 @@ export function LinksManager({
               onChange={(event) =>
                 setPublicMaxRedemptions(event.target.value)
               }
-              className="rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus:border-matcha"
+              className="field"
             >
               <option value="10">10 people</option>
               <option value="25">25 people</option>
@@ -197,7 +197,7 @@ export function LinksManager({
           <button
             type="submit"
             disabled={pending}
-            className="cursor-pointer rounded-md bg-matcha-deep px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="button-primary cursor-pointer disabled:opacity-60"
           >
             Create public invite
           </button>
@@ -281,7 +281,7 @@ export function LinksManager({
               name="invite-email"
               value={toEmail}
               onChange={(e) => setToEmail(e.target.value)}
-              className="min-w-[16rem] rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus:border-matcha"
+              className="field min-w-[16rem]"
               placeholder="friend@example.com"
               required
             />
@@ -292,7 +292,7 @@ export function LinksManager({
               name="invite-name"
               value={toName}
               onChange={(e) => setToName(e.target.value)}
-              className="min-w-[12rem] rounded-md border border-line bg-white/80 px-3 py-2 outline-none focus:border-matcha"
+              className="field min-w-[12rem]"
               placeholder="Alex"
               maxLength={80}
             />
@@ -300,7 +300,7 @@ export function LinksManager({
           <button
             type="submit"
             disabled={pending}
-            className="cursor-pointer rounded-md border border-matcha-deep bg-matcha-deep px-4 py-2 text-sm font-semibold text-[#f7faf6] transition hover:bg-matcha disabled:opacity-60"
+            className="button-primary cursor-pointer disabled:opacity-60"
           >
             Create invite
           </button>
@@ -344,7 +344,7 @@ export function LinksManager({
               value={acceptCode}
               name="invite-code"
               onChange={(e) => setAcceptCode(e.target.value)}
-              className="min-w-[14rem] rounded-md border border-line bg-white/80 px-3 py-2 font-mono outline-none focus:border-matcha"
+              className="field min-w-[14rem] font-mono"
               placeholder="HM-XXXX-XXXX-XXXX-XXXX"
               required
             />

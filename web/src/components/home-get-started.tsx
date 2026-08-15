@@ -17,19 +17,19 @@ export function HomeGetStarted({
       aria-labelledby="get-started-title"
       className="scroll-mt-24"
     >
-      <div className="mb-7 max-w-2xl">
+      <div className="mb-8 max-w-2xl">
         <p className="section-kicker">
           {signedIn ? "Finish setup" : "Simple by design"}
         </p>
         <h2
           id="get-started-title"
-          className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-[-0.035em] text-matcha-deep sm:text-4xl"
+          className="display-title mt-2 text-3xl sm:text-4xl"
         >
           Two steps, then your Grok Bot takes it from here.
         </h2>
       </div>
       <ol className="m-0 grid list-none gap-4 p-0 lg:grid-cols-2">
-        <li className="surface-card relative overflow-hidden p-5 sm:p-6">
+        <li className="surface-card surface-card-interactive relative overflow-hidden p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-matcha-deep text-sm font-bold text-white shadow-[0_8px_18px_rgba(23,63,46,0.2)]">
               01
@@ -53,7 +53,7 @@ export function HomeGetStarted({
             and details always stay private.
           </p>
         </li>
-        <li className="surface-card relative overflow-hidden p-5 sm:p-6">
+        <li className="surface-card surface-card-interactive relative overflow-hidden p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-honey text-sm font-bold text-white shadow-[0_8px_18px_rgba(200,146,45,0.22)]">
               02
@@ -77,16 +77,15 @@ export function HomeGetStarted({
             prompt into your Bot&apos;s conversation, then approve its secure
             connection.
           </p>
-            <div className="mt-3">
-              <CopyBlock text={ASK_AGENT_PROMPT} />
-            </div>
+          <div className="mt-3">
+            <CopyBlock text={ASK_AGENT_PROMPT} />
+          </div>
         </li>
       </ol>
       <p className="mt-5 text-sm text-muted">
         {signedIn ? (
           <>
-            Finish these in{" "}
-            <Link href="/app">your HoneyMatcha home</Link>.
+            Finish these in <Link href="/app">your HoneyMatcha home</Link>.
           </>
         ) : (
           "That’s the whole setup. Ask your Grok Bot to invite someone or find a meeting time whenever you’re ready."

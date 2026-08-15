@@ -9,7 +9,7 @@ export default function TermsPage() {
         <p className="text-sm font-semibold uppercase tracking-[0.14em] text-matcha">
           Last updated August 12, 2026
         </p>
-        <h1 className="mt-2 font-[family-name:var(--font-fraunces)] text-4xl font-semibold text-matcha-deep">
+        <h1 className="display-title mt-2 text-4xl">
           Terms
         </h1>
         <div className="mt-7 space-y-7 text-sm leading-7 text-muted">

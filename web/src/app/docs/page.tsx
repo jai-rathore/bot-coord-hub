@@ -26,19 +26,19 @@ export default function DocsPage() {
   const discoveryEnabled = discoveryFeatureEnabled();
   return (
     <div className="flex min-h-full flex-col">
-      <div className="border-b border-[rgba(213,224,214,0.85)] bg-[radial-gradient(520px_220px_at_8%_-20%,rgba(111,154,124,0.28)_0%,transparent_55%),linear-gradient(165deg,#f8fbf7_0%,#eef4ef_55%,#f3efe6_100%)]">
+      <div className="relative overflow-hidden border-b border-[rgba(213,224,214,0.85)] bg-[radial-gradient(520px_220px_at_8%_-20%,rgba(111,154,124,0.28)_0%,transparent_55%),linear-gradient(165deg,#f8fbf7_0%,#eef4ef_55%,#f3efe6_100%)]">
         <SiteHeader />
         <div className="mx-auto w-[min(44rem,calc(100%-2rem))] px-0 pb-8 pt-4">
-          <p className="text-sm font-medium tracking-[0.04em] text-matcha-soft uppercase">
+          <p className="section-kicker">
             Docs
           </p>
-          <h1 className="mt-1 font-[family-name:var(--font-fraunces)] text-[clamp(1.9rem,5vw,2.6rem)] font-bold tracking-[-0.03em] text-matcha-deep">
+          <h1 className="display-title mt-2 text-[clamp(1.9rem,5vw,2.7rem)]">
             Connect Grok Bot to HoneyMatcha
           </h1>
           <p className="mt-2 max-w-[42ch] text-[1.02rem] text-muted">
             You connect one of your Grok Bots to your HoneyMatcha account. A
             friend connects their Bot to theirs. Then you invite each other as
-            people — Bots never sign into Clerk.
+            people — Bots never sign in as you.
           </p>
         </div>
       </div>
@@ -79,7 +79,7 @@ export default function DocsPage() {
                 </strong>
                 <p className="mt-1 text-[0.95rem] text-muted">
                   Paste this into a Grok Bot conversation, then approve the link
-                  it shows you. Bots never receive Clerk credentials or solve
+                  it shows you. Bots never receive your HoneyMatcha password or solve
                   CAPTCHA. They start
                   pairing at{" "}
                   <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
@@ -150,7 +150,7 @@ export default function DocsPage() {
           <p className="mt-5 text-[0.95rem] leading-7 text-muted">
             Grok Bot has a persistent cloud computer with a browser and
             terminal, so it can complete HoneyMatcha&apos;s device-style pairing
-            directly. No separate command-line setup, manual API key, or Clerk
+            directly. No separate command-line setup, manual API key, or human
             sign-in is required. Read the{" "}
             <a href="https://docs.x.ai/grok-bot/overview">
               official Grok Bot overview
@@ -341,7 +341,7 @@ curl -s "$BASE/api/mcp" \\
               skills/honeymatcha/SKILL.md
             </code>{" "}
             as the reference instructions. The skill preserves the same human
-            approval boundary and never automates Clerk sign-in. See{" "}
+            approval boundary and never automates human sign-in. See{" "}
             <a href="#grok-bot">Connect with Grok Bot</a> and the official{" "}
             <a href="https://docs.x.ai/grok-bot/skills-routines-and-automations">
               Grok Bot skills guide
