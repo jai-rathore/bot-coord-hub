@@ -54,7 +54,28 @@ const clerkIds = [
   `e2e-discovery-moderator-${suffix}`,
   `e2e-discovery-probe-seeker-${suffix}`,
   `e2e-discovery-probe-host-${suffix}`,
+  `e2e-dating-a-${suffix}`,
+  `e2e-dating-b-${suffix}`,
 ];
+
+function resolvedCity(userId: string, city: string, region = "NY") {
+  const providerPlaceId = city.toLowerCase().replaceAll(" ", "-");
+  return {
+    resolutionToken: issueLocationResolutionToken(userId, {
+      schemaVersion: 1,
+      canonicalKey: `geoapify:city:${providerPlaceId}`,
+      provider: "geoapify",
+      providerPlaceId,
+      granularity: "city",
+      label: `${city}, ${region}, United States`,
+      countryCode: "US",
+      country: "United States",
+      regionCode: `US-${region}`,
+      region,
+      locality: city,
+    }),
+  };
+}
 
 function resolvedNeighborhood(userId: string, neighborhood: string) {
   const providerPlaceId = neighborhood.toLowerCase().replaceAll(" ", "-");
@@ -94,6 +115,14 @@ async function seedDiscoveryIntents() {
       requiredScopes: ["discovery:read", "discovery:write"],
       definition: LOCAL_MEETUP_DEFINITION,
     },
+    {
+      slug: "dating_introduction",
+      name: "Dating introduction",
+      description: "Private adult dating introductions.",
+      category: "dating",
+      requiredScopes: ["discovery:read", "discovery:write"],
+      definition: DATING_INTRODUCTION_DEFINITION,
+    },
   ]) {
     await db
       .insert(intentTypes)
@@ -120,36 +149,47 @@ async function seedDiscoveryIntents() {
 
 async function main() {
   await seedDiscoveryIntents();
-  const [seeker, host, moderator, probeSeeker, probeHost] = await db
-    .insert(users)
-    .values([
-      {
-        clerkUserId: clerkIds[0],
-        email: `seeker-${suffix}@example.com`,
-        name: "Seeker Example",
-      },
-      {
-        clerkUserId: clerkIds[1],
-        email: `host-${suffix}@example.com`,
-        name: "Host Example",
-      },
-      {
-        clerkUserId: clerkIds[2],
-        email: `moderator-${suffix}@example.com`,
-        name: "Moderator Example",
-      },
-      {
-        clerkUserId: clerkIds[3],
-        email: `probe-seeker-${suffix}@example.com`,
-        name: "Probe Seeker",
-      },
-      {
-        clerkUserId: clerkIds[4],
-        email: `probe-host-${suffix}@example.com`,
-        name: "Probe Host",
-      },
-    ])
-    .returning();
+  const [seeker, host, moderator, probeSeeker, probeHost, datingA, datingB] =
+    await db
+      .insert(users)
+      .values([
+        {
+          clerkUserId: clerkIds[0],
+          email: `seeker-${suffix}@example.com`,
+          name: "Seeker Example",
+        },
+        {
+          clerkUserId: clerkIds[1],
+          email: `host-${suffix}@example.com`,
+          name: "Host Example",
+        },
+        {
+          clerkUserId: clerkIds[2],
+          email: `moderator-${suffix}@example.com`,
+          name: "Moderator Example",
+        },
+        {
+          clerkUserId: clerkIds[3],
+          email: `probe-seeker-${suffix}@example.com`,
+          name: "Probe Seeker",
+        },
+        {
+          clerkUserId: clerkIds[4],
+          email: `probe-host-${suffix}@example.com`,
+          name: "Probe Host",
+        },
+        {
+          clerkUserId: clerkIds[5],
+          email: `dating-a-${suffix}@example.com`,
+          name: "Dating A",
+        },
+        {
+          clerkUserId: clerkIds[6],
+          email: `dating-b-${suffix}@example.com`,
+          name: "Dating B",
+        },
+      ])
+      .returning();
 
   const [key] = await db
     .insert(apiKeys)
@@ -163,7 +203,11 @@ async function main() {
     .returning();
   await upsertAgentCapabilityManifest({
     apiKeyId: key.id,
-    supportedIntents: { local_meetup: 2, hiring_compatibility: 2 },
+    supportedIntents: {
+      local_meetup: 2,
+      hiring_compatibility: 2,
+      dating_introduction: 2,
+    },
     platforms: ["integration-test"],
     metadata: { mode: "test" },
   });
@@ -565,12 +609,191 @@ async function main() {
     /restricted/,
   );
 
-  assert.equal(DATING_INTRODUCTION_DEFINITION.discovery.enabled, false);
+  assert.equal(DATING_INTRODUCTION_DEFINITION.discovery.enabled, true);
+  assert.equal(DATING_INTRODUCTION_DEFINITION.eligibility.minimumAge, 18);
   const datingRows = await db
     .select()
     .from(intentTypes)
     .where(eq(intentTypes.slug, "dating_introduction"));
-  assert.equal(datingRows.length, 0);
+  assert.equal(datingRows.length, 1);
+  assert.equal(datingRows[0]?.discoveryEnabled, true);
+
+  const [datingKey] = await db
+    .insert(apiKeys)
+    .values({
+      userId: datingA.id,
+      name: "Dating test agent",
+      keyPrefix: "hm_date",
+      keyHash: randomUUID().replaceAll("-", ""),
+      scopes: ["discovery:read", "discovery:write"],
+    })
+    .returning();
+  await upsertAgentCapabilityManifest({
+    apiKeyId: datingKey.id,
+    supportedIntents: { dating_introduction: 2 },
+    platforms: ["integration-test"],
+    metadata: { mode: "dating" },
+  });
+  await assert.rejects(
+    () =>
+      submitDiscoveryEnrollment(
+        { user: datingA, kind: "agent", apiKeyId: datingKey.id },
+        {
+          intentSlug: "dating_introduction",
+          claims: { age: 28 },
+          provenance: { age: { source: "agent" } },
+        },
+      ),
+    /must be supplied directly by the human/,
+  );
+  await assert.rejects(
+    () =>
+      submitDiscoveryEnrollment(
+        { user: datingA, kind: "user" },
+        {
+          intentSlug: "dating_introduction",
+          claims: {
+            age: 17,
+            relationshipIntent: "long_term",
+            headline: "Weekend hiker",
+            interests: ["hiking"],
+            introductionSummary: "Happy to grab coffee",
+          },
+          location: resolvedCity(datingA.id, "New York"),
+          requestActivation: true,
+        },
+      ),
+    /18 or older/,
+  );
+  await assert.rejects(
+    () =>
+      submitDiscoveryEnrollment(
+        { user: datingA, kind: "user" },
+        {
+          intentSlug: "dating_introduction",
+          claims: {
+            age: 29,
+            relationshipIntent: "long_term",
+            headline: "Weekend hiker",
+            interests: [],
+            introductionSummary: "Happy to grab coffee after a hike",
+          },
+          location: resolvedCity(datingA.id, "New York"),
+          requestActivation: true,
+        },
+      ),
+    /incomplete|interests/,
+  );
+  await submitDiscoveryEnrollment(
+    { user: datingA, kind: "user" },
+    {
+      intentSlug: "dating_introduction",
+      claims: {
+        age: 29,
+        relationshipIntent: "long_term",
+        headline: "Weekend hiker",
+        interests: ["hiking", "cooking"],
+        introductionSummary: "Happy to grab coffee after a hike",
+      },
+      location: resolvedCity(datingA.id, "New York"),
+      requestActivation: true,
+    },
+  );
+  await assert.rejects(
+    () =>
+      submitDiscoveryEnrollment(
+        { user: datingA, kind: "user" },
+        {
+          intentSlug: "dating_introduction",
+          claims: { age: null },
+        },
+      ),
+    /18 or older|incomplete/,
+  );
+  await submitDiscoveryEnrollment(
+    { user: datingB, kind: "user" },
+    {
+      intentSlug: "dating_introduction",
+      claims: {
+        age: 31,
+        relationshipIntent: "figuring_out",
+        headline: "Cooks too much pasta",
+        interests: ["hiking"],
+        introductionSummary: "Free most Saturday mornings",
+      },
+      location: resolvedCity(datingB.id, "New York"),
+      requestActivation: true,
+    },
+  );
+  await submitDiscoveryEnrollment(
+    { user: probeHost, kind: "user" },
+    {
+      intentSlug: "dating_introduction",
+      claims: {
+        age: 34,
+        relationshipIntent: "casual",
+        headline: "Visiting from Austin",
+        interests: ["hiking"],
+        introductionSummary: "In town briefly",
+      },
+      location: resolvedCity(probeHost.id, "Austin", "TX"),
+      requestActivation: true,
+    },
+  );
+  const datingSearch = await searchDiscovery({
+    actor: { user: datingA, kind: "agent", apiKeyId: datingKey.id },
+    intentSlug: "dating_introduction",
+  });
+  assert.equal(datingSearch.candidates.length, 1);
+  assert.equal(
+    datingSearch.candidates[0]?.untrustedParticipantData.relationshipIntent,
+    "figuring_out",
+  );
+  assert.equal(
+    "headline" in (datingSearch.candidates[0]?.untrustedParticipantData ?? {}),
+    false,
+  );
+  assert.equal(
+    JSON.stringify(datingSearch.candidates[0]?.untrustedParticipantData).includes(
+      "31",
+    ),
+    false,
+  );
+  const datingRequest = await requestDiscoveryIntroduction({
+    actor: { user: datingA, kind: "agent", apiKeyId: datingKey.id },
+    candidateHandle: datingSearch.candidates[0]!.candidateHandle,
+  });
+  assert.equal(datingRequest.status, "pending");
+  const [datingInterest] = await db
+    .select()
+    .from(discoveryInterests)
+    .where(eq(discoveryInterests.requesterUserId, datingA.id));
+  await decideDiscoveryInterest({
+    user: datingA,
+    interestId: datingInterest.id,
+    decision: "confirm_request",
+  });
+  const datingAccepted = await decideDiscoveryInterest({
+    user: datingB,
+    interestId: datingInterest.id,
+    decision: "accept",
+  });
+  assert.equal(datingAccepted.status, "accepted");
+  const datingForB = await listDiscoveryInterests(datingB.id, {
+    includeStableIds: true,
+  });
+  const datingDisclosure = datingForB.find(
+    (item) => item.id === datingInterest.id,
+  )?.disclosure;
+  assert.equal(
+    datingDisclosure?.untrustedParticipantData.headline,
+    "Weekend hiker",
+  );
+  assert.equal(
+    datingDisclosure?.untrustedParticipantData.introductionSummary,
+    "Happy to grab coffee after a hike",
+  );
+  assert.equal(JSON.stringify(datingDisclosure).includes("29"), false);
 
   const withdrawalEnrollment = await submitDiscoveryEnrollment(
     { user: moderator, kind: "user" },
@@ -628,7 +851,7 @@ async function main() {
     .where(eq(discoveryInterests.id, interestId));
   assert.equal(retainedInterest.length, 0);
   console.log(
-    "Discovery E2E passed: reviewed agent approval, opaque search, selective disclosure, privacy-safe meetup handoff, block/report, suspension, and retention cleanup.",
+    "Discovery E2E passed: reviewed agent approval, opaque search, selective disclosure, privacy-safe meetup handoff, adult dating introductions, block/report, suspension, and retention cleanup.",
   );
 }
 

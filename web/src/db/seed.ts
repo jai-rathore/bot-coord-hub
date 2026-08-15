@@ -9,6 +9,7 @@ import {
   purposeEnrollments,
 } from "./schema";
 import {
+  DATING_INTRODUCTION_DEFINITION,
   HIRING_DISCOVERY_DEFINITION,
   LOCAL_MEETUP_DEFINITION,
   SCHEDULE_MEETING_DEFINITION,
@@ -312,6 +313,64 @@ async function seed() {
       },
     });
     console.log("Seeded intent_types: local_meetup (live)");
+  }
+
+  const datingDescription =
+    "Privately suggest adult dating introductions by relationship intent, interests, and city. Agents recommend; both humans confirm before anyone is identified.";
+  const [existingDating] = await db
+    .select()
+    .from(intentTypes)
+    .where(eq(intentTypes.slug, "dating_introduction"))
+    .limit(1);
+  const datingValues = {
+    name: "Dating introduction",
+    description: datingDescription,
+    status: "live" as const,
+    category: "dating",
+    requiredScopes: ["discovery:read", "discovery:write"],
+    definitionVersion: DATING_INTRODUCTION_DEFINITION.version,
+    definition: DATING_INTRODUCTION_DEFINITION,
+    discoveryEnabled,
+    handler: DATING_INTRODUCTION_DEFINITION.discovery.handler,
+    schema: {
+      enrollment: "purpose-bound",
+      location: "city",
+      minimumAge: 18,
+      exactIdentityDisclosure: "after_mutual_approval",
+    },
+    updatedAt: new Date(),
+  };
+  if (existingDating) {
+    const upgrading =
+      existingDating.definitionVersion < DATING_INTRODUCTION_DEFINITION.version;
+    if (upgrading) {
+      await db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${"discovery-contract:dating_introduction"}))`,
+        );
+        await pauseStaleEnrollments(
+          tx,
+          "dating_introduction",
+          DATING_INTRODUCTION_DEFINITION.version,
+        );
+        await tx
+          .update(intentTypes)
+          .set(datingValues)
+          .where(eq(intentTypes.id, existingDating.id));
+      });
+    } else {
+      await db
+        .update(intentTypes)
+        .set(datingValues)
+        .where(eq(intentTypes.id, existingDating.id));
+    }
+    console.log("Updated intent_types: dating_introduction");
+  } else {
+    await db.insert(intentTypes).values({
+      slug: "dating_introduction",
+      ...datingValues,
+    });
+    console.log("Seeded intent_types: dating_introduction (live)");
   }
 
   process.exit(0);

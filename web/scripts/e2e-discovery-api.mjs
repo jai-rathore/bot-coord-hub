@@ -158,6 +158,10 @@ async function main() {
     catalog.data.intents.some((intent) => intent.slug === "local_meetup"),
     "catalog should advertise local_meetup",
   );
+  assert(
+    catalog.data.intents.some((intent) => intent.slug === "dating_introduction"),
+    "catalog should advertise dating_introduction",
+  );
 
   const capability = await jsonFetch("/api/v1/me/capabilities", {
     method: "PUT",

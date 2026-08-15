@@ -75,6 +75,13 @@ export function getAgentCard(baseUrl: string) {
                 "Match hosts and attendees by interests, broad timing, and coarse location without exposing an exact venue before approval.",
               tags: ["meetup", "location", "approval"],
             },
+            {
+              id: "dating-introduction",
+              name: "Suggest a dating introduction",
+              description:
+                "Privately look for adult dating introductions by relationship intent, interests, and city. Recommend a candidate to the human; both people must confirm before anyone is identified.",
+              tags: ["dating", "consent", "location"],
+            },
           ]
         : []),
       {

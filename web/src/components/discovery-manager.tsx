@@ -20,6 +20,7 @@ type Question = {
     | "enum";
   required: boolean;
   sensitivity: "discoverable" | "private" | "disclose_after_match";
+  sourcePolicy?: "human_only" | "human_or_agent_with_approval";
   options: string[] | null;
   locationGranularity:
     | "country"
@@ -149,10 +150,15 @@ function QuestionInput({
             : "text"
       }
       value={value}
+      min={question.key === "age" ? 18 : undefined}
+      max={question.key === "age" ? 120 : undefined}
+      inputMode={question.type === "number" ? "numeric" : undefined}
       placeholder={
         question.type === "string_list"
           ? "Comma-separated values"
-          : undefined
+          : question.key === "age"
+            ? "18 or older"
+            : undefined
       }
       onChange={(event) => onChange(event.target.value)}
     />
@@ -217,17 +223,27 @@ export function DiscoveryManager({
         }
         const raw = values[question.key]?.trim();
         if (!raw) continue;
+        if (question.type === "string_list") {
+          const items = raw
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+          if (question.required && items.length === 0) {
+            throw new Error(`${question.prompt} needs at least one value.`);
+          }
+          claims[question.key] = items;
+          continue;
+        }
+        if (question.type === "number") {
+          const parsed = Number(raw);
+          if (question.key === "age" && (!Number.isInteger(parsed) || parsed < 18)) {
+            throw new Error("Dating requires a confirmed age of 18 or older.");
+          }
+          claims[question.key] = parsed;
+          continue;
+        }
         claims[question.key] =
-          question.type === "string_list"
-            ? raw
-                .split(",")
-                .map((item) => item.trim())
-                .filter(Boolean)
-            : question.type === "number"
-              ? Number(raw)
-              : question.type === "boolean"
-                ? raw === "true"
-                : raw;
+          question.type === "boolean" ? raw === "true" : raw;
       }
       const locationBody =
         selected.discovery.locationGranularity === "none" ||
@@ -409,6 +425,13 @@ export function DiscoveryManager({
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
                     {selected.enrollment.summary}
                   </p>
+                  {selected.slug === "dating_introduction" ? (
+                    <p className="mt-3 max-w-2xl rounded-xl border border-honey/50 bg-honey/10 px-3 py-2 text-xs leading-5 text-matcha-deep">
+                      Dating is 18+ only. Age and relationship intent must come
+                      from you. Your agent can search and suggest; both people
+                      confirm before anyone is identified.
+                    </p>
+                  ) : null}
                 </div>
                 <span className="rounded-full border border-line bg-mist px-3 py-1 text-xs font-semibold text-muted">
                   {selected.currentEnrollment.status.replaceAll("_", " ")}
@@ -428,8 +451,11 @@ export function DiscoveryManager({
                       </span>
                     ) : null}
                     <span className="mt-1 block text-xs text-muted">
-                      {sensitivityLabel(question.sensitivity)} · retained up to{" "}
-                      {question.retentionDays} days
+                      {sensitivityLabel(question.sensitivity)}
+                      {question.sourcePolicy === "human_only"
+                        ? " · you must enter this yourself"
+                        : ""}{" "}
+                      · retained up to {question.retentionDays} days
                     </span>
                     {question.type === "location_list" ? (
                       <div className="mt-2">
@@ -670,7 +696,9 @@ export function DiscoveryManager({
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-ink">
-                        {interest.intentSlug.replaceAll("_", " ")}
+                        {interest.intentSlug === "dating_introduction"
+                          ? "Dating introduction"
+                          : interest.intentSlug.replaceAll("_", " ")}
                       </p>
                       <p className="mt-1 text-xs text-muted">
                         {interest.direction} · {interest.status}

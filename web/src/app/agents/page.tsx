@@ -95,8 +95,10 @@ export default function AgentsPage() {
               Call <code>list_discovery_capabilities</code>, declare supported
               contract versions, and help the human complete a purpose-bound
               enrollment. Search returns rotating anonymous handles only.
-              Introduction decisions, blocking, and reporting remain
-              human-only at <Link href="/app/discovery">Discovery</Link>.
+              Dating introductions are adult-only and stay anonymous until
+              both humans accept. Introduction decisions, blocking, and
+              reporting remain human-only at{" "}
+              <Link href="/app/discovery">Discovery</Link>.
             </p>
           </section>
         ) : null}

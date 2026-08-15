@@ -214,9 +214,55 @@ const localMeetupHandler: DiscoveryMatchHandler = ({
   };
 };
 
+function datingIntentState(
+  left: unknown,
+  right: unknown,
+): "compatible" | "incompatible" | "unknown" {
+  const a = stringValue(left);
+  const b = stringValue(right);
+  if (!a || !b) return "unknown";
+  if (a === "figuring_out" || b === "figuring_out" || a === b) {
+    return "compatible";
+  }
+  return "incompatible";
+}
+
+const datingHandler: DiscoveryMatchHandler = ({
+  seekerClaims,
+  candidateClaims,
+  seekerLocation,
+  candidateLocation,
+}) => {
+  const dimensions = {
+    relationshipIntent: datingIntentState(
+      seekerClaims.relationshipIntent,
+      candidateClaims.relationshipIntent,
+    ),
+    interests: overlapState(seekerClaims.interests, candidateClaims.interests),
+    location: locationState(seekerLocation, candidateLocation),
+  };
+  const values = Object.values(dimensions);
+  const verdict = values.includes("incompatible")
+    ? "incompatible"
+    : values.includes("unknown")
+      ? "human_review"
+      : "compatible";
+  return {
+    verdict,
+    dimensions,
+    note:
+      verdict === "compatible"
+        ? "Relationship intent, interests, and city overlap."
+        : verdict === "incompatible"
+          ? "At least one required dating constraint does not overlap."
+          : "No hard mismatch was found, but more information is needed.",
+  };
+};
+
 const HANDLERS: Partial<Record<IntentHandlerId, DiscoveryMatchHandler>> = {
   hiring_v1: hiringHandler,
   local_meetup_v1: localMeetupHandler,
+  dating_v1: datingHandler,
 };
 
 /** Resolve only audited code handlers; database definitions cannot add code. */

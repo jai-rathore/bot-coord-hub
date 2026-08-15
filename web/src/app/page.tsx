@@ -93,7 +93,7 @@ export default async function HomePage() {
               "Human approval",
               "MCP and A2A",
               ...(discoveryEnabled
-                ? ["Private recruiting", "Hosted local meetups"]
+                ? ["Private recruiting", "Dating introductions"]
                 : []),
               "Schedule from free/busy",
               "Invite by email or QR",
@@ -101,7 +101,7 @@ export default async function HomePage() {
               "Human approval",
               "MCP and A2A",
               ...(discoveryEnabled
-                ? ["Private recruiting", "Hosted local meetups"]
+                ? ["Private recruiting", "Dating introductions"]
                 : []),
             ].map((item, index) => (
               <span key={`${item}-${index}`} className="flex items-center gap-10">
@@ -197,8 +197,8 @@ export default async function HomePage() {
                     "Privately compare role and candidate constraints before either person is identified.",
                   ],
                   [
-                    "Hosted local meetups",
-                    "Match hosts and attendees by interests, broad timing, and encrypted coarse location.",
+                    "Dating introductions",
+                    "Your agent looks privately for adult matches by intent, interests, and city, then asks you before anyone is identified.",
                   ],
                   [
                     "Two human approvals",

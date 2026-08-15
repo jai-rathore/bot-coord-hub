@@ -283,31 +283,41 @@ export const LOCAL_MEETUP_DEFINITION = validateIntentDefinition({
   },
 });
 
-/** Contract-only proof. It is never seeded as a live/discoverable intent. */
 export const DATING_INTRODUCTION_DEFINITION = validateIntentDefinition({
-  version: 1,
+  version: canonicalLocationContracts ? 2 : 1,
   agentPrompt:
-    "Dating introductions are not currently live. If enabled in the future, HoneyMatcha will require adult eligibility, purpose-specific consent, private matching, mutual interest, and staged disclosure.",
+    "HoneyMatcha can privately look for adult dating introductions. Ask whether your human wants this. Age and relationship intent must come from the human. Search other enrolled people, then recommend a candidate only as a suggestion. Never enroll, request an introduction, or claim two people should date without the human's approval. Identities stay hidden until both humans accept.",
   enrollment: {
     summary:
-      "Contract fixture for a future adult-only, mutual-consent introduction flow.",
+      "Adult-only dating introductions. Agents search privately and suggest; both humans confirm before anyone is identified.",
     fields: [
       {
         key: "age",
-        prompt: "Confirm your age.",
+        prompt: "Confirm that you are 18 or older by entering your age.",
         type: "number",
         required: true,
         sensitivity: "private",
         sourcePolicy: "human_only",
-        retentionDays: 30,
+        retentionDays: 90,
       },
       {
         key: "relationshipIntent",
-        prompt: "What kind of relationship are you open to?",
-        type: "string_list",
+        prompt: "What kind of relationship are you most open to?",
+        type: "enum",
+        options: ["long_term", "casual", "friendship", "figuring_out"],
         required: true,
-        sensitivity: "private",
+        sensitivity: "discoverable",
         sourcePolicy: "human_only",
+        retentionDays: 90,
+      },
+      {
+        key: "headline",
+        prompt:
+          "What short, non-identifying headline may be shared after both people accept?",
+        type: "text",
+        required: true,
+        sensitivity: "disclose_after_match",
+        sourcePolicy: humanApprovedSource,
         retentionDays: 90,
       },
       {
@@ -321,7 +331,8 @@ export const DATING_INTRODUCTION_DEFINITION = validateIntentDefinition({
       },
       {
         key: "introductionSummary",
-        prompt: "What may be shared after mutual interest?",
+        prompt:
+          "What may be shared only after both people accept an introduction?",
         type: "text",
         required: true,
         sensitivity: "disclose_after_match",
@@ -335,22 +346,23 @@ export const DATING_INTRODUCTION_DEFINITION = validateIntentDefinition({
     requiredFields: [
       "age",
       "relationshipIntent",
+      "headline",
       "interests",
       "introductionSummary",
     ],
   },
   discovery: {
-    enabled: false,
+    enabled: true,
     handler: "dating_v1",
     locationGranularity: "city",
     pageLimit: 5,
     handleTtlMinutes: 15,
-    projectionFields: [],
+    projectionFields: ["relationshipIntent"],
   },
   disclosure: {
     requiresMutualInterest: true,
     requiresHumanConfirmation: true,
-    fields: ["introductionSummary"],
+    fields: ["headline", "introductionSummary"],
   },
   safety: {
     blockingRequired: true,
@@ -365,6 +377,7 @@ export const CANONICAL_INTENT_DEFINITIONS: Record<
   schedule_meeting: SCHEDULE_MEETING_DEFINITION,
   hiring_compatibility: HIRING_DISCOVERY_DEFINITION,
   local_meetup: LOCAL_MEETUP_DEFINITION,
+  dating_introduction: DATING_INTRODUCTION_DEFINITION,
 };
 
 export function canonicalIntentDefinition(

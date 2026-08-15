@@ -36,7 +36,7 @@ export default async function DiscoveryPage() {
       <PageHeading
         eyebrow="Private matching"
         title="Discovery"
-        description="Choose what your agent may look for. HoneyMatcha compares private constraints, keeps candidates anonymous, and releases only approved fields after mutual interest."
+        description="Choose what your agent may look for. Dating introductions are 18+ and stay anonymous until both people accept. HoneyMatcha compares private constraints and releases only approved fields after mutual interest."
       />
       <div className="mt-8">
         <DiscoveryManager
