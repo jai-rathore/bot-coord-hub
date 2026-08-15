@@ -94,12 +94,12 @@ async function main() {
   );
   checks.push({
     name: "Discovery safety admins",
-    ok: !discoveryFeatureEnabled() || safetyAdminsConfigured,
+    ok: !production || !discoveryFeatureEnabled() || safetyAdminsConfigured,
     detail: safetyAdminsConfigured
       ? "configured"
-      : discoveryFeatureEnabled()
+      : production && discoveryFeatureEnabled()
         ? "INTENT_ADMIN_EMAILS is required before enabling discovery"
-        : "not required while discovery is disabled",
+        : "not required for local/CI or while discovery is disabled",
   });
 
   const googleEnabled =
