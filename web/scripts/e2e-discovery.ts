@@ -142,7 +142,7 @@ async function main() {
     .returning();
   await upsertAgentCapabilityManifest({
     apiKeyId: key.id,
-    supportedIntents: { local_meetup: 1, hiring_compatibility: 1 },
+    supportedIntents: { local_meetup: 2, hiring_compatibility: 2 },
     platforms: ["integration-test"],
     metadata: { mode: "test" },
   });

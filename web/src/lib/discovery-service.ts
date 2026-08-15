@@ -46,6 +46,10 @@ import {
 } from "@/lib/intent-contract";
 import { registeredIntentHandler } from "@/lib/discovery-match";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
+import {
+  consumeLocationResolutionToken,
+  type CanonicalLocation,
+} from "@/lib/location-resolver";
 import { decryptJson, encryptJson } from "@/lib/secret-crypto";
 import { boundedText } from "@/lib/validation";
 
@@ -72,6 +76,7 @@ export type DiscoveryActor = {
 };
 
 export type CoarseLocationInput = {
+  resolutionToken?: unknown;
   label?: unknown;
   countryCode?: unknown;
   region?: unknown;
@@ -100,6 +105,24 @@ function privateLocationValue(location?: UserLocation | null) {
     neighborhood:
       typeof encrypted.neighborhood === "string"
         ? encrypted.neighborhood
+        : null,
+    canonicalKey:
+      typeof encrypted.canonicalKey === "string"
+        ? encrypted.canonicalKey
+        : null,
+    provider:
+      typeof encrypted.provider === "string" ? encrypted.provider : null,
+    providerPlaceId:
+      typeof encrypted.providerPlaceId === "string"
+        ? encrypted.providerPlaceId
+        : null,
+    regionCode:
+      typeof encrypted.regionCode === "string"
+        ? encrypted.regionCode
+        : null,
+    schemaVersion:
+      typeof encrypted.schemaVersion === "number"
+        ? encrypted.schemaVersion
         : null,
     granularity: location.granularity,
     visibility: location.visibility,
@@ -161,6 +184,31 @@ function validateClaimValue(field: IntentFieldDefinition, value: unknown) {
         return text;
       });
       return [...new Set(values)];
+    }
+    case "location_list": {
+      if (!Array.isArray(value) || value.length > 20) {
+        throw new AgentApiError(
+          400,
+          `${field.key} must be an array with at most 20 canonical locations`,
+        );
+      }
+      return value.map((item, index) => {
+        if (
+          !item ||
+          typeof item !== "object" ||
+          Array.isArray(item) ||
+          (item as Partial<CanonicalLocation>).schemaVersion !== 1 ||
+          typeof (item as Partial<CanonicalLocation>).canonicalKey !== "string" ||
+          typeof (item as Partial<CanonicalLocation>).label !== "string" ||
+          typeof (item as Partial<CanonicalLocation>).countryCode !== "string"
+        ) {
+          throw new AgentApiError(
+            400,
+            `${field.key}[${index}] must be a resolved canonical location`,
+          );
+        }
+        return item as CanonicalLocation;
+      });
     }
     case "number":
       if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -552,6 +600,42 @@ async function upsertCoarseLocation(
   requiredGranularity: LocationGranularity,
 ) {
   if (requiredGranularity === "none") return null;
+  const visibility =
+    normalizedText(input.visibility, "location.visibility", 40) ??
+    "private_match";
+  if (!["private_match", "disclose_after_match"].includes(visibility)) {
+    throw new AgentApiError(
+      400,
+      "location.visibility must be private_match or disclose_after_match",
+    );
+  }
+  if (input.resolutionToken !== undefined) {
+    const place = consumeLocationResolutionToken(
+      userId,
+      input.resolutionToken,
+      requiredGranularity,
+    );
+    const location = { ...place, visibility };
+    const [created] = await getDb()
+      .insert(userLocations)
+      .values({
+        userId,
+        label: "Encrypted canonical location",
+        countryCode: null,
+        region: null,
+        locality: null,
+        neighborhood: null,
+        granularity: place.granularity,
+        visibility,
+        privateValueEncrypted: encryptJson(location),
+        isPrimary: false,
+      })
+      .returning();
+    return created;
+  }
+
+  // Compatibility path for v1 clients. Current catalog contracts direct agents
+  // and humans through the canonical resolver instead of accepting free text.
   const granularity = normalizedText(input.granularity, "granularity", 20);
   const allowed: LocationGranularity[] = [
     "country",
@@ -573,7 +657,11 @@ async function upsertCoarseLocation(
   }
   const typedGranularity = granularity as LocationGranularity;
   const provided = {
-    countryCode: normalizedText(input.countryCode, "location.countryCode", 2),
+    countryCode: normalizedText(
+      input.countryCode,
+      "location.countryCode",
+      2,
+    )?.toUpperCase(),
     region: normalizedText(input.region, "location.region", 120),
     locality: normalizedText(input.locality, "location.locality", 120),
     neighborhood: normalizedText(
@@ -610,18 +698,8 @@ async function upsertCoarseLocation(
     neighborhood:
       typedGranularity === "neighborhood" ? provided.neighborhood : null,
     granularity: typedGranularity,
-    visibility:
-      normalizedText(input.visibility, "location.visibility", 40) ??
-      "private_match",
+    visibility,
   };
-  if (
-    !["private_match", "disclose_after_match"].includes(location.visibility)
-  ) {
-    throw new AgentApiError(
-      400,
-      "location.visibility must be private_match or disclose_after_match",
-    );
-  }
   const [created] = await getDb()
     .insert(userLocations)
     .values({
@@ -638,6 +716,30 @@ async function upsertCoarseLocation(
     })
     .returning();
   return created;
+}
+
+function resolveLocationClaims(
+  userId: string,
+  definition: IntentDefinition,
+  claims: Record<string, unknown>,
+) {
+  const resolved = { ...claims };
+  for (const field of definition.enrollment.fields) {
+    if (field.type !== "location_list" || resolved[field.key] === undefined) {
+      continue;
+    }
+    const tokens = resolved[field.key];
+    if (!Array.isArray(tokens) || tokens.length > 20) {
+      throw new AgentApiError(
+        400,
+        `${field.key} must be an array with at most 20 location resolution tokens`,
+      );
+    }
+    resolved[field.key] = tokens.map((token) =>
+      consumeLocationResolutionToken(userId, token),
+    );
+  }
+  return resolved;
 }
 
 function mergeClaimsForSubmission(opts: {
@@ -761,7 +863,11 @@ export async function submitDiscoveryEnrollment(
   if (actor.kind === "agent" && actor.apiKeyId) {
     await assertAgentSupportsDiscoveryIntent(actor.apiKeyId, intentSlug);
   }
-  const claims = optionalRecord(submission.claims, "claims");
+  const claims = resolveLocationClaims(
+    actor.user.id,
+    definition,
+    optionalRecord(submission.claims, "claims"),
+  );
   const provenance = optionalRecord(submission.provenance, "provenance");
   const db = getDb();
   const [existing] = await db

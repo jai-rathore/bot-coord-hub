@@ -109,7 +109,7 @@ async function main() {
     method: "PUT",
     bearer: seekerKey.raw,
     body: {
-      supportedIntents: { local_meetup: 1, hiring_compatibility: 1 },
+      supportedIntents: { local_meetup: 2, hiring_compatibility: 2 },
       platforms: ["e2e-api"],
     },
   });
@@ -118,7 +118,7 @@ async function main() {
     method: "PUT",
     bearer: hostKey.raw,
     body: {
-      supportedIntents: { local_meetup: 1 },
+      supportedIntents: { local_meetup: 2 },
       platforms: ["e2e-api"],
     },
   });
@@ -127,7 +127,7 @@ async function main() {
     method: "PUT",
     bearer: host2Key.raw,
     body: {
-      supportedIntents: { local_meetup: 1 },
+      supportedIntents: { local_meetup: 2 },
       platforms: ["e2e-api"],
     },
   });

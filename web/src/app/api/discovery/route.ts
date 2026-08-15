@@ -13,6 +13,7 @@ import {
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { distributedRateLimit } from "@/lib/distributed-rate-limit";
 import { jsonError } from "@/lib/http";
+import { resolveLocationSuggestions } from "@/lib/location-resolver";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,10 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       action?: unknown;
+      query?: unknown;
+      granularity?: unknown;
+      countryCode?: unknown;
+      limit?: unknown;
       intentSlug?: unknown;
       claims?: unknown;
       provenance?: unknown;
@@ -69,7 +74,10 @@ export async function POST(request: Request) {
       details?: unknown;
       block?: boolean;
     };
-    if (body.action === "submit_enrollment") {
+    if (
+      body.action === "submit_enrollment" ||
+      body.action === "resolve_location"
+    ) {
       if (!discoveryFeatureEnabled()) {
         return Response.json(
           {
@@ -81,7 +89,12 @@ export async function POST(request: Request) {
       }
       let rate: Awaited<ReturnType<typeof distributedRateLimit>>;
       try {
-        rate = await distributedRateLimit(`human:${user.id}`, 30);
+        rate = await distributedRateLimit(
+          body.action === "resolve_location"
+            ? `human-location:${user.id}`
+            : `human:${user.id}`,
+          body.action === "resolve_location" ? 60 : 30,
+        );
       } catch {
         return Response.json(
           {
@@ -100,6 +113,16 @@ export async function POST(request: Request) {
       }
     }
     switch (body.action) {
+      case "resolve_location":
+        return Response.json(
+          await resolveLocationSuggestions({
+            userId: user.id,
+            query: body.query,
+            granularity: body.granularity,
+            countryCode: body.countryCode,
+            limit: body.limit,
+          }),
+        );
       case "submit_enrollment":
         return Response.json({
           enrollment: await submitDiscoveryEnrollment(

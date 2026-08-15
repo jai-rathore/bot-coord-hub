@@ -13,6 +13,27 @@ import { registeredIntentHandler } from "./discovery-match";
 import { decryptJson, encryptJson } from "./secret-crypto";
 import { distributedRateLimit } from "./distributed-rate-limit";
 import { jsonFromAgentError } from "./http";
+import {
+  canonicalLocationFromGeoapify,
+  consumeLocationResolutionToken,
+  issueLocationResolutionToken,
+  resolveLocationSuggestions,
+  type CanonicalLocation,
+} from "./location-resolver";
+
+const NEW_YORK: CanonicalLocation = {
+  schemaVersion: 1,
+  canonicalKey: "geoapify:city:new-york",
+  provider: "geoapify",
+  providerPlaceId: "new-york",
+  granularity: "city",
+  label: "New York, NY, United States",
+  countryCode: "US",
+  country: "United States",
+  regionCode: "US-NY",
+  region: "New York",
+  locality: "New York",
+};
 
 test("canonical discovery definitions enforce staged disclosure", () => {
   for (const definition of [
@@ -66,7 +87,7 @@ test("hiring discovery returns compatibility dimensions without raw values", () 
     seekerClaims: {
       participantType: "candidate",
       compensationMinimum: 160_000,
-      locations: ["New York"],
+      locations: [NEW_YORK],
       workModes: ["hybrid"],
       sponsorshipRequired: true,
       levels: ["senior"],
@@ -74,7 +95,7 @@ test("hiring discovery returns compatibility dimensions without raw values", () 
     candidateClaims: {
       participantType: "employer",
       compensationMaximum: 180_000,
-      locations: ["New York"],
+      locations: [NEW_YORK],
       workModes: ["hybrid"],
       sponsorshipAvailable: true,
       levels: ["senior"],
@@ -84,6 +105,77 @@ test("hiring discovery returns compatibility dimensions without raw values", () 
   assert.equal(result.dimensions.compensation, "compatible");
   assert.equal("compensationMinimum" in result, false);
   assert.equal("compensationMaximum" in result, false);
+});
+
+test("local ISO resolver canonicalizes aliases and minor country typos", async () => {
+  const byCode = await resolveLocationSuggestions({
+    userId: "user-a",
+    query: "USA",
+    granularity: "country",
+  });
+  const byTypo = await resolveLocationSuggestions({
+    userId: "user-a",
+    query: "Inited States",
+    granularity: "country",
+  });
+  assert.equal(byCode.suggestions[0]?.place.countryCode, "US");
+  assert.equal(byTypo.suggestions[0]?.place.countryCode, "US");
+  assert.equal(byCode.attribution, "ISO 3166");
+});
+
+test("Geoapify normalization omits coordinates and creates canonical hierarchy", () => {
+  const place = canonicalLocationFromGeoapify(
+    {
+      place_id: "geo-place-1",
+      result_type: "city",
+      formatted: "New York, NY, United States",
+      country: "United States",
+      country_code: "us",
+      state: "New York",
+      state_code: "NY",
+      city: "New York",
+      lat: 40.7,
+      lon: -74,
+    } as Record<string, unknown>,
+    "city",
+  );
+  assert.equal(place?.countryCode, "US");
+  assert.equal(place?.regionCode, "US-NY");
+  assert.equal(place?.canonicalKey, "geoapify:city:geo-place-1");
+  assert.equal("lat" in (place ?? {}), false);
+  assert.equal("lon" in (place ?? {}), false);
+});
+
+test("location resolution tokens are encrypted, user-bound, and expiring", () => {
+  const mutableEnv = process.env as Record<string, string | undefined>;
+  const previousKey = process.env.TOKEN_ENCRYPTION_KEY;
+  mutableEnv.TOKEN_ENCRYPTION_KEY =
+    "test-location-resolution-key-with-sufficient-entropy";
+  try {
+    const token = issueLocationResolutionToken("user-a", NEW_YORK, 1_000);
+    assert.equal(token.includes("New York"), false);
+    assert.deepEqual(
+      consumeLocationResolutionToken("user-a", token, "city", 2_000),
+      NEW_YORK,
+    );
+    assert.throws(
+      () => consumeLocationResolutionToken("user-b", token, "city", 2_000),
+      /invalid or expired/,
+    );
+    assert.throws(
+      () =>
+        consumeLocationResolutionToken(
+          "user-a",
+          token,
+          "city",
+          31 * 60 * 1000,
+        ),
+      /invalid or expired/,
+    );
+  } finally {
+    if (previousKey === undefined) delete mutableEnv.TOKEN_ENCRYPTION_KEY;
+    else mutableEnv.TOKEN_ENCRYPTION_KEY = previousKey;
+  }
 });
 
 test("local meetup matching uses coarse location and never coordinates", () => {
@@ -100,12 +192,14 @@ test("local meetup matching uses coarse location and never coordinates", () => {
       timeWindows: ["saturday afternoon"],
     },
     seekerLocation: {
+      canonicalKey: "geoapify:neighborhood:park-slope",
       countryCode: "US",
       region: "NY",
       locality: "Brooklyn",
       neighborhood: "Park Slope",
     },
     candidateLocation: {
+      canonicalKey: "geoapify:neighborhood:park-slope",
       countryCode: "US",
       region: "NY",
       locality: "Brooklyn",

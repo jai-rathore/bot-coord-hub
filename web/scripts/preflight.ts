@@ -92,6 +92,17 @@ async function main() {
       : "disabled (safe deployment default)",
   });
 
+  const geoapifyConfigured = Boolean(process.env.GEOAPIFY_API_KEY?.trim());
+  checks.push({
+    name: "Discovery location resolver",
+    ok: !production || !discoveryFeatureEnabled() || geoapifyConfigured,
+    detail: geoapifyConfigured
+      ? "Geoapify configured"
+      : production && discoveryFeatureEnabled()
+        ? "GEOAPIFY_API_KEY is required before enabling discovery"
+        : "not required for local/CI or while discovery is disabled",
+  });
+
   const safetyAdminsConfigured = Boolean(
     process.env.INTENT_ADMIN_EMAILS?.trim(),
   );

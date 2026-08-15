@@ -1,6 +1,7 @@
 export const INTENT_FIELD_TYPES = [
   "text",
   "string_list",
+  "location_list",
   "number",
   "boolean",
   "date",
@@ -150,6 +151,11 @@ function validateField(value: unknown, index: number): IntentFieldDefinition {
   if (type === "enum" && !options?.length) {
     throw new Error(
       `enrollment.fields[${index}].options is required for enum fields`,
+    );
+  }
+  if (type !== "enum" && options?.length) {
+    throw new Error(
+      `enrollment.fields[${index}].options is supported only for enum fields`,
     );
   }
   if (field.required !== true && field.required !== false) {

@@ -44,7 +44,7 @@ export const SCHEDULE_MEETING_DEFINITION = validateIntentDefinition({
 });
 
 export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
-  version: 1,
+  version: 2,
   agentPrompt:
     "HoneyMatcha can privately look for recruiting compatibility without revealing compensation, sponsorship, or other raw constraints. Ask whether your human wants to enroll as a candidate or employer.",
   enrollment: {
@@ -74,7 +74,9 @@ export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
       {
         key: "locations",
         prompt: "Which work locations are acceptable?",
-        type: "string_list",
+        description:
+          "Use HoneyMatcha canonical city suggestions. Remote work is represented separately through work modes.",
+        type: "location_list",
         required: false,
         sensitivity: "private",
         sourcePolicy: humanApprovedSource,
@@ -187,7 +189,7 @@ export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
 });
 
 export const LOCAL_MEETUP_DEFINITION = validateIntentDefinition({
-  version: 1,
+  version: 2,
   agentPrompt:
     "HoneyMatcha can privately discover hosted meetups by interest and coarse location. Ask your human whether they want to host or attend; exact venues remain hidden until approval.",
   enrollment: {

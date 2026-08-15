@@ -47,6 +47,8 @@ services:
           type: keyvalue
           name: honeymatcha-rate-limit
           property: connectionString
+      - key: GEOAPIFY_API_KEY
+        sync: false
       - key: NEXT_PUBLIC_CLERK_SIGN_IN_URL
         value: /sign-in
       - key: NEXT_PUBLIC_CLERK_SIGN_UP_URL
