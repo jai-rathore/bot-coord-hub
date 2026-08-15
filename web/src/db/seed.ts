@@ -21,6 +21,15 @@ config();
 async function seed() {
   const db = getDb();
   const discoveryEnabled = discoveryFeatureEnabled();
+  if (
+    process.env.NODE_ENV === "production" &&
+    discoveryEnabled &&
+    !process.env.GEOAPIFY_API_KEY?.trim()
+  ) {
+    throw new Error(
+      "GEOAPIFY_API_KEY is required before seeding enabled discovery contracts",
+    );
+  }
   type SeedTransaction = Parameters<
     Parameters<typeof db.transaction>[0]
   >[0];
