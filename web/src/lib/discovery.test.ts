@@ -62,13 +62,62 @@ test("private fields cannot appear on anonymous discovery cards", () => {
   );
 });
 
-test("dating contract is adult-only and disabled", () => {
-  assert.equal(DATING_INTRODUCTION_DEFINITION.discovery.enabled, false);
+test("dating contract is adult-only and privately matched", () => {
+  assert.equal(DATING_INTRODUCTION_DEFINITION.discovery.enabled, true);
   assert.equal(DATING_INTRODUCTION_DEFINITION.eligibility.minimumAge, 18);
-  assert.throws(
-    () => registeredIntentHandler(DATING_INTRODUCTION_DEFINITION),
-    /disabled or unregistered/,
+  assert.equal(DATING_INTRODUCTION_DEFINITION.discovery.locationGranularity, "city");
+  assert.deepEqual(DATING_INTRODUCTION_DEFINITION.discovery.projectionFields, [
+    "relationshipIntent",
+  ]);
+  const ageField = DATING_INTRODUCTION_DEFINITION.enrollment.fields.find(
+    (field) => field.key === "age",
   );
+  assert.equal(ageField?.sourcePolicy, "human_only");
+  const handler = registeredIntentHandler(DATING_INTRODUCTION_DEFINITION);
+  const result = handler({
+    seekerClaims: {
+      relationshipIntent: "long_term",
+      interests: ["hiking", "cooking"],
+    },
+    candidateClaims: {
+      relationshipIntent: "figuring_out",
+      interests: ["hiking"],
+    },
+    seekerLocation: {
+      canonicalKey: "geoapify:city:new-york",
+      countryCode: "US",
+      locality: "New York",
+    },
+    candidateLocation: {
+      canonicalKey: "geoapify:city:new-york",
+      countryCode: "US",
+      locality: "New York",
+    },
+  });
+  assert.equal(result.verdict, "compatible");
+  assert.equal(result.dimensions.location, "compatible");
+  assert.equal(result.dimensions.relationshipIntent, "compatible");
+  assert.equal("age" in result.dimensions, false);
+  const mismatch = handler({
+    seekerClaims: {
+      relationshipIntent: "long_term",
+      interests: ["hiking"],
+    },
+    candidateClaims: {
+      relationshipIntent: "casual",
+      interests: ["hiking"],
+    },
+    seekerLocation: {
+      canonicalKey: "geoapify:city:new-york",
+      locality: "New York",
+    },
+    candidateLocation: {
+      canonicalKey: "geoapify:city:austin",
+      locality: "Austin",
+    },
+  });
+  assert.equal(mismatch.verdict, "incompatible");
+  assert.equal(mismatch.dimensions.location, "incompatible");
 });
 
 test("missing enrollment questions are derived from the contract", () => {
@@ -78,6 +127,16 @@ test("missing enrollment questions are derived from the contract", () => {
   assert.deepEqual(
     missing.map((field) => field.key),
     ["headline"],
+  );
+  assert.deepEqual(
+    missingEnrollmentFields(DATING_INTRODUCTION_DEFINITION, {
+      age: 29,
+      relationshipIntent: "long_term",
+      headline: "Weekend hiker",
+      interests: [],
+      introductionSummary: "Coffee after a hike",
+    }).map((field) => field.key),
+    ["interests"],
   );
 });
 

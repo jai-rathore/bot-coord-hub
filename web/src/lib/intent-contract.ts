@@ -347,13 +347,12 @@ export function missingEnrollmentFields(
   definition: IntentDefinition,
   claims: Record<string, unknown>,
 ): IntentFieldDefinition[] {
-  return definition.enrollment.fields.filter(
-    (field) =>
-      field.required &&
-      (claims[field.key] === undefined ||
-        claims[field.key] === null ||
-        claims[field.key] === ""),
-  );
+  return definition.enrollment.fields.filter((field) => {
+    if (!field.required) return false;
+    const value = claims[field.key];
+    if (value === undefined || value === null || value === "") return true;
+    return Array.isArray(value) && value.length === 0;
+  });
 }
 
 export function fieldMap(definition: IntentDefinition) {

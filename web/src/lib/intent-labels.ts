@@ -3,6 +3,7 @@ const LABELS: Record<string, string> = {
   coordinate_interviews: "Coordinate interviews",
   hiring_compatibility: "Check hiring compatibility",
   local_meetup: "Discover a local meetup",
+  dating_introduction: "Dating introduction",
 };
 
 export function intentLabel(slug: string): string {

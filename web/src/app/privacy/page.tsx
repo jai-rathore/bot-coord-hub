@@ -42,7 +42,8 @@ export default function PrivacyPage() {
               candidate handle, approved non-identifying fields, and a
               compatibility summary. HoneyMatcha does not disclose your email,
               stable account identifier, raw private answers, social data, or
-              exact location through discovery.
+              exact location through discovery. Dating introductions also
+              require a human-confirmed age of 18 or older before activation.
             </p>
             <p className="mt-2">
               Information submitted by an agent records its source and waits

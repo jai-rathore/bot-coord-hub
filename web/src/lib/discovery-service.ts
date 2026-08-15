@@ -250,6 +250,41 @@ function validateCombinedClaims(
     const value = validateClaimValue(field, claims[field.key]);
     assertSafeSharedContent(field, value);
   }
+  assertAdultEligibility(definition, claims);
+}
+
+function hasConfirmedAdultAge(
+  definition: IntentDefinition,
+  claims: Record<string, unknown>,
+) {
+  const minimumAge = definition.eligibility.minimumAge;
+  if (minimumAge === undefined) return true;
+  const age = claims.age;
+  return (
+    typeof age === "number" &&
+    Number.isInteger(age) &&
+    age >= minimumAge &&
+    age <= 120
+  );
+}
+
+function assertAdultEligibility(
+  definition: IntentDefinition,
+  claims: Record<string, unknown>,
+  required = false,
+) {
+  const minimumAge = definition.eligibility.minimumAge;
+  if (minimumAge === undefined) return;
+  if (!required && (claims.age === undefined || claims.age === null || claims.age === "")) {
+    return;
+  }
+  if (!hasConfirmedAdultAge(definition, claims)) {
+    throw new AgentApiError(
+      403,
+      `This intent requires a confirmed age of ${minimumAge} or older`,
+      { code: "adult_eligibility_required" },
+    );
+  }
 }
 
 function assertSafeSharedContent(
@@ -919,7 +954,10 @@ export async function submitDiscoveryEnrollment(
   validateCombinedClaims(definition, merged.combined);
   const missing = missingEnrollmentFields(definition, merged.combined);
   const activationRequested = submission.requestActivation === true;
-  if (activationRequested && missing.length) {
+  if (
+    (activationRequested || existing?.status === "active") &&
+    missing.length
+  ) {
     throw new AgentApiError(400, "Enrollment is incomplete", {
       code: "missing_enrollment_fields",
       missingFields: missing.map((field) => field.key),
@@ -1009,6 +1047,9 @@ export async function submitDiscoveryEnrollment(
           ? ("pending_approval" as const)
           : ("active" as const)
         : (existing?.status ?? ("draft" as const));
+  if (status === "active") {
+    assertAdultEligibility(definition, merged.combined, true);
+  }
   if (
     status === "active" &&
     definition.version >= 2 &&
@@ -1205,6 +1246,7 @@ export async function decideDiscoveryEnrollment(opts: {
       ...(enrollment.disclosureClaims as Record<string, unknown>),
     };
     validateCombinedClaims(definition, combined);
+    assertAdultEligibility(definition, combined, true);
     if (
       definition.version >= 2 &&
       definition.discovery.locationGranularity !== "none" &&
@@ -1556,6 +1598,7 @@ export async function searchDiscovery(opts: {
     ...(seeker.publicClaims as Record<string, unknown>),
     ...decryptJson(seeker.privateClaimsEncrypted),
   };
+  assertAdultEligibility(definition, seekerClaims, true);
   const handler = registeredIntentHandler(definition);
   const results: Array<{
     candidateHandle: string;
@@ -1582,6 +1625,12 @@ export async function searchDiscovery(opts: {
       ...decryptJson(candidate.enrollment.privateClaimsEncrypted),
     };
     if (
+      definition.eligibility.minimumAge !== undefined &&
+      !hasConfirmedAdultAge(definition, candidateClaims)
+    ) {
+      continue;
+    }
+    if (
       !publicParticipantTypesCompatible(
         opts.intentSlug,
         seekerClaims.participantType,
@@ -1596,6 +1645,12 @@ export async function searchDiscovery(opts: {
       seekerLocation: privateLocationValue(seekerLocation),
       candidateLocation: privateLocationValue(candidate.location),
     });
+    if (
+      compatibility.verdict === "incompatible" &&
+      definition.discovery.handler === "dating_v1"
+    ) {
+      continue;
+    }
     const projection: Record<string, unknown> = {};
     for (const key of definition.discovery.projectionFields) {
       const value = (
@@ -1713,15 +1768,31 @@ export async function requestDiscoveryIntroduction(opts: {
   }
   await assertSafetyActive(handle.candidateUserId);
   const { definition } = await getDiscoveryIntent(handle.intentSlug);
-  await activeEnrollment(
+  const requesterEnrollment = await activeEnrollment(
     opts.actor.user.id,
     handle.intentSlug,
     definition.version,
   );
-  await activeEnrollment(
+  const candidateEnrollment = await activeEnrollment(
     handle.candidateUserId,
     handle.intentSlug,
     definition.version,
+  );
+  assertAdultEligibility(
+    definition,
+    {
+      ...(requesterEnrollment.publicClaims as Record<string, unknown>),
+      ...decryptJson(requesterEnrollment.privateClaimsEncrypted),
+    },
+    true,
+  );
+  assertAdultEligibility(
+    definition,
+    {
+      ...(candidateEnrollment.publicClaims as Record<string, unknown>),
+      ...decryptJson(candidateEnrollment.privateClaimsEncrypted),
+    },
+    true,
   );
   const pairKey = canonicalDiscoveryPair(
     opts.actor.user.id,

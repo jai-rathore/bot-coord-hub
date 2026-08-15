@@ -144,7 +144,7 @@ export function getDiscoveryDocument(baseUrl?: string) {
     intents: [
       "schedule_meeting",
       "hiring_compatibility",
-      ...(discoveryEnabled ? ["local_meetup"] : []),
+      ...(discoveryEnabled ? ["local_meetup", "dating_introduction"] : []),
     ],
     connect_as_agent:
       "If a human asks you to connect to HoneyMatcha or honeymatcha.io as their agent, start pairing immediately. Do not sign in as the human or solve CAPTCHA.",
