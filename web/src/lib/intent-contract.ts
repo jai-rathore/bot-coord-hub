@@ -1,6 +1,7 @@
 export const INTENT_FIELD_TYPES = [
   "text",
   "string_list",
+  "location_list",
   "number",
   "boolean",
   "date",
@@ -49,6 +50,7 @@ export type IntentFieldDefinition = {
   sensitivity: IntentFieldSensitivity;
   sourcePolicy: IntentSourcePolicy;
   options?: string[];
+  locationGranularity?: Exclude<LocationGranularity, "none">;
   retentionDays: number;
 };
 
@@ -152,6 +154,32 @@ function validateField(value: unknown, index: number): IntentFieldDefinition {
       `enrollment.fields[${index}].options is required for enum fields`,
     );
   }
+  if (type !== "enum" && options?.length) {
+    throw new Error(
+      `enrollment.fields[${index}].options is supported only for enum fields`,
+    );
+  }
+  const locationGranularity =
+    field.locationGranularity === undefined
+      ? undefined
+      : enumValue(
+          field.locationGranularity,
+          LOCATION_GRANULARITIES.filter(
+            (value): value is Exclude<LocationGranularity, "none"> =>
+              value !== "none",
+          ),
+          `enrollment.fields[${index}].locationGranularity`,
+        );
+  if (type === "location_list" && !locationGranularity) {
+    throw new Error(
+      `enrollment.fields[${index}].locationGranularity is required for location_list fields`,
+    );
+  }
+  if (type !== "location_list" && locationGranularity) {
+    throw new Error(
+      `enrollment.fields[${index}].locationGranularity is supported only for location_list fields`,
+    );
+  }
   if (field.required !== true && field.required !== false) {
     throw new Error(`enrollment.fields[${index}].required must be boolean`);
   }
@@ -182,6 +210,7 @@ function validateField(value: unknown, index: number): IntentFieldDefinition {
       `enrollment.fields[${index}].sourcePolicy`,
     ),
     ...(options ? { options } : {}),
+    ...(locationGranularity ? { locationGranularity } : {}),
     retentionDays: positiveInteger(
       field.retentionDays,
       `enrollment.fields[${index}].retentionDays`,

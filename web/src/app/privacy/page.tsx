@@ -65,6 +65,14 @@ export default function PrivacyPage() {
               compatibility checks and is disclosed only when your selected
               visibility policy permits it.
             </p>
+            <p className="mt-2">
+              HoneyMatcha uses local ISO country and region data and sends city
+              or neighborhood search text to Geoapify to provide canonical
+              typeahead suggestions. HoneyMatcha does not send your account
+              identity to Geoapify. Search text is not written to HoneyMatcha
+              application logs, and only the location you select is retained
+              with your encrypted purpose profile.
+            </p>
           </section>
           <section>
             <h2 className="text-lg font-semibold text-ink">Guest requests</h2>

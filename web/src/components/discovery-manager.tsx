@@ -1,15 +1,32 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  LocationAutocomplete,
+  type CanonicalLocationSuggestion,
+} from "@/components/location-autocomplete";
 
 type Question = {
   key: string;
   prompt: string;
   description: string | null;
-  type: "text" | "string_list" | "number" | "boolean" | "date" | "enum";
+  type:
+    | "text"
+    | "string_list"
+    | "location_list"
+    | "number"
+    | "boolean"
+    | "date"
+    | "enum";
   required: boolean;
   sensitivity: "discoverable" | "private" | "disclose_after_match";
   options: string[] | null;
+  locationGranularity:
+    | "country"
+    | "region"
+    | "city"
+    | "neighborhood"
+    | null;
   retentionDays: number;
 };
 
@@ -158,14 +175,13 @@ export function DiscoveryManager({
     initialIntents[0]?.slug ?? "",
   );
   const [values, setValues] = useState<Record<string, string>>({});
+  const [locationValues, setLocationValues] = useState<
+    Record<string, CanonicalLocationSuggestion[]>
+  >({});
   const [clearFields, setClearFields] = useState<Set<string>>(new Set());
-  const [location, setLocation] = useState({
-    label: "",
-    countryCode: "",
-    region: "",
-    locality: "",
-    neighborhood: "",
-  });
+  const [coarseLocation, setCoarseLocation] = useState<
+    CanonicalLocationSuggestion[]
+  >([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -190,6 +206,15 @@ export function DiscoveryManager({
           claims[question.key] = null;
           continue;
         }
+        if (question.type === "location_list") {
+          const resolved = locationValues[question.key] ?? [];
+          if (resolved.length) {
+            claims[question.key] = resolved.map(
+              (location) => location.resolutionToken,
+            );
+          }
+          continue;
+        }
         const raw = values[question.key]?.trim();
         if (!raw) continue;
         claims[question.key] =
@@ -204,20 +229,12 @@ export function DiscoveryManager({
                 ? raw === "true"
                 : raw;
       }
-      const hasLocationInput = [
-        location.countryCode,
-        location.region,
-        location.locality,
-        location.neighborhood,
-      ].some((value) => value.trim());
       const locationBody =
         selected.discovery.locationGranularity === "none" ||
-        !hasLocationInput
+        !coarseLocation[0]
           ? undefined
           : {
-              ...location,
-              countryCode: location.countryCode.toUpperCase(),
-              granularity: selected.discovery.locationGranularity,
+              resolutionToken: coarseLocation[0].resolutionToken,
               visibility: "private_match",
             };
       const result = await discoveryAction({
@@ -236,6 +253,8 @@ export function DiscoveryManager({
         ),
       );
       setClearFields(new Set());
+      setLocationValues({});
+      setCoarseLocation([]);
       setMessage(
         "Enrollment activated. Your agent can now search this purpose without exposing your identity or private answers.",
       );
@@ -363,6 +382,8 @@ export function DiscoveryManager({
                 onClick={() => {
                   setSelectedSlug(intent.slug);
                   setValues({});
+                  setLocationValues({});
+                  setCoarseLocation([]);
                   setClearFields(new Set());
                   setMessage(null);
                   setError(null);
@@ -401,20 +422,43 @@ export function DiscoveryManager({
                       {question.prompt}
                       {question.required ? " *" : ""}
                     </span>
+                    {question.description ? (
+                      <span className="mt-1 block text-xs leading-5 text-muted">
+                        {question.description}
+                      </span>
+                    ) : null}
                     <span className="mt-1 block text-xs text-muted">
                       {sensitivityLabel(question.sensitivity)} · retained up to{" "}
                       {question.retentionDays} days
                     </span>
-                    <QuestionInput
-                      question={question}
-                      value={values[question.key] ?? ""}
-                      onChange={(value) =>
-                        setValues((current) => ({
-                          ...current,
-                          [question.key]: value,
-                        }))
-                      }
-                    />
+                    {question.type === "location_list" ? (
+                      <div className="mt-2">
+                        <LocationAutocomplete
+                          key={`${selected.slug}:${question.key}`}
+                          granularity={question.locationGranularity ?? "city"}
+                          multiple
+                          label={question.prompt}
+                          selected={locationValues[question.key] ?? []}
+                          onChange={(locations) =>
+                            setLocationValues((current) => ({
+                              ...current,
+                              [question.key]: locations,
+                            }))
+                          }
+                        />
+                      </div>
+                    ) : (
+                      <QuestionInput
+                        question={question}
+                        value={values[question.key] ?? ""}
+                        onChange={(value) =>
+                          setValues((current) => ({
+                            ...current,
+                            [question.key]: value,
+                          }))
+                        }
+                      />
+                    )}
                     {selected.currentEnrollment.ownerReview &&
                     Object.values(
                       selected.currentEnrollment.ownerReview.claims,
@@ -454,44 +498,58 @@ export function DiscoveryManager({
                   <p className="mb-4 text-xs leading-5 text-muted">
                     HoneyMatcha does not accept GPS coordinates. This location
                     remains private until your disclosure policy allows it.
+                    Choose a canonical suggestion so spelling and aliases do
+                    not create false mismatches. City and neighborhood search
+                    text is sent to Geoapify without your HoneyMatcha identity.
                   </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {[
-                      ["countryCode", "Country code", 0],
-                      ["region", "State or region", 1],
-                      ["locality", "City", 2],
-                      ["neighborhood", "Neighborhood", 3],
-                    ]
-                      .filter(([, , level]) => {
-                        const requiredLevel = {
-                          country: 0,
-                          region: 1,
-                          city: 2,
-                          neighborhood: 3,
-                        }[
-                          selected.discovery.locationGranularity as
-                            | "country"
-                            | "region"
-                            | "city"
-                            | "neighborhood"
-                        ];
-                        return Number(level) <= requiredLevel;
-                      })
-                      .map(([key, placeholder]) => (
-                      <input
-                        key={String(key)}
-                        className="rounded-xl border border-line bg-white px-3 py-2.5 text-sm outline-none focus:border-matcha"
-                        placeholder={String(placeholder)}
-                        value={location[key as keyof typeof location]}
-                        onChange={(event) =>
-                          setLocation((current) => ({
-                            ...current,
-                            [key]: event.target.value,
-                          }))
-                        }
-                      />
-                    ))}
-                  </div>
+                  {selected.currentEnrollment.ownerReview?.location &&
+                  !coarseLocation.length ? (
+                    <div className="mb-3 rounded-xl bg-white px-3 py-2 text-xs text-muted">
+                      <p>
+                        Saved:{" "}
+                        {String(
+                          selected.currentEnrollment.ownerReview.location
+                            .label ?? "canonical coarse location",
+                        )}
+                      </p>
+                      {selected.currentEnrollment.ownerReview.location
+                        .provider === "geoapify" ? (
+                        <p className="mt-1 text-[0.68rem]">
+                          Powered by{" "}
+                          <a
+                            href="https://www.geoapify.com/"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline"
+                          >
+                            Geoapify
+                          </a>
+                          ; ©{" "}
+                          <a
+                            href="https://www.openstreetmap.org/copyright"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline"
+                          >
+                            OpenStreetMap contributors
+                          </a>
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <LocationAutocomplete
+                    key={`${selected.slug}:${selected.discovery.locationGranularity}`}
+                    granularity={
+                      selected.discovery.locationGranularity as
+                        | "country"
+                        | "region"
+                        | "city"
+                        | "neighborhood"
+                    }
+                    label="Coarse location for private matching"
+                    selected={coarseLocation}
+                    onChange={setCoarseLocation}
+                  />
                 </fieldset>
               ) : null}
 
@@ -512,6 +570,30 @@ export function DiscoveryManager({
                       2,
                     )}
                   </pre>
+                  {JSON.stringify(
+                    selected.currentEnrollment.ownerReview,
+                  ).includes('"provider":"geoapify"') ? (
+                    <p className="mt-2 text-[0.68rem] text-muted">
+                      Location data powered by{" "}
+                      <a
+                        href="https://www.geoapify.com/"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline"
+                      >
+                        Geoapify
+                      </a>
+                      ; ©{" "}
+                      <a
+                        href="https://www.openstreetmap.org/copyright"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline"
+                      >
+                        OpenStreetMap contributors
+                      </a>
+                    </p>
+                  ) : null}
                 </section>
               ) : null}
 

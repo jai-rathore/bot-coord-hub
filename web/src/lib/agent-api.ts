@@ -77,6 +77,7 @@ import {
 } from "@/lib/discovery-service";
 import { distributedRateLimit } from "@/lib/distributed-rate-limit";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
+import { resolveLocationSuggestions } from "@/lib/location-resolver";
 
 import { AgentApiError } from "@/lib/agent-errors";
 export { AgentApiError } from "@/lib/agent-errors";
@@ -651,6 +652,30 @@ export async function listDiscoveryCapabilities(auth: AgentAuth) {
       mutualHumanApprovalRequired: true,
       exactLocationShared: false,
     },
+  };
+}
+
+export async function resolveDiscoveryLocation(
+  auth: AgentAuth,
+  body: {
+    query?: unknown;
+    granularity?: unknown;
+    countryCode?: unknown;
+    limit?: unknown;
+  },
+) {
+  assertAgentScope(auth, "discovery:write");
+  assertDiscoveryEnabled();
+  await assertDiscoveryRate(auth, "location", 30);
+  return {
+    ok: true,
+    ...(await resolveLocationSuggestions({
+      userId: auth.user.id,
+      query: body.query,
+      granularity: body.granularity,
+      countryCode: body.countryCode,
+      limit: body.limit,
+    })),
   };
 }
 

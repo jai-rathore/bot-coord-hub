@@ -29,6 +29,7 @@ import {
   readBoard,
   requestScheduleMeeting,
   requestDiscoveryInterest,
+  resolveDiscoveryLocation,
   redeemPublicInvite,
   revokeGuestTask,
   revokePublicInvite,
@@ -279,7 +280,7 @@ export const MCP_TOOLS: McpToolDef[] = [
         supportedIntents: {
           type: "object",
           description:
-            'Map intent slugs to supported contract versions, for example {"hiring_compatibility":1}.',
+            'Map intent slugs to the exact versions returned by list_discovery_capabilities.',
           additionalProperties: true,
         },
         platforms: {
@@ -292,9 +293,34 @@ export const MCP_TOOLS: McpToolDef[] = [
     },
   },
   {
+    name: "resolve_discovery_location",
+    description:
+      "Resolve a human-provided place name to canonical HoneyMatcha choices before enrollment. Present ambiguous choices to the human and submit only the returned short-lived resolutionToken. Never invent place IDs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "The human's complete place phrase, such as Brooklyn",
+        },
+        granularity: {
+          type: "string",
+          enum: ["country", "region", "city", "neighborhood"],
+        },
+        countryCode: {
+          type: "string",
+          description: "Optional ISO alpha-2 country filter",
+        },
+        limit: { type: "number", description: "Maximum choices, up to 8" },
+      },
+      required: ["query", "granularity"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "submit_discovery_enrollment",
     description:
-      "Submit purpose-bound information for one discovery intent. Agent-supplied fields require provenance and activation always waits for human approval.",
+      "Submit purpose-bound information for one discovery intent. Resolve every location first and send resolutionToken values. Agent-supplied fields require provenance and activation always waits for human approval.",
     inputSchema: {
       type: "object",
       properties: {
@@ -309,8 +335,16 @@ export const MCP_TOOLS: McpToolDef[] = [
         location: {
           type: "object",
           description:
-            "Optional coarse country/region/city/neighborhood. Exact coordinates are unsupported.",
-          additionalProperties: true,
+            "Canonical coarse location from resolve_discovery_location. Use {resolutionToken, visibility?}; exact coordinates and invented place strings are unsupported.",
+          properties: {
+            resolutionToken: { type: "string" },
+            visibility: {
+              type: "string",
+              enum: ["private_match"],
+            },
+          },
+          required: ["resolutionToken"],
+          additionalProperties: false,
         },
         requestActivation: { type: "boolean" },
       },
@@ -471,6 +505,7 @@ export const MCP_TOOLS: McpToolDef[] = [
 
 const DISCOVERY_FLAGGED_TOOLS = new Set([
   "set_agent_capabilities",
+  "resolve_discovery_location",
   "submit_discovery_enrollment",
   "search_discovery",
   "request_discovery_introduction",
@@ -574,6 +609,13 @@ export async function dispatchMcpTool(
         platforms: args.platforms,
         metadata: args.metadata,
       });
+    case "resolve_discovery_location":
+      return resolveDiscoveryLocation(auth, {
+        query: args.query,
+        granularity: args.granularity,
+        countryCode: args.countryCode,
+        limit: args.limit,
+      });
     case "submit_discovery_enrollment":
       return submitDiscoveryProfile(auth, {
         intentSlug: args.intentSlug,
@@ -581,12 +623,7 @@ export async function dispatchMcpTool(
         provenance: args.provenance,
         location: args.location as
           | {
-              label?: unknown;
-              countryCode?: unknown;
-              region?: unknown;
-              locality?: unknown;
-              neighborhood?: unknown;
-              granularity?: unknown;
+              resolutionToken?: unknown;
               visibility?: unknown;
             }
           | undefined,

@@ -1,5 +1,10 @@
 import "dotenv/config";
-import { createHash, randomBytes, randomUUID } from "crypto";
+import {
+  createCipheriv,
+  createHash,
+  randomBytes,
+  randomUUID,
+} from "crypto";
 import postgres from "postgres";
 
 const base = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000";
@@ -21,6 +26,55 @@ function keyMaterial() {
     raw,
     prefix: raw.slice(0, 11),
     hash: createHash("sha256").update(raw).digest("hex"),
+  };
+}
+
+function testEncryptionKey() {
+  const value =
+    process.env.TOKEN_ENCRYPTION_KEY ??
+    "local-test-discovery-encryption-key-with-sufficient-entropy";
+  if (/^[0-9a-f]{64}$/i.test(value)) return Buffer.from(value, "hex");
+  const decoded = Buffer.from(value, "base64");
+  if (decoded.length === 32) return decoded;
+  return createHash("sha256").update(value).digest();
+}
+
+function resolvedNeighborhood(userId, neighborhood = "Park Slope") {
+  const providerPlaceId = neighborhood.toLowerCase().replaceAll(" ", "-");
+  const payload = JSON.stringify({
+    tokenType: "location_resolution",
+    userId,
+    place: {
+      schemaVersion: 1,
+      canonicalKey: `geoapify:neighborhood:${providerPlaceId}`,
+      provider: "geoapify",
+      providerPlaceId,
+      granularity: "neighborhood",
+      label: `${neighborhood}, Brooklyn, NY, United States`,
+      countryCode: "US",
+      country: "United States",
+      regionCode: "US-NY",
+      region: "New York",
+      locality: "Brooklyn",
+      neighborhood,
+    },
+    expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+  });
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", testEncryptionKey(), iv);
+  const encrypted = Buffer.concat([
+    cipher.update(payload, "utf8"),
+    cipher.final(),
+  ]);
+  const token = [
+    "enc:v1",
+    iv.toString("base64url"),
+    cipher.getAuthTag().toString("base64url"),
+    encrypted.toString("base64url"),
+  ].join(":");
+  return {
+    resolutionToken: `hlr_${token}`,
+    visibility: "private_match",
   };
 }
 
@@ -109,7 +163,7 @@ async function main() {
     method: "PUT",
     bearer: seekerKey.raw,
     body: {
-      supportedIntents: { local_meetup: 1, hiring_compatibility: 1 },
+      supportedIntents: { local_meetup: 2, hiring_compatibility: 2 },
       platforms: ["e2e-api"],
     },
   });
@@ -118,7 +172,7 @@ async function main() {
     method: "PUT",
     bearer: hostKey.raw,
     body: {
-      supportedIntents: { local_meetup: 1 },
+      supportedIntents: { local_meetup: 2 },
       platforms: ["e2e-api"],
     },
   });
@@ -127,21 +181,34 @@ async function main() {
     method: "PUT",
     bearer: host2Key.raw,
     body: {
-      supportedIntents: { local_meetup: 1 },
+      supportedIntents: { local_meetup: 2 },
       platforms: ["e2e-api"],
     },
   });
   assert(host2Capability.response.ok, JSON.stringify(host2Capability.data));
 
-  const commonLocation = {
-    label: "Park Slope",
-    countryCode: "US",
-    region: "NY",
-    locality: "Brooklyn",
-    neighborhood: "Park Slope",
-    granularity: "neighborhood",
-    visibility: "private_match",
-  };
+  const resolvedCountry = await jsonFetch(
+    "/api/v1/discovery/locations/resolve",
+    {
+      method: "POST",
+      bearer: seekerKey.raw,
+      body: {
+        query: "USA",
+        granularity: "country",
+        limit: 3,
+      },
+    },
+  );
+  assert(resolvedCountry.response.ok, JSON.stringify(resolvedCountry.data));
+  assert(
+    resolvedCountry.data.suggestions?.[0]?.place?.countryCode === "US",
+    "location resolver should canonicalize USA to US",
+  );
+  assert(
+    resolvedCountry.data.suggestions?.[0]?.resolutionToken?.startsWith("hlr_"),
+    "location resolver should return an opaque enrollment token",
+  );
+
   const seekerEnrollment = await jsonFetch(
     "/api/v1/discovery/enrollments",
     {
@@ -161,7 +228,7 @@ async function main() {
           timeWindows: { source: "human conversation" },
           introductionSummary: { source: "human conversation" },
         },
-        location: commonLocation,
+        location: resolvedNeighborhood(seeker.id),
         requestActivation: true,
       },
     },
@@ -188,7 +255,7 @@ async function main() {
         timeWindows: { source: "human conversation" },
         introductionSummary: { source: "human conversation" },
       },
-      location: commonLocation,
+      location: resolvedNeighborhood(host.id),
       requestActivation: true,
     },
   });
@@ -210,7 +277,7 @@ async function main() {
         timeWindows: { source: "human conversation" },
         introductionSummary: { source: "human conversation" },
       },
-      location: commonLocation,
+      location: resolvedNeighborhood(host2.id),
       requestActivation: true,
     },
   });
@@ -442,6 +509,7 @@ async function main() {
       {
         ok: true,
         catalog: "local_meetup",
+        location: "canonical resolver available",
         enrollment: "human approval required",
         candidate: "opaque",
         introduction: "human-only decisions enforced",

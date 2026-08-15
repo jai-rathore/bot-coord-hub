@@ -257,6 +257,24 @@ export async function deliverDiscoveryInbox(opts: {
   return { inboxId: created.id, callback };
 }
 
+export async function postDiscoveryInboxCallback(
+  inboxId: string,
+): Promise<"delivered" | "failed" | "none"> {
+  const [item] = await getDb()
+    .select()
+    .from(agentInbox)
+    .where(and(eq(agentInbox.id, inboxId), isNull(agentInbox.ackedAt)))
+    .limit(1);
+  if (!item) return "none";
+  return postAgentCallbacks({
+    userId: item.userId,
+    inboxId: item.id,
+    sessionId: item.sessionId,
+    kind: item.kind,
+    summary: item.summary,
+  });
+}
+
 async function deliverToUserAgent(opts: {
   userId: string;
   email: string;

@@ -16,7 +16,10 @@ import {
   discoveryBlocks,
   userLocations,
 } from "../src/db/schema";
-import { discoveryFeatureEnabled } from "../src/lib/discovery-feature";
+import {
+  canonicalLocationsEnabled,
+  discoveryFeatureEnabled,
+} from "../src/lib/discovery-feature";
 
 config({ path: ".env.local" });
 config();
@@ -90,6 +93,24 @@ async function main() {
     detail: discoveryFeatureEnabled()
       ? "enabled"
       : "disabled (safe deployment default)",
+  });
+  checks.push({
+    name: "Canonical location contracts",
+    ok: true,
+    detail: canonicalLocationsEnabled()
+      ? "v2 canonical contracts enabled"
+      : "v1 compatibility mode",
+  });
+
+  const geoapifyConfigured = Boolean(process.env.GEOAPIFY_API_KEY?.trim());
+  checks.push({
+    name: "Discovery location resolver",
+    ok: !production || !discoveryFeatureEnabled() || geoapifyConfigured,
+    detail: geoapifyConfigured
+      ? "Geoapify configured"
+      : production && discoveryFeatureEnabled()
+        ? "GEOAPIFY_API_KEY is required before enabling discovery"
+        : "not required for local/CI or while discovery is disabled",
   });
 
   const safetyAdminsConfigured = Boolean(

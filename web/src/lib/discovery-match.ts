@@ -9,6 +9,7 @@ import type {
 } from "@/lib/intent-contract";
 
 export type DiscoveryLocation = {
+  canonicalKey?: string | null;
   countryCode?: string | null;
   region?: string | null;
   locality?: string | null;
@@ -38,6 +39,25 @@ function strings(value: unknown): string[] | undefined {
     : undefined;
 }
 
+function locationKeys(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const keys = value
+    .map((item) => {
+      if (typeof item === "string") return item;
+      if (
+        item &&
+        typeof item === "object" &&
+        !Array.isArray(item) &&
+        typeof (item as Record<string, unknown>).canonicalKey === "string"
+      ) {
+        return String((item as Record<string, unknown>).canonicalKey);
+      }
+      return null;
+    })
+    .filter((item): item is string => Boolean(item));
+  return keys.length ? keys : undefined;
+}
+
 function numberValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
@@ -53,7 +73,7 @@ function stringValue(value: unknown): string | undefined {
 function roleConstraints(claims: Record<string, unknown>): RoleConstraints {
   return {
     compensationMaximum: numberValue(claims.compensationMaximum),
-    locations: strings(claims.locations),
+    locations: locationKeys(claims.locations),
     workModes: strings(claims.workModes),
     sponsorshipAvailable: booleanValue(claims.sponsorshipAvailable),
     latestStart: stringValue(claims.latestStart),
@@ -66,7 +86,7 @@ function candidateConstraints(
 ): CandidateConstraints {
   return {
     compensationMinimum: numberValue(claims.compensationMinimum),
-    locations: strings(claims.locations),
+    locations: locationKeys(claims.locations),
     workModes: strings(claims.workModes),
     sponsorshipRequired: booleanValue(claims.sponsorshipRequired),
     earliestStart: stringValue(claims.earliestStart),
@@ -126,6 +146,11 @@ function locationState(
   right?: DiscoveryLocation | null,
 ): "compatible" | "incompatible" | "unknown" {
   if (!left || !right) return "unknown";
+  if (left.canonicalKey && right.canonicalKey) {
+    return left.canonicalKey === right.canonicalKey
+      ? "compatible"
+      : "incompatible";
+  }
   const pairs: Array<[string | null | undefined, string | null | undefined]> = [
     [left.neighborhood, right.neighborhood],
     [left.locality, right.locality],
