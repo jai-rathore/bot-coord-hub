@@ -66,6 +66,11 @@ import {
   revokePublicInvite as revokeShareablePublicInvite,
 } from "@/lib/public-invites";
 import {
+  getOwnedProfile,
+  getPublicAgentProfile,
+  requestProfileConnection,
+} from "@/lib/agent-profiles";
+import {
   getAgentCapabilityManifest,
   listDiscoveryCatalog,
   listDiscoveryInterests,
@@ -169,12 +174,14 @@ export async function whoami(auth: AgentAuth) {
   }
   const pendingInbox = inbox.length;
   const capabilityManifest = await getAgentCapabilityManifest(auth.apiKey.id);
+  const profile = await getOwnedProfile(auth.user, "");
   return {
     ok: true,
     user: {
       id: auth.user.id,
       email: auth.user.email,
       name: auth.user.name,
+      handle: profile?.handle ?? null,
     },
     apiKey: {
       id: auth.apiKey.id,
@@ -304,6 +311,33 @@ export async function redeemPublicInvite(
     return await redeemShareablePublicInvite({
       user: auth.user,
       token: body.token ?? "",
+    });
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
+}
+
+export async function getAgentProfile(handle: string, baseUrl = "") {
+  try {
+    const profile = await getPublicAgentProfile(handle, baseUrl);
+    if (!profile) {
+      throw new AgentApiError(404, "That public agent page is unavailable");
+    }
+    return { ok: true, profile };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
+}
+
+export async function requestAgentConnection(
+  auth: AgentAuth,
+  body: { handle?: string },
+) {
+  assertAgentScope(auth, "people:write");
+  try {
+    return await requestProfileConnection({
+      user: auth.user,
+      handle: body.handle ?? "",
     });
   } catch (err) {
     rethrowAsAgentError(err);

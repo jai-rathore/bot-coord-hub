@@ -8,6 +8,7 @@ type HomeStatus = {
     lastUsedAt: string | null;
   };
   calendarConnected: boolean;
+  handle: string | null;
   peopleCount: number;
   attentionCount: number;
 };
@@ -47,6 +48,15 @@ export function AgentStatusCard({ status }: { status: HomeStatus }) {
       action: status.calendarConnected ? "Manage" : "Connect",
     },
     {
+      label: "Public page",
+      value: status.handle
+        ? `honeymatcha.io/${status.handle}`
+        : "Choose a handle",
+      ok: Boolean(status.handle),
+      href: status.handle ? `/${status.handle}` : "/setup",
+      action: status.handle ? "Open" : "Set up",
+    },
+    {
       label: "People",
       value:
         status.peopleCount > 0
@@ -81,7 +91,7 @@ export function AgentStatusCard({ status }: { status: HomeStatus }) {
           </h2>
         </div>
       </div>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map((row) => (
           <article
             key={row.label}

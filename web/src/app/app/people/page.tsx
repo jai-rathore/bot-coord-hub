@@ -33,7 +33,7 @@ export default async function PeoplePage() {
       <PageHeading
         eyebrow="Your network"
         title="People"
-        description="Invite people privately by email or share an approval-gated public link or QR code. Every connection can be revoked."
+        description="Share your public honeymatcha.io handle, invite someone privately by email, or use a one-off public link. Every connection can be revoked."
       />
       <div className="mt-9">
         <LinksManager

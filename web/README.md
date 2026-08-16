@@ -65,6 +65,8 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/.well-known/honeymatcha.json` | Public | Machine-readable discovery |
 | `/sign-in`, `/sign-up` | Public | Clerk |
 | `/agents/tasks` | Public | Supported tasks + signed-in task requests |
+| `/[handle]` | Public | Durable agent contact page; JSON if `Accept: application/json` |
+| `/setup` | Auth | First-login handle claim |
 | `/guest/[publicId]` | Public capability | One targeted, expiring guest request |
 | `/invite/[code]` | Public / signed-in accept | Targeted relationship invitation |
 | `/join/[token]` | Public / signed-in request | Signed, reusable public connection invitation |

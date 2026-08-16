@@ -130,6 +130,39 @@ export const users = pgTable(
   ],
 );
 
+/**
+ * Stable public address for a human and their paired agent. Handles are
+ * immutable in v1 so links shared on personal sites remain durable.
+ */
+export const agentProfiles = pgTable(
+  "agent_profiles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    handle: text("handle").notNull(),
+    displayName: text("display_name"),
+    headline: text("headline"),
+    websiteUrl: text("website_url"),
+    isPublished: boolean("is_published").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("agent_profiles_user_id_uidx").on(t.userId),
+    uniqueIndex("agent_profiles_handle_uidx").on(sql`lower(${t.handle})`),
+    check(
+      "agent_profiles_handle_format_check",
+      sql`${t.handle} = lower(${t.handle}) and ${t.handle} ~ '^[a-z][a-z0-9-]{2,29}$'`,
+    ),
+  ],
+);
+
 export const apiKeys = pgTable(
   "api_keys",
   {
@@ -221,6 +254,8 @@ export const links = pgTable(
     publicInviteId: uuid("public_invite_id").references(() => publicInvites.id, {
       onDelete: "set null",
     }),
+    /** Stable profile handle used for an approval-gated public request. */
+    profileHandle: text("profile_handle"),
     /** When true, schedule_meeting waits for human confirms before booking. */
     confirmRequired: boolean("confirm_required").notNull().default(true),
     /** Optional IANA timezone for allowed_hours evaluation. */
@@ -241,9 +276,18 @@ export const links = pgTable(
     index("links_from_user_id_idx").on(t.fromUserId),
     index("links_to_user_id_idx").on(t.toUserId),
     index("links_public_invite_id_idx").on(t.publicInviteId),
+    index("links_profile_handle_idx").on(t.profileHandle),
     uniqueIndex("links_public_invite_user_uidx").on(
       t.publicInviteId,
       t.toUserId,
+    ),
+    uniqueIndex("links_profile_handle_user_uidx").on(
+      t.profileHandle,
+      t.toUserId,
+    ),
+    check(
+      "links_single_public_source_check",
+      sql`not (${t.publicInviteId} is not null and ${t.profileHandle} is not null)`,
     ),
   ],
 );
@@ -1036,6 +1080,7 @@ export const agentInbox = pgTable(
 );
 
 export type User = typeof users.$inferSelect;
+export type AgentProfile = typeof agentProfiles.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type PublicInvite = typeof publicInvites.$inferSelect;
 export type Link = typeof links.$inferSelect;

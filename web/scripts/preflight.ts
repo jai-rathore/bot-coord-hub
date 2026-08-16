@@ -3,6 +3,7 @@ import { eq, isNull } from "drizzle-orm";
 import { getDb } from "../src/db";
 import {
   agentPairings,
+  agentProfiles,
   agentCapabilities,
   apiKeys,
   calendarConnections,
@@ -160,9 +161,13 @@ async function main() {
           .from(publicInvites)
           .limit(1),
         db
-          .select({ publicInviteId: links.publicInviteId })
+          .select({
+            publicInviteId: links.publicInviteId,
+            profileHandle: links.profileHandle,
+          })
           .from(links)
           .limit(1),
+        db.select({ handle: agentProfiles.handle }).from(agentProfiles).limit(1),
         db
           .select({ id: purposeEnrollments.id })
           .from(purposeEnrollments)
@@ -186,7 +191,7 @@ async function main() {
         name: "Current schema",
         ok: true,
         detail:
-          "guest, pairing, invite, discovery, location, safety, and capability tables available",
+          "guest, pairing, invite, profile, discovery, location, safety, and capability tables available",
       });
     } catch (error) {
       checks.push({

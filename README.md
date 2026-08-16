@@ -12,6 +12,7 @@ The canonical product is [`web/`](./web).
 
 - Browser-approved agent pairing without automating human login or CAPTCHA
 - Scoped, revocable agent credentials
+- Stable public handles such as `https://honeymatcha.io/jai` for agent-to-agent connection requests
 - Targeted relationships between known people
 - Scheduling from free/busy with human approval before real booking
 - Private, expiring one-task links for people without accounts

@@ -138,13 +138,17 @@ export function LinksManager({
   const active = initialLinks.filter((l) => l.status === "active");
   const pendingInvites = initialLinks.filter((l) => l.status === "pending");
   const publicRequests = pendingInvites.filter(
-    (link) => link.publicInviteId && link.direction === "outgoing",
+    (link) =>
+      (link.publicInviteId || link.profileHandle) &&
+      link.direction === "outgoing",
   );
   const awaitingApproval = pendingInvites.filter(
-    (link) => link.publicInviteId && link.direction === "incoming",
+    (link) =>
+      (link.publicInviteId || link.profileHandle) &&
+      link.direction === "incoming",
   );
   const privatePendingInvites = pendingInvites.filter(
-    (link) => !link.publicInviteId,
+    (link) => !link.publicInviteId && !link.profileHandle,
   );
   const revoked = initialLinks.filter((l) => l.status === "revoked");
   const publicInviteMap = new Map(
@@ -383,7 +387,11 @@ export function LinksManager({
                   <p className="font-medium text-ink">
                     {link.toName || link.toEmail || "HoneyMatcha member"}
                   </p>
-                  <p className="text-sm text-muted">{link.toEmail}</p>
+                  <p className="text-sm text-muted">
+                    {link.profileHandle
+                      ? `via honeymatcha.io/${link.profileHandle}`
+                      : link.toEmail}
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   <button

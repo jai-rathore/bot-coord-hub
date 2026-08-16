@@ -1,7 +1,9 @@
 import { and, count, eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { AppNav } from "@/components/app-nav";
 import { getDb } from "@/db";
 import { confirms } from "@/db/schema";
+import { getProfileForUser } from "@/lib/agent-profiles";
 import { ensureCurrentUser } from "@/lib/users";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
@@ -14,6 +16,9 @@ export default async function AppLayout({
   let attentionCount = 0;
   try {
     const user = await ensureCurrentUser();
+    if (user && !(await getProfileForUser(user.id))) {
+      redirect("/setup");
+    }
     if (user) {
       const [row] = await getDb()
         .select({ count: count() })

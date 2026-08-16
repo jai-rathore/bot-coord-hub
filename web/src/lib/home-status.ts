@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull, notInArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
+  agentProfiles,
   apiKeys,
   calendarConnections,
   confirms,
@@ -26,7 +27,7 @@ export function isVisibleHomeTask(status: string) {
 
 export async function getHomeStatus(user: User) {
   const db = getDb();
-  const [keys, activeLinks, pendingConfirms, recentSessions, calendar] =
+  const [keys, activeLinks, pendingConfirms, recentSessions, calendar, profile] =
     await Promise.all([
       db
         .select({
@@ -74,6 +75,11 @@ export async function getHomeStatus(user: User) {
         .from(calendarConnections)
         .where(eq(calendarConnections.userId, user.id))
         .limit(1),
+      db
+        .select({ handle: agentProfiles.handle })
+        .from(agentProfiles)
+        .where(eq(agentProfiles.userId, user.id))
+        .limit(1),
     ]);
 
   const activeKey = keys.find((key) => key.lastUsedAt) ?? keys[0] ?? null;
@@ -85,6 +91,7 @@ export async function getHomeStatus(user: User) {
       lastUsedAt: activeKey?.lastUsedAt?.toISOString() ?? null,
     },
     calendarConnected: calendar.length > 0,
+    handle: profile[0]?.handle ?? null,
     peopleCount: activeLinks.length,
     attentionCount: pendingConfirms.length,
     recentTasks: recentSessions.map((session) => ({

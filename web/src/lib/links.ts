@@ -1,6 +1,7 @@
 import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
+  agentProfiles,
   links,
   publicInvites,
   users,
@@ -8,6 +9,7 @@ import {
   type Link,
   type User,
 } from "@/db/schema";
+import { deliverDiscoveryInbox } from "@/lib/agent-inbox";
 import { writeAudit } from "@/lib/audit";
 import {
   DEFAULT_LINK_SCOPES,
@@ -29,6 +31,7 @@ export type PublicLink = {
   toName: string | null;
   pairLinkId: string | null;
   publicInviteId: string | null;
+  profileHandle: string | null;
   confirmRequired: boolean;
   timezone: string | null;
   allowedHours: AllowedHours | null;
@@ -351,14 +354,14 @@ export async function approveConnectionRequest(opts: {
     }
     if (request.fromUserId !== opts.user.id) {
       throw Object.assign(
-        new Error("Only the public invite owner can approve this request"),
+        new Error("Only the owner can approve this request"),
         { status: 403 },
       );
     }
     if (
       request.status !== "pending" ||
-      !request.publicInviteId ||
-      !request.toUserId
+      !request.toUserId ||
+      (!request.publicInviteId && !request.profileHandle)
     ) {
       throw Object.assign(new Error("This request is no longer pending"), {
         status: 409,
@@ -369,22 +372,43 @@ export async function approveConnectionRequest(opts: {
         status: 410,
       });
     }
-    const [sourceInvite] = await tx
-      .select({ id: publicInvites.id })
-      .from(publicInvites)
-      .where(
-        and(
-          eq(publicInvites.id, request.publicInviteId),
-          eq(publicInvites.status, "active"),
-          gt(publicInvites.expiresAt, new Date()),
-        ),
-      )
-      .limit(1);
-    if (!sourceInvite) {
-      throw Object.assign(
-        new Error("The public invitation was revoked or expired"),
-        { status: 409 },
-      );
+    if (request.publicInviteId) {
+      const [sourceInvite] = await tx
+        .select({ id: publicInvites.id })
+        .from(publicInvites)
+        .where(
+          and(
+            eq(publicInvites.id, request.publicInviteId),
+            eq(publicInvites.status, "active"),
+            gt(publicInvites.expiresAt, new Date()),
+          ),
+        )
+        .limit(1);
+      if (!sourceInvite) {
+        throw Object.assign(
+          new Error("The public invitation was revoked or expired"),
+          { status: 409 },
+        );
+      }
+    }
+    if (request.profileHandle) {
+      const [sourceProfile] = await tx
+        .select({ id: agentProfiles.id })
+        .from(agentProfiles)
+        .where(
+          and(
+            eq(agentProfiles.userId, opts.user.id),
+            eq(agentProfiles.handle, request.profileHandle),
+            eq(agentProfiles.isPublished, true),
+          ),
+        )
+        .limit(1);
+      if (!sourceProfile) {
+        throw Object.assign(
+          new Error("This public agent page is no longer available"),
+          { status: 409 },
+        );
+      }
     }
 
     const [requester] = await tx
@@ -472,15 +496,30 @@ export async function approveConnectionRequest(opts: {
 
   await writeAudit({
     actorUserId: opts.user.id,
-    action: "public_invite.request_approved",
+    action: result.activated.profileHandle
+      ? "agent_profile.connection_approved"
+      : "public_invite.request_approved",
     entityType: "link",
     entityId: result.activated.id,
     metadata: {
       publicInviteId: result.activated.publicInviteId,
+      profileHandle: result.activated.profileHandle,
       requesterUserId: result.requester.id,
       pairLinkId: result.pair.id,
     },
   });
+  if (result.activated.profileHandle) {
+    await deliverDiscoveryInbox({
+      userId: result.requester.id,
+      kind: "profile.connection_approved",
+      summary: `${opts.user.name || "A HoneyMatcha member"} approved the agent connection.`,
+      body: {
+        handle: result.activated.profileHandle,
+        ownerUserId: opts.user.id,
+        linkId: result.activated.id,
+      },
+    });
+  }
   return {
     link: toPublicLink(result.activated, opts.user, opts.origin, result.requester),
     pair: toPublicLink(result.pair, opts.user, opts.origin, result.requester),
@@ -630,6 +669,7 @@ export async function getPendingInviteByCode(inviteCode: string) {
         eq(links.inviteCode, inviteCode),
         eq(links.status, "pending"),
         isNull(links.publicInviteId),
+        isNull(links.profileHandle),
         or(isNull(links.expiresAt), gt(links.expiresAt, new Date())),
       ),
     )
@@ -676,6 +716,7 @@ function toPublicLink(
     toName: link.toName,
     pairLinkId: link.pairLinkId,
     publicInviteId: link.publicInviteId,
+    profileHandle: link.profileHandle,
     confirmRequired: link.confirmRequired,
     timezone: link.timezone,
     allowedHours: link.allowedHours ?? null,
