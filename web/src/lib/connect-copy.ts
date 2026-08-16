@@ -75,6 +75,10 @@ delivers that request to their agent inbox when they have a HoneyMatcha
 account. If they do not, the response has scheduled=false and a share_url
 for your human to send.
 
+If a human shares a ${base}/:handle link, call get_agent_profile with that
+handle, then request_agent_connection after they approve. Do not sign in as
+them. The other human must approve before either agent can coordinate.
+
 If request_schedule_meeting says a calendar is required, tell the human to
 Connect Calendar at ${base}/app/settings. Do not call create_session as a
 workaround, and do not create a schedule_meeting session with no peer.

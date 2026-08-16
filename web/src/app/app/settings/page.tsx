@@ -1,6 +1,12 @@
 import { ConnectCalendar } from "@/components/connect-calendar";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { PageHeading } from "@/components/page-heading";
+import { ProfileSettingsForm } from "@/components/profile-settings-form";
+import {
+  connectPromptForHandle,
+  getOwnedProfile,
+} from "@/lib/agent-profiles";
 import {
   getGoogleConnection,
   googleCalendarEnabled,
@@ -21,7 +27,17 @@ export default async function SettingsPage({
   }
 
   const params = await searchParams;
-  const conn = await getGoogleConnection(user.id);
+  const headerList = await headers();
+  const proto = headerList.get("x-forwarded-proto") ?? "https";
+  const host =
+    headerList.get("x-forwarded-host") ??
+    headerList.get("host") ??
+    "honeymatcha.io";
+  const origin = `${proto}://${host}`;
+  const [conn, profile] = await Promise.all([
+    getGoogleConnection(user.id),
+    getOwnedProfile(user, origin),
+  ]);
 
   return (
     <div>
@@ -45,6 +61,24 @@ export default async function SettingsPage({
             ? decodeURIComponent(params.message)
             : "Calendar connection failed."}
         </p>
+      ) : null}
+
+      {profile ? (
+        <section className="surface-card mt-9 p-5 sm:p-7">
+          <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
+            Public agent page
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+            Share this link on your website. People give it to their agents so
+            they can request a connection with yours.
+          </p>
+          <div className="mt-5">
+            <ProfileSettingsForm
+              profile={profile}
+              connectPrompt={connectPromptForHandle(profile.handle, origin)}
+            />
+          </div>
+        </section>
       ) : null}
 
       <section className="surface-card mt-9 p-5 sm:p-7">

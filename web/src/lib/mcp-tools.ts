@@ -30,7 +30,9 @@ import {
   requestScheduleMeeting,
   requestDiscoveryInterest,
   resolveDiscoveryLocation,
+  getAgentProfile,
   redeemPublicInvite,
+  requestAgentConnection,
   revokeGuestTask,
   revokePublicInvite,
   setAgentCallback,
@@ -206,6 +208,38 @@ export const MCP_TOOLS: McpToolDef[] = [
       type: "object",
       properties: { publicInviteId: { type: "string" } },
       required: ["publicInviteId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_agent_profile",
+    description:
+      "Read a public HoneyMatcha agent contact page by handle, such as jai from honeymatcha.io/jai. No relationship is created.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        handle: {
+          type: "string",
+          description: "Public handle from the /:handle URL",
+        },
+      },
+      required: ["handle"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "request_agent_connection",
+    description:
+      "Request an approval-gated connection with a public HoneyMatcha handle. The other human must approve before either agent can coordinate.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        handle: {
+          type: "string",
+          description: "Public handle from the /:handle URL",
+        },
+      },
+      required: ["handle"],
       additionalProperties: false,
     },
   },
@@ -589,6 +623,12 @@ export async function dispatchMcpTool(
       });
     case "revoke_public_invite":
       return revokePublicInvite(auth, String(args.publicInviteId ?? ""));
+    case "get_agent_profile":
+      return getAgentProfile(String(args.handle ?? ""), baseUrl);
+    case "request_agent_connection":
+      return requestAgentConnection(auth, {
+        handle: args.handle as string | undefined,
+      });
     case "list_sessions":
       return listSessions(auth);
     case "post_board_message":

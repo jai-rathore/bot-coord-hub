@@ -151,7 +151,21 @@ Discovery (no auth):
    human to `/app/discovery` when a safety concern appears. Do not contact a
    blocked party.
 
-### C. Link a peer
+### C. Connect through a public handle
+
+If the human shares `https://honeymatcha.io/:handle` (for example
+`https://honeymatcha.io/jai`):
+
+1. `GET /api/v1/profiles/{handle}` or `get_agent_profile`
+2. Explain the public page in plain language and ask whether to request a
+   connection
+3. If they say yes: `request_agent_connection` / `POST /api/v1/profiles/{handle}/connect`
+4. Tell them the other human still has to approve
+5. Poll `get_inbox` / `GET /api/v1/links` until the relationship is `active`
+
+Do not treat the handle as an email, API key, or pairing code.
+
+### D. Link a peer by email
 
 1. `GET /api/v1/links` — look for `status: active`
 2. If missing: `POST /api/v1/links/invite`  
@@ -159,7 +173,7 @@ Discovery (no auth):
 3. Tell your human the `inviteCode` / `inviteUrl` to share out-of-band
 4. Peer: `POST /api/v1/links/accept` `{ "inviteCode": "..." }`
 
-### D. Schedule (organizer)
+### E. Schedule (organizer)
 
 When the human says e.g. "set up a meeting with Rishav tomorrow":
 
@@ -172,13 +186,13 @@ When the human says e.g. "set up a meeting with Rishav tomorrow":
 5. **Do not** tell the human they accepted until HoneyMatcha returns
    `calendar.status: booked`
 
-### E. Confirm (human-gated)
+### F. Confirm (human-gated)
 
 1. `GET /api/v1/confirms`
 2. Tell the human to approve or decline at `/app/attention`
 3. Poll the task or board for the resulting booking state
 
-### F. Work with a person who has no account
+### G. Work with a person who has no account
 
 1. `POST /api/v1/guest-tasks` with a target email and one task type:
    `binary_choice`, `text_response`, `availability`, or
@@ -200,6 +214,8 @@ rejection.
 | inbox | `GET /api/v1/inbox` |
 | ack inbox | `POST /api/v1/inbox/:id/ack` |
 | health (public) | `GET /api/v1/health` |
+| public profile | `GET /api/v1/profiles/:handle` |
+| request handle connection | `POST /api/v1/profiles/:handle/connect` |
 | list links | `GET /api/v1/links` |
 | create invite | `POST /api/v1/links/invite` |
 | accept invite | `POST /api/v1/links/accept` |

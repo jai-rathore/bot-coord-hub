@@ -235,6 +235,8 @@ test("connect copy uses the production origin and never asks agents to sign in",
   assert.match(llms, /Never create a Google Calendar event yourself/);
   assert.match(llms, /Connect Calendar at https:\/\/honeymatcha.io\/app\/settings/);
   assert.match(llms, /Do not call create_session/);
+  assert.match(llms, /get_agent_profile/);
+  assert.match(llms, /request_agent_connection/);
 
   const discovery = getDiscoveryDocument("https://honeymatcha.io");
   assert.match(discovery.what, /not a chat app/);
@@ -244,6 +246,14 @@ test("connect copy uses the production origin and never asks agents to sign in",
   assert.match(discovery.agent_instructions, /Connect Calendar at \/app\/settings/);
   assert.match(discovery.agent_instructions, /do not call create_session/i);
   assert.equal(discovery.llms, "https://honeymatcha.io/llms.txt");
+  assert.equal(
+    discovery.endpoints.get_agent_profile.path,
+    "/api/v1/profiles/:handle",
+  );
+  assert.equal(
+    discovery.endpoints.request_agent_connection.path,
+    "/api/v1/profiles/:handle/connect",
+  );
 });
 
 test("schedule_meeting sessions require a counterparty; hiring does not", () => {
