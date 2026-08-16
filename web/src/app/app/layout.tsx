@@ -31,7 +31,16 @@ export default async function AppLayout({
         );
       attentionCount = Number(row?.count ?? 0);
     }
-  } catch {
+  } catch (error) {
+    // redirect() throws; a bare catch would skip first-login handle setup.
+    if (
+      error &&
+      typeof error === "object" &&
+      "digest" in error &&
+      String((error as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")
+    ) {
+      throw error;
+    }
     // DB may be unavailable in local UI-only runs; pages that need DB surface errors.
   }
 
