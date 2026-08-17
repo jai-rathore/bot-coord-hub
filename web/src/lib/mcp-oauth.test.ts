@@ -7,6 +7,7 @@ import {
   getProtectedResourceMetadata,
   isAllowedRedirectUri,
   MCP_OAUTH_SCOPES,
+  mcpProtectedResourceMetadataUrl,
   verifyPkceS256,
 } from "./mcp-oauth";
 import { PAIRING_AGENT_SCOPES } from "./scopes";
@@ -16,7 +17,7 @@ test("MCP OAuth scopes never include approvals:write", () => {
   assert.deepEqual(MCP_OAUTH_SCOPES, PAIRING_AGENT_SCOPES);
 });
 
-test("redirect allowlist accepts Cursor cloud and desktop callbacks", () => {
+test("redirect allowlist accepts Cursor cloud, desktop loopback, and cursor:// fallback", () => {
   assert.equal(
     isAllowedRedirectUri("https://www.cursor.com/agents/mcp/oauth/callback"),
     true,
@@ -26,7 +27,15 @@ test("redirect allowlist accepts Cursor cloud and desktop callbacks", () => {
     true,
   );
   assert.equal(isAllowedRedirectUri("http://localhost:8787/callback"), true);
+  assert.equal(isAllowedRedirectUri("http://127.0.0.1:8787/callback"), true);
+  assert.equal(isAllowedRedirectUri("http://[::1]:8787/callback"), true);
+  assert.equal(isAllowedRedirectUri("http://127.0.0.1:9999/callback"), true);
+  assert.equal(
+    isAllowedRedirectUri("cursor://anysphere.cursor-mcp/oauth/callback"),
+    true,
+  );
   assert.equal(isAllowedRedirectUri("https://evil.example/callback"), false);
+  assert.equal(isAllowedRedirectUri("http://localhost:8787/other"), false);
   assert.ok(DEFAULT_REDIRECT_ALLOWLIST.length >= 2);
 });
 
@@ -55,4 +64,8 @@ test("authorization server and protected resource metadata point at OAuth routes
   assert.deepEqual(pr.authorization_servers, [issuer]);
   assert.ok(pr.scopes_supported.includes("tasks:write"));
   assert.equal(pr.scopes_supported.includes("approvals:write"), false);
+  assert.equal(
+    mcpProtectedResourceMetadataUrl(issuer),
+    `${issuer}/.well-known/oauth-protected-resource/api/mcp`,
+  );
 });

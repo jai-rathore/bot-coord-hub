@@ -243,8 +243,8 @@ async function main() {
   assert(unauthMcp.response.status === 401, "MCP without Bearer must 401");
   const wwwAuth = unauthMcp.response.headers.get("www-authenticate") ?? "";
   assert(
-    wwwAuth.includes("oauth-protected-resource"),
-    `expected resource_metadata challenge, got ${wwwAuth}`,
+    wwwAuth.includes("oauth-protected-resource/api/mcp"),
+    `expected path-appended resource_metadata, got ${wwwAuth}`,
   );
 
   const protectedResource = await jsonFetch(

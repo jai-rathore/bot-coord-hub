@@ -34,7 +34,31 @@ export const DEFAULT_REDIRECT_ALLOWLIST = [
   "https://www.cursor.com/agents/mcp/oauth/callback",
   "https://cursor.com/agents/mcp/oauth/callback",
   "http://localhost:8787/callback",
+  "http://127.0.0.1:8787/callback",
+  "http://[::1]:8787/callback",
+  "cursor://anysphere.cursor-mcp/oauth/callback",
 ] as const;
+
+const CURSOR_CUSTOM_SCHEME_CALLBACKS = [
+  "cursor://anysphere.cursor-mcp/oauth/callback",
+] as const;
+
+function isLoopbackOAuthCallback(uri: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(uri);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "http:") return false;
+  const host = url.hostname.toLowerCase();
+  if (host !== "localhost" && host !== "127.0.0.1" && host !== "::1") {
+    return false;
+  }
+  if (url.username || url.password) return false;
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+  return path === "/callback";
+}
 
 export const AGENT_SCOPE_COPY: Record<string, string> = {
   "profile:read": "Know which HoneyMatcha account it represents",
@@ -54,7 +78,7 @@ export const AGENT_SCOPE_COPY: Record<string, string> = {
 export function corsHeaders(): HeadersInit {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     "Access-Control-Allow-Headers":
       "Authorization, Content-Type, Mcp-Session-Id, MCP-Protocol-Version",
     "Access-Control-Expose-Headers": "Mcp-Session-Id, WWW-Authenticate",
@@ -90,7 +114,44 @@ export function redirectAllowlist(): string[] {
 }
 
 export function isAllowedRedirectUri(uri: string): boolean {
-  return redirectAllowlist().includes(uri);
+  if (redirectAllowlist().includes(uri)) return true;
+  if (
+    CURSOR_CUSTOM_SCHEME_CALLBACKS.some(
+      (callback) => uri === callback || uri.startsWith(`${callback}?`),
+    )
+  ) {
+    return true;
+  }
+  return isLoopbackOAuthCallback(uri);
+}
+
+export function mcpProtectedResourceMetadataUrl(issuer: string): string {
+  const base = issuer.replace(/\/$/, "");
+  return `${base}/.well-known/oauth-protected-resource/api/mcp`;
+}
+
+/** RFC 9728 + MCP-style Bearer challenge. Path-appended metadata matches Linear/Sentry. */
+export function mcpUnauthorized(issuer: string): Response {
+  const metadata = mcpProtectedResourceMetadataUrl(issuer);
+  const description = "Missing or invalid access token";
+  return jsonCors(
+    { error: "invalid_token", error_description: description },
+    401,
+    {
+      "Cache-Control": "no-store",
+      "WWW-Authenticate": `Bearer realm="OAuth", resource_metadata="${metadata}", error="invalid_token", error_description="${description}"`,
+    },
+  );
+}
+
+export function mcpMethodNotAllowed(allow = "POST, OPTIONS"): Response {
+  return new Response(null, {
+    status: 405,
+    headers: {
+      ...corsHeaders(),
+      Allow: allow,
+    },
+  });
 }
 
 export function hashOAuthSecret(value: string): string {
@@ -145,19 +206,18 @@ export async function registerOAuthClient(input: {
   redirectUris?: unknown;
   tokenEndpointAuthMethod?: unknown;
 }) {
-  const redirectUris = Array.isArray(input.redirectUris)
+  const requested = Array.isArray(input.redirectUris)
     ? input.redirectUris.filter((uri): uri is string => typeof uri === "string")
     : [];
-  if (!redirectUris.length) {
+  if (!requested.length) {
     throw new AgentApiError(400, "redirect_uris is required");
   }
-  for (const uri of redirectUris) {
-    if (!isAllowedRedirectUri(uri)) {
-      throw new AgentApiError(400, `redirect_uri is not allowed: ${uri}`, {
-        code: "invalid_redirect_uri",
-        allowed: redirectAllowlist(),
-      });
-    }
+  const redirectUris = [...new Set(requested.filter(isAllowedRedirectUri))];
+  if (!redirectUris.length) {
+    throw new AgentApiError(400, `redirect_uri is not allowed: ${requested[0]}`, {
+      code: "invalid_redirect_uri",
+      allowed: redirectAllowlist(),
+    });
   }
 
   const clientName =

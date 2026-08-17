@@ -1,10 +1,14 @@
 import { randomBytes } from "crypto";
+import { authenticateAgent } from "@/lib/agent-auth";
 import { PRODUCT_VERSION } from "@/lib/discovery";
-import { requireAgent } from "@/lib/http";
+import { requestBaseUrl } from "@/lib/http";
 import {
   corsHeaders,
   jsonCors,
+  mcpMethodNotAllowed,
+  mcpUnauthorized,
   optionsCors,
+  withCors,
 } from "@/lib/mcp-oauth";
 import {
   dispatchMcpTool,
@@ -12,6 +16,11 @@ import {
   mcpToolError,
   mcpToolResult,
 } from "@/lib/mcp-tools";
+import {
+  agentRateLimitKey,
+  rateLimit,
+  rateLimitedJson,
+} from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -57,12 +66,26 @@ function newSessionId(): string {
   return `hm_${randomBytes(16).toString("hex")}`;
 }
 
+function mcpAuth(request: Request) {
+  const rate = rateLimit(agentRateLimitKey(request));
+  if (!rate.ok) return withCors(rateLimitedJson(rate));
+  return null;
+}
+
+async function requireMcpAgent(request: Request) {
+  const limited = mcpAuth(request);
+  if (limited) return limited;
+  const auth = await authenticateAgent(request);
+  if (!auth) return mcpUnauthorized(requestBaseUrl(request));
+  return auth;
+}
+
 export async function OPTIONS() {
   return optionsCors();
 }
 
 /**
- * Streamable HTTP-compatible MCP JSON-RPC for remote agents (Grok Bot, Cursor).
+ * Streamable HTTP MCP JSON-RPC for remote agents (Grok Bot, Cursor).
  *
  * POST /api/mcp
  * Authorization: Bearer hm_...
@@ -70,17 +93,12 @@ export async function OPTIONS() {
  * Supported methods: initialize, tools/list, tools/call, ping
  * Also accepts { tool, arguments } shortcut for tools/call.
  *
- * Unauthenticated requests return 401 + WWW-Authenticate so MCP clients start OAuth.
+ * Unauthenticated POSTs return 401 + WWW-Authenticate so MCP clients start OAuth.
+ * GET with Accept: text/event-stream returns 405 — this server does not offer SSE.
  */
 export async function POST(request: Request) {
-  const auth = await requireAgent(request);
-  if (auth instanceof Response) {
-    const headers = new Headers(auth.headers);
-    for (const [key, value] of Object.entries(corsHeaders())) {
-      headers.set(key, value);
-    }
-    return new Response(auth.body, { status: auth.status, headers });
-  }
+  const auth = await requireMcpAgent(request);
+  if (auth instanceof Response) return auth;
 
   let body: JsonRpcRequest;
   try {
@@ -170,16 +188,19 @@ export async function POST(request: Request) {
   }
 }
 
-/** GET returns tool catalog (discovery helper). Auth required. */
+/**
+ * Streamable HTTP clients probe GET for an SSE notification stream.
+ * We do not offer one — 405 is the spec signal to continue with POST-only JSON.
+ * Other GET Accept types return the tool catalog (auth required).
+ */
 export async function GET(request: Request) {
-  const auth = await requireAgent(request);
-  if (auth instanceof Response) {
-    const headers = new Headers(auth.headers);
-    for (const [key, value] of Object.entries(corsHeaders())) {
-      headers.set(key, value);
-    }
-    return new Response(auth.body, { status: auth.status, headers });
+  const accept = (request.headers.get("accept") ?? "").toLowerCase();
+  if (accept.includes("text/event-stream")) {
+    return mcpMethodNotAllowed("POST, OPTIONS");
   }
+
+  const auth = await requireMcpAgent(request);
+  if (auth instanceof Response) return auth;
 
   return jsonCors({
     ok: true,
@@ -193,4 +214,9 @@ export async function GET(request: Request) {
       shortcut: 'POST { "tool":"list_intents","arguments":{} }',
     },
   });
+}
+
+/** Session teardown is optional; Streamable HTTP clients accept 405. */
+export async function DELETE() {
+  return mcpMethodNotAllowed("POST, GET, OPTIONS");
 }
