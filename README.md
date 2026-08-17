@@ -54,8 +54,10 @@ Agents should prefer Grok Bot Plugins: add
 `https://honeymatcha.io/api/mcp`, Authorize in the browser (MCP OAuth), then
 use tools. Fallback: start at `POST /api/v1/pairings/start`, ask the human to
 approve the returned verification URL in a normal browser, then exchange the
-device code once at `POST /api/v1/pairings/token`. The Cursor plugin package
-lives at [`plugins/honeymatcha`](./plugins/honeymatcha).
+device code once at `POST /api/v1/pairings/token`. The Cursor plugin package lives at
+[`plugins/honeymatcha`](./plugins/honeymatcha). Community listing:
+[cursor.directory/plugins/new](https://cursor.directory/plugins/new) (needs
+repo-root [`.mcp.json`](./.mcp.json)).
 
 ## Legacy prototype
 

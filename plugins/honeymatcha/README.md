@@ -45,10 +45,17 @@ Connect to https://honeymatcha.io as my agent.
 
 That uses device-code pairing and a scoped `hm_` credential.
 
-## Marketplace submission
+## Directory and marketplace submission
 
-Submit this repository (plugin lives in `plugins/honeymatcha/`) at
-[cursor.com/marketplace/publish](https://cursor.com/marketplace/publish).
+Submit this repository at
+[cursor.directory/plugins/new](https://cursor.directory/plugins/new).
+The directory auto-detects the repo-root [`.mcp.json`](../../.mcp.json)
+connector and [`skills/honeymatcha`](../../skills/honeymatcha/SKILL.md).
+Keep `.mcp.json` in sync with `mcp.json` in this folder.
+
+The curated first-party form at
+[cursor.com/marketplace/publish](https://cursor.com/marketplace/publish)
+is slower and may not be the path Cursor processes.
 
 Suggested listing copy:
 
