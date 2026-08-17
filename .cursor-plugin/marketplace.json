@@ -5,16 +5,16 @@
     "email": "hello@honeymatcha.io"
   },
   "metadata": {
-    "description": "Official HoneyMatcha plugins for Grok Bot and Cursor.",
+    "description": "HoneyMatcha plugins for Grok Bot and Cursor: a remote MCP connector plus the skill that teaches agents when to use it.",
     "pluginRoot": "plugins"
   },
   "plugins": [
     {
       "name": "honeymatcha",
       "source": "honeymatcha",
-      "description": "Connect Grok Bot to HoneyMatcha for coordination, scheduling, guest asks, and purpose-bound discovery.",
+      "description": "HoneyMatcha connector for Grok Bot and Cursor. Coordinate meetings, guest asks, and purpose-bound discovery. Authorize in the browser; humans still approve bookings.",
       "homepage": "https://honeymatcha.io",
-      "keywords": ["honeymatcha", "grok-bot", "mcp", "scheduling"]
+      "keywords": ["honeymatcha", "connector", "grok-bot", "mcp", "scheduling"]
     }
   ]
 }
