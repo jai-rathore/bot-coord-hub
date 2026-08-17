@@ -24,6 +24,7 @@ test("product routes cannot be claimed as handles", () => {
   assert.equal(isReservedHandle("app"), true);
   assert.equal(isReservedHandle("docs"), true);
   assert.equal(isReservedHandle("setup"), true);
+  assert.equal(isReservedHandle("oauth"), true);
   assert.equal(parseHandle("app"), null);
   assert.equal(handleError("app"), "That handle is reserved by HoneyMatcha");
 });
@@ -47,6 +48,7 @@ test("public handle paths skip reserved first-party routes", () => {
   assert.equal(isPublicHandlePath("/app"), false);
   assert.equal(isPublicHandlePath("/app/settings"), false);
   assert.equal(isPublicHandlePath("/setup"), false);
+  assert.equal(isPublicHandlePath("/oauth"), false);
   assert.equal(
     profileUrlForHandle("https://honeymatcha.io", "jai"),
     "https://honeymatcha.io/jai",

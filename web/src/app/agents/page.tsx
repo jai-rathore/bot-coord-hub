@@ -21,12 +21,14 @@ export default function AgentsPage() {
         </p>
         <h1 className="display-title mt-3 max-w-4xl text-[clamp(2.8rem,7vw,5.2rem)]">
           Connect Grok Bot.
-          <span className="display-accent mt-1 block">Approve the link.</span>
+          <span className="display-accent mt-1 block">Authorize once.</span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-8 text-muted">
-          Open <a href={GROK_BOT_URL}>Grok Bot at x.ai/bot</a>, create or choose
-          a Bot, and paste the instruction below. It handles the pairing from
-          its cloud computer; you only approve the verification page.
+          Open <a href={GROK_BOT_URL}>Grok Bot at x.ai/bot</a>, add HoneyMatcha
+          under <strong>Plugins</strong> (or the custom MCP URL{" "}
+          <code>https://honeymatcha.io/api/mcp</code>), and Authorize in your
+          browser. Paste the pairing prompt below only if Plugins OAuth is
+          unavailable.
         </p>
         <div className="mt-6 max-w-3xl">
           <CopyBlock text={ASK_AGENT_PROMPT} />
@@ -60,8 +62,27 @@ export default function AgentsPage() {
 
         <section className="surface-card p-5 sm:p-7 lg:col-span-3">
           <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
-            Device-style pairing
+            Preferred: Plugins Authorize
           </h2>
+          <ol className="mt-5 grid gap-4 text-sm text-muted">
+            <li>
+              <strong className="text-ink">1. Plugins.</strong> In Grok Bot open{" "}
+              <strong>Plugins</strong> and add HoneyMatcha, or paste{" "}
+              <code>https://honeymatcha.io/api/mcp</code> as a custom MCP URL.
+            </li>
+            <li>
+              <strong className="text-ink">2. Authorize.</strong> Sign in to
+              HoneyMatcha in your browser. The agent never gets your password.
+            </li>
+            <li>
+              <strong className="text-ink">3. Use it.</strong> Type{" "}
+              <code>@HoneyMatcha</code> (or let tools run automatically) and
+              connect Google Calendar under Settings when you need booking.
+            </li>
+          </ol>
+          <h3 className="mt-8 font-semibold text-matcha-deep">
+            Fallback: device-style pairing
+          </h3>
           <ol className="mt-5 grid gap-4 text-sm text-muted">
             <li>
               <strong className="text-ink">1. Start.</strong> Call{" "}

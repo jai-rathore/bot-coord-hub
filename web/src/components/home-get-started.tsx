@@ -73,8 +73,8 @@ export function HomeGetStarted({
             Connect your Grok Bot
           </h3>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Open <a href={GROK_BOT_URL}>Grok Bot at x.ai/bot</a>, paste this
-            prompt into your Bot&apos;s conversation, then approve its secure
+            Open <a href={GROK_BOT_URL}>Grok Bot at x.ai/bot</a>, add HoneyMatcha
+            under Plugins and Authorize, or paste this prompt and approve the
             connection.
           </p>
           <div className="mt-3">

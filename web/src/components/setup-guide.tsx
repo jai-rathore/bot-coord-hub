@@ -87,9 +87,10 @@ export function SetupGuide({
           ) : (
             <>
               <p className="mt-3 text-sm leading-6 text-muted">
-                Open <a href={GROK_BOT_URL}>Grok Bot at x.ai/bot</a>, paste this
-                into your Bot&apos;s conversation, and approve the verification
-                link it returns.
+                Open <a href={GROK_BOT_URL}>Grok Bot at x.ai/bot</a>, add
+                HoneyMatcha under Plugins (custom MCP{" "}
+                <code>https://honeymatcha.io/api/mcp</code>) and Authorize, or
+                paste this prompt and approve the verification link.
               </p>
               <div className="mt-3">
                 <CopyBlock text={ASK_AGENT_PROMPT} />

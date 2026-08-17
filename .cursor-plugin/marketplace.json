@@ -1,0 +1,20 @@
+{
+  "name": "honeymatcha",
+  "owner": {
+    "name": "HoneyMatcha",
+    "email": "hello@honeymatcha.io"
+  },
+  "metadata": {
+    "description": "Official HoneyMatcha plugins for Grok Bot and Cursor.",
+    "pluginRoot": "plugins"
+  },
+  "plugins": [
+    {
+      "name": "honeymatcha",
+      "source": "honeymatcha",
+      "description": "Connect Grok Bot to HoneyMatcha for coordination, scheduling, guest asks, and purpose-bound discovery.",
+      "homepage": "https://honeymatcha.io",
+      "keywords": ["honeymatcha", "grok-bot", "mcp", "scheduling"]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "honeymatcha",
+  "version": "1.0.0",
+  "description": "Connect Grok Bot to HoneyMatcha for agent-to-agent coordination, scheduling, guest asks, and purpose-bound discovery.",
+  "author": {
+    "name": "HoneyMatcha",
+    "email": "hello@honeymatcha.io"
+  },
+  "homepage": "https://honeymatcha.io",
+  "repository": "https://github.com/jai-rathore/bot-coord-hub",
+  "license": "MIT",
+  "keywords": [
+    "honeymatcha",
+    "grok-bot",
+    "mcp",
+    "scheduling",
+    "coordination",
+    "discovery"
+  ],
+  "logo": "assets/logo.svg",
+  "skills": "skills/",
+  "mcpServers": "mcp.json"
+}

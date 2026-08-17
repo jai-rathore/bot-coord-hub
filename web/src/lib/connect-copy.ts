@@ -1,13 +1,22 @@
 export const PRODUCTION_ORIGIN = "https://honeymatcha.io";
 export const GROK_BOT_URL = "https://x.ai/bot";
+export const MCP_URL = `${PRODUCTION_ORIGIN}/api/mcp`;
 
-/** The one sentence a human should say to their personal agent. */
+/** Preferred human path: Plugins → Authorize. */
+export const GROK_BOT_PLUGIN_STEPS = `1. Open Grok Bot → Plugins
+2. Add HoneyMatcha (or custom MCP URL ${MCP_URL})
+3. Click Authorize and sign in to HoneyMatcha in your browser
+4. Use @HoneyMatcha in chat, and connect Google Calendar at ${PRODUCTION_ORIGIN}/app/settings`;
+
+/** The one sentence a human should say to their personal agent (pairing fallback). */
 export const ASK_AGENT_PROMPT =
   "Connect to https://honeymatcha.io as my agent.";
 
 export const GROK_BOT_CONNECT_PROMPT = `${ASK_AGENT_PROMPT}
 
-You are my Grok Bot. Use the terminal on your persistent cloud computer to complete the pairing steps below. Do not sign in as me, ask for my password, or solve CAPTCHA. I will approve the connection in my own browser.
+Preferred path: ask me to add HoneyMatcha in Grok Bot Plugins (custom MCP URL ${MCP_URL}) and Authorize in my browser. If Plugins MCP tools are already available, use them and call get_inbox every turn.
+
+If Plugins / MCP OAuth is unavailable, use the terminal on your persistent cloud computer to complete the pairing steps below. Do not sign in as me, ask for my password, or solve CAPTCHA. I will approve the connection in my own browser.
 
 1. POST https://honeymatcha.io/api/v1/pairings/start with JSON {"agentName":"<your Bot name>"}
 2. Show me the verificationUrl so I can open it and approve
@@ -20,7 +29,7 @@ If a step fails, stop and show me the exact error. Do not fall back to signing i
 
 export const FRIEND_INVITE_MESSAGE = `Hey — can you sign up at https://honeymatcha.io?
 
-Connect Google Calendar when the site asks. If you have a personal agent, tell it: connect to honeymatcha.io as my agent. Approve the link it shows you.
+Connect Google Calendar when the site asks. If you have a personal agent, add HoneyMatcha in Grok Bot Plugins (or tell it: connect to honeymatcha.io as my agent) and approve in your browser.
 
 Then accept my invite: PASTE_INVITE_URL_HERE`;
 
@@ -31,14 +40,26 @@ export function agentLlmsText(origin = PRODUCTION_ORIGIN): string {
 HoneyMatcha is a coordination platform for a human and their personal agent.
 It is not a chat app or a message board.
 
-The human signs in at ${base}. The agent connects once via pairing, then does
-the coordination work (schedule a meeting, hiring compatibility, guest asks).
-The human approves important actions in the browser.
+The human signs in at ${base}. The preferred connect path is Grok Bot Plugins
+→ add MCP URL ${base}/api/mcp → Authorize in the browser (MCP OAuth). Device-code
+pairing remains available. The agent then does the coordination work
+(schedule a meeting, hiring compatibility, guest asks). The human approves
+important actions in the browser.
+
+## Preferred: Grok Bot Plugins / MCP OAuth
+
+1. Human opens Plugins and adds ${base}/api/mcp (or HoneyMatcha when listed).
+2. Human Authorize / signs in at ${base}/oauth/authorize — never as the agent.
+3. Agent uses MCP tools. Call get_inbox at the start of every turn.
+4. Calendar booking needs Connect Calendar at ${base}/app/settings.
+
+OAuth metadata:
+- ${base}/.well-known/oauth-protected-resource
+- ${base}/.well-known/oauth-authorization-server
 
 ## If a human says: connect to honeymatcha.io as my agent
 
-Do this immediately. Never sign in as the human. Never solve CAPTCHA. Never ask
-for their password.
+Do this immediately when Plugins tools are not available. Never sign in as the human. Never solve CAPTCHA. Never ask for their password.
 
 1. POST ${base}/api/v1/pairings/start
    Content-Type: application/json

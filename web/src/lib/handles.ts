@@ -38,6 +38,7 @@ export const RESERVED_HANDLES = new Set([
   "login",
   "mcp",
   "me",
+  "oauth",
   "openapi",
   "people",
   "privacy",

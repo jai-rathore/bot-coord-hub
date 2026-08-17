@@ -11,6 +11,7 @@ export async function OPTIONS() {
   return optionsCors();
 }
 
+/** RFC 9728 path-appended metadata for resource https://host/api/mcp */
 export async function GET(request: Request) {
   const base = requestBaseUrl(request).replace(/\/$/, "");
   return jsonCors(getProtectedResourceMetadata(base), 200, {

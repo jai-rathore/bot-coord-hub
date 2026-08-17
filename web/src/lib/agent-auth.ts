@@ -60,7 +60,7 @@ export function unauthorizedJson(
       status: 401,
       headers: resourceMetadata
         ? {
-            "WWW-Authenticate": `Bearer resource_metadata="${resourceMetadata}"`,
+            "WWW-Authenticate": `Bearer error="invalid_token", resource_metadata="${resourceMetadata}"`,
           }
         : undefined,
     },

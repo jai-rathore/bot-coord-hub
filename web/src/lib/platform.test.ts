@@ -221,6 +221,8 @@ test("connect copy uses the production origin and never asks agents to sign in",
   assert.equal(GROK_BOT_URL, "https://x.ai/bot");
   assert.equal(ASK_AGENT_PROMPT, "Connect to https://honeymatcha.io as my agent.");
   assert.match(GROK_BOT_CONNECT_PROMPT, /Grok Bot/);
+  assert.match(GROK_BOT_CONNECT_PROMPT, /Plugins/);
+  assert.match(GROK_BOT_CONNECT_PROMPT, /honeymatcha\.io\/api\/mcp/);
   assert.match(GROK_BOT_CONNECT_PROMPT, /honeymatcha\.io\/api\/v1\/pairings\/start/);
   assert.match(GROK_BOT_CONNECT_PROMPT, /Do not sign in as me/);
   assert.match(FRIEND_INVITE_MESSAGE, /PASTE_INVITE_URL_HERE/);
@@ -229,6 +231,8 @@ test("connect copy uses the production origin and never asks agents to sign in",
 
   const llms = agentLlmsText();
   assert.match(llms, /not a chat app/i);
+  assert.match(llms, /Plugins/);
+  assert.match(llms, /oauth-authorization-server/);
   assert.match(llms, /pairings\/start/);
   assert.match(llms, /Never sign in as the human/);
   assert.match(llms, /get_inbox/);
@@ -240,11 +244,13 @@ test("connect copy uses the production origin and never asks agents to sign in",
 
   const discovery = getDiscoveryDocument("https://honeymatcha.io");
   assert.match(discovery.what, /not a chat app/);
-  assert.match(discovery.connect_as_agent, /start pairing immediately/);
+  assert.match(discovery.connect_as_agent, /Plugins Authorize|start pairing immediately/);
   assert.match(discovery.agent_instructions, /Never sign in as the human/);
   assert.match(discovery.agent_instructions, /get_inbox/);
   assert.match(discovery.agent_instructions, /Connect Calendar at \/app\/settings/);
   assert.match(discovery.agent_instructions, /do not call create_session/i);
+  assert.equal(discovery.auth.oauth?.authorize, "https://honeymatcha.io/oauth/authorize");
+  assert.equal(discovery.mcp.http, "https://honeymatcha.io/api/mcp");
   assert.equal(discovery.llms, "https://honeymatcha.io/llms.txt");
   assert.equal(
     discovery.endpoints.get_agent_profile.path,

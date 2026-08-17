@@ -2,19 +2,7 @@ import { Show, SignInButton } from "@clerk/nextjs";
 import { BrandLink } from "@/components/brand-link";
 import { PairingDecision } from "@/components/pairing-decision";
 import { getPairingForHuman } from "@/lib/agent-pairing";
-
-const SCOPE_COPY: Record<string, string> = {
-  "profile:read": "Know which HoneyMatcha account it represents",
-  "people:read": "See people you have connected",
-  "people:write": "Invite or remove people for you",
-  "tasks:read": "Read your coordination tasks",
-  "tasks:write": "Start tasks and handle the back-and-forth",
-  "approvals:read": "Tell you when something needs your attention",
-  "guest_tasks:read": "Read answers to private guest requests",
-  "guest_tasks:write": "Create private requests for people without accounts",
-  "intents:read": "See supported task types",
-  "intents:request": "Suggest a new task type",
-};
+import { AGENT_SCOPE_COPY } from "@/lib/mcp-oauth";
 
 export default async function ConnectAgentPage({
   params,
@@ -78,7 +66,7 @@ export default async function ConnectAgentPage({
                       <span aria-hidden="true" className="text-matcha">
                         ✓
                       </span>
-                      {SCOPE_COPY[scope] ?? scope}
+                      {AGENT_SCOPE_COPY[scope] ?? scope}
                     </li>
                   ))}
                 </ul>

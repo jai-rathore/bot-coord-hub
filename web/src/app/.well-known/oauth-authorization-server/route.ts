@@ -1,5 +1,5 @@
 import {
-  getProtectedResourceMetadata,
+  getAuthorizationServerMetadata,
   jsonCors,
   optionsCors,
 } from "@/lib/mcp-oauth";
@@ -13,7 +13,7 @@ export async function OPTIONS() {
 
 export async function GET(request: Request) {
   const base = requestBaseUrl(request).replace(/\/$/, "");
-  return jsonCors(getProtectedResourceMetadata(base), 200, {
+  return jsonCors(getAuthorizationServerMetadata(base), 200, {
     "Cache-Control": "public, max-age=300",
   });
 }

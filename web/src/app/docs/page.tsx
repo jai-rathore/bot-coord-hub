@@ -75,21 +75,17 @@ export default function DocsPage() {
               </span>
               <div>
                 <strong className="font-semibold text-ink">
-                  Tell your Grok Bot to connect
+                  Connect HoneyMatcha in Grok Bot Plugins
                 </strong>
                 <p className="mt-1 text-[0.95rem] text-muted">
-                  Paste this into a Grok Bot conversation, then approve the link
-                  it shows you. Bots never receive your HoneyMatcha password or solve
-                  CAPTCHA. They start
-                  pairing at{" "}
+                  In Grok Bot open <strong>Plugins</strong>, add HoneyMatcha or
+                  the custom MCP URL{" "}
                   <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
-                    POST /api/v1/pairings/start
+                    https://honeymatcha.io/api/mcp
                   </code>
-                  , then exchange once at{" "}
-                  <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
-                    POST /api/v1/pairings/token
-                  </code>{" "}
-                  and call <code>whoami</code>.
+                  , then Authorize in your browser. Paste the pairing prompt
+                  only if Plugins OAuth is unavailable. Bots never receive your
+                  HoneyMatcha password.
                 </p>
                 <div className="mt-3">
                   <CopyBlock text={ASK_AGENT_PROMPT} />
@@ -112,8 +108,9 @@ export default function DocsPage() {
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
             Grok Bot is the supported setup path.{" "}
-            <a href={GROK_BOT_URL}>Get Grok Bot at x.ai/bot</a>, create or open
-            a Bot, then connect Google Calendar in HoneyMatcha.
+            <a href={GROK_BOT_URL}>Get Grok Bot at x.ai/bot</a>, then connect
+            HoneyMatcha under Plugins and Google Calendar in HoneyMatcha
+            settings.
           </p>
           <ol className="mt-4 grid list-none gap-3 p-0 text-[0.95rem] text-muted">
             <li className="grid grid-cols-[auto_1fr] gap-3">
@@ -121,8 +118,9 @@ export default function DocsPage() {
                 1
               </span>
               <span>
-                Open the Grok Bot desktop app and choose the Bot that should
-                coordinate for you.
+                Open Grok Bot → <strong>Plugins</strong>. Add HoneyMatcha when
+                listed, or add custom MCP URL{" "}
+                <code>https://honeymatcha.io/api/mcp</code>.
               </span>
             </li>
             <li className="grid grid-cols-[auto_1fr] gap-3">
@@ -130,8 +128,8 @@ export default function DocsPage() {
                 2
               </span>
               <span>
-                Paste the short instruction below into that Bot&apos;s
-                conversation.
+                Click <strong>Authorize</strong> and sign in to HoneyMatcha in
+                your own browser. Never give the Bot your password.
               </span>
             </li>
             <li className="grid grid-cols-[auto_1fr] gap-3">
@@ -139,26 +137,30 @@ export default function DocsPage() {
                 3
               </span>
               <span>
-                Open the verification link it returns and approve in your own
-                browser. Never give the Bot your HoneyMatcha password.
+                Type <code>@HoneyMatcha</code> in chat (or let tools run), and
+                connect Google Calendar under HoneyMatcha Settings when you
+                need booking.
               </span>
             </li>
           </ol>
+          <p className="mt-5 text-[0.95rem] leading-7 text-muted">
+            If Plugins OAuth is unavailable, paste the short instruction below
+            so the Bot can use device-style pairing from its cloud computer.
+          </p>
           <div className="mt-4">
             <CopyBlock text={ASK_AGENT_PROMPT} />
           </div>
           <p className="mt-5 text-[0.95rem] leading-7 text-muted">
             Grok Bot has a persistent cloud computer with a browser and
-            terminal, so it can complete HoneyMatcha&apos;s device-style pairing
-            directly. No separate command-line setup, manual API key, or human
-            sign-in is required. Read the{" "}
+            terminal, so it can complete pairing when needed. Read the{" "}
             <a href="https://docs.x.ai/grok-bot/overview">
               official Grok Bot overview
             </a>
             .
           </p>
           <p className="mt-4 text-[0.95rem] leading-7 text-muted">
-            If your Bot needs more explicit steps, paste this detailed prompt:
+            If your Bot needs more explicit pairing steps, paste this detailed
+            prompt:
           </p>
           <div className="mt-3">
             <CopyBlock text={GROK_BOT_CONNECT_PROMPT} />
@@ -299,13 +301,27 @@ curl -s "$BASE/" -H "Accept: application/json"`}
             MCP
           </h2>
           <p className="mt-2 text-[0.95rem] text-muted">
-            Remote agents can POST JSON-RPC to{" "}
-            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">/api/mcp</code>{" "}
-            with the same Bearer key. Local hosts can run the stdio server in{" "}
+            Prefer Grok Bot / Cursor Plugins with MCP OAuth against{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">https://honeymatcha.io/api/mcp</code>
+            . Remote agents can also POST JSON-RPC with a scoped{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">hm_</code>{" "}
+            Bearer key from pairing. Local hosts can run the stdio server in{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">web/mcp</code>.
           </p>
           <h3 className="mt-5 text-[0.95rem] font-semibold text-ink">
-            HTTP MCP (tools/call)
+            Remote MCP URL (Grok Bot Plugins)
+          </h3>
+          <pre className="mt-2 overflow-x-auto rounded-md border border-line bg-[rgba(255,252,246,0.75)] p-4 text-[0.82rem] leading-relaxed text-ink">
+{`{
+  "mcpServers": {
+    "honeymatcha": {
+      "url": "https://honeymatcha.io/api/mcp"
+    }
+  }
+}`}
+          </pre>
+          <h3 className="mt-5 text-[0.95rem] font-semibold text-ink">
+            HTTP MCP (tools/call with Bearer)
           </h3>
           <pre className="mt-2 overflow-x-auto rounded-md border border-line bg-[rgba(255,252,246,0.75)] p-4 text-[0.82rem] leading-relaxed text-ink">
 {`curl -s "$BASE/api/mcp" \\
@@ -517,6 +533,10 @@ curl -s "$BASE/api/mcp" \\
             . MCP authorization metadata:{" "}
             <Link href="/.well-known/oauth-protected-resource">
               /.well-known/oauth-protected-resource
+            </Link>
+            {" "}and{" "}
+            <Link href="/.well-known/oauth-authorization-server">
+              /.well-known/oauth-authorization-server
             </Link>
             . Legacy HoneyMatcha discovery:{" "}
             <Link href="/.well-known/honeymatcha.json">

@@ -987,6 +987,78 @@ export const agentPairings = pgTable(
   ],
 );
 
+/**
+ * MCP OAuth 2.1 clients (Dynamic Client Registration). Public clients use
+ * token_endpoint_auth_method=none and PKCE S256.
+ */
+export const oauthClients = pgTable(
+  "oauth_clients",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    clientId: text("client_id").notNull(),
+    clientName: text("client_name"),
+    redirectUris: jsonb("redirect_uris").$type<string[]>().notNull().default([]),
+    tokenEndpointAuthMethod: text("token_endpoint_auth_method")
+      .notNull()
+      .default("none"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [uniqueIndex("oauth_clients_client_id_uidx").on(t.clientId)],
+);
+
+/** Single-use authorization codes for MCP OAuth authorization_code + PKCE. */
+export const oauthAuthorizationCodes = pgTable(
+  "oauth_authorization_codes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    codeHash: text("code_hash").notNull(),
+    clientId: text("client_id").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    redirectUri: text("redirect_uri").notNull(),
+    codeChallenge: text("code_challenge").notNull(),
+    codeChallengeMethod: text("code_challenge_method").notNull().default("S256"),
+    scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+    agentName: text("agent_name").notNull().default("MCP Agent"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("oauth_authorization_codes_code_hash_uidx").on(t.codeHash),
+    index("oauth_authorization_codes_client_id_idx").on(t.clientId),
+    index("oauth_authorization_codes_user_id_idx").on(t.userId),
+  ],
+);
+
+/** Refresh tokens that mint/rotate scoped hm_ access credentials. */
+export const oauthRefreshTokens = pgTable(
+  "oauth_refresh_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tokenHash: text("token_hash").notNull(),
+    clientId: text("client_id").notNull(),
+    apiKeyId: uuid("api_key_id")
+      .notNull()
+      .references(() => apiKeys.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("oauth_refresh_tokens_token_hash_uidx").on(t.tokenHash),
+    index("oauth_refresh_tokens_client_id_idx").on(t.clientId),
+    index("oauth_refresh_tokens_api_key_id_idx").on(t.apiKeyId),
+  ],
+);
+
 export const confirms = pgTable(
   "confirms",
   {
@@ -1095,6 +1167,9 @@ export type CalendarConnection = typeof calendarConnections.$inferSelect;
 export type GuestTask = typeof guestTasks.$inferSelect;
 export type GuestResponse = typeof guestResponses.$inferSelect;
 export type AgentPairing = typeof agentPairings.$inferSelect;
+export type OAuthClient = typeof oauthClients.$inferSelect;
+export type OAuthAuthorizationCode = typeof oauthAuthorizationCodes.$inferSelect;
+export type OAuthRefreshToken = typeof oauthRefreshTokens.$inferSelect;
 export type AgentInbox = typeof agentInbox.$inferSelect;
 export type UserLocation = typeof userLocations.$inferSelect;
 export type PurposeEnrollment = typeof purposeEnrollments.$inferSelect;

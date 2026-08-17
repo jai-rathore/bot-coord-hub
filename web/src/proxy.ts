@@ -58,7 +58,8 @@ export default clerkMiddleware(async (auth, req) => {
   if (
     req.nextUrl.pathname === "/app" ||
     req.nextUrl.pathname.startsWith("/app/") ||
-    req.nextUrl.pathname === "/setup"
+    req.nextUrl.pathname === "/setup" ||
+    req.nextUrl.pathname === "/oauth/authorize"
   ) {
     await auth.protect();
   }

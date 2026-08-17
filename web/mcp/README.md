@@ -39,14 +39,21 @@ node web/mcp/server.mjs
 
 ## Remote HTTP MCP
 
-If you do not want a local process, POST JSON-RPC to:
+Prefer Grok Bot / Cursor Plugins with MCP OAuth:
+
+```
+https://honeymatcha.io/api/mcp
+```
+
+Authorize in the browser (no manual key). Device-code pairing still works: after
+you have an `hm_...` credential, POST JSON-RPC to:
 
 ```
 POST {BASE}/api/mcp
 Authorization: Bearer hm_...
 ```
 
-See `/docs` on the website for curl examples.
+See `/docs` on the website for curl examples. Plugin package: `plugins/honeymatcha/`.
 
 ## Tools
 

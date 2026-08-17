@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { randomBytes, randomUUID } from "crypto";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import postgres from "postgres";
 
 const base = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000";
@@ -236,6 +236,107 @@ async function main() {
   });
   assert(a2a.response.ok && a2a.data.result?.message, JSON.stringify(a2a.data));
 
+  const unauthMcp = await jsonFetch("/api/mcp", {
+    method: "POST",
+    body: { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
+  });
+  assert(unauthMcp.response.status === 401, "MCP without Bearer must 401");
+  const wwwAuth = unauthMcp.response.headers.get("www-authenticate") ?? "";
+  assert(
+    wwwAuth.includes("oauth-protected-resource"),
+    `expected resource_metadata challenge, got ${wwwAuth}`,
+  );
+
+  const protectedResource = await jsonFetch(
+    "/.well-known/oauth-protected-resource",
+  );
+  assert(protectedResource.response.ok, JSON.stringify(protectedResource.data));
+  assert(
+    Array.isArray(protectedResource.data.authorization_servers) &&
+      protectedResource.data.authorization_servers.length > 0,
+    "authorization_servers must be set for MCP OAuth",
+  );
+
+  const asMeta = await jsonFetch("/.well-known/oauth-authorization-server");
+  assert(asMeta.response.ok, JSON.stringify(asMeta.data));
+  assert(asMeta.data.token_endpoint?.includes("/oauth/token"));
+
+  const codeVerifier = randomBytes(32).toString("base64url");
+  const codeChallenge = createHash("sha256")
+    .update(codeVerifier)
+    .digest("base64url");
+  const redirectUri = "https://www.cursor.com/agents/mcp/oauth/callback";
+
+  const registered = await jsonFetch("/oauth/register", {
+    method: "POST",
+    body: {
+      client_name: "Platform Test MCP",
+      redirect_uris: [redirectUri],
+      token_endpoint_auth_method: "none",
+    },
+  });
+  assert(registered.response.status === 201, JSON.stringify(registered.data));
+  const clientId = registered.data.client_id;
+  assert(String(clientId).startsWith("hmc_"), "DCR must return hmc_ client_id");
+
+  const rejected = await jsonFetch("/oauth/register", {
+    method: "POST",
+    body: {
+      client_name: "Evil",
+      redirect_uris: ["https://evil.example/callback"],
+    },
+  });
+  assert(rejected.response.status === 400, "non-allowlisted redirect must fail");
+
+  const authCode = `hac_${randomBytes(24).toString("base64url")}`;
+  const codeHash = createHash("sha256").update(authCode).digest("hex");
+  await sql`
+    insert into oauth_authorization_codes (
+      code_hash, client_id, user_id, redirect_uri, code_challenge,
+      code_challenge_method, scopes, agent_name, expires_at
+    ) values (
+      ${codeHash},
+      ${clientId},
+      ${user.id},
+      ${redirectUri},
+      ${codeChallenge},
+      ${"S256"},
+      ${sql.json(["profile:read", "tasks:read", "tasks:write", "people:read", "people:write", "approvals:read", "guest_tasks:read", "guest_tasks:write", "intents:read", "intents:request", "discovery:read", "discovery:write"])},
+      ${"Platform OAuth Agent"},
+      ${new Date(Date.now() + 10 * 60 * 1000)}
+    )
+  `;
+
+  const tokenRes = await jsonFetch("/oauth/token", {
+    method: "POST",
+    body: {
+      grant_type: "authorization_code",
+      code: authCode,
+      redirect_uri: redirectUri,
+      client_id: clientId,
+      code_verifier: codeVerifier,
+    },
+  });
+  assert(tokenRes.response.ok, JSON.stringify(tokenRes.data));
+  const oauthToken = tokenRes.data.access_token;
+  assert(String(oauthToken).startsWith("hm_"), "OAuth must mint hm_ access token");
+  assert(
+    !String(tokenRes.data.scope ?? "").includes("approvals:write"),
+    "OAuth scopes must exclude approvals:write",
+  );
+
+  const mcpList = await jsonFetch("/api/mcp", {
+    method: "POST",
+    bearer: oauthToken,
+    body: { jsonrpc: "2.0", id: 2, method: "tools/list" },
+  });
+  assert(mcpList.response.ok, JSON.stringify(mcpList.data));
+  assert(
+    Array.isArray(mcpList.data.result?.tools) &&
+      mcpList.data.result.tools.some((t) => t.name === "get_inbox"),
+    "OAuth token must list MCP tools including get_inbox",
+  );
+
   console.log(
     JSON.stringify(
       {
@@ -245,6 +346,7 @@ async function main() {
         guestResponses: organizerRead.data.responses.length,
         hiringCompatibility: publicMatch.verdict,
         a2a: "SendMessage completed",
+        mcpOAuth: "DCR + PKCE token + tools/list",
       },
       null,
       2,
