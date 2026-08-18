@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
-import { CopyBlock } from "@/components/copy-block";
 import { HomeLivePreview } from "@/components/home-live-preview";
-import { ASK_AGENT_PROMPT, GROK_BOT_URL } from "@/lib/connect-copy";
 
 function SignedInHero({
   firstName,
@@ -35,17 +33,18 @@ function SignedInHero({
 function SignedOutHero() {
   return (
     <>
-      <p className="animate-rise-delay-1 mt-6 max-w-[24ch] font-[family-name:var(--font-fraunces)] text-[clamp(1.4rem,3.4vw,1.9rem)] font-semibold leading-[1.25] tracking-[-0.02em] text-ink">
-        Give your Grok Bot the next plan.
+      <p className="animate-rise-delay-1 mt-6 max-w-[26ch] font-[family-name:var(--font-fraunces)] text-[clamp(1.35rem,3.4vw,1.85rem)] font-semibold leading-[1.25] tracking-[-0.02em] text-ink">
+        Pick a time with ten people. Or one. Or someone you haven&apos;t met.
       </p>
-      <p className="animate-rise-delay-2 mt-3 max-w-[47ch] text-[1.05rem] leading-7 text-muted sm:text-[1.1rem]">
-        It schedules, invites, and coordinates across people and calendars.
-        You only show up when something needs a yes.
+      <p className="animate-rise-delay-2 mt-3 max-w-[48ch] text-[1.05rem] leading-7 text-muted sm:text-[1.1rem]">
+        Share one link and HoneyMatcha settles it on a deadline instead of
+        waiting for everyone. Connect an agent and it does the back-and-forth
+        for you. Either way, nothing is booked until you say yes.
       </p>
       <div className="animate-rise-delay-3 mt-8 flex flex-wrap gap-3">
         <SignUpButton mode="redirect">
           <button type="button" className="button-primary min-h-12 cursor-pointer px-5">
-            Get started
+            Create an event
           </button>
         </SignUpButton>
         <SignInButton mode="redirect">
@@ -57,17 +56,16 @@ function SignedOutHero() {
           </button>
         </SignInButton>
       </div>
-      <div className="animate-rise-delay-3 mt-8 max-w-[46ch]">
-        <p className="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold tracking-[0.08em] text-matcha uppercase">
-          <span className="h-px w-5 bg-matcha-soft" />
-          After you sign up, open{" "}
-          <a href={GROK_BOT_URL} className="underline">
-            Grok Bot
-          </a>{" "}
-          and paste:
-        </p>
-        <CopyBlock text={ASK_AGENT_PROMPT} />
-      </div>
+      <p className="animate-rise-delay-3 mt-3 text-sm text-muted">
+        Free while we&apos;re in beta. No agent required.
+      </p>
+      <p className="animate-rise-delay-3 mt-6 text-sm text-muted">
+        Already have an agent?{" "}
+        <a href="#get-started" className="font-semibold text-matcha-deep">
+          Connect it in two steps
+        </a>
+        .
+      </p>
     </>
   );
 }
@@ -88,9 +86,9 @@ export function HomeHero({
           <span className="live-dot animate-pulse-live" />
           You keep the yes
         </div>
-        <h1 className="display-title animate-rise mt-5 text-[clamp(3.35rem,8.6vw,6.1rem)]">
-          Let your Bot
-          <span className="display-accent mt-1 block">take it from here.</span>
+        <h1 className="display-title animate-rise mt-5 text-[clamp(2.9rem,7.6vw,5.4rem)]">
+          Sort it out
+          <span className="display-accent mt-1 block">without the group chat.</span>
         </h1>
         {signedIn ? (
           <SignedInHero firstName={firstName} setupComplete={setupComplete} />

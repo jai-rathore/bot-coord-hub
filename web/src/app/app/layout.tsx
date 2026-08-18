@@ -5,6 +5,7 @@ import { getDb } from "@/db";
 import { confirms } from "@/db/schema";
 import { getProfileForUser } from "@/lib/agent-profiles";
 import { ensureCurrentUser } from "@/lib/users";
+import { getHomeStatus } from "@/lib/home-status";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
 export default async function AppLayout({
@@ -14,6 +15,7 @@ export default async function AppLayout({
 }) {
   // Sync Clerk user into Postgres on first /app visit.
   let attentionCount = 0;
+  let agentConnected = false;
   try {
     const user = await ensureCurrentUser();
     if (user && !(await getProfileForUser(user.id))) {
@@ -30,6 +32,7 @@ export default async function AppLayout({
           ),
         );
       attentionCount = Number(row?.count ?? 0);
+      agentConnected = (await getHomeStatus(user)).agent.connected;
     }
   } catch (error) {
     // redirect() throws; a bare catch would skip first-login handle setup.
@@ -49,6 +52,7 @@ export default async function AppLayout({
       <AppNav
         attentionCount={attentionCount}
         discoveryEnabled={discoveryFeatureEnabled()}
+        agentConnected={agentConnected}
       />
       <main className="mx-auto w-full max-w-[72rem] flex-1 px-5 py-8 sm:px-6 sm:py-12">
         {children}
