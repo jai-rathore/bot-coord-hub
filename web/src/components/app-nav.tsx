@@ -94,8 +94,8 @@ function NavLink({
   return (
     <Link
       href={item.href}
-      title={item.hint}
       aria-current={active ? "page" : undefined}
+      aria-describedby={`nav-hint-${item.href.replace(/\//g, "-")}`}
       className={`flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-sm no-underline transition ${
         active
           ? "bg-matcha-deep text-white shadow-[0_6px_16px_rgba(23,63,46,0.16)] hover:text-white"
@@ -104,6 +104,12 @@ function NavLink({
     >
       <NavIcon href={item.href} />
       {item.label}
+      <span
+        id={`nav-hint-${item.href.replace(/\//g, "-")}`}
+        className="sr-only"
+      >
+        {item.hint}
+      </span>
       {badge ? (
         <span
           className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[0.65rem] font-bold ${
