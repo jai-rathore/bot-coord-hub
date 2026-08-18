@@ -96,7 +96,8 @@ export function EventClient({
   const [draft, setDraft] = useState<Record<string, EventPref>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  /** Which copy action just fired, so only that button says "Copied". */
+  const [copied, setCopied] = useState<"link" | "status" | null>(null);
   const [showQr, setShowQr] = useState(false);
 
   const slug = board.event.shareSlug;
@@ -171,12 +172,15 @@ export function EventClient({
     await post("/controls", { action, ...extra });
   }
 
-  async function copyStatus() {
-    const text = `${board.event.title} — ${board.summary} ${shareUrl}`;
+  async function copyToClipboard(kind: "link" | "status") {
+    const text =
+      kind === "link"
+        ? shareUrl
+        : `${board.event.title} — ${board.summary} ${shareUrl}`;
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2200);
+      setCopied(kind);
+      setTimeout(() => setCopied(null), 2200);
     } catch {
       setError("Could not copy. Select the link and copy it manually.");
     }
@@ -231,12 +235,22 @@ export function EventClient({
           {isOrganizer && (
             <>
               <div className="mt-5 flex flex-wrap gap-2">
+                {/* Plain link first: pasting into a chat that unfurls its own
+                    preview is the common case, and the status line duplicates
+                    what the preview already says. */}
                 <button
                   type="button"
-                  onClick={copyStatus}
+                  onClick={() => void copyToClipboard("link")}
                   className="button-secondary"
                 >
-                  {copied ? "Copied" : "Copy status + link"}
+                  {copied === "link" ? "Copied" : "Copy link"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void copyToClipboard("status")}
+                  className="button-secondary"
+                >
+                  {copied === "status" ? "Copied" : "Copy status + link"}
                 </button>
                 <button
                   type="button"
