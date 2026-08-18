@@ -22,6 +22,7 @@ import {
 } from "./events/context";
 import { projectBoard, type BoardSource } from "./events/board";
 import { renderTemplate } from "./events/notify";
+import { getMcpTools } from "./mcp-tools";
 
 /* ------------------------------------------------------------------ */
 /* guardrails — defence in depth                                       */
@@ -372,4 +373,84 @@ test("every template renders a subject, a body, and the event link", () => {
     assert.ok(rendered.subject.length > 0, template);
     assert.ok(rendered.body.includes(url), `${template} must link the event`);
   }
+});
+
+/* ------------------------------------------------------------------ */
+/* the remote tool catalog                                             */
+/* ------------------------------------------------------------------ */
+
+/** Both halves of an event, as an outside agent sees them over MCP. */
+const EVENT_TOOLS = [
+  "create_event",
+  "list_events",
+  "get_event_board",
+  "join_event",
+  "respond_to_event",
+  "suggest_event_option",
+  "add_event_option",
+  "extend_event_deadline",
+  "nudge_event_participants",
+  "record_meeting",
+];
+
+function withEventsEnabled<T>(enabled: boolean, run: () => T): T {
+  const previous = process.env.ENABLE_EVENTS;
+  process.env.ENABLE_EVENTS = enabled ? "true" : "false";
+  try {
+    return run();
+  } finally {
+    if (previous === undefined) delete process.env.ENABLE_EVENTS;
+    else process.env.ENABLE_EVENTS = previous;
+  }
+}
+
+test("an agent can take part in an event, not just organize one", () => {
+  const names = withEventsEnabled(true, () =>
+    getMcpTools().map((tool) => tool.name),
+  );
+  for (const name of EVENT_TOOLS) {
+    assert.ok(names.includes(name), `${name} is missing from the catalog`);
+  }
+});
+
+test("every event tool disappears when the feature is off", () => {
+  const names = withEventsEnabled(false, () =>
+    getMcpTools().map((tool) => tool.name),
+  );
+  for (const name of EVENT_TOOLS) {
+    assert.equal(
+      names.includes(name),
+      false,
+      `${name} is still advertised with events disabled`,
+    );
+  }
+  // The rest of the surface is untouched.
+  assert.ok(names.includes("whoami"));
+  assert.ok(names.includes("get_inbox"));
+});
+
+test("no tool is advertised for an action only a human may take", () => {
+  const names = withEventsEnabled(true, () =>
+    getMcpTools().map((tool) => tool.name),
+  );
+  for (const action of HUMAN_ONLY_ACTIONS) {
+    assert.equal(
+      names.includes(action),
+      false,
+      `${action} must stay the human's own button`,
+    );
+  }
+  for (const forbidden of ["lock_event", "cancel_event", "confirm_event"]) {
+    assert.equal(names.includes(forbidden), false);
+  }
+});
+
+test("an event tool takes a link, not just an id", () => {
+  const board = withEventsEnabled(true, () =>
+    getMcpTools().find((tool) => tool.name === "get_event_board"),
+  );
+  const described = JSON.stringify(board?.inputSchema ?? {});
+  // A human pastes their agent a URL; the schema has to say that is allowed.
+  assert.match(described, /share slug/i);
+  assert.match(described, /link/i);
 });

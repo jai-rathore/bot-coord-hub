@@ -14,7 +14,11 @@ import {
   agentExtendEventDeadline,
   agentGetEventBoard,
   agentHumanOnlyEventAction,
+  agentJoinEvent,
   agentListEvents,
+  agentRecordMeeting,
+  agentRespondToEvent,
+  agentSuggestEventOption,
   agentNudgeEventParticipants,
 } from "@/lib/events/agent-api";
 import {
@@ -250,6 +254,33 @@ export const MCP_TOOLS: McpToolDef[] = [
         },
       },
       required: ["handle"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "record_meeting",
+    description:
+      "Your human just met someone in person and has their HoneyMatcha handle. Sends an approval-gated connection request and, unless intent is 'connect', opens a two-person event already seeded with candidate times so the plan does not evaporate. Ask your human which shape they want before calling.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        handle: {
+          type: "string",
+          description: "The other person's handle, e.g. \"jai\".",
+        },
+        intent: {
+          type: "string",
+          enum: ["coffee", "lunch", "drinks", "call", "connect"],
+          description:
+            "What to set up. 'connect' asks for the link only, with no times.",
+        },
+        timezone: {
+          type: "string",
+          description:
+            "IANA timezone the times should land in. Defaults to UTC — pass your human's.",
+        },
+      },
+      required: ["handle", "intent"],
       additionalProperties: false,
     },
   },
@@ -589,17 +620,103 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "get_event_board",
     description:
-      "Live status of one event: per-option tallies, who has answered, the leading option, quorum, and a plain-English summary you can relay verbatim.",
+      "Live status of one event: per-option tallies, who has answered, the leading option, quorum, and a plain-English summary you can relay verbatim. Takes an event id, a share slug, or the share link your human pasted you.",
     inputSchema: {
       type: "object",
-      properties: { eventId: { type: "string" } },
+      properties: {
+        eventId: {
+          type: "string",
+          description:
+            "Event id, share slug, or full /e/<slug> link — any of the three.",
+        },
+      },
       required: ["eventId"],
       additionalProperties: false,
     },
   },
   {
+    name: "join_event",
+    description:
+      "Join an event your human was given a link to, without answering yet. Returns the board. Use respond_to_event instead when you already know what works — it joins for you.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventId: {
+          type: "string",
+          description:
+            "Event id, share slug, or full /e/<slug> link — any of the three.",
+        },
+      },
+      required: ["eventId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "respond_to_event",
+    description:
+      "Answer an event for your human: mark each time yes/no/maybe and say whether they're coming. Joins the event if they haven't yet. Ask your human first — never guess their availability. Call get_event_board for the optionIds.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventId: {
+          type: "string",
+          description:
+            "Event id, share slug, or full /e/<slug> link — any of the three.",
+        },
+        entries: {
+          type: "array",
+          description: "One entry per option your human has an opinion on.",
+          items: {
+            type: "object",
+            properties: {
+              optionId: {
+                type: "string",
+                description: "From get_event_board.",
+              },
+              value: { type: "string", enum: ["yes", "no", "maybe"] },
+            },
+            required: ["optionId", "value"],
+          },
+        },
+        attendance: {
+          type: "string",
+          enum: ["yes", "no", "maybe"],
+          description:
+            "Overall answer. Inferred from entries when omitted; send it alone for a fixed-time RSVP.",
+        },
+      },
+      required: ["eventId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "suggest_event_option",
+    description:
+      "Suggest another time or place on an event your human takes part in. Capped per person, and the organizer can turn suggestions off.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventId: {
+          type: "string",
+          description:
+            "Event id, share slug, or full /e/<slug> link — any of the three.",
+        },
+        dimensionId: { type: "string", description: "From get_event_board." },
+        startsAt: { type: "string", description: "ISO 8601." },
+        endsAt: { type: "string", description: "ISO 8601." },
+        label: {
+          type: "string",
+          description: "For a place, or a name for the time.",
+        },
+      },
+      required: ["eventId", "dimensionId"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "add_event_option",
-    description: "Add another time or place to an event you organize.",
+    description:
+      "Add another time or place to an event you organize. Use suggest_event_option when your human is a participant instead.",
     inputSchema: {
       type: "object",
       properties: {
@@ -660,9 +777,13 @@ const EVENT_FLAGGED_TOOLS = new Set([
   "create_event",
   "list_events",
   "get_event_board",
+  "join_event",
+  "respond_to_event",
+  "suggest_event_option",
   "add_event_option",
   "extend_event_deadline",
   "nudge_event_participants",
+  "record_meeting",
 ]);
 
 export function getMcpTools(): McpToolDef[] {
@@ -752,6 +873,8 @@ export async function dispatchMcpTool(
       return requestAgentConnection(auth, {
         handle: args.handle as string | undefined,
       });
+    case "record_meeting":
+      return agentRecordMeeting(auth, args, baseUrl);
     case "list_sessions":
       return listSessions(auth);
     case "post_board_message":
@@ -852,9 +975,15 @@ export async function dispatchMcpTool(
     case "create_event":
       return agentCreateEvent(auth, args, baseUrl);
     case "list_events":
-      return agentListEvents(auth);
+      return agentListEvents(auth, baseUrl);
     case "get_event_board":
-      return agentGetEventBoard(auth, String(args.eventId ?? ""), baseUrl);
+      return agentGetEventBoard(auth, args.eventId, baseUrl);
+    case "join_event":
+      return agentJoinEvent(auth, args as never, baseUrl);
+    case "respond_to_event":
+      return agentRespondToEvent(auth, args as never, baseUrl);
+    case "suggest_event_option":
+      return agentSuggestEventOption(auth, args as never);
     case "add_event_option":
       return agentAddEventOption(auth, args as never);
     case "extend_event_deadline":

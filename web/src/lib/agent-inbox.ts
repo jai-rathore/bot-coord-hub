@@ -22,6 +22,8 @@ export type AgentNotifyResult = {
 export type InboxItem = {
   id: string;
   sessionId: string | null;
+  /** Set on event items; pass straight to get_event_board / respond_to_event. */
+  eventId: string | null;
   kind: string;
   summary: string;
   body: Record<string, unknown>;
@@ -99,6 +101,7 @@ export async function listInboxForUser(
   return rows.map((row) => ({
     id: row.id,
     sessionId: row.sessionId,
+    eventId: row.eventId,
     kind: row.kind,
     summary: row.summary,
     body: (row.body as Record<string, unknown>) ?? {},
@@ -125,6 +128,7 @@ export async function ackInboxItem(opts: {
   return {
     id: updated.id,
     sessionId: updated.sessionId,
+    eventId: updated.eventId,
     kind: updated.kind,
     summary: updated.summary,
     body: (updated.body as Record<string, unknown>) ?? {},
@@ -257,6 +261,50 @@ export async function deliverDiscoveryInbox(opts: {
   return { inboxId: created.id, callback };
 }
 
+/**
+ * Deliver one event notification to a human's agent.
+ *
+ * Events reach people by email through notification_outbox; this is the same
+ * fan-out for the agent side, so an agent learns about an invitation, a closing
+ * deadline, or a confirmed time by calling get_inbox — the contract the MCP
+ * initialize instructions promise.
+ *
+ * `dedupeKey` is the outbox's key, so a retried tick can never deliver twice.
+ * A row that already exists is a no-op and reports callback "none".
+ */
+export async function deliverEventInbox(opts: {
+  userId: string;
+  eventId: string;
+  kind: string;
+  summary: string;
+  body: Record<string, unknown>;
+  dedupeKey: string;
+}): Promise<{ inboxId: string | null; callback: "delivered" | "failed" | "none" }> {
+  const [created] = await getDb()
+    .insert(agentInbox)
+    .values({
+      userId: opts.userId,
+      eventId: opts.eventId,
+      kind: opts.kind,
+      summary: opts.summary,
+      body: opts.body,
+      dedupeKey: opts.dedupeKey,
+    })
+    .onConflictDoNothing({ target: agentInbox.dedupeKey })
+    .returning();
+  if (!created) return { inboxId: null, callback: "none" };
+
+  const callback = await postAgentCallbacks({
+    userId: opts.userId,
+    inboxId: created.id,
+    sessionId: null,
+    eventId: opts.eventId,
+    kind: opts.kind,
+    summary: opts.summary,
+  });
+  return { inboxId: created.id, callback };
+}
+
 export async function postDiscoveryInboxCallback(
   inboxId: string,
 ): Promise<"delivered" | "failed" | "none"> {
@@ -351,6 +399,7 @@ async function postAgentCallbacks(opts: {
   userId: string;
   inboxId: string;
   sessionId: string | null;
+  eventId?: string | null;
   kind: string;
   summary: string;
 }): Promise<"delivered" | "failed" | "none"> {
@@ -375,10 +424,12 @@ async function postAgentCallbacks(opts: {
     type: "agent_inbox",
     inboxId: opts.inboxId,
     sessionId: opts.sessionId,
+    eventId: opts.eventId ?? null,
     kind: opts.kind,
     summary: opts.summary,
-    instructions:
-      "Call get_inbox, then read_board for this session. Do not book a Google Calendar event yourself.",
+    instructions: opts.eventId
+      ? "Call get_inbox, then get_event_board for this eventId. Answer with respond_to_event once your human has told you what works. Do not lock, cancel, or book anything yourself."
+      : "Call get_inbox, then read_board for this session. Do not book a Google Calendar event yourself.",
   });
 
   let delivered = false;

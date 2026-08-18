@@ -90,9 +90,16 @@ export function getDiscoveryDocument(baseUrl?: string) {
         method: "POST",
         path: "/api/v1/profiles/:handle/connect",
       },
+      record_meeting: { method: "POST", path: "/api/v1/meet/:handle" },
       list_events: { method: "GET", path: "/api/v1/events" },
       create_event: { method: "POST", path: "/api/v1/events" },
       get_event_board: { method: "GET", path: "/api/v1/events/:id" },
+      join_event: { method: "POST", path: "/api/v1/events/:id/join" },
+      respond_to_event: { method: "POST", path: "/api/v1/events/:id/respond" },
+      suggest_event_option: {
+        method: "POST",
+        path: "/api/v1/events/:id/suggest-option",
+      },
       add_event_option: { method: "POST", path: "/api/v1/events/:id/options" },
       extend_event_deadline: {
         method: "POST",

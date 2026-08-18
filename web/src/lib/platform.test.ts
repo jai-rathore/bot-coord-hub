@@ -58,6 +58,15 @@ test("default paired agents cannot approve for a human", () => {
   );
 });
 
+test("a paired agent can take part in events out of the box", () => {
+  // Every key-minting path uses these two lists, so an event tool that is not
+  // reachable with them is not reachable at all.
+  for (const scopes of [DEFAULT_AGENT_SCOPES, PAIRING_AGENT_SCOPES]) {
+    assert.equal(scopes.includes("events:read"), true);
+    assert.equal(scopes.includes("events:write"), true);
+  }
+});
+
 test("relationship permissions reject unknown values", () => {
   assert.deepEqual(
     normalizeLinkScopes(["schedule_meeting", "unknown"]),

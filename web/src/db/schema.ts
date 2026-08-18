@@ -1137,9 +1137,17 @@ export const agentInbox = pgTable(
       () => discoveryInterests.id,
       { onDelete: "cascade" },
     ),
+    /** Set when the item is about an event, so an agent can act on it directly.
+     *  The cascade FK lives in the migration rather than here: `events` is
+     *  declared further down this module, so a thunk reference would be a TDZ
+     *  hazard at DDL-build time. */
+    eventId: uuid("event_id"),
     kind: text("kind").notNull(),
     summary: text("summary").notNull(),
     body: jsonb("body").$type<Record<string, unknown>>().notNull().default({}),
+    /** Optional idempotency key. Mirrors notification_outbox so a retried
+     *  fan-out cannot deliver the same item to an agent twice. */
+    dedupeKey: text("dedupe_key"),
     ackedAt: timestamp("acked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -1150,6 +1158,8 @@ export const agentInbox = pgTable(
     index("agent_inbox_user_unacked_idx").on(t.userId, t.ackedAt),
     index("agent_inbox_session_kind_idx").on(t.sessionId, t.kind),
     index("agent_inbox_discovery_interest_idx").on(t.discoveryInterestId),
+    index("agent_inbox_event_idx").on(t.eventId),
+    uniqueIndex("agent_inbox_dedupe_uidx").on(t.dedupeKey),
   ],
 );
 

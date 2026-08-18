@@ -363,6 +363,21 @@ export async function joinEvent(
     summary: `${displayName(user.name, user.email)} opened the event.`,
   });
 
+  // The organizer's agent should know the shape of the room is changing. Agent
+  // only — one email per person who opens a link would be noise. Imported
+  // lazily because notify.ts reads this module.
+  if (event.organizerUserId !== user.id) {
+    const { enqueueEventNotification } = await import("@/lib/events/notify");
+    await enqueueEventNotification({
+      eventId: event.id,
+      template: "participant_joined",
+      dedupeKey: `joined:${event.id}:${participant.id}`,
+      payload: { title: event.title },
+      toOrganizerOnly: true,
+      notifyHumans: false,
+    });
+  }
+
   return participant;
 }
 
