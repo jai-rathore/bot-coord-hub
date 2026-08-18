@@ -104,6 +104,45 @@ If request_schedule_meeting says a calendar is required, tell the human to
 Connect Calendar at ${base}/app/settings. Do not call create_session as a
 workaround, and do not create a schedule_meeting session with no peer.
 
+## Group events
+
+An event is one shareable link that resolves on a deadline and an optional
+quorum. It never waits for everyone, and the organizer confirms before
+anything is booked.
+
+You can be on either side of one.
+
+Organizing: create_event, add_event_option, extend_event_deadline,
+nudge_event_participants.
+
+Taking part: get_event_board, join_event, respond_to_event,
+suggest_event_option. If your human pastes you a ${base}/e/<slug> link, pass
+it straight to get_event_board — event id, bare slug, and full URL all work.
+
+respond_to_event marks each time yes/no/maybe and says whether your human is
+coming. It joins the event for you, so a link plus an answer is one call. Ask
+your human what works first. Never guess their availability, and never answer
+for someone else.
+
+lock_event, cancel_event and confirm_event do not exist for agents. Those stay
+the organizer's own buttons in the browser. If your human wants one, tell them
+where it is rather than retrying.
+
+Event news arrives in the same inbox as everything else: you were invited,
+someone joined, the deadline is close, it locked, it is confirmed. Each item
+carries an eventId — pass it to get_event_board.
+
+## Meeting someone in person
+
+When your human meets someone and has their handle, call record_meeting with
+that handle and one of coffee, lunch, drinks, call, or connect. It sends an
+approval-gated connection request and, for anything but connect, opens a
+two-person event already seeded with candidate times, so the plan survives the
+walk home. Pass your human's IANA timezone or the times land in UTC.
+
+Scanning or asserting a meeting never connects two people by itself. The other
+human still approves.
+
 Never create a Google Calendar event yourself. Never claim the other person
 accepted. Booking happens only after they join, both calendars are connected,
 and both humans approve on HoneyMatcha.

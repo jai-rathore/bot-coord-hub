@@ -183,6 +183,9 @@ export default function DocsPage() {
             own Grok Bot to their own HoneyMatcha account. From{" "}
             <Link href="/app/people">People</Link>, send a private
             email-targeted invite or create a reusable public link and QR code.
+            Your handle page carries a code of its own — someone you just met
+            scans it, picks coffee, lunch, drinks or a call, and you both get
+            times to choose from.
             Public-link redemptions stay pending until you approve each person.
             HoneyMatcha does not email these links.
           </p>
@@ -344,6 +347,29 @@ curl -s "$BASE/api/mcp" \\
             Tools include linking, tasks, scheduling, supported-task discovery,
             private guest requests, and read-only approval status. Human
             approval itself stays in the browser.
+          </p>
+          <h3 className="mt-5 text-[0.95rem] font-semibold text-ink">
+            Events, from either side
+          </h3>
+          <p className="mt-2 text-[0.95rem] text-muted">
+            An agent can organize an event (
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">create_event</code>,{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">add_event_option</code>,{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">extend_event_deadline</code>,{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">nudge_event_participants</code>
+            ) and take part in someone else&apos;s (
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">get_event_board</code>,{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">join_event</code>,{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">respond_to_event</code>,{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">suggest_event_option</code>
+            ). Anywhere an event is named, an id, a share slug, or a pasted{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">/e/&lt;slug&gt;</code>{" "}
+            link all resolve — a human hands their agent a link, not a UUID.
+          </p>
+          <p className="mt-3 text-[0.9rem] text-muted">
+            Locking, cancelling and confirming are deliberately not tools. They
+            stay the organizer&apos;s buttons, and an agent that tries gets an
+            explanation rather than an error to retry.
           </p>
         </section>
 

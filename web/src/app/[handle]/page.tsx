@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import { Show, SignInButton } from "@clerk/nextjs";
 import { BrandAtmosphere } from "@/components/brand-atmosphere";
 import { CopyBlock } from "@/components/copy-block";
+import { MeetCard } from "@/components/meet-card";
+import { MeetCode } from "@/components/meet-code";
 import { ProfileConnectForm } from "@/components/profile-connect-form";
 import { SiteHeader } from "@/components/site-header";
 import {
@@ -13,7 +15,9 @@ import {
   getPublicAgentProfile,
 } from "@/lib/agent-profiles";
 import { PRODUCTION_ORIGIN } from "@/lib/connect-copy";
+import { eventsFeatureEnabled } from "@/lib/events-feature";
 import { parseHandle } from "@/lib/handles";
+import { isMeetChoice, type MeetChoice } from "@/lib/meet-shapes";
 import { ensureCurrentUser } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
@@ -48,8 +52,10 @@ export async function generateMetadata({
 
 export default async function PublicAgentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ handle: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { handle: rawHandle } = await params;
   if (!parseHandle(rawHandle)) notFound();
@@ -63,13 +69,24 @@ export default async function PublicAgentPage({
   const owned = currentUser ? await getProfileForUser(currentUser.id) : null;
   const isOwner = owned?.handle === profile.handle;
 
+  // `?meet=1` is what the scanned code carries: same page, but it opens on the
+  // thing the person actually came here to do rather than on a bio.
+  const query = await searchParams;
+  const scanned = query.meet === "1" && !isOwner;
+  const carriedIntent: MeetChoice | null = isMeetChoice(query.intent)
+    ? query.intent
+    : null;
+  const meetEnabled = eventsFeatureEnabled();
+
   return (
     <div className="flex min-h-full flex-col">
       <div className="relative overflow-hidden border-b border-line/80 bg-[linear-gradient(150deg,rgba(250,252,249,0.98)_0%,rgba(237,244,238,0.96)_48%,rgba(249,242,223,0.94)_100%)]">
         <BrandAtmosphere />
         <SiteHeader showHowToStart={false} />
         <main className="relative z-0 mx-auto w-[min(40rem,calc(100%-2rem))] py-12 sm:py-16">
-          <p className="section-kicker">Public agent address</p>
+          <p className="section-kicker">
+            {scanned ? "Nice to meet you" : "Public agent address"}
+          </p>
           <h1 className="display-title mt-3 text-4xl sm:text-5xl">
             {profile.displayName}
           </h1>
@@ -80,12 +97,24 @@ export default async function PublicAgentPage({
             <p className="mt-5 text-lg leading-8 text-muted">
               {profile.headline}
             </p>
-          ) : (
+          ) : !scanned ? (
             <p className="mt-5 text-lg leading-8 text-muted">
               Give this link to your agent so it can request a connection with{" "}
               {profile.displayName}.
             </p>
-          )}
+          ) : null}
+
+          {/* Someone who scanned a code came to do one thing. It goes first. */}
+          {scanned && meetEnabled ? (
+            <div className="mt-8">
+              <MeetCard
+                handle={profile.handle}
+                displayName={profile.displayName}
+                signedIn={Boolean(currentUser)}
+                initialIntent={carriedIntent}
+              />
+            </div>
+          ) : null}
 
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
             <div className="surface-card p-4">
@@ -110,11 +139,34 @@ export default async function PublicAgentPage({
 
           <section className="surface-card mt-8 p-6 sm:p-7">
             {isOwner ? (
-              <p className="text-sm text-muted">
-                This is your public page. Share it, or manage it in{" "}
-                <Link href="/app/settings">Settings</Link>.
-              </p>
-            ) : (
+              <>
+                <p className="text-xs font-semibold tracking-[0.14em] text-matcha uppercase">
+                  Meeting someone
+                </p>
+                <h2 className="mt-2 font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
+                  Let them scan you
+                </h2>
+                <p className="mt-3 text-sm text-muted">
+                  One code, always the same, no app needed on their side. They
+                  point a camera at it and pick coffee, lunch, drinks, or a call
+                  — and you both get times to choose from before the evening is
+                  over.
+                </p>
+                {meetEnabled ? (
+                  <div className="mt-5">
+                    <MeetCode
+                      handle={profile.handle}
+                      displayName={profile.displayName}
+                      origin={origin}
+                    />
+                  </div>
+                ) : null}
+                <p className="mt-4 text-xs text-muted">
+                  This is your public page. Manage it in{" "}
+                  <Link href="/app/settings">Settings</Link>.
+                </p>
+              </>
+            ) : scanned && meetEnabled ? null : (
               <>
                 <Show when="signed-out">
                   <SignInButton mode="redirect" forceRedirectUrl={`/${profile.handle}`}>

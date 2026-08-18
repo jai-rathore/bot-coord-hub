@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { EventChat } from "@/components/event-chat";
+import { ShareQr } from "@/components/share-qr";
 import type { EventBoard, EventPref, OptionTally } from "@/lib/events/types";
 
 const CYCLE: Record<string, EventPref> = {
@@ -96,8 +97,14 @@ export function EventClient({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
 
   const slug = board.event.shareSlug;
+  // Only read on the client; the QR panel cannot open before hydration.
+  const shareUrl =
+    typeof window === "undefined"
+      ? `/e/${slug}`
+      : `${window.location.origin}/e/${slug}`;
   const isOrganizer = board.viewer.role === "organizer";
   const canRespond = board.viewer.canRespond;
 
@@ -165,8 +172,7 @@ export function EventClient({
   }
 
   async function copyStatus() {
-    const url = typeof window === "undefined" ? "" : window.location.origin;
-    const text = `${board.event.title} — ${board.summary} ${url}/e/${slug}`;
+    const text = `${board.event.title} — ${board.summary} ${shareUrl}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -223,15 +229,41 @@ export function EventClient({
           )}
 
           {isOrganizer && (
-            <div className="mt-5 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={copyStatus}
-                className="button-secondary"
-              >
-                {copied ? "Copied" : "Copy status + link"}
-              </button>
-            </div>
+            <>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={copyStatus}
+                  className="button-secondary"
+                >
+                  {copied ? "Copied" : "Copy status + link"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowQr((open) => !open)}
+                  className="button-secondary"
+                  aria-expanded={showQr}
+                >
+                  {showQr ? "Hide QR" : "Show QR"}
+                </button>
+              </div>
+              {/* For a room rather than a group chat: on a slide, a printed
+                  card, or a phone held out at the table. */}
+              {showQr && (
+                <div className="mt-4 flex flex-wrap items-center gap-4">
+                  <ShareQr
+                    url={shareUrl}
+                    alt={`QR code for ${board.event.title}`}
+                    downloadName={`honeymatcha-${slug}.png`}
+                    size={176}
+                  />
+                  <p className="max-w-xs text-xs text-muted">
+                    Anyone can scan this to see the event. Responding still
+                    needs a sign-in, and you confirm before anything is booked.
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </header>

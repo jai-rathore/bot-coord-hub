@@ -17,6 +17,7 @@ import {
   notificationOutbox,
   users,
 } from "@/db/schema";
+import { deliverEventInbox } from "@/lib/agent-inbox";
 
 const FROM = process.env.EVENT_EMAIL_FROM || "HoneyMatcha <no-reply@honeymatcha.io>";
 
@@ -41,23 +42,73 @@ export type EnqueueInput = {
   toAllParticipants?: boolean;
   toOrganizerOnly?: boolean;
   scheduledFor?: Date;
+  /** Set false for mail that would be noise in an agent's inbox. */
+  notifyAgents?: boolean;
+  /** Set false for signals only an agent should act on, never an inbox full of mail. */
+  notifyHumans?: boolean;
 };
 
-/** Returns true when a new row was queued (false when deduped). */
+/**
+ * One-line summary for the agent copy of a notification.
+ *
+ * Deliberately terser than the email: an agent relays or acts on this, it does
+ * not read it as prose. Never includes another participant's name — the board
+ * projection decides what a viewer may see, and this bypasses it.
+ */
+function agentSummary(
+  template: string,
+  payload: Record<string, unknown>,
+): string {
+  const title = String(payload.title ?? "an event");
+  switch (template) {
+    case "event_invited":
+      return `You were invited to "${title}". Call get_event_board, then respond_to_event with what works for your human.`;
+    case "participant_joined":
+      return `Someone new opened your event "${title}" and has not answered yet. Call get_event_board for the tallies.`;
+    case "event_locked":
+      return `Responses closed on "${title}"${payload.winner ? ` — ${payload.winner} led` : ""}. The organizer confirms next.`;
+    case "event_confirmed":
+      return `"${title}" is confirmed${payload.winner ? ` for ${payload.winner}` : ""}. Put it on your human's radar.`;
+    case "event_cancelled":
+      return `"${title}" was cancelled by the organizer.`;
+    case "quorum_missed":
+      return `"${title}" closed without reaching quorum.`;
+    case "deadline_soon":
+      return `"${title}" closes in about ${payload.hours ?? 24} hours and your human has not answered. Call get_event_board and respond_to_event.`;
+    case "organizer_digest":
+      return `Update on your event "${title}": ${payload.summary ?? "there is new activity"}.`;
+    default:
+      return `There is an update on "${title}". Call get_event_board.`;
+  }
+}
+
+/**
+ * Queue a notification for people, and deliver the same news to their agents.
+ *
+ * Both channels share `dedupeKey`, so a retried tick delivers neither twice.
+ * Agent delivery is best-effort: a failure there must never cost the email.
+ *
+ * Returns true when a new email row was queued (false when deduped).
+ */
 export async function enqueueEventNotification(
   input: EnqueueInput,
 ): Promise<boolean> {
   const db = getDb();
 
+  // One lookup serves both the organizer recipient and the agent-side link.
+  const [event] = await db
+    .select({
+      organizerUserId: events.organizerUserId,
+      shareSlug: events.shareSlug,
+    })
+    .from(events)
+    .where(eq(events.id, input.eventId))
+    .limit(1);
+
   let recipients: string[] = [];
   if (input.userId) {
     recipients = [input.userId];
   } else if (input.toOrganizerOnly) {
-    const [event] = await db
-      .select({ organizerUserId: events.organizerUserId })
-      .from(events)
-      .where(eq(events.id, input.eventId))
-      .limit(1);
     if (event) recipients = [event.organizerUserId];
   } else if (input.toAllParticipants) {
     const rows = await db
@@ -73,20 +124,42 @@ export async function enqueueEventNotification(
       recipients.length > 1 || !input.userId
         ? `${input.dedupeKey}:${userId}`
         : input.dedupeKey;
-    const inserted = await db
-      .insert(notificationOutbox)
-      .values({
+    if (input.notifyHumans !== false) {
+      const inserted = await db
+        .insert(notificationOutbox)
+        .values({
+          userId,
+          eventId: input.eventId,
+          channel: "email",
+          template: input.template,
+          payload: input.payload ?? {},
+          dedupeKey,
+          scheduledFor: input.scheduledFor ?? new Date(),
+        })
+        .onConflictDoNothing({ target: notificationOutbox.dedupeKey })
+        .returning({ id: notificationOutbox.id });
+      if (inserted[0]) queued += 1;
+    }
+
+    if (input.notifyAgents === false) continue;
+    try {
+      await deliverEventInbox({
         userId,
         eventId: input.eventId,
-        channel: "email",
-        template: input.template,
-        payload: input.payload ?? {},
-        dedupeKey,
-        scheduledFor: input.scheduledFor ?? new Date(),
-      })
-      .onConflictDoNothing({ target: notificationOutbox.dedupeKey })
-      .returning({ id: notificationOutbox.id });
-    if (inserted[0]) queued += 1;
+        kind: `event.${input.template}`,
+        summary: agentSummary(input.template, input.payload ?? {}),
+        body: {
+          ...(input.payload ?? {}),
+          eventId: input.eventId,
+          template: input.template,
+          eventUrl: event ? `${publicOrigin()}/e/${event.shareSlug}` : undefined,
+        },
+        dedupeKey: `agent:${dedupeKey}`,
+      });
+    } catch (error) {
+      // Email is the contract; the agent copy is additive. Never fail the queue.
+      console.error("[events] agent inbox delivery failed", error);
+    }
   }
   return queued > 0;
 }
@@ -116,6 +189,11 @@ function renderTemplate(
       return {
         subject: `Cancelled — ${title}`,
         body: `“${title}” was cancelled by the organizer.\n\n${eventUrl}`,
+      };
+    case "event_invited":
+      return {
+        subject: `You're invited — ${title}`,
+        body: `${payload.invitedBy ? `${payload.invitedBy} wants` : "Someone wants"} to find a time with you for “${title}”. Pick what works and HoneyMatcha handles the rest.\n\n${eventUrl}`,
       };
     case "quorum_missed":
       return {

@@ -53,6 +53,20 @@ export function getAgentCard(baseUrl: string) {
         tags: ["coordination", "events", "group", "approval"],
       },
       {
+        id: "join-event",
+        name: "Answer someone else's event",
+        description:
+          "Take part in an event your human was sent a link to: read the board, mark which times work, suggest another. Hand it the link — id, slug, or URL all resolve.",
+        tags: ["coordination", "events", "participant"],
+      },
+      {
+        id: "meet-in-person",
+        name: "Follow up on meeting someone",
+        description:
+          "Your human met someone and has their handle. Sends an approval-gated connection request and opens a two-person event already seeded with candidate times, so the plan does not evaporate.",
+        tags: ["coordination", "events", "introduction", "approval"],
+      },
+      {
         id: "guest-task",
         name: "Ask a no-account guest",
         description:
