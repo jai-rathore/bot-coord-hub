@@ -18,7 +18,7 @@ import {
   users,
 } from "@/db/schema";
 import { resolveDimension, type ResolvableOption } from "@/lib/events/resolve";
-import { formatSlot, statusSummary } from "@/lib/events/copy";
+import { displayName, formatSlot, statusSummary } from "@/lib/events/copy";
 import {
   MIN_COUNT_DISCLOSURE,
   type DimensionView,
@@ -76,12 +76,16 @@ export async function loadBoardSource(
 
   return {
     event: row.event,
-    organizerName: row.organizerName || row.organizerEmail || "The organizer",
+    organizerName: displayName(
+      row.organizerName,
+      row.organizerEmail,
+      "The organizer",
+    ),
     dimensions,
     options,
     participants: participantRows.map((p) => ({
       participant: p.participant,
-      name: p.name || p.email || "Someone",
+      name: displayName(p.name, p.email),
     })),
     responses,
   };
@@ -338,9 +342,12 @@ export function projectBoard(
     },
     leader: showCounts ? leader : null,
     quorum: {
+      // `required` is a rule of the event, so everyone may see it. Progress
+      // toward it is an aggregate and follows the same disclosure rules as
+      // counts and voters — otherwise a blind event leaks its own tally.
       required: event.quorumMin,
-      met: quorumMet,
-      leadingYes,
+      met: showCounts ? quorumMet : null,
+      leadingYes: showCounts ? leadingYes : null,
     },
     summary: statusSummary({
       status: event.status,

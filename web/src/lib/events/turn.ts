@@ -43,6 +43,7 @@ import {
   setResponses,
 } from "@/lib/events/service";
 import { boardFor } from "@/lib/events/access";
+import { displayName } from "@/lib/events/copy";
 import type { EventBoard } from "@/lib/events/types";
 
 export const DEFAULT_TURN_CAP = 12;
@@ -228,7 +229,7 @@ async function applyToolCall(opts: {
         eventId: event.id,
         actorUserId: user.id,
         kind: "question_asked",
-        summary: `${user.name || user.email} asked: ${question}`,
+        summary: `${displayName(user.name, user.email)} asked: ${question}`,
         body: { question },
       });
       const { enqueueEventNotification } = await import("@/lib/events/notify");

@@ -9,6 +9,7 @@ import {
   type ResolvableVote,
 } from "./events/resolve";
 import { projectBoard, type BoardSource } from "./events/board";
+import { displayName } from "./events/copy";
 import { relativeDeadline, statusSummary } from "./events/copy";
 import { MIN_COUNT_DISCLOSURE } from "./events/types";
 
@@ -277,6 +278,95 @@ function source(
     ),
   };
 }
+
+test("no board payload ever serializes an email address", () => {
+  // Regression: users.name is nullable and the share page is public, so a
+  // `name || email` fallback published the organizer's address to anyone
+  // holding the link. Names must degrade to a local part, never an address.
+  const nameless = source("open");
+  nameless.organizerName = displayName(null, "jai@example.com", "The organizer");
+  nameless.participants = nameless.participants.map((p) => ({
+    ...p,
+    name: displayName(null, `${p.participant.userId}@example.com`),
+  }));
+
+  for (const viewer of [ORGANIZER, ALICE, BOB, null]) {
+    const payload = JSON.stringify(projectBoard(nameless, viewer));
+    assert.equal(
+      payload.includes("@"),
+      false,
+      `viewer ${viewer ?? "public"} received an email address`,
+    );
+  }
+  assert.equal(nameless.organizerName, "jai");
+});
+
+test("displayName never returns a full address", () => {
+  assert.equal(displayName("Jai Rathore", "jai@example.com"), "Jai Rathore");
+  assert.equal(displayName(null, "jai@example.com"), "jai");
+  assert.equal(displayName("   ", "jai@example.com"), "jai");
+  assert.equal(displayName(null, null), "Someone");
+  assert.equal(displayName(null, null, "The organizer"), "The organizer");
+  for (const value of [
+    displayName(null, "a.b+tag@sub.example.co.uk"),
+    displayName(null, "jai@example.com"),
+  ]) {
+    assert.equal(value.includes("@"), false);
+  }
+});
+
+test("a suppressed board discloses no aggregate anywhere in its payload", () => {
+  // Regression: `quorum.leadingYes` and `quorum.met` were computed from full
+  // data and returned ungated, so a blind event leaked its own tally in the
+  // JSON even though the UI never rendered it.
+  for (const mode of ["blind", "counts_only"] as const) {
+    const board = projectBoard(source(mode), BOB);
+    assert.equal(board.countsSuppressed, true, mode);
+    assert.equal(board.counts.joined, null, mode);
+    assert.equal(board.counts.responded, null, mode);
+    assert.equal(board.leader, null, mode);
+    assert.equal(board.quorum.met, null, `${mode}: quorum.met must be null`);
+    assert.equal(
+      board.quorum.leadingYes,
+      null,
+      `${mode}: quorum.leadingYes must be null`,
+    );
+    for (const dimension of board.dimensions) {
+      for (const option of dimension.options) {
+        assert.equal(option.yes, null, mode);
+        assert.equal(option.maybe, null, mode);
+        assert.equal(option.no, null, mode);
+        assert.equal(option.score, null, mode);
+        assert.equal(option.voters, null, mode);
+      }
+    }
+  }
+});
+
+test("no suppressed board serializes another participant's name", () => {
+  // Scans the whole payload rather than named fields, so a field added later
+  // cannot reintroduce the leak unnoticed.
+  for (const mode of ["blind", "counts_only"] as const) {
+    const payload = JSON.stringify(projectBoard(source(mode), BOB));
+    assert.equal(payload.includes("Alice"), false, `${mode} leaked Alice`);
+    assert.equal(
+      payload.includes(ALICE),
+      false,
+      `${mode} leaked Alice's user id`,
+    );
+  }
+});
+
+test("the viewer still sees their own answers when others are hidden", () => {
+  // Suppression must hide other people, not break the page for the viewer.
+  const board = projectBoard(source("blind"), ALICE);
+  const mine = board.dimensions
+    .flatMap((d) => d.options)
+    .filter((o) => o.mine !== null);
+  assert.ok(mine.length > 0, "the viewer must still see their own preference");
+  assert.equal(board.viewer.role, "participant");
+  assert.equal(board.viewer.hasResponded, true);
+});
 
 test("organizer sees names and counts under every visibility mode", () => {
   for (const mode of ["open", "counts_only", "blind"] as const) {

@@ -172,6 +172,56 @@ async function main() {
   assert.equal(noConfirm.length, 0, "an unmet quorum must not create a confirm");
   ok("quorum shortfall expires the event and creates no approval");
 
+  console.log("\n6b. An RSVP event locks on attendance, not on choosing a slot");
+  const rsvp = await createEvent(organizer, {
+    title: `RSVP ${suffix}`,
+    timezone: "UTC",
+    deadlineAt: new Date(Date.now() + 3600_000).toISOString(),
+    fixedStartsAt: new Date(soon).toISOString(),
+  });
+  const rsvpA = await joinEvent(rsvp, alice);
+  const rsvpB = await joinEvent(rsvp, bob);
+  await setResponses(rsvp, rsvpA, [], "yes");
+  await setResponses(rsvp, rsvpB, [], "yes");
+  await db
+    .update(events)
+    .set({ deadlineAt: new Date(Date.now() - 60_000) })
+    .where(eq(events.id, rsvp.id));
+  await runEventsTick();
+  const rsvpAfter = (
+    await db.select().from(events).where(eq(events.id, rsvp.id))
+  )[0];
+  assert.equal(
+    rsvpAfter.status,
+    "locked",
+    "an RSVP event with attendees must lock, not expire",
+  );
+  const rsvpConfirm = await db
+    .select()
+    .from(confirms)
+    .where(eq(confirms.sessionId, rsvpAfter.sessionId!));
+  assert.equal(rsvpConfirm.length, 1, "the organizer must get an approval");
+  assert.equal((rsvpAfter.outcome as Record<string, unknown>).yes, 2);
+  ok("a fixed-time RSVP event locks and asks the organizer to confirm");
+
+  console.log("\n6c. An RSVP event nobody joined expires");
+  const empty = await createEvent(organizer, {
+    title: `Empty ${suffix}`,
+    timezone: "UTC",
+    deadlineAt: new Date(Date.now() + 3600_000).toISOString(),
+    fixedStartsAt: new Date(soon).toISOString(),
+  });
+  await db
+    .update(events)
+    .set({ deadlineAt: new Date(Date.now() - 60_000) })
+    .where(eq(events.id, empty.id));
+  await runEventsTick();
+  const emptyAfter = (
+    await db.select().from(events).where(eq(events.id, empty.id))
+  )[0];
+  assert.equal(emptyAfter.status, "expired");
+  ok("an RSVP event with nobody coming expires instead of booking");
+
   console.log("\n7. Notification outbox is idempotent");
   const first = await enqueueEventNotification({
     eventId: event.id,
@@ -232,6 +282,8 @@ async function main() {
   console.log("\n11. Cleanup");
   await db.delete(events).where(eq(events.id, event.id));
   await db.delete(events).where(eq(events.id, lonely.id));
+  await db.delete(events).where(eq(events.id, rsvp.id));
+  await db.delete(events).where(eq(events.id, empty.id));
   for (const u of [organizer, alice, bob]) {
     await db.delete(users).where(eq(users.id, u.id));
   }
