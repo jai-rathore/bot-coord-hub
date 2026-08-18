@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/site-header";
 import { getHomeStatus, isSetupComplete } from "@/lib/home-status";
 import { ensureCurrentUser } from "@/lib/users";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
+import { eventsFeatureEnabled } from "@/lib/events-feature";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,7 @@ export default async function HomePage() {
   const signedIn = Boolean(signedInHome);
   const setupComplete = signedInHome?.setupComplete ?? false;
   const discoveryEnabled = discoveryFeatureEnabled();
+  const eventsEnabled = eventsFeatureEnabled();
 
   return (
     <div className="flex min-h-full flex-col">
@@ -169,6 +171,69 @@ export default async function HomePage() {
             </article>
           ))}
         </div>
+
+        {eventsEnabled ? (
+          <section
+            aria-labelledby="events-title"
+            className="mb-16 sm:mb-20"
+          >
+            <div className="surface-card relative overflow-hidden p-7 sm:p-10">
+              <span
+                className="absolute -top-20 -right-16 h-56 w-56 rounded-full border border-matcha-soft/15 bg-matcha-soft/8"
+                aria-hidden="true"
+              />
+              <div className="relative grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
+                <div>
+                  <p className="section-kicker">New — group events</p>
+                  <h2
+                    id="events-title"
+                    className="display-title mt-2 text-3xl sm:text-4xl"
+                  >
+                    One link. The whole group sorted.
+                  </h2>
+                  <p className="mt-4 max-w-xl text-lg leading-8 text-muted">
+                    Share a single link in the group chat. Everyone taps what
+                    works, and it settles on a deadline and a headcount instead
+                    of waiting for all ten people to reply.
+                  </p>
+                  <div className="mt-7 flex flex-wrap gap-3">
+                    <Link href="/app/events/new" className="button-primary">
+                      Create an event
+                    </Link>
+                  </div>
+                  <p className="mt-4 text-sm text-muted">
+                    Anyone can open the link. Responding takes a quick sign-in,
+                    so every answer belongs to a real person.
+                  </p>
+                </div>
+                <ul className="grid gap-3 self-center">
+                  {[
+                    [
+                      "Nobody blocks the plan",
+                      "Set a deadline and a minimum headcount. People who never reply simply don't count.",
+                    ],
+                    [
+                      "You choose who sees what",
+                      "Show everything, show counts without names, or keep responses to yourself.",
+                    ],
+                    [
+                      "You confirm, not the agent",
+                      "HoneyMatcha proposes the winning time. Nothing reaches a calendar until you say yes.",
+                    ],
+                  ].map(([title, body]) => (
+                    <li
+                      key={title}
+                      className="rounded-[0.9rem] border border-line bg-white/55 p-4"
+                    >
+                      <h3 className="font-semibold text-ink">{title}</h3>
+                      <p className="mt-1 text-sm leading-6 text-muted">{body}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         {discoveryEnabled ? (
           <section aria-labelledby="discovery-title" className="mb-20 sm:mb-28">

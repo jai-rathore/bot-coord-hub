@@ -10,6 +10,7 @@ import {
   googleOAuthConfigured,
 } from "@/lib/google-oauth";
 import { ensureCurrentUser } from "@/lib/users";
+import { eventsFeatureEnabled } from "@/lib/events-feature";
 
 export default async function AppHomePage() {
   const [clerkUser, user] = await Promise.all([
@@ -61,6 +62,36 @@ export default async function AppHomePage() {
       />
 
       {setupComplete ? <AgentStatusCard status={status} /> : null}
+
+      {eventsFeatureEnabled() ? (
+        <section className="surface-card relative overflow-hidden p-6 sm:p-7">
+          <span
+            className="absolute -top-16 -right-12 h-44 w-44 rounded-full border border-matcha-soft/15 bg-matcha-soft/8"
+            aria-hidden="true"
+          />
+          <div className="relative flex flex-wrap items-end justify-between gap-5">
+            <div>
+              <p className="section-kicker">Group events</p>
+              <h2 className="mt-1 font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-[-0.03em] text-matcha-deep">
+                Sort a plan with one link
+              </h2>
+              <p className="mt-2 max-w-xl text-sm leading-7 text-muted">
+                Share it in the group chat. Everyone taps what works, and it
+                closes on your deadline — no waiting on the quiet ones. You
+                confirm before anything is booked.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/app/events/new" className="button-primary">
+                Create an event
+              </Link>
+              <Link href="/app/events" className="button-secondary">
+                See all
+              </Link>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section>
         <div className="flex items-center justify-between gap-3">

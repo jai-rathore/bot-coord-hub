@@ -7,6 +7,16 @@ import { SCHEDULE_MEETING_TOOL_DESCRIPTION } from "@/lib/schedule-copy";
 import type { AgentAuth } from "@/lib/agent-auth";
 import { assertAgentScope } from "@/lib/scopes";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
+import { eventsFeatureEnabled } from "@/lib/events-feature";
+import {
+  agentAddEventOption,
+  agentCreateEvent,
+  agentExtendEventDeadline,
+  agentGetEventBoard,
+  agentHumanOnlyEventAction,
+  agentListEvents,
+  agentNudgeEventParticipants,
+} from "@/lib/events/agent-api";
 import {
   acceptInvite,
   ackInbox,
@@ -527,6 +537,106 @@ export const MCP_TOOLS: McpToolDef[] = [
     },
   },
   {
+    name: "create_event",
+    description:
+      "Create a group event and get one shareable link. Anyone can open the link; responding requires a HoneyMatcha sign-in. Resolves on a deadline and optional quorum — it never waits for everyone. The organizer confirms before anything is booked.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        place: { type: "string", description: "Fixed location, if known." },
+        timezone: { type: "string", description: "IANA timezone." },
+        deadlineAt: {
+          type: "string",
+          description: "ISO 8601. Defaults to 48 hours from now.",
+        },
+        quorumMin: {
+          type: "number",
+          description: "Only happens if at least this many can make it.",
+        },
+        visibility: {
+          type: "string",
+          enum: ["open", "counts_only", "blind"],
+          description: "Who sees the responses. Use blind for recruiting.",
+        },
+        slots: {
+          type: "array",
+          description: "Candidate times. Omit for a fixed-time RSVP event.",
+          items: {
+            type: "object",
+            properties: {
+              startsAt: { type: "string" },
+              endsAt: { type: "string" },
+            },
+            required: ["startsAt"],
+          },
+        },
+        fixedStartsAt: {
+          type: "string",
+          description: "For RSVP-only events: the single fixed start time.",
+        },
+      },
+      required: ["title"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "list_events",
+    description: "List events this human organizes or was invited to.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "get_event_board",
+    description:
+      "Live status of one event: per-option tallies, who has answered, the leading option, quorum, and a plain-English summary you can relay verbatim.",
+    inputSchema: {
+      type: "object",
+      properties: { eventId: { type: "string" } },
+      required: ["eventId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "add_event_option",
+    description: "Add another time or place to an event you organize.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventId: { type: "string" },
+        dimensionId: { type: "string" },
+        startsAt: { type: "string" },
+        endsAt: { type: "string" },
+        label: { type: "string" },
+      },
+      required: ["eventId", "dimensionId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "extend_event_deadline",
+    description: "Move an event's response deadline later.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventId: { type: "string" },
+        deadlineAt: { type: "string" },
+      },
+      required: ["eventId", "deadlineAt"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "nudge_event_participants",
+    description: "Queue a reminder to everyone who has not answered yet.",
+    inputSchema: {
+      type: "object",
+      properties: { eventId: { type: "string" } },
+      required: ["eventId"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "revoke_guest_task",
     description: "Revoke an open guest request immediately.",
     inputSchema: {
@@ -546,10 +656,23 @@ const DISCOVERY_FLAGGED_TOOLS = new Set([
   "list_discovery_interests",
 ]);
 
+const EVENT_FLAGGED_TOOLS = new Set([
+  "create_event",
+  "list_events",
+  "get_event_board",
+  "add_event_option",
+  "extend_event_deadline",
+  "nudge_event_participants",
+]);
+
 export function getMcpTools(): McpToolDef[] {
-  return discoveryFeatureEnabled()
-    ? MCP_TOOLS
-    : MCP_TOOLS.filter((tool) => !DISCOVERY_FLAGGED_TOOLS.has(tool.name));
+  const discoveryOn = discoveryFeatureEnabled();
+  const eventsOn = eventsFeatureEnabled();
+  return MCP_TOOLS.filter((tool) => {
+    if (!discoveryOn && DISCOVERY_FLAGGED_TOOLS.has(tool.name)) return false;
+    if (!eventsOn && EVENT_FLAGGED_TOOLS.has(tool.name)) return false;
+    return true;
+  });
 }
 
 function baseUrlFromRequest(request?: Request): string | undefined {
@@ -726,6 +849,22 @@ export async function dispatchMcpTool(
       );
     case "read_guest_task":
       return readGuestTask(auth, String(args.publicId ?? ""));
+    case "create_event":
+      return agentCreateEvent(auth, args, baseUrl);
+    case "list_events":
+      return agentListEvents(auth);
+    case "get_event_board":
+      return agentGetEventBoard(auth, String(args.eventId ?? ""), baseUrl);
+    case "add_event_option":
+      return agentAddEventOption(auth, args as never);
+    case "extend_event_deadline":
+      return agentExtendEventDeadline(auth, args as never);
+    case "nudge_event_participants":
+      return agentNudgeEventParticipants(auth, args as never);
+    case "lock_event":
+    case "cancel_event":
+    case "confirm_event":
+      return agentHumanOnlyEventAction(name);
     case "revoke_guest_task":
       return revokeGuestTask(auth, String(args.publicId ?? ""));
     default:

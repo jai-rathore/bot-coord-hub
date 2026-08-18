@@ -373,6 +373,40 @@ async function seed() {
     console.log("Seeded intent_types: dating_introduction (live)");
   }
 
+  const groupEventDescription =
+    "Coordinate a group event from one shared link: people pick what works, HoneyMatcha tallies it against a deadline and quorum, and the organizer confirms before anything is booked.";
+  const [existingGroupEvent] = await db
+    .select()
+    .from(intentTypes)
+    .where(eq(intentTypes.slug, "group_event"))
+    .limit(1);
+  const groupEventValues = {
+    name: "Group event",
+    description: groupEventDescription,
+    status: "live" as const,
+    category: "coordination",
+    requiredScopes: ["events:read", "events:write"],
+    handler: "none",
+    schema: {
+      participation: "signed-in users only",
+      resolution: "quorum + deadline",
+      booking: "organizer confirm required",
+    },
+  };
+  if (existingGroupEvent) {
+    await db
+      .update(intentTypes)
+      .set(groupEventValues)
+      .where(eq(intentTypes.id, existingGroupEvent.id));
+    console.log("Updated intent_types: group_event");
+  } else {
+    await db.insert(intentTypes).values({
+      slug: "group_event",
+      ...groupEventValues,
+    });
+    console.log("Seeded intent_types: group_event (live)");
+  }
+
   process.exit(0);
 }
 

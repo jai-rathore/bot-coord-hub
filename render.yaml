@@ -12,10 +12,20 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: ENABLE_EVENTS
+        value: "true"
       - key: ENABLE_DISCOVERY
         value: "false"
       - key: ENABLE_CANONICAL_LOCATIONS
         value: "false"
+      - key: HOSTED_AGENT_PROVIDER
+        value: gemini
+      - key: HOSTED_AGENT_MODEL
+        value: gemini-3.7-flash
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_APP_ORIGIN
+        value: https://honeymatcha.io
       - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
         sync: false
       - key: CLERK_SECRET_KEY
@@ -74,4 +84,34 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
+        sync: false
+  - type: cron
+    name: honeymatcha-events-tick
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: web
+    schedule: "*/5 * * * *"
+    buildCommand: npm install
+    startCommand: npm run events:tick
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ENABLE_EVENTS
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EVENT_EMAIL_FROM
+        sync: false
+      - key: NEXT_PUBLIC_APP_ORIGIN
+        value: https://honeymatcha.io
+      - key: GOOGLE_CALENDAR_ENABLED
+        value: "true"
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
         sync: false

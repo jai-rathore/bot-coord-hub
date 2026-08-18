@@ -241,6 +241,24 @@ export async function decideConfirm(opts: {
     };
   }
 
+  // approved — events book straight away; the organizer is the only approver.
+  if (updated.action === "event.confirm") {
+    const { bookEventForConfirm } = await import("@/lib/events/book");
+    const booking = await bookEventForConfirm(
+      (updated.metadata as Record<string, unknown>) ?? {},
+    );
+    await db
+      .update(sessions)
+      .set({ status: "confirmed", updatedAt: now })
+      .where(eq(sessions.id, session.id));
+    return {
+      ...toPublicConfirm(updated, { ...session, status: "confirmed" }),
+      calendar: (booking as unknown as Record<string, unknown>) ?? {
+        status: "unavailable",
+      },
+    };
+  }
+
   // approved — for schedule_meeting wait for all; otherwise confirm immediately
   if (session.intentType === "schedule_meeting") {
     const booking = await tryBookAfterConfirmApprovals(

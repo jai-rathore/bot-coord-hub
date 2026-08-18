@@ -21,7 +21,10 @@
     "test:e2e-api": "node scripts/e2e-api.mjs",
     "test:e2e-platform": "node scripts/e2e-platform.mjs",
     "test:e2e-discovery": "tsx scripts/e2e-discovery.ts",
-    "test:e2e-discovery-api": "node scripts/e2e-discovery-api.mjs"
+    "test:e2e-discovery-api": "node scripts/e2e-discovery-api.mjs",
+    "test:e2e-events": "tsx scripts/e2e-events.ts",
+    "events:tick": "tsx scripts/events-tick.ts",
+    "test:e2e-events-agent": "tsx scripts/e2e-events-agent.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.4",
