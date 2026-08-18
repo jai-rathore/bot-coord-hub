@@ -1341,6 +1341,8 @@ export const eventParticipants = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     role: participantRoleEnum("role").notNull().default("invitee"),
     attendance: eventAttendanceEnum("attendance").notNull().default("pending"),
+    /** Opt-in: email + agent-inbox updates when someone else responds. */
+    notifyUpdates: boolean("notify_updates").notNull().default(false),
     chatTurnsUsed: integer("chat_turns_used").notNull().default(0),
     source: text("source").notNull().default("share_link"),
     joinedAt: timestamp("joined_at", { withTimezone: true })

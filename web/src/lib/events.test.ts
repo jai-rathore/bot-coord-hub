@@ -445,12 +445,22 @@ test("responding is closed once the event is locked", () => {
   assert.equal(board.viewer.canRespond, false);
 });
 
-test("a non-participant signed-in user is treated as public", () => {
+test("a signed-in non-participant sees the public view but may respond", () => {
+  // The exact state every share-link recipient is in the moment after they
+  // sign in. Responding joins them, so the buttons must be live — gating on
+  // participant role left real recipients staring at a dead board.
   const src = source("open");
   src.participants = src.participants.filter(
     (p) => p.participant.userId !== CARA,
   );
   const board = projectBoard(src, CARA);
+  assert.equal(board.viewer.role, "public");
+  assert.equal(board.viewer.canRespond, true);
+  assert.equal(board.viewer.participantId, null);
+});
+
+test("an anonymous viewer can never respond", () => {
+  const board = projectBoard(source("open"), null);
   assert.equal(board.viewer.role, "public");
   assert.equal(board.viewer.canRespond, false);
 });

@@ -461,6 +461,95 @@ export async function setResponses(
     summary: `A participant responded (${nextAttendance}).`,
     body: { entries: entries.length, attendance: nextAttendance },
   });
+
+  await notifySubscribersOfUpdate(event, participant.userId, {
+    kind: "responded",
+    summary: `Someone answered (${nextAttendance}).`,
+  });
+}
+
+/**
+ * Tell people who opted in that the event moved.
+ *
+ * Deliberately nameless and tally-free: an email is outside the board's
+ * visibility projection, so it must never say more than the most restricted
+ * viewer could see. Under anything but open visibility, response updates go
+ * only to the organizer (who sees everything) — and only if they opted in.
+ * Imported lazily because notify.ts reads this module.
+ */
+async function notifySubscribersOfUpdate(
+  event: Event,
+  actorUserId: string,
+  update: { kind: string; summary: string },
+): Promise<void> {
+  const { enqueueEventNotification } = await import("@/lib/events/notify");
+  const base = {
+    eventId: event.id,
+    template: "event_update",
+    payload: { title: event.title, summary: update.summary },
+  };
+  const responsesArePrivate =
+    update.kind === "responded" && event.visibility !== "open";
+
+  if (responsesArePrivate) {
+    if (event.organizerUserId === actorUserId) return;
+    const db = getDb();
+    const [organizerRow] = await db
+      .select({ notifyUpdates: eventParticipants.notifyUpdates })
+      .from(eventParticipants)
+      .where(
+        and(
+          eq(eventParticipants.eventId, event.id),
+          eq(eventParticipants.userId, event.organizerUserId),
+        ),
+      )
+      .limit(1);
+    if (!organizerRow?.notifyUpdates) return;
+    await enqueueEventNotification({
+      ...base,
+      dedupeKey: `update:${update.kind}:${event.id}:${event.organizerUserId}:${Date.now()}`,
+      userId: event.organizerUserId,
+    });
+    return;
+  }
+
+  await enqueueEventNotification({
+    ...base,
+    dedupeKey: `update:${update.kind}:${event.id}:${Date.now()}`,
+    toSubscribedParticipants: true,
+    excludeUserId: actorUserId,
+  });
+}
+
+/**
+ * Flip update notifications for this person, joining them first if needed —
+ * subscribing to an event is engaging with it, exactly like responding is.
+ */
+export async function setNotifyUpdates(
+  event: Event,
+  user: User,
+  notify: boolean,
+): Promise<EventParticipant> {
+  const db = getDb();
+  let participant = await db
+    .select()
+    .from(eventParticipants)
+    .where(
+      and(
+        eq(eventParticipants.eventId, event.id),
+        eq(eventParticipants.userId, user.id),
+      ),
+    )
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+  if (!participant) participant = await joinEvent(event, user);
+
+  const [updated] = await db
+    .update(eventParticipants)
+    .set({ notifyUpdates: notify })
+    .where(eq(eventParticipants.id, participant.id))
+    .returning();
+  return updated ?? participant;
 }
 
 export async function addOption(
@@ -541,14 +630,25 @@ export async function addOption(
     createdByUserId: user.id,
   });
 
+  const optionName = label ?? formatSlot(startsAt, endsAt, event.timezone);
   await recordActivity({
     eventId: event.id,
     actorUserId: user.id,
     kind: "option_added",
     summary:
       role === "organizer"
-        ? `The organizer added ${label ?? formatSlot(startsAt, endsAt, event.timezone)}.`
-        : `${displayName(user.name, user.email)} suggested ${label ?? formatSlot(startsAt, endsAt, event.timezone)}.`,
+        ? `The organizer added ${optionName}.`
+        : `${displayName(user.name, user.email)} suggested ${optionName}.`,
+  });
+
+  // Options are public on the board under every visibility, so this is safe
+  // to say to any subscriber.
+  await notifySubscribersOfUpdate(event, user.id, {
+    kind: "option_added",
+    summary:
+      role === "organizer"
+        ? `The organizer added another option: ${optionName}.`
+        : `A new option was suggested: ${optionName}.`,
   });
 }
 

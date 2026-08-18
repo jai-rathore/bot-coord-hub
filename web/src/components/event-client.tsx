@@ -172,6 +172,10 @@ export function EventClient({
     await post("/controls", { action, ...extra });
   }
 
+  async function toggleNotifications() {
+    await post("/subscribe", { notify: !board.viewer.notifyUpdates });
+  }
+
   async function copyToClipboard(kind: "link" | "status") {
     const text =
       kind === "link"
@@ -455,6 +459,38 @@ export function EventClient({
             </div>
           )}
         </section>
+      )}
+
+      {/* ---------- update notifications ---------- */}
+      {signedIn && board.event.status === "open" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[0.9rem] border border-line bg-white/60 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink">
+              {board.viewer.notifyUpdates
+                ? "You're getting updates"
+                : "Follow this event"}
+            </p>
+            <p className="text-xs text-muted">
+              {board.viewer.notifyUpdates
+                ? "We'll email you when someone answers or suggests a time."
+                : "Get an email when someone answers or suggests a time."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void toggleNotifications()}
+            disabled={busy}
+            role="switch"
+            aria-checked={Boolean(board.viewer.notifyUpdates)}
+            className={
+              board.viewer.notifyUpdates
+                ? "button-secondary shrink-0"
+                : "button-primary shrink-0"
+            }
+          >
+            {board.viewer.notifyUpdates ? "Turn off" : "Notify me"}
+          </button>
+        </div>
       )}
 
       {/* ---------- who's in ---------- */}

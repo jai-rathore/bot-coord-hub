@@ -91,6 +91,8 @@ export type EventBoard = {
     attendance: EventAttendance | null;
     hasResponded: boolean;
     canRespond: boolean;
+    /** Null until the viewer has joined. */
+    notifyUpdates: boolean | null;
   };
   dimensions: DimensionView[];
   /** Null when the viewer may not see the roster. */

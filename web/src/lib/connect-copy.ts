@@ -132,6 +132,11 @@ Event news arrives in the same inbox as everything else: you were invited,
 someone joined, the deadline is close, it locked, it is confirmed. Each item
 carries an eventId — pass it to get_event_board.
 
+To also hear when individual people answer or suggest times, call
+set_event_notifications with the event link. Updates then land in get_inbox
+(and your human's email). Pass notify=false to stop. Subscribe when your human
+cares about an event; do not subscribe to everything.
+
 ## Meeting someone in person
 
 When your human meets someone and has their handle, call record_meeting with

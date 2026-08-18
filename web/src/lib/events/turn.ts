@@ -10,6 +10,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
+  eventDimensions,
   eventMessages,
   eventParticipants,
   events,
@@ -133,6 +134,64 @@ async function logAnomaly(
 }
 
 /**
+ * Where a suggested option lands. The model never sees dimension ids — a
+ * hallucinated one used to make every proposal fail — so the server picks:
+ * a time suggestion goes to the open time dimension, a bare label to an open
+ * place/custom dimension, falling back to any open one.
+ */
+async function resolveOpenDimensionId(
+  eventId: string,
+  wantsTime: boolean,
+): Promise<string | null> {
+  const db = getDb();
+  const dims = await db
+    .select()
+    .from(eventDimensions)
+    .where(eq(eventDimensions.eventId, eventId));
+  const open = dims.filter((d) => d.mode === "open");
+  const preferred = wantsTime
+    ? open.find((d) => d.kind === "time")
+    : (open.find((d) => d.kind === "place" || d.kind === "custom") ??
+      open.find((d) => d.kind === "time"));
+  return (preferred ?? open[0])?.id ?? null;
+}
+
+/**
+ * What the person reads when the model made changes but wrote no reply, or
+ * said nothing at all. The old fallback was the guardrail refusal — so a
+ * benign "how about Saturday?" that ended in a silent tool call read as a
+ * security lecture.
+ */
+export function composeFallbackReply(
+  applied: string[],
+  role: EventToolRole,
+  summary: string,
+): string {
+  if (applied.length > 0) {
+    const parts: string[] = [];
+    if (applied.some((a) => a.startsWith("preference:"))) {
+      parts.push("saved your answers");
+    }
+    if (applied.some((a) => a.startsWith("attendance:"))) {
+      parts.push("noted whether you're coming");
+    }
+    if (applied.includes("option_proposed")) {
+      parts.push("added your suggestion for everyone to see");
+    }
+    if (applied.includes("option_added")) parts.push("added that option");
+    if (applied.includes("deadline_extended")) parts.push("moved the deadline");
+    if (applied.includes("question_sent")) {
+      parts.push("passed your question to the organizer");
+    }
+    const done = parts.length > 0 ? parts.join(" and ") : "saved that";
+    return `Done — I've ${done}. ${summary}`;
+  }
+  return role === "organizer"
+    ? "I didn't catch that. You can ask me what's leading, who hasn't answered, or tell me a time or place to add."
+    : "I didn't catch that. Tell me which of the listed times work for you, or name another time and I'll suggest it.";
+}
+
+/**
  * Apply one validated tool call. Returns a short label when it changed state.
  * Anything not explicitly handled is rejected, never silently ignored.
  */
@@ -164,7 +223,11 @@ async function applyToolCall(opts: {
       const optionId = String(args.optionId ?? "");
       const value = String(args.value ?? "");
       if (!optionId || !["yes", "no", "maybe"].includes(value)) {
-        return { applied: null, reply: null };
+        return {
+          applied: null,
+          reply:
+            "I couldn't match that to one of the listed times. Tell me which one you meant, or tap it above.",
+        };
       }
       await setResponses(event, participant, [
         { optionId, value: value as "yes" | "no" | "maybe" },
@@ -183,35 +246,57 @@ async function applyToolCall(opts: {
     }
 
     case "propose_option": {
-      if (!event.allowGuestOptions) return { applied: null, reply: null };
-      const dimensionId = String(args.dimensionId ?? "");
-      if (!dimensionId) return { applied: null, reply: null };
-      await addOption(
-        event,
-        user,
-        {
-          dimensionId,
-          startsAt: args.startsAt ? String(args.startsAt) : undefined,
-          label: args.label ? String(args.label) : undefined,
-        },
-        "participant",
+      if (!event.allowGuestOptions) {
+        return {
+          applied: null,
+          reply:
+            "The organizer isn't taking extra suggestions on this one. I can pass it along as a question instead — want me to?",
+        };
+      }
+      const startsAt = args.startsAt ? String(args.startsAt) : undefined;
+      const label = args.label ? String(args.label) : undefined;
+      if (!startsAt && !label) {
+        return {
+          applied: null,
+          reply: "Tell me the time (or place) you'd like me to suggest.",
+        };
+      }
+      const dimensionId = await resolveOpenDimensionId(
+        event.id,
+        Boolean(startsAt),
       );
+      if (!dimensionId) {
+        return {
+          applied: null,
+          reply:
+            "This event's times are fixed, so I can't add another — but I can pass your preference to the organizer.",
+        };
+      }
+      await addOption(event, user, { dimensionId, startsAt, label }, "participant");
       return { applied: "option_proposed", reply: null };
     }
 
     case "add_option": {
-      const dimensionId = String(args.dimensionId ?? "");
-      if (!dimensionId) return { applied: null, reply: null };
-      await addOption(
-        event,
-        user,
-        {
-          dimensionId,
-          startsAt: args.startsAt ? String(args.startsAt) : undefined,
-          label: args.label ? String(args.label) : undefined,
-        },
-        "organizer",
+      const startsAt = args.startsAt ? String(args.startsAt) : undefined;
+      const label = args.label ? String(args.label) : undefined;
+      if (!startsAt && !label) {
+        return {
+          applied: null,
+          reply: "Give me the time or the place you want added.",
+        };
+      }
+      const dimensionId = await resolveOpenDimensionId(
+        event.id,
+        Boolean(startsAt),
       );
+      if (!dimensionId) {
+        return {
+          applied: null,
+          reply:
+            "There's no open list to add to on this event — its options are fixed.",
+        };
+      }
+      await addOption(event, user, { dimensionId, startsAt, label }, "organizer");
       return { applied: "option_added", reply: null };
     }
 
@@ -380,7 +465,14 @@ export async function runEventChatTurn(opts: {
     }
   }
 
-  reply = reply ?? boundReply(result.text) ?? REFUSAL_MESSAGE;
+  // The refusal message is for blocked input only. A turn that ends with tool
+  // calls and no prose gets an honest confirmation instead.
+  if (!reply) {
+    const freshSummary = (await boardFor(event.id, user)).summary;
+    reply =
+      boundReply(result.text) ??
+      composeFallbackReply(applied, role, freshSummary);
+  }
 
   await persistMessage({
     eventId: event.id,

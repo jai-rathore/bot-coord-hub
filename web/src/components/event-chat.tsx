@@ -92,19 +92,43 @@ export function EventChat({
   }
 
   if (!open) {
+    // A first-time recipient has no idea what "Sage" is. The collapsed state
+    // introduces it as a thing — name, what it is, what it can do — instead of
+    // a bare link that assumes they already know.
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(true);
-          if (available === null) void load();
-        }}
-        className="text-sm font-semibold text-matcha-deep underline underline-offset-4 hover:text-matcha"
-      >
-        {isOrganizer
-          ? `Ask ${agentName} about this event`
-          : "None of these work, or it's complicated?"}
-      </button>
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-[0.9rem] border border-matcha-soft/40 bg-matcha/6 p-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            aria-hidden
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-matcha-deep text-base text-white"
+          >
+            ✦
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink">
+              {agentName}
+              <span className="ml-2 rounded-full bg-matcha/12 px-2 py-0.5 text-[0.65rem] font-bold tracking-[0.08em] text-matcha uppercase">
+                Event assistant
+              </span>
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              {isOrganizer
+                ? `Ask who hasn't answered, what's leading, or tell it a time to add.`
+                : `None of these times work, or it's complicated? Tell ${agentName} — it can record your answer, suggest another time, or pass a question to ${organizerName}.`}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(true);
+            if (available === null) void load();
+          }}
+          className="button-secondary shrink-0"
+        >
+          Chat with {agentName}
+        </button>
+      </div>
     );
   }
 
@@ -122,7 +146,8 @@ export function EventChat({
             )}
           </p>
           <p className="text-xs text-muted">
-            Automated assistant. It can only help with this event.
+            Automated assistant — not a person. It can record your answers,
+            suggest times, and pass questions along. Only for this event.
           </p>
         </div>
         <button
@@ -148,7 +173,7 @@ export function EventChat({
               <li className="rounded-[0.8rem] bg-matcha/8 p-3 text-sm text-ink">
                 {isOrganizer
                   ? `Hi — ask me who hasn't replied, what's leading, or to add another time.`
-                  : `Hi — I'm ${agentName}, helping ${organizerName} organize this. Tell me what would work and I'll add it. I can only help with this event.`}
+                  : `Hi — I'm ${agentName}, the assistant organizing this for ${organizerName}. Tell me which times work, name a different one and I'll suggest it, or ask a question and I'll pass it on.`}
               </li>
             )}
             {messages.map((message) => (

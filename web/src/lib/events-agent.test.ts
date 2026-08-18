@@ -21,6 +21,7 @@ import {
   buildParticipantSystemPrompt,
 } from "./events/context";
 import { projectBoard, type BoardSource } from "./events/board";
+import { composeFallbackReply } from "./events/turn";
 import { renderTemplate } from "./events/notify";
 import { getMcpTools } from "./mcp-tools";
 
@@ -453,4 +454,84 @@ test("an event tool takes a link, not just an id", () => {
   // A human pastes their agent a URL; the schema has to say that is allowed.
   assert.match(described, /share slug/i);
   assert.match(described, /link/i);
+});
+
+/* ------------------------------------------------------------------ */
+/* the reply a person actually reads                                   */
+/* ------------------------------------------------------------------ */
+
+test("a turn that only made tool calls never reads as a refusal", () => {
+  // The old fallback was the guardrail refusal, so "how about Saturday?"
+  // followed by a silent tool call read as a security lecture.
+  for (const applied of [
+    ["preference:yes"],
+    ["option_proposed"],
+    ["attendance:no", "preference:no"],
+    [],
+  ]) {
+    const reply = composeFallbackReply(applied, "participant", "1 of 2 responded.");
+    assert.doesNotMatch(reply, /only help with this event/i);
+  }
+});
+
+test("applied changes are confirmed in plain words", () => {
+  const saved = composeFallbackReply(
+    ["preference:yes", "attendance:yes"],
+    "participant",
+    "2 of 3 responded.",
+  );
+  assert.match(saved, /^Done — /);
+  assert.match(saved, /saved your answers/);
+  assert.match(saved, /2 of 3 responded/);
+
+  const proposed = composeFallbackReply(["option_proposed"], "participant", "s.");
+  assert.match(proposed, /added your suggestion/);
+});
+
+test("an empty turn asks for something usable, per role", () => {
+  assert.match(
+    composeFallbackReply([], "participant", ""),
+    /which of the listed times|name another time/i,
+  );
+  assert.match(
+    composeFallbackReply([], "organizer", ""),
+    /what's leading|who hasn't answered/i,
+  );
+});
+
+/* ------------------------------------------------------------------ */
+/* what the model is given to work with                                */
+/* ------------------------------------------------------------------ */
+
+test("prompts carry the current date, so 'Saturday' can become a time", () => {
+  const board = projectBoard(source("open"), ALICE);
+  for (const prompt of [
+    buildParticipantSystemPrompt(board),
+    buildOrganizerSystemPrompt(projectBoard(source("open"), ORGANIZER)),
+  ]) {
+    assert.match(prompt, /Right now it is \d{4}-\d{2}-\d{2}T/);
+  }
+});
+
+test("time options reach the model with their ISO instants", () => {
+  const prompt = buildParticipantSystemPrompt(projectBoard(source("open"), ALICE));
+  assert.match(prompt, /starts=\d{4}-\d{2}-\d{2}T/);
+});
+
+test("no chat tool demands an id the model was never given", () => {
+  // dimensionId is internal; a required parameter the context omits meant
+  // every proposal failed. The server resolves the dimension now.
+  for (const tool of [...participantToolDefs(true), ...organizerToolDefs()]) {
+    const required = (tool.parameters?.required ?? []) as string[];
+    assert.equal(
+      required.includes("dimensionId"),
+      false,
+      `${tool.name} requires dimensionId`,
+    );
+    assert.equal(
+      "dimensionId" in ((tool.parameters?.properties ?? {}) as object),
+      false,
+      `${tool.name} still advertises dimensionId`,
+    );
+  }
 });

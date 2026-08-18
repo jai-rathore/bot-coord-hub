@@ -105,18 +105,16 @@ export function participantToolDefs(allowProposals: boolean): LlmToolDef[] {
     tools.splice(2, 0, {
       name: "propose_option",
       description:
-        "Suggest another time when none of the listed options work. Only for times the person actually named.",
+        "Suggest another time when none of the listed options work. Only for times the person actually named. Give startsAt for a time, or label for a place.",
       parameters: {
         type: "object",
         properties: {
-          dimensionId: { type: "string", description: "The dimension id to add to." },
           startsAt: {
             type: "string",
             description: "ISO 8601 start time, e.g. 2026-09-01T18:00:00Z.",
           },
-          label: { type: "string", description: "Optional label for a place." },
+          label: { type: "string", description: "Label, for a place suggestion." },
         },
-        required: ["dimensionId"],
       },
     });
   }
@@ -128,15 +126,14 @@ export function organizerToolDefs(): LlmToolDef[] {
   return [
     {
       name: "add_option",
-      description: "Add another time or place to the event.",
+      description:
+        "Add another time or place to the event. Give startsAt for a time, or label for a place.",
       parameters: {
         type: "object",
         properties: {
-          dimensionId: { type: "string" },
           startsAt: { type: "string", description: "ISO 8601 start time." },
           label: { type: "string", description: "Label, for a place option." },
         },
-        required: ["dimensionId"],
       },
     },
     {
