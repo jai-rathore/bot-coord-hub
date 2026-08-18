@@ -395,3 +395,132 @@ a[href^="https://www.clerk.com"],
 a[href^="https://go.clerk.com"] {
   display: none !important;
 }
+
+/* ── Range ladder ───────────────────────────────────────────────────────────
+   Rungs step inward and rise into view as you scroll, so the climb from a
+   two-tap coffee to a hiring round is felt rather than only read. Built on
+   scroll-driven animations: no JS, and it degrades to a static list wherever
+   they are unsupported or motion is unwelcome. */
+
+.rung-card {
+  transition:
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 260ms ease;
+}
+
+@media (min-width: 900px) {
+  .rung-card {
+    /* Each rung is a little narrower and further in than the one below. */
+    margin-left: calc(var(--rung, 0) * 2.6rem);
+    margin-right: calc((3 - var(--rung, 0)) * 0.9rem);
+  }
+}
+
+.rung-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.rung-glyph {
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.rung-card:hover .rung-glyph {
+  transform: scale(1.06) rotate(-2deg);
+}
+
+@keyframes rung-rise {
+  from {
+    opacity: 0;
+    transform: translateY(2rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .rung-rise {
+      animation: rung-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 2% cover 26%;
+    }
+  }
+}
+
+/* ── Hero arrival ──────────────────────────────────────────────────────────
+   One orchestrated entrance rather than scattered effects: the eyebrow, the
+   two lines of the headline, then the supporting copy and buttons. */
+
+@keyframes hero-line {
+  from {
+    opacity: 0;
+    transform: translateY(0.7em);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-line {
+    animation: hero-line 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .hero-line-1 {
+    animation-delay: 120ms;
+  }
+
+  .hero-line-2 {
+    animation-delay: 300ms;
+  }
+}
+
+/* A hairline that draws itself under the headline once it has landed. */
+@keyframes hero-rule {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.hero-rule {
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-rule {
+    animation: hero-rule 760ms cubic-bezier(0.22, 1, 0.36, 1) 620ms both;
+  }
+}
+
+/* ── Capability cards ──────────────────────────────────────────────────────
+   Each of the three gets its own character: warm for a group you know, green
+   for one person, deep for someone you have not met. */
+
+.cap-card {
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 240ms ease,
+    border-color 240ms ease;
+}
+
+.cap-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.cap-mark {
+  transition: transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cap-card:hover .cap-mark {
+  transform: translateY(-2px) scale(1.05);
+}
