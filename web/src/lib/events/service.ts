@@ -20,7 +20,7 @@ import {
 import { AgentApiError } from "@/lib/agent-errors";
 import { writeAudit } from "@/lib/audit";
 import { boundedText } from "@/lib/validation";
-import { formatSlot } from "@/lib/events/copy";
+import { displayName, formatSlot } from "@/lib/events/copy";
 import type { EventPref, EventVisibility } from "@/lib/events/types";
 
 export const EVENT_LIMITS = {
@@ -285,7 +285,7 @@ export async function createEvent(
     eventId: event.id,
     actorUserId: organizer.id,
     kind: "created",
-    summary: `${organizer.name || organizer.email} created “${title}”.`,
+    summary: `${displayName(organizer.name, organizer.email)} created “${title}”.`,
     body: { slots: slots.length, quorumMin, visibility: event.visibility },
   });
   await writeAudit({
@@ -360,7 +360,7 @@ export async function joinEvent(
     eventId: event.id,
     actorUserId: user.id,
     kind: "joined",
-    summary: `${user.name || user.email} opened the event.`,
+    summary: `${displayName(user.name, user.email)} opened the event.`,
   });
 
   return participant;
@@ -533,7 +533,7 @@ export async function addOption(
     summary:
       role === "organizer"
         ? `The organizer added ${label ?? formatSlot(startsAt, endsAt, event.timezone)}.`
-        : `${user.name || user.email} suggested ${label ?? formatSlot(startsAt, endsAt, event.timezone)}.`,
+        : `${displayName(user.name, user.email)} suggested ${label ?? formatSlot(startsAt, endsAt, event.timezone)}.`,
   });
 }
 

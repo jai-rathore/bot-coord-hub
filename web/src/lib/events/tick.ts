@@ -6,7 +6,7 @@
  * computed deterministically by resolve.ts.
  */
 
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, lte, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   eventDimensions,
@@ -76,6 +76,47 @@ export async function resolveEventOutcome(event: Event) {
   return { dimension, outcome, winningOption };
 }
 
+
+/**
+ * The single fixed time on an RSVP-style event, if it has one. Used when there
+ * is no option to choose between and the only open question is who is coming.
+ */
+async function fixedTimeOption(eventId: string) {
+  const db = getDb();
+  const [dimension] = await db
+    .select()
+    .from(eventDimensions)
+    .where(
+      and(
+        eq(eventDimensions.eventId, eventId),
+        eq(eventDimensions.kind, "time"),
+        eq(eventDimensions.mode, "fixed"),
+      ),
+    )
+    .limit(1);
+  if (!dimension) return null;
+  const [option] = await db
+    .select()
+    .from(eventOptions)
+    .where(eq(eventOptions.dimensionId, dimension.id))
+    .limit(1);
+  return option ?? null;
+}
+
+async function attendingCount(eventId: string): Promise<number> {
+  const db = getDb();
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(eventParticipants)
+    .where(
+      and(
+        eq(eventParticipants.eventId, eventId),
+        eq(eventParticipants.attendance, "yes"),
+      ),
+    );
+  return row?.count ?? 0;
+}
+
 /**
  * Close an event and record its outcome. Locking never books — it creates the
  * organizer's confirm, and only their approval reaches a calendar.
@@ -84,9 +125,27 @@ export async function closeEvent(event: Event): Promise<"locked" | "expired"> {
   const db = getDb();
   const resolved = await resolveEventOutcome(event);
 
-  const quorumMet = resolved?.outcome.quorumMet ?? false;
-  const winner = resolved?.winningOption ?? null;
-  const nextStatus: "locked" | "expired" = winner && quorumMet ? "locked" : "expired";
+  let quorumMet: boolean;
+  let winner: Awaited<ReturnType<typeof fixedTimeOption>> = null;
+  let yesCount: number;
+
+  if (resolved) {
+    quorumMet = resolved.outcome.quorumMet;
+    winner = resolved.winningOption;
+    yesCount = resolved.outcome.winner?.yes ?? 0;
+  } else {
+    // Nothing to choose between — this is an RSVP event, where the only open
+    // question is who is coming. Resolve on attendance and keep the event's
+    // own fixed time as the outcome, so it still reaches the organizer's
+    // approval instead of silently expiring.
+    yesCount = await attendingCount(event.id);
+    quorumMet = yesCount >= (event.quorumMin ?? 1);
+    winner = await fixedTimeOption(event.id);
+  }
+
+  // A decidable event needs a winning option; an RSVP event only needs people.
+  const nextStatus: "locked" | "expired" =
+    quorumMet && (resolved ? Boolean(winner) : true) ? "locked" : "expired";
 
   // Conditional update: whoever gets there first wins, so a concurrent tick
   // cannot double-transition or double-notify.
@@ -97,13 +156,13 @@ export async function closeEvent(event: Event): Promise<"locked" | "expired"> {
       lockedAt: nextStatus === "locked" ? new Date() : null,
       updatedAt: new Date(),
       outcome: {
-        reason: resolved?.outcome.reason ?? "no_options",
+        reason: resolved?.outcome.reason ?? (quorumMet ? "resolved" : "quorum_not_met"),
         winningOptionId: winner?.id ?? null,
         winningLabel: winner
           ? (winner.label ??
             formatSlot(winner.startsAt, winner.endsAt, event.timezone))
           : null,
-        yes: resolved?.outcome.winner?.yes ?? 0,
+        yes: yesCount,
       },
     })
     .where(and(eq(events.id, event.id), eq(events.status, "open")))

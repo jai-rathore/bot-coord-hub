@@ -1,3 +1,22 @@
+/**
+ * A name safe to show to other people.
+ *
+ * Never returns a full email address. `users.name` is nullable and the event
+ * share page is public, so falling back to the raw email would publish it to
+ * anyone holding the link.
+ */
+export function displayName(
+  name: string | null | undefined,
+  email: string | null | undefined,
+  fallback = "Someone",
+): string {
+  const trimmed = name?.trim();
+  if (trimmed) return trimmed;
+  const local = email?.split("@")[0]?.trim();
+  if (local) return local;
+  return fallback;
+}
+
 /** Plain-English strings for events. Mirrors the tone of activity-copy.ts. */
 
 export function relativeDeadline(deadlineAt: Date, now = new Date()): string {
