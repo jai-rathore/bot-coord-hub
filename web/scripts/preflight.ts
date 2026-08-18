@@ -5,6 +5,12 @@ import {
   agentPairings,
   agentProfiles,
   agentCapabilities,
+  eventActivity,
+  eventDimensions,
+  eventOptions,
+  eventParticipants,
+  eventResponses,
+  events,
   apiKeys,
   calendarConnections,
   guestTasks,
@@ -186,12 +192,21 @@ async function main() {
           .select({ id: agentCapabilities.id })
           .from(agentCapabilities)
           .limit(1),
+        db.select({ id: events.id }).from(events).limit(1),
+        db.select({ id: eventDimensions.id }).from(eventDimensions).limit(1),
+        db.select({ id: eventOptions.id }).from(eventOptions).limit(1),
+        db
+          .select({ id: eventParticipants.id })
+          .from(eventParticipants)
+          .limit(1),
+        db.select({ id: eventResponses.id }).from(eventResponses).limit(1),
+        db.select({ id: eventActivity.id }).from(eventActivity).limit(1),
       ]);
       checks.push({
         name: "Current schema",
         ok: true,
         detail:
-          "guest, pairing, invite, profile, discovery, location, safety, and capability tables available",
+          "guest, pairing, invite, profile, discovery, location, safety, capability, and event tables available",
       });
     } catch (error) {
       checks.push({

@@ -223,6 +223,28 @@ HoneyMatcha returns only a verdict and per-dimension compatibility. Never expose
 candidate raw values, rank candidates, or treat the result as an automatic
 rejection.
 
+### H. Coordinate a group event
+
+Use this when several people need to agree on a time, or just say whether
+they're coming. It beats `schedule_meeting` whenever the group is larger than
+two or you don't know who will actually show up.
+
+1. `create_event` with a title and either `slots` (times to choose from) or
+   `fixedStartsAt` (RSVP only). Set `quorumMin` when it only happens if enough
+   people can make it, and `visibility: "blind"` for recruiting.
+2. Give the human the returned share link. They paste it wherever the group
+   already talks. **Anyone can open it; responding requires a HoneyMatcha
+   sign-in**, so every answer belongs to a real person.
+3. Poll `get_event_board` for status. It returns per-option tallies, who has
+   answered, the leading option, and a `summary` string you can relay verbatim.
+4. It resolves on the deadline (or early, at quorum). **Never wait for everyone
+   to answer** — non-responders are expected and simply don't count.
+5. When it locks, the organizer gets an approval in HoneyMatcha. Only they can
+   confirm, and only that confirms books a calendar.
+
+`lock_event`, `cancel_event`, and `confirm_event` are human-only. If you call
+them you get an instruction, not an error — relay it and do not retry.
+
 ## Endpoints cheat sheet
 
 | Action | Method & path |
@@ -236,6 +258,12 @@ rejection.
 | list links | `GET /api/v1/links` |
 | create invite | `POST /api/v1/links/invite` |
 | accept invite | `POST /api/v1/links/accept` |
+| list events | `GET /api/v1/events` |
+| create event | `POST /api/v1/events` |
+| event board | `GET /api/v1/events/:id` |
+| add event option | `POST /api/v1/events/:id/options` |
+| extend event deadline | `POST /api/v1/events/:id/deadline` |
+| nudge participants | `POST /api/v1/events/:id/nudge` |
 | list sessions | `GET /api/v1/sessions` |
 | read board | `GET /api/v1/sessions/:id/board` |
 | post board | `POST /api/v1/sessions/:id/messages` |

@@ -117,6 +117,8 @@ export const users = pgTable(
     clerkUserId: text("clerk_user_id").notNull(),
     email: text("email").notNull(),
     name: text("name"),
+    /** Default display name for the platform-provided agent. */
+    hostedAgentName: text("hosted_agent_name"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -1151,6 +1153,318 @@ export const agentInbox = pgTable(
   ],
 );
 
+/* ==========================================================================
+ * Events — shareable group coordination.
+ *
+ * Viewing an event is public. Participating requires a signed-in HoneyMatcha
+ * user, so every participant resolves to a real `users` row: identity is
+ * verified, dedupe is a unique index, and no participant PII lives here.
+ * ========================================================================== */
+
+export const eventStatusEnum = pgEnum("event_status", [
+  "draft",
+  "open",
+  "locked",
+  "confirmed",
+  "cancelled",
+  "expired",
+]);
+
+export const eventVisibilityEnum = pgEnum("event_visibility", [
+  "open",
+  "counts_only",
+  "blind",
+]);
+
+export const eventLockPolicyEnum = pgEnum("event_lock_policy", [
+  "on_quorum",
+  "at_deadline",
+  "manual",
+]);
+
+export const eventDimensionKindEnum = pgEnum("event_dimension_kind", [
+  "time",
+  "place",
+  "attendance",
+  "custom",
+]);
+
+export const eventDimensionModeEnum = pgEnum("event_dimension_mode", [
+  "fixed",
+  "open",
+]);
+
+export const eventAgentModeEnum = pgEnum("event_agent_mode", [
+  "hosted",
+  "byo",
+  "none",
+]);
+
+export const eventAttendanceEnum = pgEnum("event_attendance", [
+  "pending",
+  "yes",
+  "no",
+  "maybe",
+]);
+
+export const eventPrefEnum = pgEnum("event_pref", ["yes", "no", "maybe"]);
+
+export const events = pgTable(
+  "events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    publicId: uuid("public_id").defaultRandom().notNull(),
+    /** Short, human-shareable path segment. Not a secret — it only grants read. */
+    shareSlug: text("share_slug").notNull(),
+    organizerUserId: uuid("organizer_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id").references(() => sessions.id, {
+      onDelete: "set null",
+    }),
+    title: text("title").notNull(),
+    description: text("description"),
+    timezone: text("timezone").notNull().default("UTC"),
+    status: eventStatusEnum("status").notNull().default("open"),
+    visibility: eventVisibilityEnum("visibility").notNull().default("open"),
+    lockPolicy: eventLockPolicyEnum("lock_policy").notNull().default("at_deadline"),
+    quorumMin: integer("quorum_min"),
+    capacityMax: integer("capacity_max"),
+    deadlineAt: timestamp("deadline_at", { withTimezone: true }).notNull(),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    agentMode: eventAgentModeEnum("agent_mode").notNull().default("hosted"),
+    /** Snapshot of the hosted agent name at creation, so renames never rewrite history. */
+    agentName: text("agent_name").notNull().default("Sage"),
+    allowChat: boolean("allow_chat").notNull().default(true),
+    allowGuestOptions: boolean("allow_guest_options").notNull().default(true),
+    outcome: jsonb("outcome").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("events_public_id_uidx").on(t.publicId),
+    uniqueIndex("events_share_slug_uidx").on(t.shareSlug),
+    index("events_organizer_idx").on(t.organizerUserId),
+    index("events_status_deadline_idx").on(t.status, t.deadlineAt),
+    check(
+      "events_quorum_min_check",
+      sql`${t.quorumMin} is null or ${t.quorumMin} >= 1`,
+    ),
+    check(
+      "events_capacity_max_check",
+      sql`${t.capacityMax} is null or ${t.capacityMax} >= 1`,
+    ),
+  ],
+);
+
+export const eventDimensions = pgTable(
+  "event_dimensions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    kind: eventDimensionKindEnum("kind").notNull(),
+    label: text("label").notNull(),
+    mode: eventDimensionModeEnum("mode").notNull(),
+    resolutionRule: text("resolution_rule").notNull().default("max_attendance"),
+    resolvedOptionId: uuid("resolved_option_id"),
+    dependsOnDimensionId: uuid("depends_on_dimension_id"),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("event_dimensions_event_idx").on(t.eventId, t.position),
+    uniqueIndex("event_dimensions_event_kind_uidx").on(t.eventId, t.kind),
+  ],
+);
+
+export const eventOptions = pgTable(
+  "event_options",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    dimensionId: uuid("dimension_id")
+      .notNull()
+      .references(() => eventDimensions.id, { onDelete: "cascade" }),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    label: text("label"),
+    placeRef: jsonb("place_ref").$type<Record<string, unknown>>().notNull().default({}),
+    capacity: integer("capacity"),
+    createdByRole: text("created_by_role").notNull().default("organizer"),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    status: text("status").notNull().default("active"),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("event_options_event_dim_idx").on(t.eventId, t.dimensionId, t.position),
+    index("event_options_dimension_idx").on(t.dimensionId),
+  ],
+);
+
+export const eventParticipants = pgTable(
+  "event_participants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    /** Never null — participation requires a signed-in account. */
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: participantRoleEnum("role").notNull().default("invitee"),
+    attendance: eventAttendanceEnum("attendance").notNull().default("pending"),
+    chatTurnsUsed: integer("chat_turns_used").notNull().default(0),
+    source: text("source").notNull().default("share_link"),
+    joinedAt: timestamp("joined_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("event_participants_event_user_uidx").on(t.eventId, t.userId),
+    index("event_participants_event_idx").on(t.eventId),
+    index("event_participants_user_idx").on(t.userId),
+  ],
+);
+
+export const eventResponses = pgTable(
+  "event_responses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    participantId: uuid("participant_id")
+      .notNull()
+      .references(() => eventParticipants.id, { onDelete: "cascade" }),
+    dimensionId: uuid("dimension_id")
+      .notNull()
+      .references(() => eventDimensions.id, { onDelete: "cascade" }),
+    optionId: uuid("option_id")
+      .notNull()
+      .references(() => eventOptions.id, { onDelete: "cascade" }),
+    value: eventPrefEnum("value").notNull(),
+    note: text("note"),
+    source: text("source").notNull().default("ui"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("event_responses_participant_option_uidx").on(
+      t.participantId,
+      t.optionId,
+    ),
+    index("event_responses_event_option_idx").on(t.eventId, t.optionId),
+  ],
+);
+
+export const eventActivity = pgTable(
+  "event_activity",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    actorUserId: uuid("actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    kind: text("kind").notNull(),
+    summary: text("summary").notNull(),
+    body: jsonb("body").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("event_activity_event_created_idx").on(t.eventId, t.createdAt)],
+);
+
+export const eventMessages = pgTable(
+  "event_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    /** Null means the organizer's own thread with the hosted agent. */
+    participantId: uuid("participant_id").references(() => eventParticipants.id, {
+      onDelete: "cascade",
+    }),
+    role: text("role").notNull(),
+    text: text("text").notNull(),
+    toolCalls: jsonb("tool_calls").$type<unknown[]>().notNull().default([]),
+    tokensIn: integer("tokens_in").notNull().default(0),
+    tokensOut: integer("tokens_out").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("event_messages_thread_idx").on(
+      t.eventId,
+      t.participantId,
+      t.createdAt,
+    ),
+  ],
+);
+
+/**
+ * Durable, idempotent notification queue. `dedupeKey` is unique, so a cron
+ * retry can never double-send.
+ */
+export const notificationOutbox = pgTable(
+  "notification_outbox",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id").references(() => events.id, {
+      onDelete: "cascade",
+    }),
+    channel: text("channel").notNull().default("email"),
+    template: text("template").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    dedupeKey: text("dedupe_key").notNull(),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("notification_outbox_dedupe_uidx").on(t.dedupeKey),
+    index("notification_outbox_pending_idx")
+      .on(t.scheduledFor)
+      .where(sql`${t.sentAt} is null`),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type AgentProfile = typeof agentProfiles.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
@@ -1181,3 +1495,11 @@ export type DiscoveryBlock = typeof discoveryBlocks.$inferSelect;
 export type DiscoveryPairHistory = typeof discoveryPairHistory.$inferSelect;
 export type UserSafety = typeof userSafety.$inferSelect;
 export type SafetyReport = typeof safetyReports.$inferSelect;
+export type Event = typeof events.$inferSelect;
+export type EventDimension = typeof eventDimensions.$inferSelect;
+export type EventOption = typeof eventOptions.$inferSelect;
+export type EventParticipant = typeof eventParticipants.$inferSelect;
+export type EventResponse = typeof eventResponses.$inferSelect;
+export type EventActivity = typeof eventActivity.$inferSelect;
+export type EventMessage = typeof eventMessages.$inferSelect;
+export type NotificationOutbox = typeof notificationOutbox.$inferSelect;

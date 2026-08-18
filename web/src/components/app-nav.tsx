@@ -8,6 +8,7 @@ import { BrandLink } from "@/components/brand-link";
 const NAV: Array<{ href: string; label: string; exact?: boolean }> = [
   { href: "/app", label: "Home", exact: true },
   { href: "/app/tasks", label: "Tasks" },
+  { href: "/app/events", label: "Events" },
   { href: "/app/discovery", label: "Discovery" },
   { href: "/app/people", label: "People" },
   { href: "/app/attention", label: "Needs your attention" },
@@ -22,6 +23,12 @@ function NavIcon({ href }: { href: string }) {
       <>
         <rect x="5" y="4" width="14" height="16" rx="2" />
         <path d="M9 9h6M9 13h6M9 17h4" />
+      </>
+    ),
+    "/app/events": (
+      <>
+        <rect x="4" y="5" width="16" height="15" rx="2" />
+        <path d="M8 3v4M16 3v4M4 10h16M9 14h2M9 17h6" />
       </>
     ),
     "/app/discovery": (

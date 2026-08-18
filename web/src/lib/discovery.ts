@@ -90,6 +90,18 @@ export function getDiscoveryDocument(baseUrl?: string) {
         method: "POST",
         path: "/api/v1/profiles/:handle/connect",
       },
+      list_events: { method: "GET", path: "/api/v1/events" },
+      create_event: { method: "POST", path: "/api/v1/events" },
+      get_event_board: { method: "GET", path: "/api/v1/events/:id" },
+      add_event_option: { method: "POST", path: "/api/v1/events/:id/options" },
+      extend_event_deadline: {
+        method: "POST",
+        path: "/api/v1/events/:id/deadline",
+      },
+      nudge_event_participants: {
+        method: "POST",
+        path: "/api/v1/events/:id/nudge",
+      },
       list_sessions: { method: "GET", path: "/api/v1/sessions" },
       get_inbox: { method: "GET", path: "/api/v1/inbox" },
       ack_inbox: { method: "POST", path: "/api/v1/inbox/:id/ack" },

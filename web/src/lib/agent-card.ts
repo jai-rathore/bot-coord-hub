@@ -46,6 +46,13 @@ export function getAgentCard(baseUrl: string) {
         tags: ["coordination", "calendar", "approval"],
       },
       {
+        id: "group-event",
+        name: "Coordinate a group event",
+        description:
+          "Create one shareable event link. Anyone can read it; responding needs a sign-in. It resolves on a deadline and optional quorum instead of waiting for everyone, and the organizer confirms before anything is booked.",
+        tags: ["coordination", "events", "group", "approval"],
+      },
+      {
         id: "guest-task",
         name: "Ask a no-account guest",
         description:

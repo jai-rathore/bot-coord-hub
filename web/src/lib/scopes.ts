@@ -15,6 +15,8 @@ export const AGENT_SCOPES = [
   "intents:request",
   "discovery:read",
   "discovery:write",
+  "events:read",
+  "events:write",
 ] as const;
 
 export type AgentScope = (typeof AGENT_SCOPES)[number];
@@ -33,6 +35,7 @@ export const DEFAULT_AGENT_SCOPES: AgentScope[] = [
   "intents:request",
   "discovery:read",
   "discovery:write",
+  "events:read",
 ];
 
 export const PAIRING_AGENT_SCOPES = DEFAULT_AGENT_SCOPES;
