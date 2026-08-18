@@ -3,6 +3,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { BrandAtmosphere } from "@/components/brand-atmosphere";
 import { HomeGetStarted } from "@/components/home-get-started";
 import { HomeHero } from "@/components/home-hero";
+import { HomeLadder } from "@/components/home-ladder";
 import { SiteHeader } from "@/components/site-header";
 import { getHomeStatus, isSetupComplete } from "@/lib/home-status";
 import { ensureCurrentUser } from "@/lib/users";
@@ -10,6 +11,103 @@ import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 
 export const dynamic = "force-dynamic";
+
+type WayTone = {
+  card: string;
+  eyebrow: string;
+  title: string;
+  body: string;
+  bullet: string;
+  cta: string;
+  mark: string;
+};
+
+/** Each capability reads differently at a glance: warm for a group you already
+ *  know, green for one person, deep for someone you have not met. */
+const WAY_TONE: Record<string, WayTone> = {
+  events: {
+    card: "border-honey-soft/55 bg-[linear-gradient(155deg,rgba(255,255,252,0.95),rgba(249,240,216,0.82))]",
+    eyebrow: "text-honey",
+    title: "text-matcha-deep",
+    body: "text-muted",
+    bullet: "bg-honey/70",
+    cta: "text-matcha-deep",
+    mark: "text-honey/75",
+  },
+  people: {
+    card: "border-matcha-soft/45 bg-[linear-gradient(155deg,rgba(255,255,252,0.95),rgba(233,243,235,0.88))]",
+    eyebrow: "text-matcha",
+    title: "text-matcha-deep",
+    body: "text-muted",
+    bullet: "bg-matcha-soft",
+    cta: "text-matcha-deep",
+    mark: "text-matcha-soft",
+  },
+  discovery: {
+    card: "border-matcha-deep bg-[linear-gradient(155deg,#1d4834_0%,#173f2e_60%,#122f22_100%)]",
+    eyebrow: "text-honey-soft",
+    title: "text-[#f4f8f4]",
+    body: "text-[#cfe0d3]",
+    bullet: "bg-honey-soft/80",
+    cta: "text-honey-soft",
+    mark: "text-honey-soft/70",
+  },
+};
+
+function WayMark({ kind, className }: { kind: string; className: string }) {
+  const p = {
+    viewBox: "0 0 64 40",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.5,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true as const,
+    className,
+  };
+  if (kind === "events") {
+    // many converging on one
+    return (
+      <svg {...p}>
+        <circle cx="46" cy="20" r="7" />
+        {[
+          [10, 8],
+          [8, 20],
+          [12, 32],
+          [24, 4],
+          [26, 36],
+        ].map(([x, y]) => (
+          <g key={`${x}-${y}`}>
+            <circle cx={x} cy={y} r="2.6" />
+            <path d={`M${x + 3} ${y} L39 20`} strokeDasharray="2 3" opacity="0.55" />
+          </g>
+        ))}
+      </svg>
+    );
+  }
+  if (kind === "people") {
+    // two, meeting in the middle
+    return (
+      <svg {...p}>
+        <circle cx="16" cy="20" r="7.5" />
+        <circle cx="48" cy="20" r="7.5" />
+        <path d="M24 20h16" strokeDasharray="3 3" />
+        <path d="M29 15.5l3 4.5-3 4.5M35 15.5l-3 4.5 3 4.5" opacity="0.7" />
+      </svg>
+    );
+  }
+  // veiled: known shapes behind a curtain
+  return (
+    <svg {...p}>
+      <circle cx="14" cy="20" r="6.5" />
+      <circle cx="34" cy="13" r="4" opacity="0.6" />
+      <circle cx="38" cy="28" r="4" opacity="0.6" />
+      <circle cx="54" cy="20" r="5" opacity="0.35" />
+      <path d="M24 6v28" strokeDasharray="3 4" opacity="0.8" />
+      <path d="M46 8v24" strokeDasharray="3 4" opacity="0.45" />
+    </svg>
+  );
+}
 
 const WAYS = [
   {
@@ -170,30 +268,36 @@ export default async function HomePage() {
             ).map((card) => (
               <article
                 key={card.title}
-                className={`surface-card surface-card-interactive group relative flex flex-col overflow-hidden p-6 sm:p-7 ${
-                  card.featured ? "ring-1 ring-matcha-soft/35" : ""
-                }`}
+                className={`cap-card surface-card group relative flex flex-col overflow-hidden border p-6 sm:p-7 ${WAY_TONE[card.key].card}`}
               >
-                <span
-                  className="pointer-events-none absolute -top-14 -right-12 h-40 w-40 rounded-full border border-matcha-soft/12 bg-matcha-soft/5 transition duration-500 group-hover:scale-110"
-                  aria-hidden="true"
-                />
                 <div className="relative flex flex-1 flex-col">
-                  <p className="text-[0.7rem] font-bold tracking-[0.14em] text-honey uppercase">
-                    {card.eyebrow}
-                  </p>
-                  <h3 className="mt-2 font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
+                  <div className="flex items-start justify-between gap-4">
+                    <p
+                      className={`text-[0.7rem] font-bold tracking-[0.14em] uppercase ${WAY_TONE[card.key].eyebrow}`}
+                    >
+                      {card.eyebrow}
+                    </p>
+                    <WayMark
+                      kind={card.key}
+                      className={`cap-mark h-9 w-14 shrink-0 ${WAY_TONE[card.key].mark}`}
+                    />
+                  </div>
+                  <h3
+                    className={`mt-2 font-[family-name:var(--font-fraunces)] text-2xl font-semibold ${WAY_TONE[card.key].title}`}
+                  >
                     {card.title}
                   </h3>
-                  <p className="mt-3 text-sm leading-6 text-muted">{card.body}</p>
+                  <p className={`mt-3 text-sm leading-6 ${WAY_TONE[card.key].body}`}>
+                    {card.body}
+                  </p>
                   <ul className="mt-5 space-y-2">
                     {card.points.map((point) => (
                       <li
                         key={point}
-                        className="flex gap-2 text-sm leading-6 text-ink/85"
+                        className={`flex gap-2 text-sm leading-6 ${WAY_TONE[card.key].body}`}
                       >
                         <span
-                          className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-matcha-soft"
+                          className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${WAY_TONE[card.key].bullet}`}
                           aria-hidden="true"
                         />
                         {point}
@@ -203,7 +307,7 @@ export default async function HomePage() {
                   <div className="mt-6 flex-1" />
                   <Link
                     href={card.href}
-                    className="font-semibold text-matcha-deep no-underline transition group-hover:text-matcha"
+                    className={`font-semibold no-underline ${WAY_TONE[card.key].cta}`}
                   >
                     {card.cta} <span aria-hidden="true">&rarr;</span>
                   </Link>
@@ -212,6 +316,10 @@ export default async function HomePage() {
             ))}
           </div>
         </section>
+
+        <div className="mt-16 sm:mt-24">
+          <HomeLadder discoveryEnabled={discoveryEnabled} />
+        </div>
 
         {/* The agent layer sits under all three, so it comes after them. */}
         <section
@@ -242,118 +350,6 @@ export default async function HomePage() {
             </div>
           </div>
         </section>
-
-        {eventsEnabled ? (
-          <section
-            aria-labelledby="events-title"
-            className="mt-16 mb-16 sm:mt-24 sm:mb-20"
-          >
-            <div className="surface-card relative overflow-hidden p-7 sm:p-10">
-              <span
-                className="absolute -top-20 -right-16 h-56 w-56 rounded-full border border-matcha-soft/15 bg-matcha-soft/8"
-                aria-hidden="true"
-              />
-              <div className="relative grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
-                <div>
-                  <p className="section-kicker">A closer look — events</p>
-                  <h2
-                    id="events-title"
-                    className="display-title mt-2 text-3xl sm:text-4xl"
-                  >
-                    One link. The whole group sorted.
-                  </h2>
-                  <p className="mt-4 max-w-xl text-lg leading-8 text-muted">
-                    Share a single link in the group chat. Everyone taps what
-                    works, and it settles on a deadline and a headcount instead
-                    of waiting for all ten people to reply.
-                  </p>
-                  <div className="mt-7 flex flex-wrap gap-3">
-                    <Link href="/app/events/new" className="button-primary">
-                      Create an event
-                    </Link>
-                  </div>
-                  <p className="mt-4 text-sm text-muted">
-                    Anyone can open the link. Responding takes a quick sign-in,
-                    so every answer belongs to a real person.
-                  </p>
-                </div>
-                <ul className="grid gap-3 self-center">
-                  {[
-                    [
-                      "Nobody blocks the plan",
-                      "Set a deadline and a minimum headcount. People who never reply simply don't count.",
-                    ],
-                    [
-                      "You choose who sees what",
-                      "Show everything, show counts without names, or keep responses to yourself.",
-                    ],
-                    [
-                      "You confirm, not the agent",
-                      "HoneyMatcha proposes the winning time. Nothing reaches a calendar until you say yes.",
-                    ],
-                  ].map(([title, body]) => (
-                    <li
-                      key={title}
-                      className="rounded-[0.9rem] border border-line bg-white/55 p-4"
-                    >
-                      <h3 className="font-semibold text-ink">{title}</h3>
-                      <p className="mt-1 text-sm leading-6 text-muted">{body}</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        {discoveryEnabled ? (
-          <section aria-labelledby="discovery-title" className="mb-20 sm:mb-28">
-            <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
-              <div>
-                <p className="section-kicker">Agent-powered discovery</p>
-                <h2
-                  id="discovery-title"
-                  className="display-title mt-2 text-3xl sm:text-4xl"
-                >
-                  Let your agent find potential people to meet.
-                </h2>
-                <p className="mt-4 text-base leading-7 text-muted">
-                  Your agent can explain supported discovery tasks, gather only
-                  the information that task needs, and privately look for
-                  potential counterparts.
-                </p>
-                <Link href="/app/discovery" className="button-primary mt-6">
-                  Manage discovery
-                </Link>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {[
-                  [
-                    "Recruiting",
-                    "Privately compare role and candidate constraints before either person is identified.",
-                  ],
-                  [
-                    "Dating introductions",
-                    "Your agent looks privately for adult matches by intent, interests, and city, then asks you before anyone is identified.",
-                  ],
-                  [
-                    "Two human approvals",
-                    "Your outgoing request stays private until you approve it. The recipient then makes their own decision.",
-                  ],
-                  [
-                    "No public directory",
-                    "Agents receive rotating anonymous handles—not emails, profiles, stable IDs, or private match dimensions.",
-                  ],
-                ].map(([title, body]) => (
-                  <article key={title} className="surface-card surface-card-interactive p-5">
-                    <h3 className="font-semibold text-matcha-deep">{title}</h3>
-                    <p className="mt-2 text-sm leading-6 text-muted">{body}</p>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </section>
-        ) : null}
 
         <div id="get-started" className="scroll-mt-24">
           <HomeGetStarted signedIn={signedIn} setupComplete={setupComplete} />

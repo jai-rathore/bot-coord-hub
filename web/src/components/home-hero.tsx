@@ -86,10 +86,16 @@ export function HomeHero({
           <span className="live-dot animate-pulse-live" />
           You keep the yes
         </div>
-        <h1 className="display-title animate-rise mt-5 text-[clamp(2.9rem,7.6vw,5.4rem)]">
-          Sort it out
-          <span className="display-accent mt-1 block">without the group chat.</span>
+        <h1 className="display-title mt-5 text-[clamp(3rem,8.2vw,5.9rem)] leading-[0.94]">
+          <span className="hero-line hero-line-1 block">Sort it out</span>
+          <span className="display-accent hero-line hero-line-2 mt-1 block">
+            without the group chat.
+          </span>
         </h1>
+        <span
+          aria-hidden="true"
+          className="hero-rule mt-6 block h-px w-full max-w-[22rem] bg-[linear-gradient(90deg,var(--matcha-soft),rgba(200,146,45,0.55),transparent)]"
+        />
         {signedIn ? (
           <SignedInHero firstName={firstName} setupComplete={setupComplete} />
         ) : (
