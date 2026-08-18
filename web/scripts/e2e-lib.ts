@@ -169,7 +169,7 @@ async function main() {
         linkId: carolRequest.request.id,
         origin,
       }),
-    /Only the public invite owner/,
+    /Only the owner can approve/,
   );
   const publicAccepted = await approveConnectionRequest({
     user: alice,
