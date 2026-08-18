@@ -151,12 +151,14 @@ export function EventCreateForm() {
                         prev.map((s, i) => (i === index ? e.target.value : s)),
                       )
                     }
-                    className="field w-full sm:w-auto"
+                    /* min-w-0 flex-1 so the input yields space instead of
+                       crushing the Remove button into a letter column. */
+                    className="field min-w-0 flex-1"
                   />
                   {slots.length > 1 && (
                     <button
                       type="button"
-                      className="button-secondary"
+                      className="button-secondary shrink-0 whitespace-nowrap"
                       onClick={() =>
                         setSlots((prev) => prev.filter((_, i) => i !== index))
                       }
