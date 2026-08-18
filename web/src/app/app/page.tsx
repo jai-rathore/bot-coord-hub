@@ -29,6 +29,23 @@ export default async function AppHomePage() {
   const setupComplete = isSetupComplete(status);
   const discoveryEnabled = discoveryFeatureEnabled();
 
+  const setupPanel = (
+    <>
+      <SetupGuide
+        calendar={{
+          connected: Boolean(conn),
+          enabled: googleCalendarEnabled(),
+          configured: googleOAuthConfigured(),
+          googleAccountEmail: conn?.googleAccountEmail ?? null,
+          calendarId: conn?.calendarId ?? null,
+          updatedAt: conn?.updatedAt?.toISOString() ?? null,
+        }}
+        agent={status.agent}
+      />
+      {setupComplete ? <AgentStatusCard status={status} /> : null}
+    </>
+  );
+
   return (
     <div className="space-y-12">
       <section className="relative overflow-hidden rounded-[1.75rem] border border-matcha-soft/20 bg-[linear-gradient(135deg,rgba(255,255,252,0.96),rgba(235,244,237,0.9))] px-6 py-7 shadow-[0_20px_55px_rgba(23,63,46,0.09)] sm:px-8 sm:py-9">
@@ -51,19 +68,9 @@ export default async function AppHomePage() {
         </div>
       </section>
 
-      <SetupGuide
-        calendar={{
-          connected: Boolean(conn),
-          enabled: googleCalendarEnabled(),
-          configured: googleOAuthConfigured(),
-          googleAccountEmail: conn?.googleAccountEmail ?? null,
-          calendarId: conn?.calendarId ?? null,
-          updatedAt: conn?.updatedAt?.toISOString() ?? null,
-        }}
-        agent={status.agent}
-      />
-
-      {setupComplete ? <AgentStatusCard status={status} /> : null}
+      {/* Until setup is done, connecting is the most useful thing on the page.
+          After that it is just confirmation, so the actions come first. */}
+      {setupComplete ? null : setupPanel}
 
       {/* Mirrors the three ways in on the marketing page, so what the product
           offers reads the same before and after signing in. */}
@@ -151,6 +158,8 @@ export default async function AppHomePage() {
             ))}
         </div>
       </section>
+
+      {setupComplete ? setupPanel : null}
 
       <section>
         <div className="flex items-center justify-between gap-3">
