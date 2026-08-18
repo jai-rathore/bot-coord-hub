@@ -18,6 +18,7 @@ import {
   agentListEvents,
   agentRecordMeeting,
   agentRespondToEvent,
+  agentSetEventNotifications,
   agentSuggestEventOption,
   agentNudgeEventParticipants,
 } from "@/lib/events/agent-api";
@@ -254,6 +255,27 @@ export const MCP_TOOLS: McpToolDef[] = [
         },
       },
       required: ["handle"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "set_event_notifications",
+    description:
+      "Get told when this event moves — someone answers or a new time is suggested. Updates arrive in get_inbox (and your human's email). Joins the event for your human if they haven't yet. Pass notify=false to stop.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventId: {
+          type: "string",
+          description:
+            "Event id, share slug, or full /e/<slug> link — any of the three.",
+        },
+        notify: {
+          type: "boolean",
+          description: "Omit or true to subscribe; false to unsubscribe.",
+        },
+      },
+      required: ["eventId"],
       additionalProperties: false,
     },
   },
@@ -783,6 +805,7 @@ const EVENT_FLAGGED_TOOLS = new Set([
   "add_event_option",
   "extend_event_deadline",
   "nudge_event_participants",
+  "set_event_notifications",
   "record_meeting",
 ]);
 
@@ -873,6 +896,8 @@ export async function dispatchMcpTool(
       return requestAgentConnection(auth, {
         handle: args.handle as string | undefined,
       });
+    case "set_event_notifications":
+      return agentSetEventNotifications(auth, args as never);
     case "record_meeting":
       return agentRecordMeeting(auth, args, baseUrl);
     case "list_sessions":

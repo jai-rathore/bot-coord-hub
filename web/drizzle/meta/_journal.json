@@ -148,6 +148,13 @@
       "when": 1787076964610,
       "tag": "0020_first_scarlet_spider",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787090736819,
+      "tag": "0021_dusty_zombie",
+      "breakpoints": true
     }
   ]
 }

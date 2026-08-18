@@ -42,6 +42,10 @@ export type EnqueueInput = {
   toAllParticipants?: boolean;
   toOrganizerOnly?: boolean;
   scheduledFor?: Date;
+  /** Send to participants who opted into updates (notify_updates). */
+  toSubscribedParticipants?: boolean;
+  /** Skip this user — the person who caused the update already knows. */
+  excludeUserId?: string;
   /** Set false for mail that would be noise in an agent's inbox. */
   notifyAgents?: boolean;
   /** Set false for signals only an agent should act on, never an inbox full of mail. */
@@ -63,6 +67,8 @@ function agentSummary(
   switch (template) {
     case "event_invited":
       return `You were invited to "${title}". Call get_event_board, then respond_to_event with what works for your human.`;
+    case "event_update":
+      return `Update on "${title}": ${payload.summary ?? "new activity"}. Call get_event_board for the current state.`;
     case "participant_joined":
       return `Someone new opened your event "${title}" and has not answered yet. Call get_event_board for the tallies.`;
     case "event_locked":
@@ -116,6 +122,20 @@ export async function enqueueEventNotification(
       .from(eventParticipants)
       .where(eq(eventParticipants.eventId, input.eventId));
     recipients = rows.map((r) => r.userId);
+  } else if (input.toSubscribedParticipants) {
+    const rows = await db
+      .select({ userId: eventParticipants.userId })
+      .from(eventParticipants)
+      .where(
+        and(
+          eq(eventParticipants.eventId, input.eventId),
+          eq(eventParticipants.notifyUpdates, true),
+        ),
+      );
+    recipients = rows.map((r) => r.userId);
+  }
+  if (input.excludeUserId) {
+    recipients = recipients.filter((id) => id !== input.excludeUserId);
   }
 
   let queued = 0;
@@ -204,6 +224,11 @@ function renderTemplate(
       return {
         subject: `${payload.hours ?? 24}h left — ${title}`,
         body: `You haven't answered “${title}” yet. It closes in about ${payload.hours ?? 24} hours.\n\n${eventUrl}`,
+      };
+    case "event_update":
+      return {
+        subject: `Update — ${title}`,
+        body: `${payload.summary ?? "There's new activity on this event."}\n\nYou asked to be notified when something changes here. Turn it off on the event page.\n\n${eventUrl}`,
       };
     case "organizer_digest":
       return {

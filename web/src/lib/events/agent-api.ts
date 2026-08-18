@@ -27,6 +27,7 @@ import {
   extendDeadline,
   joinEvent,
   listEventsForUser,
+  setNotifyUpdates,
   setResponses,
   type CreateEventInput,
   type ResponseEntry,
@@ -152,7 +153,7 @@ async function boardPayload(auth: AgentAuth, event: Event, baseUrl?: string) {
     shareUrl: baseUrl ? `${baseUrl}/e/${board.event.shareSlug}` : undefined,
     board,
     agent_instructions: stillOpen
-      ? board.viewer.canRespond
+      ? board.viewer.participantId
         ? "Ask your human which of these work, then call respond_to_event with the optionIds above. Do not guess for them."
         : "Your human is not on this event yet. Ask them which times work, then call respond_to_event — it joins them at the same time."
       : "This event is closed to new responses. Relay the summary; do not try to answer.",
@@ -388,6 +389,35 @@ export async function agentNudgeEventParticipants(
     toAllParticipants: true,
   });
   return { ok: true, queued };
+}
+
+/**
+ * Opt this agent's human in or out of updates on an event: someone answered,
+ * a new time was suggested. Delivered to their email (when configured) and to
+ * this same agent's inbox, off one dedupe key. Joins the event if needed.
+ */
+export async function agentSetEventNotifications(
+  auth: AgentAuth,
+  body: {
+    eventId?: unknown;
+    shareSlug?: unknown;
+    shareUrl?: unknown;
+    notify?: unknown;
+  },
+) {
+  assertEnabled();
+  assertAgentScope(auth, "events:write");
+  const event = await resolveEventRef(eventRefFrom(body));
+  const notify = body.notify !== false;
+  const participant = await setNotifyUpdates(event, auth.user, notify);
+  return {
+    ok: true,
+    eventId: event.id,
+    notify: participant.notifyUpdates,
+    human_note: notify
+      ? "Updates about this event will arrive in your inbox (get_inbox) and by email when someone answers or suggests a time."
+      : "Updates for this event are off.",
+  };
 }
 
 /**

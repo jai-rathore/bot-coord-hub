@@ -1,4 +1,6 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { CopyBlock } from "@/components/copy-block";
 import { EventClient } from "@/components/event-client";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import {
@@ -9,6 +11,15 @@ import {
 import { ensureCurrentUser } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
+
+/** The origin people actually reached us on, so a copied link is pasteable. */
+async function currentOrigin(): Promise<string> {
+  const list = await headers();
+  const proto = list.get("x-forwarded-proto") ?? "https";
+  const host =
+    list.get("x-forwarded-host") ?? list.get("host") ?? "honeymatcha.io";
+  return `${proto}://${host}`;
+}
 
 export default async function OrganizerEventPage({
   params,
@@ -30,6 +41,7 @@ export default async function OrganizerEventPage({
   const isOrganizer = source.event.organizerUserId === user.id;
   const board = projectBoard(source, user.id);
   const activity = isOrganizer ? await loadEventActivity(id) : [];
+  const shareUrl = `${await currentOrigin()}/e/${board.event.shareSlug}`;
 
   return (
     <div className="space-y-8">
@@ -46,9 +58,11 @@ export default async function OrganizerEventPage({
           <h2 className="mt-2 text-lg font-semibold text-ink">
             Paste this wherever your group talks
           </h2>
-          <p className="mt-3 rounded-[0.8rem] border border-line bg-code-bg px-3 py-2 font-mono text-sm break-all text-matcha-deep">
-            /e/{board.event.shareSlug}
-          </p>
+          {/* The whole URL, not just the path — someone reading this off the
+              screen or copying it by hand needs something that resolves. */}
+          <div className="mt-3">
+            <CopyBlock text={shareUrl} label="Copy link" />
+          </div>
           <p className="mt-2 text-xs text-muted">
             Anyone can open it. Responding needs a sign-in, so every answer is
             tied to a real person.

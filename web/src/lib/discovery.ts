@@ -100,6 +100,10 @@ export function getDiscoveryDocument(baseUrl?: string) {
         method: "POST",
         path: "/api/v1/events/:id/suggest-option",
       },
+      set_event_notifications: {
+        method: "POST",
+        path: "/api/v1/events/:id/subscribe",
+      },
       add_event_option: { method: "POST", path: "/api/v1/events/:id/options" },
       extend_event_deadline: {
         method: "POST",

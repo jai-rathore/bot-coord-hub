@@ -381,7 +381,146 @@ async function main() {
   );
 
   /* ---------------------------------------------------------------- */
-  console.log("\n11. Cleanup");
+  console.log("\n11. Following an event actually tells you things");
+
+  // Guest's agent subscribes using nothing but the share link.
+  const subscribed = (await call(guest, "set_event_notifications", {
+    eventId: `${ORIGIN}/e/${slug}`,
+  })) as { ok: boolean; notify: boolean };
+  assert.equal(subscribed.notify, true);
+  ok("an agent can follow an event straight from its link");
+
+  // A third person answers; the subscriber hears about it, the actor doesn't.
+  const strangerBoard = (await call(stranger, "get_event_board", {
+    eventId: slug,
+  })) as {
+    board: { dimensions: Array<{ kind: string; options: Array<{ id: string }> }> };
+  };
+  const strangerOption = strangerBoard.board.dimensions.find(
+    (d) => d.kind === "time",
+  )!.options[0];
+  await call(stranger, "respond_to_event", {
+    eventId: slug,
+    entries: [{ optionId: strangerOption.id, value: "yes" }],
+  });
+
+  const updateMail = await db
+    .select()
+    .from(notificationOutbox)
+    .where(
+      and(
+        eq(notificationOutbox.eventId, createdEvent.event.id),
+        eq(notificationOutbox.template, "event_update"),
+      ),
+    );
+  const mailedTo = new Set(updateMail.map((row) => row.userId));
+  assert.ok(mailedTo.has(guest.user.id), "the subscriber should be emailed");
+  assert.ok(!mailedTo.has(stranger.user.id), "the actor must not be notified");
+  assert.ok(
+    !mailedTo.has(host.user.id),
+    "the unsubscribed organizer must not be emailed",
+  );
+  ok("a response notifies exactly the people who opted in");
+
+  const guestUpdates = (await listInboxForUser(guest.user.id)).filter(
+    (item) => item.kind === "event.event_update",
+  );
+  assert.ok(guestUpdates.length > 0, "the subscriber's agent should hear too");
+  assert.equal(guestUpdates[0]!.eventId, createdEvent.event.id);
+  ok("...and the same update reaches their agent's inbox");
+
+  // A new suggestion notifies subscribers as well.
+  const mailsBefore = updateMail.length;
+  await call(stranger, "suggest_event_option", {
+    eventId: slug,
+    dimensionId: timeDim.id,
+    startsAt: new Date(Date.now() + 345_600_000).toISOString(),
+  });
+  const afterOption = await db
+    .select()
+    .from(notificationOutbox)
+    .where(
+      and(
+        eq(notificationOutbox.eventId, createdEvent.event.id),
+        eq(notificationOutbox.template, "event_update"),
+      ),
+    );
+  assert.ok(
+    afterOption.length > mailsBefore,
+    "a suggested option should notify subscribers",
+  );
+  ok("a new suggestion notifies followers");
+
+  // Unsubscribing stops the flow.
+  const unsubscribed = (await call(guest, "set_event_notifications", {
+    eventId: slug,
+    notify: false,
+  })) as { notify: boolean };
+  assert.equal(unsubscribed.notify, false);
+  const countBefore = (
+    await db
+      .select()
+      .from(notificationOutbox)
+      .where(
+        and(
+          eq(notificationOutbox.eventId, createdEvent.event.id),
+          eq(notificationOutbox.template, "event_update"),
+        ),
+      )
+  ).length;
+  await call(stranger, "respond_to_event", {
+    eventId: slug,
+    entries: [{ optionId: strangerOption.id, value: "maybe" }],
+  });
+  const countAfter = (
+    await db
+      .select()
+      .from(notificationOutbox)
+      .where(
+        and(
+          eq(notificationOutbox.eventId, createdEvent.event.id),
+          eq(notificationOutbox.template, "event_update"),
+        ),
+      )
+  ).length;
+  assert.equal(countAfter, countBefore, "unsubscribing must stop updates");
+  ok("turning it off actually turns it off");
+
+  /* ---------------------------------------------------------------- */
+  console.log("\n12. Private events do not narrate responses to followers");
+  const blindEvent = (await call(host, "create_event", {
+    title: `Blind hiring ${suffix}`,
+    timezone: "UTC",
+    visibility: "blind",
+    slots: [{ startsAt: new Date(Date.now() + 86_400_000).toISOString() }],
+  })) as { event: { id: string; shareSlug: string } };
+  created.push(blindEvent.event.id);
+
+  await call(guest, "set_event_notifications", {
+    eventId: blindEvent.event.shareSlug,
+  });
+  await call(stranger, "respond_to_event", {
+    eventId: blindEvent.event.shareSlug,
+    attendance: "yes",
+  });
+  const blindMail = await db
+    .select()
+    .from(notificationOutbox)
+    .where(
+      and(
+        eq(notificationOutbox.eventId, blindEvent.event.id),
+        eq(notificationOutbox.template, "event_update"),
+      ),
+    );
+  assert.equal(
+    blindMail.filter((row) => row.userId === guest.user.id).length,
+    0,
+    "a blind event must not tell followers who answered",
+  );
+  ok("blind events keep responses out of follower updates");
+
+  /* ---------------------------------------------------------------- */
+  console.log("\n13. Cleanup");
   const users_ = [host.user, guest.user, stranger.user] as User[];
   await db.delete(events).where(inArray(events.id, created));
   await db.delete(agentProfiles).where(eq(agentProfiles.userId, host.user.id));

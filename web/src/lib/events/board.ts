@@ -295,8 +295,12 @@ export function projectBoard(
       }))
     : null;
 
+  // Any signed-in viewer can respond, participant or not: the respond
+  // endpoints join-imply, and a share link is exactly the case where someone
+  // signed in a moment ago and has not joined yet. Gating this on role left
+  // every fresh recipient staring at disabled buttons.
   const canRespond =
-    role !== "public" &&
+    viewerUserId != null &&
     event.status === "open" &&
     event.deadlineAt.getTime() > now.getTime();
 
@@ -332,6 +336,9 @@ export function projectBoard(
           viewerParticipant.participant.attendance !== "pending"
         : false,
       canRespond,
+      notifyUpdates: viewerParticipant
+        ? viewerParticipant.participant.notifyUpdates
+        : null,
     },
     dimensions,
     participants,
