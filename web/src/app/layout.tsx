@@ -43,7 +43,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "HoneyMatcha — Let your Bot take it from here.",
+        alt: "HoneyMatcha — Sort it out without the group chat.",
       },
     ],
   },

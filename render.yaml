@@ -15,7 +15,7 @@ services:
       - key: ENABLE_EVENTS
         value: "true"
       - key: ENABLE_DISCOVERY
-        value: "false"
+        value: "true"
       - key: ENABLE_CANONICAL_LOCATIONS
         value: "false"
       - key: HOSTED_AGENT_PROVIDER

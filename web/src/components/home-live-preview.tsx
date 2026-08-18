@@ -57,7 +57,7 @@ export function HomeLivePreview() {
   return (
     <div className="relative mx-auto w-full max-w-[31rem]">
       <div
-        className="absolute -inset-10 rounded-full bg-[radial-gradient(circle,rgba(117,161,132,0.26),transparent_68%)] blur-2xl"
+        className="pointer-events-none absolute -inset-4 rounded-full bg-[radial-gradient(circle,rgba(117,161,132,0.26),transparent_68%)] blur-2xl sm:-inset-10"
         aria-hidden="true"
       />
       <div className="surface-card relative overflow-hidden p-3 shadow-[0_32px_80px_rgba(23,63,46,0.18)] sm:p-4">

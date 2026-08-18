@@ -11,23 +11,52 @@ import { eventsFeatureEnabled } from "@/lib/events-feature";
 
 export const dynamic = "force-dynamic";
 
-const JOBS = [
-  [
-    "Schedule a meeting",
-    "Your Bot compares free/busy time, finds a slot, and waits for you before anything is booked.",
-  ],
-  [
-    "Invite someone in",
-    "Send a private email invite, or share an approval-gated public link and QR from People.",
-  ],
-  [
-    "Hand off one task",
-    "A guest can finish a single request from an expiring link — no account, no network access.",
-  ],
-  [
-    "Stay in the loop",
-    "Watch it unfold, then step in only when a booking or sensitive action needs your say.",
-  ],
+const WAYS = [
+  {
+    key: "events",
+    eyebrow: "A group you know",
+    title: "Events",
+    body: "Share one link in the group chat. Everyone taps what works, and it settles on a deadline and a headcount instead of waiting for all ten replies.",
+    points: [
+      "Non-responders never block the plan",
+      "Show names, counts only, or nothing",
+    ],
+    href: "/app/events/new",
+    cta: "Create an event",
+    featured: true,
+  },
+  {
+    key: "people",
+    eyebrow: "One person you know",
+    title: "Connections",
+    body: "Invite someone by email or an approval-gated link. Once connected, the two agents compare free/busy and propose a time neither of you had to hunt for.",
+    points: [
+      "Free/busy only — never event titles",
+      "Revoke any connection at any time",
+    ],
+    href: "/app/people",
+    cta: "Invite someone",
+    featured: false,
+  },
+  {
+    key: "discovery",
+    eyebrow: "Someone you haven't met",
+    title: "Discovery",
+    body: "Describe what you are looking for — a hire, a local meetup, an introduction. Your agent looks privately and asks you before anyone is identified.",
+    points: [
+      "Rotating handles, no public directory",
+      "Two human approvals before contact",
+    ],
+    href: "/app/discovery",
+    cta: "Explore discovery",
+    featured: false,
+  },
+] as const;
+
+const STEPS = [
+  ["01", "Start something", "Create an event, invite a person, or describe who you want to meet."],
+  ["02", "It coordinates", "Replies, free/busy, and reminders are handled without you in the thread."],
+  ["03", "You decide", "Bookings and introductions pause for your yes. An agent can never approve for you."],
 ] as const;
 
 const TRUST = [
@@ -116,31 +145,94 @@ export default async function HomePage() {
       </div>
 
       <main className="mx-auto w-full max-w-[72rem] flex-1 px-5 py-16 sm:px-6 sm:py-24">
+        {/* The three capabilities as equals. Which one you reach for depends
+            on who you are coordinating with, not on how the product works. */}
+        <section aria-labelledby="ways-title" className="scroll-mt-24">
+          <div className="max-w-2xl">
+            <p className="section-kicker">Three ways in</p>
+            <h2 id="ways-title" className="display-title mt-2 text-3xl sm:text-4xl">
+              It depends who you&apos;re trying to reach.
+            </h2>
+            <p className="mt-4 text-lg leading-8 text-muted">
+              A group you already know, one person you know, or someone you
+              haven&apos;t met yet. Same rule underneath all three: HoneyMatcha
+              does the chasing, and nothing happens until you approve it.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-4 lg:grid-cols-3">
+            {WAYS.filter((card) =>
+              card.key === "events"
+                ? eventsEnabled
+                : card.key === "discovery"
+                  ? discoveryEnabled
+                  : true,
+            ).map((card) => (
+              <article
+                key={card.title}
+                className={`surface-card surface-card-interactive group relative flex flex-col overflow-hidden p-6 sm:p-7 ${
+                  card.featured ? "ring-1 ring-matcha-soft/35" : ""
+                }`}
+              >
+                <span
+                  className="pointer-events-none absolute -top-14 -right-12 h-40 w-40 rounded-full border border-matcha-soft/12 bg-matcha-soft/5 transition duration-500 group-hover:scale-110"
+                  aria-hidden="true"
+                />
+                <div className="relative flex flex-1 flex-col">
+                  <p className="text-[0.7rem] font-bold tracking-[0.14em] text-honey uppercase">
+                    {card.eyebrow}
+                  </p>
+                  <h3 className="mt-2 font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
+                    {card.title}
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-muted">{card.body}</p>
+                  <ul className="mt-5 space-y-2">
+                    {card.points.map((point) => (
+                      <li
+                        key={point}
+                        className="flex gap-2 text-sm leading-6 text-ink/85"
+                      >
+                        <span
+                          className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-matcha-soft"
+                          aria-hidden="true"
+                        />
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-6 flex-1" />
+                  <Link
+                    href={card.href}
+                    className="font-semibold text-matcha-deep no-underline transition group-hover:text-matcha"
+                  >
+                    {card.cta} <span aria-hidden="true">&rarr;</span>
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {/* The agent layer sits under all three, so it comes after them. */}
         <section
-          aria-labelledby="what-title"
-          className="grid items-start gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20"
+          aria-labelledby="how-title"
+          className="mt-16 grid items-start gap-8 sm:mt-24 lg:grid-cols-[0.72fr_1.28fr] lg:gap-20"
         >
           <div>
-            <p className="section-kicker">Built for real life</p>
-            <h2
-              id="what-title"
-              className="display-title mt-2 text-3xl sm:text-4xl"
-            >
-              Ask your Bot. Watch it move.
+            <p className="section-kicker">How it works</p>
+            <h2 id="how-title" className="display-title mt-2 text-3xl sm:text-4xl">
+              You approve. It does the rest.
             </h2>
           </div>
           <div>
             <p className="max-w-2xl text-lg leading-8 text-muted">
-              HoneyMatcha is where your Grok Bot steps in when plans cross
-              people, calendars, and inboxes — a coffee, a meetup, a hire.
-              You stay in control while your Bot handles the back-and-forth.
+              You can use HoneyMatcha on its own — an event link needs no setup
+              beyond signing in. Connect an agent and it starts doing the
+              back-and-forth for you: comparing calendars, chasing replies, and
+              bringing you only the decisions that need a person.
             </p>
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              {[
-                ["01", "Connect once", "Link your calendar and Grok Bot securely."],
-                ["02", "Delegate freely", "Ask your Bot to schedule, invite, or coordinate."],
-                ["03", "Approve clearly", "Review important actions before anything happens."],
-              ].map(([number, title, body]) => (
+              {STEPS.map(([number, title, body]) => (
                 <div key={number} className="border-l border-line pl-4">
                   <p className="text-xs font-bold text-honey">{number}</p>
                   <h3 className="mt-2 font-semibold text-ink">{title}</h3>
@@ -151,31 +243,10 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <div className="my-16 grid gap-4 sm:my-20 sm:grid-cols-2">
-          {JOBS.map(([title, body], index) => (
-            <article
-              key={title}
-              className="surface-card surface-card-interactive group relative overflow-hidden p-6 sm:p-7"
-            >
-              <span className="text-[0.7rem] font-bold tracking-[0.16em] text-honey uppercase">
-                0{index + 1}
-              </span>
-              <h3 className="mt-3 font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
-                {title}
-              </h3>
-              <p className="mt-3 text-sm leading-6 text-muted">{body}</p>
-              <span
-                className="absolute -right-6 -bottom-8 h-24 w-24 rounded-full border border-matcha-soft/10 transition duration-300 group-hover:scale-110"
-                aria-hidden="true"
-              />
-            </article>
-          ))}
-        </div>
-
         {eventsEnabled ? (
           <section
             aria-labelledby="events-title"
-            className="mb-16 sm:mb-20"
+            className="mt-16 mb-16 sm:mt-24 sm:mb-20"
           >
             <div className="surface-card relative overflow-hidden p-7 sm:p-10">
               <span
@@ -184,7 +255,7 @@ export default async function HomePage() {
               />
               <div className="relative grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14">
                 <div>
-                  <p className="section-kicker">New — group events</p>
+                  <p className="section-kicker">A closer look — events</p>
                   <h2
                     id="events-title"
                     className="display-title mt-2 text-3xl sm:text-4xl"
@@ -284,7 +355,9 @@ export default async function HomePage() {
           </section>
         ) : null}
 
-        <HomeGetStarted signedIn={signedIn} setupComplete={setupComplete} />
+        <div id="get-started" className="scroll-mt-24">
+          <HomeGetStarted signedIn={signedIn} setupComplete={setupComplete} />
+        </div>
 
         <section aria-labelledby="trust-title" className="mt-20 sm:mt-28">
           <div className="mx-auto max-w-2xl text-center">

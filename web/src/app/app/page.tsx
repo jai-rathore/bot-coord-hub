@@ -11,6 +11,7 @@ import {
 } from "@/lib/google-oauth";
 import { ensureCurrentUser } from "@/lib/users";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
+import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
 export default async function AppHomePage() {
   const [clerkUser, user] = await Promise.all([
@@ -26,6 +27,7 @@ export default async function AppHomePage() {
     getGoogleConnection(user.id),
   ]);
   const setupComplete = isSetupComplete(status);
+  const discoveryEnabled = discoveryFeatureEnabled();
 
   return (
     <div className="space-y-12">
@@ -63,35 +65,92 @@ export default async function AppHomePage() {
 
       {setupComplete ? <AgentStatusCard status={status} /> : null}
 
-      {eventsFeatureEnabled() ? (
-        <section className="surface-card relative overflow-hidden p-6 sm:p-7">
-          <span
-            className="absolute -top-16 -right-12 h-44 w-44 rounded-full border border-matcha-soft/15 bg-matcha-soft/8"
-            aria-hidden="true"
-          />
-          <div className="relative flex flex-wrap items-end justify-between gap-5">
-            <div>
-              <p className="section-kicker">Group events</p>
-              <h2 className="mt-1 font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-[-0.03em] text-matcha-deep">
-                Sort a plan with one link
-              </h2>
-              <p className="mt-2 max-w-xl text-sm leading-7 text-muted">
-                Share it in the group chat. Everyone taps what works, and it
-                closes on your deadline — no waiting on the quiet ones. You
-                confirm before anything is booked.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link href="/app/events/new" className="button-primary">
-                Create an event
-              </Link>
-              <Link href="/app/events" className="button-secondary">
-                See all
-              </Link>
-            </div>
-          </div>
-        </section>
-      ) : null}
+      {/* Mirrors the three ways in on the marketing page, so what the product
+          offers reads the same before and after signing in. */}
+      <section aria-labelledby="start-title">
+        <p className="section-kicker">Start something</p>
+        <h2
+          id="start-title"
+          className="mt-1 font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-[-0.03em] text-matcha-deep"
+        >
+          Who are you trying to reach?
+        </h2>
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          {[
+            {
+              show: eventsFeatureEnabled(),
+              eyebrow: "A group you know",
+              title: "Plan an event",
+              body: "One link in the group chat. It closes on your deadline instead of waiting on the quiet ones.",
+              href: "/app/events/new",
+              cta: "Create an event",
+              secondary: { href: "/app/events", label: "See all" },
+              featured: true,
+            },
+            {
+              show: true,
+              eyebrow: "One person you know",
+              title: "Invite someone",
+              body: "Connect by email or a link they approve. Then your agents compare free/busy for you.",
+              href: "/app/people",
+              cta: "Open People",
+              secondary: null,
+              featured: false,
+            },
+            {
+              show: discoveryEnabled,
+              eyebrow: "Someone you haven't met",
+              title: "Find someone",
+              body: "Describe who you're looking for. Your agent looks privately and asks before anyone is identified.",
+              href: "/app/discovery",
+              cta: "Open Discovery",
+              secondary: null,
+              featured: false,
+            },
+          ]
+            .filter((card) => card.show)
+            .map((card) => (
+              <article
+                key={card.title}
+                className={`surface-card relative flex flex-col overflow-hidden p-5 sm:p-6 ${
+                  card.featured ? "ring-1 ring-matcha-soft/35" : ""
+                }`}
+              >
+                <span
+                  className="pointer-events-none absolute -top-12 -right-10 h-32 w-32 rounded-full border border-matcha-soft/12 bg-matcha-soft/6"
+                  aria-hidden="true"
+                />
+                <div className="relative flex flex-1 flex-col">
+                  <p className="text-[0.68rem] font-bold tracking-[0.14em] text-honey uppercase">
+                    {card.eyebrow}
+                  </p>
+                  <h3 className="mt-2 font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
+                    {card.title}
+                  </h3>
+                  <p className="mt-2 flex-1 text-sm leading-6 text-muted">
+                    {card.body}
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <Link
+                      href={card.href}
+                      className={card.featured ? "button-primary" : "button-secondary"}
+                    >
+                      {card.cta}
+                    </Link>
+                    {card.secondary ? (
+                      <Link
+                        href={card.secondary.href}
+                        className="rounded-lg px-3 py-2 text-sm font-semibold no-underline transition hover:bg-white/75"
+                      >
+                        {card.secondary.label}
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            ))}
+        </div>
+      </section>
 
       <section>
         <div className="flex items-center justify-between gap-3">

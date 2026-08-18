@@ -50,6 +50,13 @@
 html {
   scroll-behavior: smooth;
   background: var(--background);
+  /* Decorative blurs and drifting blobs sit outside the layout box. `clip`
+     rather than `hidden` so sticky headers inside still work. */
+  overflow-x: clip;
+}
+
+:where(p, li, h1, h2, h3, h4, dd, dt) {
+  overflow-wrap: anywhere;
 }
 
 body {
@@ -101,6 +108,10 @@ body {
     background: rgba(255, 255, 252, 0.82);
     box-shadow: var(--shadow-sm);
     backdrop-filter: blur(14px);
+    /* Grid and flex children default to min-width:auto, so one long string or
+       a <pre> inside a card widens its track and scrolls the whole page
+       sideways on mobile. Cards must always be allowed to shrink. */
+    min-width: 0;
   }
 
   .surface-card-interactive {
