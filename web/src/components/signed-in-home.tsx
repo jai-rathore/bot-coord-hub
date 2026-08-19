@@ -1,19 +1,22 @@
 import Link from "next/link";
 import { AppNav } from "@/components/app-nav";
+import { CapabilityGrid } from "@/components/capability-grid";
 import { EventUpdatePill } from "@/components/event-update-pill";
 import { MeetCode } from "@/components/meet-code";
+import { enabledCapabilities, lockedCount } from "@/lib/capabilities";
 import { relativeDeadline } from "@/lib/events/copy";
 import type { EventWithUpdates } from "@/lib/events/updates";
 
 /**
  * Home for someone who is signed in.
  *
- * It replaces the old dashboard outright. The dashboard's problem was that it
- * described the product to people who had already bought it: three essay cards
- * where three buttons belonged, and an agent status panel shown to people who
- * had no agent and never intended to get one. This page answers two questions
- * only — what can I start, and what is waiting on me — and every agent-shaped
- * thing lives one deliberate tap away under "Advanced agent setup".
+ * Two questions, in order: what is waiting on me, and what else can I hand
+ * off. The second used to be a flat row of buttons that said nothing about how
+ * the product works — Discovery simply appeared, with no hint that it needs an
+ * agent behind it — and the agent layer itself sat at the bottom in the
+ * smallest type on the page, phrased as an apology. It is not an apology. For
+ * someone with no agent it is the single action that turns four capabilities
+ * on, so the grid states that plainly on every locked tile.
  */
 export function SignedInHome({
   firstName,
@@ -39,6 +42,11 @@ export function SignedInHome({
   attentionCount: number;
 }) {
   const displayName = firstName ?? "there";
+  const capabilities = enabledCapabilities({
+    events: eventsEnabled,
+    discovery: discoveryEnabled,
+  });
+  const locked = agentConnected ? 0 : lockedCount(capabilities);
 
   return (
     <div className="flex min-h-full flex-col bg-[radial-gradient(circle_at_8%_0%,rgba(117,161,132,0.12),transparent_25rem),radial-gradient(circle_at_94%_20%,rgba(240,220,168,0.15),transparent_24rem),linear-gradient(180deg,#f9fbf8_0%,#f4f7f3_55%,#f6f3eb_100%)]">
@@ -60,8 +68,6 @@ export function SignedInHome({
             : "What would you like to sort out?"}
         </p>
 
-        {/* One shape, one colour, one meaning: everything here is a button and
-            every button does something. Nothing on this page is decoration. */}
         <div className="mt-6 space-y-3">
           {eventsEnabled ? (
             <Link
@@ -72,23 +78,16 @@ export function SignedInHome({
             </Link>
           ) : null}
           <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
-            <Link href="/app/people" className="button-primary w-full sm:w-auto">
+            <Link href="/app/people" className="button-secondary w-full sm:w-auto">
               People
             </Link>
-            {discoveryEnabled ? (
-              <Link
-                href="/app/discovery"
-                className="button-primary w-full sm:w-auto"
-              >
-                Discovery
-              </Link>
-            ) : null}
             {handle ? (
               <MeetCode
                 handle={handle}
                 displayName={firstName ?? handle}
                 origin={origin}
                 label="My code"
+                className="button-secondary w-full cursor-pointer sm:w-auto"
               />
             ) : null}
           </div>
@@ -158,9 +157,32 @@ export function SignedInHome({
           )}
         </section>
 
-        {/* The whole agent layer, behind one door. People who have an agent get
-            a live entry; people who do not get a single sentence they can
-            ignore forever. */}
+        {capabilities.length > 0 ? (
+          <section aria-labelledby="home-capabilities" className="mt-10">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <h2
+                id="home-capabilities"
+                className="font-[family-name:var(--font-fraunces)] text-xl font-semibold tracking-[-0.02em] text-matcha-deep"
+              >
+                What you can hand off
+              </h2>
+              <p className="text-sm text-muted">
+                {agentConnected
+                  ? "Your agent runs all of these."
+                  : "Sage runs the first one today."}
+              </p>
+            </div>
+            <div className="mt-4">
+              <CapabilityGrid
+                capabilities={capabilities}
+                agentConnected={agentConnected}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {/* The agent layer, stated as what it is: the key to the locked tiles
+            above, not a footnote for enthusiasts. */}
         <section className="mt-12 border-t border-line pt-6">
           {agentConnected ? (
             <Link
@@ -181,14 +203,26 @@ export function SignedInHome({
               </span>
             </Link>
           ) : (
-            <p className="text-sm leading-6 text-muted">
-              Have an AI agent?{" "}
-              <Link href="/app/agent" className="font-semibold text-matcha-deep">
-                Set up advanced agent mode
-              </Link>{" "}
-              and it can do the back-and-forth for you. Everything above keeps
-              working without one.
-            </p>
+            <Link
+              href="/app/agent"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-matcha-soft/40 bg-white/70 p-4 no-underline"
+            >
+              <span>
+                <span className="block font-semibold text-ink">
+                  {locked > 0
+                    ? `Unlock ${locked} more with your own agent`
+                    : "Bring your own agent"}
+                </span>
+                <span className="mt-1 block text-sm leading-6 text-muted">
+                  Grok, Claude, Cursor, or anything speaking MCP. One browser
+                  approval and it runs everything above — Sage keeps handling
+                  the rest either way.
+                </span>
+              </span>
+              <span className="shrink-0 font-semibold text-matcha-deep">
+                Connect <span aria-hidden="true">&rarr;</span>
+              </span>
+            </Link>
           )}
         </section>
       </main>

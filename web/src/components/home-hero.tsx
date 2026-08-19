@@ -5,9 +5,9 @@ import { HomeLivePreview } from "@/components/home-live-preview";
  * The first screen for someone who has never been here.
  *
  * Signed-in people no longer pass through this file at all — they get their own
- * home — so the hero only has one job: say what the thing is and offer the one
- * button that starts it. Everything that used to sit under it (three capability
- * cards, a four-rung ladder, a trust grid) is one swipeable rail now.
+ * home — so the hero only has one job: say what the thing is and offer the two
+ * ways in. Those two are the product: use the agent we provide, or bring the
+ * one you already have. Everything else is one swipeable rail below.
  */
 export function HomeHero() {
   return (
@@ -24,18 +24,19 @@ export function HomeHero() {
           </span>
         </h1>
         <p className="animate-rise-delay-2 mt-5 max-w-[38ch] text-[1.05rem] leading-7 text-muted">
-          One link. A deadline. It settles without you chasing anyone.
+          Hand it to Sage, our agent, and it settles without you chasing
+          anyone. Already have an agent? Bring that one instead.
         </p>
         <div className="animate-rise-delay-3 mt-7 flex flex-col gap-3 sm:flex-row">
           <Link href="/sign-up" className="button-primary w-full sm:w-auto sm:px-5">
             Create an event
           </Link>
-          <Link href="/sign-in" className="button-secondary w-full sm:w-auto sm:px-5">
-            Sign in
+          <Link href="/agents" className="button-secondary w-full sm:w-auto sm:px-5">
+            Bring your agent
           </Link>
         </div>
         <p className="animate-rise-delay-3 mt-3 text-sm text-muted">
-          Free in beta. No agent required.
+          Free in beta. Sage is included — there is nothing to install.
         </p>
       </div>
       <div className="animate-rise-delay-2 lg:pt-2">
