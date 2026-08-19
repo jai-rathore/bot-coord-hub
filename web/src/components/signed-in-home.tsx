@@ -58,7 +58,7 @@ export function SignedInHome({
         handle={handle}
       />
 
-      <main className="mx-auto w-full max-w-[72rem] flex-1 px-5 py-8 sm:px-6 sm:py-12">
+      <main className="has-tab-bar mx-auto w-full max-w-[72rem] flex-1 px-5 pt-8 sm:px-6 sm:pt-12">
         <h1 className="display-title text-3xl sm:text-4xl">
           Hey {displayName}
         </h1>
