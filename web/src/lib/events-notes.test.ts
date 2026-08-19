@@ -20,6 +20,7 @@ import {
 import { appendNotices, composeFallbackReply } from "./events/turn";
 import { buildParticipantSystemPrompt } from "./events/context";
 import { projectBoard, type BoardSource } from "./events/board";
+import { getMcpTools } from "./mcp-tools";
 import type { EventBoard, NoteView } from "./events/types";
 
 /** A minimal one-option, one-note board source for projection tests. */
@@ -491,4 +492,56 @@ test("with no digest cached, the rollup is still per-viewer", () => {
   const source = sourceWithNotes({ notesDigest: null });
   assert.equal(projectBoard(source, null).notesSummary, null);
   assert.ok(projectBoard(source, BOB).notesSummary);
+});
+
+/* ------------------------------------------------------------------ */
+/* agent parity — what Sage can do, an external agent can do too       */
+/* ------------------------------------------------------------------ */
+
+test("an agent has the same note reach as Sage, and no more", () => {
+  const previous = process.env.ENABLE_EVENTS;
+  process.env.ENABLE_EVENTS = "true";
+  try {
+    const tools = getMcpTools();
+    const byName = new Map(tools.map((t) => [t.name, t]));
+
+    // Parity: Sage can write a note and take one back. So can an agent.
+    assert.ok(byName.has("post_event_note"), "agents must be able to post");
+    assert.ok(byName.has("retract_event_note"), "and to retract");
+
+    // No read tool: notes come back on get_event_board, already projected for
+    // the agent's human. A separate reader would be a second projection to
+    // keep correct, and the first one to drift.
+    assert.equal(
+      tools.some((t) => /note/.test(t.name) && /list|read|get/.test(t.name)),
+      false,
+      "notes are read through the board, never through their own endpoint",
+    );
+
+    // The audience is a closed set at the schema level, so a malformed value
+    // is refused before it reaches the visibility rules.
+    const post = byName.get("post_event_note")!;
+    const audience = (
+      post.inputSchema.properties as Record<string, { enum?: string[] }>
+    ).audience;
+    assert.deepEqual(audience.enum, ["everyone", "organizer"]);
+    assert.deepEqual(post.inputSchema.required, ["eventId", "body"]);
+    assert.equal(post.inputSchema.additionalProperties, false);
+  } finally {
+    if (previous === undefined) delete process.env.ENABLE_EVENTS;
+    else process.env.ENABLE_EVENTS = previous;
+  }
+});
+
+test("note tools vanish with the events feature, like every other event tool", () => {
+  const previous = process.env.ENABLE_EVENTS;
+  process.env.ENABLE_EVENTS = "false";
+  try {
+    const names = getMcpTools().map((t) => t.name);
+    assert.equal(names.includes("post_event_note"), false);
+    assert.equal(names.includes("retract_event_note"), false);
+  } finally {
+    if (previous === undefined) delete process.env.ENABLE_EVENTS;
+    else process.env.ENABLE_EVENTS = previous;
+  }
 });

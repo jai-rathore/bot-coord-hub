@@ -20,6 +20,7 @@ import { AgentApiError } from "@/lib/agent-errors";
 import { assertAgentScope } from "@/lib/scopes";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import { loadBoardSource, projectBoard } from "@/lib/events/board";
+import { isNoteVisibility, NOTE_LIMITS } from "@/lib/events/notes";
 import {
   addOption,
   assertOrganizer,
@@ -27,6 +28,9 @@ import {
   extendDeadline,
   joinEvent,
   listEventsForUser,
+  publishNote,
+  removeNoteAndRefresh,
+  retractNoteAndRefresh,
   setNotifyUpdates,
   setResponses,
   type CreateEventInput,
@@ -154,9 +158,9 @@ async function boardPayload(auth: AgentAuth, event: Event, baseUrl?: string) {
     board,
     agent_instructions: stillOpen
       ? board.viewer.participantId
-        ? "Ask your human which of these work, then call respond_to_event with the optionIds above. Do not guess for them."
-        : "Your human is not on this event yet. Ask them which times work, then call respond_to_event — it joins them at the same time."
-      : "This event is closed to new responses. Relay the summary; do not try to answer.",
+        ? "Ask your human which of these work, then call respond_to_event with the optionIds above. Do not guess for them. When they give a reason the others should know — why a day is out, what they need — also call post_event_note; board.notes is where those live."
+        : "Your human is not on this event yet. Ask them which times work, then call respond_to_event — it joins them at the same time. Read board.notes first: someone may already have said why a time does not work."
+      : "This event is closed to new responses. Relay the summary and board.notes; do not try to answer.",
   };
 }
 
@@ -323,6 +327,126 @@ export async function agentSuggestEventOption(
     role,
   );
   return { ok: true, role };
+}
+
+/**
+ * Leave a note on the event, on the human's behalf.
+ *
+ * The same write Sage makes through its `post_note` tool and the same one the
+ * composer on the event page makes — one code path, so an agent cannot reach
+ * past a rule the other two obey. In particular `publishNote` still downgrades
+ * an `everyone` note to the organizer on a private board, and still returns
+ * the notice saying so; that notice is handed back here rather than swallowed,
+ * because an agent that told its human "everyone can see it" would be lying.
+ */
+export async function agentPostEventNote(
+  auth: AgentAuth,
+  body: {
+    eventId?: unknown;
+    shareSlug?: unknown;
+    shareUrl?: unknown;
+    body?: unknown;
+    audience?: unknown;
+    optionId?: unknown;
+  },
+) {
+  assertEnabled();
+  assertAgentScope(auth, "events:write");
+  const event = await resolveEventRef(eventRefFrom(body));
+
+  if (typeof body.body !== "string" || !body.body.trim()) {
+    throw new AgentApiError(400, "body is required — the note, in their words.");
+  }
+
+  const audience = typeof body.audience === "string" ? body.audience : "everyone";
+  if (!isNoteVisibility(audience)) {
+    throw new AgentApiError(
+      400,
+      "audience must be 'everyone' or 'organizer'.",
+    );
+  }
+
+  // Leaving a note is engaging with the event, exactly as responding is, so
+  // it joins first rather than making the agent call join_event separately.
+  const db = getDb();
+  const [existing] = await db
+    .select()
+    .from(eventParticipants)
+    .where(
+      and(
+        eq(eventParticipants.eventId, event.id),
+        eq(eventParticipants.userId, auth.user.id),
+      ),
+    )
+    .limit(1);
+  const isOrganizer = event.organizerUserId === auth.user.id;
+  const participant =
+    existing ?? (isOrganizer ? null : await joinEvent(event, auth.user));
+
+  const { note, notice } = await publishNote({
+    event,
+    user: auth.user,
+    participant,
+    input: {
+      body: body.body,
+      visibility: audience,
+      optionId: typeof body.optionId === "string" ? body.optionId : null,
+      source: "chat",
+    },
+  });
+
+  return {
+    ok: true,
+    noteId: note.id,
+    /** What it actually became, which is not always what was asked for. */
+    audience: note.visibility,
+    notice,
+    human_note:
+      note.visibility === "everyone"
+        ? "This is on the event board for everyone who can see the event."
+        : "Only the organizer can read this one.",
+    agent_instructions:
+      notice ??
+      "Relay the note back to your human as recorded. Do not post the same note twice.",
+  };
+}
+
+/**
+ * Take a note down. The author retracts their own; the organizer removes
+ * anyone's. Which applies is decided from the caller's real role here, never
+ * from the request — an agent naming someone else's note gets the author
+ * check, and fails it.
+ */
+export async function agentRetractEventNote(
+  auth: AgentAuth,
+  body: {
+    eventId?: unknown;
+    shareSlug?: unknown;
+    shareUrl?: unknown;
+    noteId?: unknown;
+  },
+) {
+  assertEnabled();
+  assertAgentScope(auth, "events:write");
+  const event = await resolveEventRef(eventRefFrom(body));
+  if (typeof body.noteId !== "string" || !body.noteId) {
+    throw new AgentApiError(
+      400,
+      "noteId is required — take it from get_event_board.",
+    );
+  }
+
+  const asOrganizer = event.organizerUserId === auth.user.id;
+  if (asOrganizer) {
+    await removeNoteAndRefresh({ event, user: auth.user, noteId: body.noteId });
+  } else {
+    await retractNoteAndRefresh({ event, user: auth.user, noteId: body.noteId });
+  }
+  return {
+    ok: true,
+    removedAs: asOrganizer ? "organizer" : "author",
+    noteLimit: NOTE_LIMITS.perAuthor,
+  };
 }
 
 export async function agentAddEventOption(

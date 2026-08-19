@@ -56,8 +56,8 @@ export function getAgentCard(baseUrl: string) {
         id: "join-event",
         name: "Answer someone else's event",
         description:
-          "Take part in an event your human was sent a link to: read the board, mark which times work, suggest another. Hand it the link — id, slug, or URL all resolve.",
-        tags: ["coordination", "events", "participant"],
+          "Take part in an event your human was sent a link to: read the board, mark which times work, suggest another, and leave a note saying why when a yes or no does not explain itself. Hand it the link — id, slug, or URL all resolve.",
+        tags: ["coordination", "events", "participant", "notes"],
       },
       {
         id: "meet-in-person",
