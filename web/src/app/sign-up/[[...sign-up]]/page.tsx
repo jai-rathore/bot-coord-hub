@@ -6,7 +6,7 @@ export default function SignUpPage() {
   return (
     <AuthShell>
       <SignUp
-        fallbackRedirectUrl="/app"
+        fallbackRedirectUrl="/"
         signInUrl="/sign-in"
         appearance={clerkAppearance}
       />

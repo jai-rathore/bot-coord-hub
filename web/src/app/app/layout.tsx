@@ -19,6 +19,7 @@ export default async function AppLayout({
   let attentionCount = 0;
   let eventsUnreadCount = 0;
   let agentConnected = false;
+  let handle: string | null = null;
   try {
     const user = await ensureCurrentUser();
     if (user && !(await getProfileForUser(user.id))) {
@@ -44,6 +45,7 @@ export default async function AppLayout({
       attentionCount = Number(row?.count ?? 0);
       eventsUnreadCount = eventUpdates.unreadEventCount;
       agentConnected = home.agent.connected;
+      handle = home.handle;
     }
   } catch (error) {
     // redirect() throws; a bare catch would skip first-login handle setup.
@@ -65,6 +67,7 @@ export default async function AppLayout({
         eventsUnreadCount={eventsUnreadCount}
         discoveryEnabled={discoveryFeatureEnabled()}
         agentConnected={agentConnected}
+        handle={handle}
       />
       <main className="mx-auto w-full max-w-[72rem] flex-1 px-5 py-8 sm:px-6 sm:py-12">
         {children}

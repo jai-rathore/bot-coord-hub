@@ -46,7 +46,7 @@ export function HandleSetupForm({
       setError(data.error ?? "Could not claim that handle");
       return;
     }
-    startTransition(() => router.replace("/app"));
+    startTransition(() => router.replace("/"));
   }
 
   return (

@@ -1,129 +1,45 @@
-"use client";
-
-import type { ReactNode } from "react";
 import Link from "next/link";
-import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { HomeLivePreview } from "@/components/home-live-preview";
 
-function SignedInHero({
-  firstName,
-  setupComplete,
-  hasUpdates,
-}: {
-  firstName: string | null;
-  setupComplete: boolean;
-  hasUpdates: boolean;
-}) {
+/**
+ * The first screen for someone who has never been here.
+ *
+ * Signed-in people no longer pass through this file at all — they get their own
+ * home — so the hero only has one job: say what the thing is and offer the one
+ * button that starts it. Everything that used to sit under it (three capability
+ * cards, a four-rung ladder, a trust grid) is one swipeable rail now.
+ */
+export function HomeHero() {
   return (
-    <>
-      <p className="animate-rise-delay-1 mt-6 max-w-[28ch] font-[family-name:var(--font-fraunces)] text-[clamp(1.4rem,3.4vw,1.85rem)] font-semibold leading-[1.25] tracking-[-0.02em] text-ink">
-        {firstName ? `Welcome back, ${firstName}` : "Welcome back"}
-      </p>
-      <p className="animate-rise-delay-2 mt-3 max-w-[46ch] text-[1.05rem] leading-7 text-muted sm:text-[1.1rem]">
-        {hasUpdates
-          ? "There's a new reply on one of your events. Open it to catch up — or send your Grok Bot the next plan."
-          : setupComplete
-            ? "Your Grok Bot is already coordinating. Jump in to approve what’s waiting — or send it the next plan."
-            : "Two steps left, then talk to your Grok Bot. HoneyMatcha is only for the moments that need your yes."}
-      </p>
-      <div className="animate-rise-delay-3 mt-8">
-        <Link
-          href={hasUpdates ? "/app/events" : "/app"}
-          className="button-primary min-h-12 px-5"
-        >
-          {hasUpdates
-            ? "See updates"
-            : setupComplete
-              ? "Open dashboard"
-              : "Continue setup"}
-        </Link>
-      </div>
-    </>
-  );
-}
-
-function SignedOutHero() {
-  return (
-    <>
-      <p className="animate-rise-delay-1 mt-6 max-w-[26ch] font-[family-name:var(--font-fraunces)] text-[clamp(1.35rem,3.4vw,1.85rem)] font-semibold leading-[1.25] tracking-[-0.02em] text-ink">
-        Pick a time with ten people. Or one. Or someone you haven&apos;t met.
-      </p>
-      <p className="animate-rise-delay-2 mt-3 max-w-[48ch] text-[1.05rem] leading-7 text-muted sm:text-[1.1rem]">
-        Share one link and HoneyMatcha settles it on a deadline instead of
-        waiting for everyone. Connect an agent and it does the back-and-forth
-        for you. Either way, nothing is booked until you say yes.
-      </p>
-      <div className="animate-rise-delay-3 mt-8 flex flex-wrap gap-3">
-        <SignUpButton mode="redirect">
-          <button type="button" className="button-primary min-h-12 cursor-pointer px-5">
-            Create an event
-          </button>
-        </SignUpButton>
-        <SignInButton mode="redirect">
-          <button
-            type="button"
-            className="button-secondary min-h-12 cursor-pointer px-5"
-          >
-            Sign in
-          </button>
-        </SignInButton>
-      </div>
-      <p className="animate-rise-delay-3 mt-3 text-sm text-muted">
-        Free while we&apos;re in beta. No agent required.
-      </p>
-      <p className="animate-rise-delay-3 mt-6 text-sm text-muted">
-        Already have an agent?{" "}
-        <a href="#get-started" className="font-semibold text-matcha-deep">
-          Connect it in two steps
-        </a>
-        .
-      </p>
-    </>
-  );
-}
-
-export function HomeHero({
-  signedIn,
-  setupComplete,
-  firstName,
-  hasUpdates = false,
-  preview,
-}: {
-  signedIn: boolean;
-  setupComplete: boolean;
-  firstName: string | null;
-  hasUpdates?: boolean;
-  preview?: ReactNode;
-}) {
-  return (
-    <div className="relative z-0 mx-auto grid w-full max-w-[72rem] items-center gap-12 px-5 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:pb-24 lg:pt-16">
+    <div className="relative z-0 mx-auto grid w-full max-w-[72rem] items-center gap-10 px-5 pt-8 pb-14 sm:px-6 sm:pt-12 sm:pb-20 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
       <div>
         <div className="animate-rise inline-flex items-center gap-2 rounded-full border border-matcha-soft/25 bg-white/70 px-3 py-1.5 text-[0.7rem] font-semibold tracking-[0.1em] text-matcha uppercase backdrop-blur-sm">
           <span className="live-dot animate-pulse-live" />
           You keep the yes
         </div>
-        <h1 className="display-title mt-5 text-[clamp(3rem,8.2vw,5.9rem)] leading-[0.94]">
+        <h1 className="display-title mt-5 text-[clamp(2.6rem,11vw,5.4rem)] leading-[0.96]">
           <span className="hero-line hero-line-1 block">Sort it out</span>
           <span className="display-accent hero-line hero-line-2 mt-1 block">
             without the group chat.
           </span>
         </h1>
-        <span
-          aria-hidden="true"
-          className="hero-rule mt-6 block h-px w-full max-w-[22rem] bg-[linear-gradient(90deg,var(--matcha-soft),rgba(200,146,45,0.55),transparent)]"
-        />
-        {signedIn ? (
-          <SignedInHero
-            firstName={firstName}
-            setupComplete={setupComplete}
-            hasUpdates={hasUpdates}
-          />
-        ) : (
-          <SignedOutHero />
-        )}
+        <p className="animate-rise-delay-2 mt-5 max-w-[38ch] text-[1.05rem] leading-7 text-muted">
+          One link. A deadline. It settles without you chasing anyone.
+        </p>
+        <div className="animate-rise-delay-3 mt-7 flex flex-col gap-3 sm:flex-row">
+          <Link href="/sign-up" className="button-primary w-full sm:w-auto sm:px-5">
+            Create an event
+          </Link>
+          <Link href="/sign-in" className="button-secondary w-full sm:w-auto sm:px-5">
+            Sign in
+          </Link>
+        </div>
+        <p className="animate-rise-delay-3 mt-3 text-sm text-muted">
+          Free in beta. No agent required.
+        </p>
       </div>
       <div className="animate-rise-delay-2 lg:pt-2">
-        {preview ?? <HomeLivePreview />}
+        <HomeLivePreview />
       </div>
     </div>
   );

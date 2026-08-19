@@ -10,22 +10,15 @@ import {
 } from "@clerk/nextjs";
 import { BrandLink } from "@/components/brand-link";
 
-const SECONDARY_LINKS = [
-  { href: "/#how-it-works", label: "How to start" },
-  { href: "/agents", label: "For Grok Bot" },
-] as const;
+/** The marketing pages are one scroll now, so the header carries the one link
+ *  that leaves them rather than an anchor into a section that no longer exists. */
+const SECONDARY_LINKS = [{ href: "/agents", label: "For agents" }] as const;
 
-export function SiteHeader({
-  showHowToStart = true,
-}: {
-  showHowToStart?: boolean;
-}) {
+export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
-  const secondaryLinks = showHowToStart
-    ? SECONDARY_LINKS
-    : SECONDARY_LINKS.filter((link) => link.href !== "/#how-it-works");
+  const secondaryLinks = SECONDARY_LINKS;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -149,10 +142,10 @@ export function SiteHeader({
         </Show>
         <Show when="signed-in">
           <Link
-            href="/app"
+            href="/"
             className="button-primary min-h-10 whitespace-nowrap px-2.5 py-1.5 sm:px-3.5"
           >
-            Dashboard
+            Home
           </Link>
           <UserButton />
         </Show>
