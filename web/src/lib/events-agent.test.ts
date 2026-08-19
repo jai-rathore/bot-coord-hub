@@ -438,22 +438,22 @@ test("sendTestEmail posts to Resend when a key is set", async () => {
   }
 });
 
-test("smsConfigured is false without Twilio", () => {
+test("smsConfigured is false without a From number, even with Twilio credentials", () => {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const from = process.env.TWILIO_FROM_NUMBER;
-  const service = process.env.TWILIO_MESSAGING_SERVICE_SID;
-  delete process.env.TWILIO_ACCOUNT_SID;
-  delete process.env.TWILIO_AUTH_TOKEN;
+  process.env.TWILIO_ACCOUNT_SID = "ACtest";
+  process.env.TWILIO_AUTH_TOKEN = "token";
   delete process.env.TWILIO_FROM_NUMBER;
-  delete process.env.TWILIO_MESSAGING_SERVICE_SID;
   try {
     assert.equal(smsConfigured(), false);
   } finally {
     if (sid !== undefined) process.env.TWILIO_ACCOUNT_SID = sid;
+    else delete process.env.TWILIO_ACCOUNT_SID;
     if (token !== undefined) process.env.TWILIO_AUTH_TOKEN = token;
+    else delete process.env.TWILIO_AUTH_TOKEN;
     if (from !== undefined) process.env.TWILIO_FROM_NUMBER = from;
-    if (service !== undefined) process.env.TWILIO_MESSAGING_SERVICE_SID = service;
+    else delete process.env.TWILIO_FROM_NUMBER;
   }
 });
 

@@ -341,6 +341,7 @@ export function projectBoard(
         : null,
       notifyChannel: "email",
       hasPhone: false,
+      smsEnabled: false,
     },
     dimensions,
     participants,

@@ -24,6 +24,7 @@ import {
   parseNotifyChannel,
   type NotifyChannel,
 } from "@/lib/phone";
+import { smsOffered } from "@/lib/sms-flag";
 
 const FROM =
   process.env.EVENT_EMAIL_FROM || "HoneyMatcha <onboarding@resend.dev>";
@@ -35,10 +36,7 @@ export function emailConfigured(): boolean {
 export function smsConfigured(): boolean {
   const sid = process.env.TWILIO_ACCOUNT_SID?.trim();
   const token = process.env.TWILIO_AUTH_TOKEN?.trim();
-  const from =
-    process.env.TWILIO_FROM_NUMBER?.trim() ||
-    process.env.TWILIO_MESSAGING_SERVICE_SID?.trim();
-  return Boolean(sid && token && from);
+  return Boolean(smsOffered() && sid && token);
 }
 
 export function publicOrigin(): string {
@@ -186,7 +184,10 @@ export async function enqueueEventNotification(
         channel: "email" as const,
         phoneE164: null,
       };
-      for (const channel of humanChannelsFor(pref)) {
+      for (const channel of humanChannelsFor({
+        ...pref,
+        smsOffered: smsOffered(),
+      })) {
         const channelKey = channel === "email" ? dedupeKey : `${dedupeKey}:sms`;
         const inserted = await db
           .insert(notificationOutbox)

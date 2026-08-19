@@ -273,6 +273,8 @@ async function main() {
   ok(`${recipients.size} people queued for the lock notice`);
 
   console.log("\n10. SMS preference queues a second outbox row");
+  const savedFrom = process.env.TWILIO_FROM_NUMBER;
+  process.env.TWILIO_FROM_NUMBER = "+15550001111";
   await db
     .update(users)
     .set({
@@ -324,6 +326,8 @@ async function main() {
   if (savedKey) process.env.RESEND_API_KEY = savedKey;
   if (savedSmsSid) process.env.TWILIO_ACCOUNT_SID = savedSmsSid;
   if (savedSmsToken) process.env.TWILIO_AUTH_TOKEN = savedSmsToken;
+  if (savedFrom !== undefined) process.env.TWILIO_FROM_NUMBER = savedFrom;
+  else delete process.env.TWILIO_FROM_NUMBER;
   ok("missing Twilio leaves text rows queued, same as missing Resend");
 
   console.log("\n11. A closed event refuses further responses");

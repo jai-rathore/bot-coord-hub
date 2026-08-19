@@ -97,6 +97,8 @@ export type EventBoard = {
     notifyChannel: "email" | "sms" | "both";
     /** Whether this signed-in viewer already has a number on file. */
     hasPhone: boolean;
+    /** False until TWILIO_FROM_NUMBER is set. Hides Text in the UI. */
+    smsEnabled: boolean;
   };
   dimensions: DimensionView[];
   /** Null when the viewer may not see the roster. */

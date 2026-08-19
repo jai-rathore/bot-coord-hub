@@ -10,6 +10,7 @@ import {
   wantsSms,
   type NotifyChannel,
 } from "@/lib/phone";
+import { smsOffered } from "@/lib/sms-flag";
 
 function isUniqueViolation(error: unknown): boolean {
   return Boolean(
@@ -155,6 +156,10 @@ export async function updateNotificationPrefs(
         );
       }
     }
+  }
+
+  if (wantsSms(channel) && !smsOffered()) {
+    throw new AgentApiError(400, "Text notifications are not available yet.");
   }
 
   if (wantsSms(channel) && !phoneE164) {

@@ -65,6 +65,10 @@ services:
         value: /sign-in
       - key: NEXT_PUBLIC_CLERK_SIGN_UP_URL
         value: /sign-up
+      # Setting this number turns Text on in Settings and on event pages.
+      # Leave unset until A2P 10DLC is approved.
+      - key: TWILIO_FROM_NUMBER
+        sync: false
   - type: keyvalue
     name: honeymatcha-rate-limit
     plan: starter

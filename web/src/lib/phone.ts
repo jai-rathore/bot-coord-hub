@@ -36,10 +36,14 @@ export function wantsSms(channel: NotifyChannel): boolean {
 export function humanChannelsFor(input: {
   channel: NotifyChannel;
   phoneE164: string | null | undefined;
+  /** When false, SMS is not queued even if they asked for texts. */
+  smsOffered?: boolean;
 }): Array<"email" | "sms"> {
   const channels: Array<"email" | "sms"> = [];
   if (wantsEmail(input.channel)) channels.push("email");
-  if (wantsSms(input.channel) && input.phoneE164) channels.push("sms");
+  if (wantsSms(input.channel) && input.phoneE164 && input.smsOffered !== false) {
+    channels.push("sms");
+  }
   return channels;
 }
 

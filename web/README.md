@@ -40,7 +40,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `EVENT_EMAIL_FROM` | Resend From address. Use `HoneyMatcha <onboarding@resend.dev>` until `honeymatcha.io` is verified. |
 | `TWILIO_ACCOUNT_SID` | Twilio account SID for event texts. |
 | `TWILIO_AUTH_TOKEN` | Twilio auth token. Without Twilio, SMS outbox rows stay queued. |
-| `TWILIO_FROM_NUMBER` | Twilio phone number in E.164 (`+15551234567`). |
+| `TWILIO_FROM_NUMBER` | Feature flag + Twilio From number (`+15551234567`). Unset hides Text and skips SMS. |
 | `TWILIO_MESSAGING_SERVICE_SID` | Optional. Use instead of `TWILIO_FROM_NUMBER` after A2P 10DLC. |
 
 ## Scripts

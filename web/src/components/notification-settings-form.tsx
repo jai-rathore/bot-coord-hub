@@ -13,9 +13,11 @@ import {
 export function NotificationSettingsForm({
   initialChannel,
   initialPhone,
+  smsEnabled,
 }: {
   initialChannel: string;
   initialPhone: string | null;
+  smsEnabled: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -49,6 +51,15 @@ export function NotificationSettingsForm({
     }
     setSaved(true);
     startTransition(() => router.refresh());
+  }
+
+  if (!smsEnabled) {
+    return (
+      <p id="notifications" className="text-sm leading-6 text-muted">
+        We&apos;ll email you when an event you follow changes. Your Grok Bot
+        still gets every update in its inbox.
+      </p>
+    );
   }
 
   return (

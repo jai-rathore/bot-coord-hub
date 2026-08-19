@@ -112,6 +112,7 @@ export function EventClient({
   const [phoneDraft, setPhoneDraft] = useState("");
   const [needPhone, setNeedPhone] = useState(false);
 
+  const smsEnabled = board.viewer.smsEnabled;
   const slug = board.event.shareSlug;
   // Only read on the client; the QR panel cannot open before hydration.
   const shareUrl =
@@ -199,14 +200,23 @@ export function EventClient({
       await post("/subscribe", { notify: false });
       return;
     }
-    if (wantsSms(channelDraft) && !board.viewer.hasPhone && !phoneDraft.trim()) {
+    if (
+      smsEnabled &&
+      wantsSms(channelDraft) &&
+      !board.viewer.hasPhone &&
+      !phoneDraft.trim()
+    ) {
       setNeedPhone(true);
       return;
     }
     const result = await post("/subscribe", {
       notify: true,
-      channel: channelDraft,
-      ...(phoneDraft.trim() ? { phone: phoneDraft.trim() } : {}),
+      ...(smsEnabled
+        ? {
+            channel: channelDraft,
+            ...(phoneDraft.trim() ? { phone: phoneDraft.trim() } : {}),
+          }
+        : {}),
     });
     if (result) setNeedPhone(false);
   }
@@ -529,7 +539,7 @@ export function EventClient({
               <p className="text-sm font-semibold text-ink">
                 {
                   followCopy(
-                    channelDraft,
+                    smsEnabled ? channelDraft : "email",
                     Boolean(board.viewer.notifyUpdates),
                   ).title
                 }
@@ -537,7 +547,7 @@ export function EventClient({
               <p className="text-xs text-muted">
                 {
                   followCopy(
-                    channelDraft,
+                    smsEnabled ? channelDraft : "email",
                     Boolean(board.viewer.notifyUpdates),
                   ).detail
                 }
@@ -558,21 +568,23 @@ export function EventClient({
               {board.viewer.notifyUpdates ? "Turn off" : "Notify me"}
             </button>
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <NotificationChannelPicker
-              value={channelDraft}
-              onChange={(next) => void chooseChannel(next)}
-              disabled={busy}
-              size="compact"
-            />
-            <Link
-              href="/app/settings#notifications"
-              className="text-xs text-muted no-underline hover:text-matcha"
-            >
-              Change in Settings
-            </Link>
-          </div>
-          {needPhone ? (
+          {smsEnabled ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <NotificationChannelPicker
+                value={channelDraft}
+                onChange={(next) => void chooseChannel(next)}
+                disabled={busy}
+                size="compact"
+              />
+              <Link
+                href="/app/settings#notifications"
+                className="text-xs text-muted no-underline hover:text-matcha"
+              >
+                Change in Settings
+              </Link>
+            </div>
+          ) : null}
+          {smsEnabled && needPhone ? (
             <div className="mt-3 border-t border-line pt-3">
               <label className="grid gap-2 text-sm">
                 <span className="font-medium text-ink">

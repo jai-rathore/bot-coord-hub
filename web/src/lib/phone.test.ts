@@ -65,6 +65,14 @@ test("SMS is not queued until a number exists", () => {
     humanChannelsFor({ channel: "sms", phoneE164: "+15551234567" }),
     ["sms"],
   );
+  assert.deepEqual(
+    humanChannelsFor({
+      channel: "both",
+      phoneE164: "+15551234567",
+      smsOffered: false,
+    }),
+    ["email"],
+  );
 });
 
 test("follow copy stays specific to the chosen channel", () => {

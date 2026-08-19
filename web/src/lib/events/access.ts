@@ -10,6 +10,7 @@ import { AgentApiError } from "@/lib/agent-errors";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import { loadBoardSource, projectBoard } from "@/lib/events/board";
 import { parseNotifyChannel } from "@/lib/phone";
+import { smsOffered } from "@/lib/sms-flag";
 import type { EventBoard } from "@/lib/events/types";
 
 export function assertEventsEnabled(): void {
@@ -72,6 +73,7 @@ export async function boardFor(
       ...board.viewer,
       notifyChannel: parseNotifyChannel(user.notifyChannel),
       hasPhone: Boolean(user.phoneE164),
+      smsEnabled: smsOffered(),
     },
   };
 }
