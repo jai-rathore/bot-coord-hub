@@ -92,4 +92,5 @@ jobs:
           npm run test:e2e-platform
           npm run test:e2e-events
           npm run test:e2e-events-agent
+          npm run test:e2e-events-notes
           npm run test:e2e-meet
