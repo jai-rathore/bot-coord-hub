@@ -5,14 +5,19 @@ import { useState, useTransition } from "react";
 import type { PublicLink } from "@/lib/links";
 import type { PublicInviteView } from "@/lib/public-invites";
 import { PublicInviteQr } from "@/components/public-invite-qr";
+import { AgentBadge } from "@/components/people-met";
 
 export function LinksManager({
   initialLinks,
   initialPublicInvites,
+  agentUserIds = [],
 }: {
   initialLinks: PublicLink[];
   initialPublicInvites: PublicInviteView[];
+  /** Peers running an agent of their own, so a badge can say so. */
+  agentUserIds?: string[];
 }) {
+  const agents = new Set(agentUserIds);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [toEmail, setToEmail] = useState("");
@@ -463,8 +468,9 @@ export function LinksManager({
                 className="flex flex-wrap items-center justify-between gap-3 py-3"
               >
                 <div>
-                  <p className="font-medium text-ink">
+                  <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
                     {link.peer?.name || link.peer?.email || link.toEmail || "Peer"}
+                    {link.peer && agents.has(link.peer.id) ? <AgentBadge /> : null}
                   </p>
                   <p className="text-sm text-muted">
                     {link.peer?.email ?? link.toEmail ?? "—"} · can coordinate

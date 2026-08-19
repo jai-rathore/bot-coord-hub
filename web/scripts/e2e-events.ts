@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
 import { getDb } from "../src/db";
 import {
+  apiKeys,
   eventOptions,
   eventParticipants,
   events,
@@ -28,6 +29,10 @@ import {
   listEventsWithUpdates,
   markEventSeen,
 } from "../src/lib/events/updates";
+import {
+  agentConnectedUserIds,
+  listPeopleMetThroughEvents,
+} from "../src/lib/people";
 
 function ok(label: string) {
   console.log(`  ✓ ${label}`);
@@ -450,7 +455,93 @@ async function main() {
   assert.equal(paged.hasMore, true, "hasMore sees past the page");
   ok("the list pages instead of silently truncating");
 
-  console.log("\n17. Cleanup");
+  console.log("\n17. People met through events");
+  const social = await createEvent(organizer, {
+    title: `Trivia night ${suffix}`,
+    timezone: "UTC",
+    deadlineAt: new Date(soon).toISOString(),
+    fixedStartsAt: new Date(soon + 24 * 3600_000).toISOString(),
+    place: "The pub",
+  });
+  await joinEvent(social, alice);
+  await joinEvent(social, bob);
+
+  const organizerSees = await listPeopleMetThroughEvents(organizer);
+  const seenIds = organizerSees.map((p) => p.userId).sort();
+  assert.deepEqual(
+    seenIds,
+    [alice.id, bob.id].sort(),
+    "everyone on the event shows up, and you never list yourself",
+  );
+  assert.equal(
+    organizerSees.every((p) => p.youOrganized && p.viaEventTitle === social.title),
+    true,
+    "each row says how you met",
+  );
+  ok("event participants appear in People");
+
+  const aliceSees = await listPeopleMetThroughEvents(alice);
+  assert.equal(
+    aliceSees.some((p) => p.userId === organizer.id),
+    true,
+    "it works from the invitee's side too",
+  );
+  assert.equal(
+    aliceSees.find((p) => p.userId === organizer.id)?.youOrganized,
+    false,
+    "an invitee did not organize it",
+  );
+  ok("the invitee sees the organizer, correctly labelled");
+
+  const filtered = await listPeopleMetThroughEvents(organizer, {
+    excludeUserIds: new Set([alice.id]),
+  });
+  assert.equal(
+    filtered.some((p) => p.userId === alice.id),
+    false,
+    "already-connected people are left to the Connected list",
+  );
+  ok("exclusions keep one person to one row");
+
+  // A key nobody has used is not an agent, and must not be advertised as one.
+  const [freshKey] = await db
+    .insert(apiKeys)
+    .values({
+      userId: alice.id,
+      name: "Never used",
+      keyPrefix: `hm_${suffix}`,
+      keyHash: `hash_unused_${suffix}`,
+      scopes: [],
+    })
+    .returning();
+  assert.equal(
+    (await agentConnectedUserIds([alice.id])).has(alice.id),
+    false,
+    "an unused key is not a connected agent",
+  );
+  await db
+    .update(apiKeys)
+    .set({ lastUsedAt: new Date() })
+    .where(eq(apiKeys.id, freshKey.id));
+  assert.equal(
+    (await agentConnectedUserIds([alice.id])).has(alice.id),
+    true,
+    "a used key is",
+  );
+  await db
+    .update(apiKeys)
+    .set({ revokedAt: new Date() })
+    .where(eq(apiKeys.id, freshKey.id));
+  assert.equal(
+    (await agentConnectedUserIds([alice.id])).has(alice.id),
+    false,
+    "a revoked key stops counting",
+  );
+  ok("the agent badge tracks a key that is used and not revoked");
+
+  await db.delete(events).where(eq(events.id, social.id));
+
+  console.log("\n18. Cleanup");
   await db.delete(events).where(eq(events.id, event.id));
   await db.delete(events).where(eq(events.id, past.id));
   await db.delete(events).where(eq(events.id, rsvp.id));
