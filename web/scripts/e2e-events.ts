@@ -3,13 +3,23 @@ import assert from "node:assert/strict";
 import { randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
 import { getDb } from "../src/db";
-import { eventOptions, eventParticipants, events, users } from "../src/db/schema";
+import {
+  apiKeys,
+  eventOptions,
+  eventParticipants,
+  events,
+  notificationOutbox,
+  users,
+} from "../src/db/schema";
 import {
   addOption,
+  archiveEvent,
   assertOrganizer,
   cancelEvent,
   createEvent,
+  deleteEvent,
   joinEvent,
+  listEventsForUser,
   lockEvent,
   rotateShareSlug,
   setResponses,
@@ -19,6 +29,10 @@ import {
   listEventsWithUpdates,
   markEventSeen,
 } from "../src/lib/events/updates";
+import {
+  agentConnectedUserIds,
+  listPeopleMetThroughEvents,
+} from "../src/lib/people";
 
 function ok(label: string) {
   console.log(`  ✓ ${label}`);
@@ -358,7 +372,176 @@ async function main() {
   assert.equal(aliceRow.attendance, "yes");
   ok("RSVP flow records attendance against a fixed time");
 
-  console.log("\n14. Cleanup");
+  console.log("\n14. Archive is per person");
+  const shared = await createEvent(organizer, {
+    title: `Shared plan ${suffix}`,
+    timezone: "UTC",
+    deadlineAt: new Date(soon).toISOString(),
+    fixedStartsAt: new Date(soon + 24 * 3600_000).toISOString(),
+    place: "Anywhere",
+  });
+  await joinEvent(shared, alice);
+
+  const seenByBoth = async () => ({
+    organizer: (await listEventsForUser(organizer)).organized.some(
+      (e) => e.id === shared.id,
+    ),
+    alice: (await listEventsForUser(alice)).joined.some(
+      (e) => e.id === shared.id,
+    ),
+  });
+
+  assert.deepEqual(await seenByBoth(), { organizer: true, alice: true });
+  await archiveEvent(shared, organizer, true);
+  assert.deepEqual(
+    await seenByBoth(),
+    { organizer: false, alice: true },
+    "archiving must not touch anyone else's list",
+  );
+  ok("the organizer archiving leaves the participant's copy alone");
+
+  const archivedList = await listEventsForUser(organizer, { archived: true });
+  assert.ok(
+    archivedList.organized.some((e) => e.id === shared.id),
+    "archived events are still reachable",
+  );
+  await archiveEvent(shared, organizer, false);
+  assert.deepEqual(await seenByBoth(), { organizer: true, alice: true });
+  ok("un-archiving puts it back");
+
+  console.log("\n15. Delete is organizer-only, cancelled-only");
+  await expectReject("a participant cannot delete", () =>
+    deleteEvent(shared, alice),
+  );
+  await expectReject("an open event cannot be deleted", () =>
+    deleteEvent(shared, organizer),
+  );
+
+  await cancelEvent(shared, organizer);
+  const cancelled = (await db.select().from(events).where(eq(events.id, shared.id)))[0];
+  // Cancelling queues the "it is off" mail, and notification_outbox cascades
+  // from events — so a delete before it drains would erase the telling.
+  await expectReject("delete waits for the cancellation to be sent", () =>
+    deleteEvent(cancelled, organizer),
+  );
+  await db
+    .update(notificationOutbox)
+    .set({ sentAt: new Date() })
+    .where(eq(notificationOutbox.eventId, shared.id));
+
+  await deleteEvent(cancelled, organizer);
+  const goneRows = await db.select().from(events).where(eq(events.id, shared.id));
+  assert.equal(goneRows.length, 0, "the event row is gone");
+  const orphanParticipants = await db
+    .select()
+    .from(eventParticipants)
+    .where(eq(eventParticipants.eventId, shared.id));
+  assert.equal(orphanParticipants.length, 0, "participants cascade away");
+  assert.equal(
+    (await listEventsForUser(alice)).joined.some((e) => e.id === shared.id),
+    false,
+    "it leaves the participant's list too",
+  );
+  ok("a cancelled event deletes for everyone once the mail has gone");
+
+  console.log("\n16. Paging");
+  const paged = await listEventsForUser(organizer, { limit: 1, offset: 0 });
+  const pagedCount = paged.organized.length + paged.joined.length;
+  assert.equal(pagedCount, 1, "a page holds what it was asked for");
+  const second = await listEventsForUser(organizer, { limit: 1, offset: 1 });
+  const firstId = [...paged.organized, ...paged.joined][0]?.id;
+  const secondId = [...second.organized, ...second.joined][0]?.id;
+  assert.notEqual(firstId, secondId, "the second page is different events");
+  assert.equal(paged.hasMore, true, "hasMore sees past the page");
+  ok("the list pages instead of silently truncating");
+
+  console.log("\n17. People met through events");
+  const social = await createEvent(organizer, {
+    title: `Trivia night ${suffix}`,
+    timezone: "UTC",
+    deadlineAt: new Date(soon).toISOString(),
+    fixedStartsAt: new Date(soon + 24 * 3600_000).toISOString(),
+    place: "The pub",
+  });
+  await joinEvent(social, alice);
+  await joinEvent(social, bob);
+
+  const organizerSees = await listPeopleMetThroughEvents(organizer);
+  const seenIds = organizerSees.map((p) => p.userId).sort();
+  assert.deepEqual(
+    seenIds,
+    [alice.id, bob.id].sort(),
+    "everyone on the event shows up, and you never list yourself",
+  );
+  assert.equal(
+    organizerSees.every((p) => p.youOrganized && p.viaEventTitle === social.title),
+    true,
+    "each row says how you met",
+  );
+  ok("event participants appear in People");
+
+  const aliceSees = await listPeopleMetThroughEvents(alice);
+  assert.equal(
+    aliceSees.some((p) => p.userId === organizer.id),
+    true,
+    "it works from the invitee's side too",
+  );
+  assert.equal(
+    aliceSees.find((p) => p.userId === organizer.id)?.youOrganized,
+    false,
+    "an invitee did not organize it",
+  );
+  ok("the invitee sees the organizer, correctly labelled");
+
+  const filtered = await listPeopleMetThroughEvents(organizer, {
+    excludeUserIds: new Set([alice.id]),
+  });
+  assert.equal(
+    filtered.some((p) => p.userId === alice.id),
+    false,
+    "already-connected people are left to the Connected list",
+  );
+  ok("exclusions keep one person to one row");
+
+  // A key nobody has used is not an agent, and must not be advertised as one.
+  const [freshKey] = await db
+    .insert(apiKeys)
+    .values({
+      userId: alice.id,
+      name: "Never used",
+      keyPrefix: `hm_${suffix}`,
+      keyHash: `hash_unused_${suffix}`,
+      scopes: [],
+    })
+    .returning();
+  assert.equal(
+    (await agentConnectedUserIds([alice.id])).has(alice.id),
+    false,
+    "an unused key is not a connected agent",
+  );
+  await db
+    .update(apiKeys)
+    .set({ lastUsedAt: new Date() })
+    .where(eq(apiKeys.id, freshKey.id));
+  assert.equal(
+    (await agentConnectedUserIds([alice.id])).has(alice.id),
+    true,
+    "a used key is",
+  );
+  await db
+    .update(apiKeys)
+    .set({ revokedAt: new Date() })
+    .where(eq(apiKeys.id, freshKey.id));
+  assert.equal(
+    (await agentConnectedUserIds([alice.id])).has(alice.id),
+    false,
+    "a revoked key stops counting",
+  );
+  ok("the agent badge tracks a key that is used and not revoked");
+
+  await db.delete(events).where(eq(events.id, social.id));
+
+  console.log("\n18. Cleanup");
   await db.delete(events).where(eq(events.id, event.id));
   await db.delete(events).where(eq(events.id, past.id));
   await db.delete(events).where(eq(events.id, rsvp.id));

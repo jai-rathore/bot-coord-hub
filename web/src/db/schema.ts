@@ -1369,6 +1369,12 @@ export const eventParticipants = pgTable(
       .notNull(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     respondedAt: timestamp("responded_at", { withTimezone: true }),
+    /**
+     * Archiving is per person, not per event: the organizer clearing a finished
+     * plan off their list must not take it off everyone else's. The organizer
+     * is always a participant, so one column covers both sides.
+     */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
   },
   (t) => [
     uniqueIndex("event_participants_event_user_uidx").on(t.eventId, t.userId),

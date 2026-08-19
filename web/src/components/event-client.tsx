@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventChat } from "@/components/event-chat";
 import { EventNotes } from "@/components/event-notes";
@@ -100,7 +101,10 @@ export function EventClient({
   signInUrl: string;
   showOrganizerControls?: boolean;
 }) {
+  const router = useRouter();
   const [board, setBoard] = useState(initialBoard);
+  /** Deleting destroys other people's answers, so it asks once first. */
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState<Record<string, EventPref>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +125,13 @@ export function EventClient({
       ? `/e/${slug}`
       : `${window.location.origin}/e/${slug}`;
   const isOrganizer = board.viewer.role === "organizer";
+  /**
+   * Nothing is still running. Offering to lock responses on an event that was
+   * cancelled last week is the bug this replaces: the buttons stayed live and
+   * only Cancel knew to grey itself out.
+   */
+  const finished =
+    board.event.status === "cancelled" || board.event.status === "expired";
   const canRespond = board.viewer.canRespond;
 
   const openTimeDimension = useMemo(
@@ -260,6 +271,13 @@ export function EventClient({
 
   async function control(action: string, extra: Record<string, unknown> = {}) {
     await post("/controls", { action, ...extra });
+  }
+
+  async function leaveList(action: "archive" | "delete") {
+    const result = await post("/controls", { action });
+    // Both take this event off the list this page came from, and a deleted
+    // event has no page left to show.
+    if (result) router.push("/app/events");
   }
 
   async function toggleNotifications() {
@@ -762,50 +780,114 @@ export function EventClient({
       {isOrganizer && showOrganizerControls && (
         <section className="surface-card p-6 sm:p-7">
           <p className="section-kicker">Organizer controls</p>
-          <h2 className="mt-2 text-lg font-semibold text-ink">
-            Your call, not the agent&apos;s
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            Locking stops new responses. Nothing reaches a calendar until you
-            confirm it.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="button-secondary"
-              disabled={busy || board.event.status !== "open"}
-              onClick={() => control("lock")}
-            >
-              Lock responses now
-            </button>
-            <button
-              type="button"
-              className="button-secondary"
-              disabled={busy}
-              onClick={() => {
-                const next = new Date(Date.now() + 48 * 3600_000).toISOString();
-                void control("extend", { deadlineAt: next });
-              }}
-            >
-              Give it 48 more hours
-            </button>
-            <button
-              type="button"
-              className="button-secondary"
-              disabled={busy}
-              onClick={() => control("rotate")}
-            >
-              Replace share link
-            </button>
-            <button
-              type="button"
-              className="button-secondary text-danger"
-              disabled={busy || board.event.status === "cancelled"}
-              onClick={() => control("cancel")}
-            >
-              Cancel event
-            </button>
-          </div>
+          {finished ? (
+            <>
+              <h2 className="mt-2 text-lg font-semibold text-ink">
+                {board.event.status === "cancelled"
+                  ? "You cancelled this one"
+                  : "This one has run out of time"}
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-muted">
+                {board.event.status === "cancelled"
+                  ? "Everyone on it was told when you cancelled. Nothing here is still running."
+                  : "The deadline passed without a decision. Nothing here is still running."}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="button-secondary"
+                  disabled={busy}
+                  onClick={() => leaveList("archive")}
+                >
+                  Archive
+                </button>
+                {board.event.status === "cancelled" &&
+                  (confirmingDelete ? (
+                    <>
+                      <button
+                        type="button"
+                        className="button-secondary text-danger"
+                        disabled={busy}
+                        onClick={() => leaveList("delete")}
+                      >
+                        Yes, delete it for everyone
+                      </button>
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        disabled={busy}
+                        onClick={() => setConfirmingDelete(false)}
+                      >
+                        Keep it
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="button-secondary text-danger"
+                      disabled={busy}
+                      onClick={() => setConfirmingDelete(true)}
+                    >
+                      Delete permanently
+                    </button>
+                  ))}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-muted">
+                {confirmingDelete
+                  ? "This erases the event, everyone's answers, and every note on it. It cannot be undone."
+                  : "Archiving only takes it off your list — everyone else keeps theirs."}
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="mt-2 text-lg font-semibold text-ink">
+                Your call, not the agent&apos;s
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Locking stops new responses. Nothing reaches a calendar until
+                you confirm it.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="button-secondary"
+                  disabled={busy || board.event.status !== "open"}
+                  onClick={() => control("lock")}
+                >
+                  Lock responses now
+                </button>
+                <button
+                  type="button"
+                  className="button-secondary"
+                  disabled={busy || board.event.status !== "open"}
+                  onClick={() => {
+                    const next = new Date(
+                      Date.now() + 48 * 3600_000,
+                    ).toISOString();
+                    void control("extend", { deadlineAt: next });
+                  }}
+                >
+                  Give it 48 more hours
+                </button>
+                <button
+                  type="button"
+                  className="button-secondary"
+                  disabled={busy}
+                  onClick={() => control("rotate")}
+                >
+                  Replace share link
+                </button>
+                <button
+                  type="button"
+                  className="button-secondary text-danger"
+                  disabled={busy}
+                  onClick={() => control("cancel")}
+                >
+                  Cancel event
+                </button>
+              </div>
+            </>
+          )}
         </section>
       )}
     </div>

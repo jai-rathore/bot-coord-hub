@@ -1,7 +1,12 @@
 import { headers } from "next/headers";
 import { LinksManager } from "@/components/links-manager";
 import { PageHeading } from "@/components/page-heading";
+import { PeopleMet } from "@/components/people-met";
 import { listLinksForUser } from "@/lib/links";
+import {
+  agentConnectedUserIds,
+  listPeopleMetThroughEvents,
+} from "@/lib/people";
 import { listPublicInvites } from "@/lib/public-invites";
 import { ensureCurrentUser } from "@/lib/users";
 
@@ -28,18 +33,30 @@ export default async function PeoplePage() {
     listPublicInvites(user, origin),
   ]);
 
+  // Anyone already connected belongs under Connected, not under "met through" —
+  // one person, one row, and the row that grants something wins.
+  const linkedUserIds = new Set(
+    links.map((link) => link.peer?.id).filter((id): id is string => Boolean(id)),
+  );
+  const met = await listPeopleMetThroughEvents(user, {
+    excludeUserIds: linkedUserIds,
+  });
+  const agentUserIds = [...(await agentConnectedUserIds([...linkedUserIds]))];
+
   return (
     <div>
       <PageHeading
         eyebrow="Your network"
         title="People"
-        description="Share your public honeymatcha.io handle, invite someone privately by email, or use a one-off public link. Every connection can be revoked."
+        description="Everyone you have coordinated with. Connect to someone and your agents can settle times between them; being listed on its own grants nothing."
       />
-      <div className="mt-9">
+      <div className="mt-9 space-y-10">
         <LinksManager
           initialLinks={links}
           initialPublicInvites={publicInvites}
+          agentUserIds={agentUserIds}
         />
+        <PeopleMet people={met} />
       </div>
     </div>
   );
