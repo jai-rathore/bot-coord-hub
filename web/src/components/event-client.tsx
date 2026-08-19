@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventChat } from "@/components/event-chat";
+import { EventNotes } from "@/components/event-notes";
 import { NotificationChannelPicker } from "@/components/notification-channel-picker";
 import { ShareQr } from "@/components/share-qr";
 import type { EventBoard, EventPref, OptionTally } from "@/lib/events/types";
@@ -167,6 +168,74 @@ export function EventClient({
     },
     [slug],
   );
+
+  /**
+   * Keep the page honest without a reload.
+   *
+   * Notes and answers arrive from other people while this page is open, so the
+   * board is re-fetched on a timer — paused while the tab is hidden, because a
+   * backgrounded invite does not need to poll, and skipped while a write is in
+   * flight so a slow GET cannot overwrite what was just saved.
+   */
+  const busyRef = useRef(busy);
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+
+  useEffect(() => {
+    if (board.event.status !== "open") return;
+    let cancelled = false;
+
+    async function refresh() {
+      if (document.hidden || busyRef.current) return;
+      try {
+        const res = await fetch(`/api/events/${slug}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data.board) setBoard(data.board as EventBoard);
+      } catch {
+        // A dropped poll is not worth an error banner; the next one retries.
+      }
+    }
+
+    const timer = setInterval(refresh, 15_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [slug, board.event.status]);
+
+  async function postNote(input: {
+    body: string;
+    visibility: "everyone" | "organizer";
+    optionId: string | null;
+  }): Promise<string | null> {
+    const result = await post("/notes", input);
+    return (result?.notice as string | null) ?? null;
+  }
+
+  async function removeNote(noteId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/events/${slug}/notes?noteId=${encodeURIComponent(noteId)}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Could not remove that note.");
+        return;
+      }
+      if (data.board) setBoard(data.board as EventBoard);
+    } catch {
+      setError("Could not reach HoneyMatcha. Check your connection.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function cycle(optionId: string, current: EventPref | null) {
     if (!canRespond) return;
@@ -529,6 +598,17 @@ export function EventClient({
             </div>
           )}
         </section>
+      )}
+
+      {/* ---------- what people said ---------- */}
+      {signedIn && (
+        <EventNotes
+          board={board}
+          agentName={board.event.agentName}
+          busy={busy}
+          onPost={postNote}
+          onRemove={removeNote}
+        />
       )}
 
       {/* ---------- update notifications ---------- */}

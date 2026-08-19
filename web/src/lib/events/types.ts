@@ -16,6 +16,28 @@ export type EventStatus =
 
 export type ViewerRole = "organizer" | "participant" | "public";
 
+export type NoteVisibility = "everyone" | "organizer";
+export type NoteSource = "chat" | "ui";
+
+/** One note, already filtered to what the viewer is permitted to see. */
+export type NoteView = {
+  id: string;
+  body: string;
+  visibility: NoteVisibility;
+  source: NoteSource;
+  /** Set when the note is about one specific option. */
+  optionId: string | null;
+  optionLabel: string | null;
+  authorName: string;
+  isMine: boolean;
+  isOrganizerAuthor: boolean;
+  createdAt: string;
+  /** The author can take their own words back. */
+  canRetract: boolean;
+  /** The organizer can take anyone's off the board. */
+  canRemove: boolean;
+};
+
 /** Below this many responses, counts_only would disclose identity, so counts
  *  are suppressed entirely. See plan §2. */
 export const MIN_COUNT_DISCLOSURE = 3;
@@ -123,4 +145,12 @@ export type EventBoard = {
   /** One-line, paste-ready status. Always safe for the viewer to see. */
   summary: string;
   countsSuppressed: boolean;
+  /** Free text people added, already filtered to what this viewer may see. */
+  notes: NoteView[];
+  /** Sage's rollup of the shared notes, or a deterministic one. Null when none. */
+  notesSummary: string | null;
+  /** True when the summary came from the model rather than the fallback. */
+  notesDigestIsLive: boolean;
+  /** False for anonymous visitors and cancelled events. */
+  canPostNote: boolean;
 };

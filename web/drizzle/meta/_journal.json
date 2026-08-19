@@ -162,6 +162,13 @@
       "when": 1787101708086,
       "tag": "0022_stormy_silhouette",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1787200000000,
+      "tag": "0023_event_notes",
+      "breakpoints": true
     }
   ]
 }

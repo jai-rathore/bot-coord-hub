@@ -18,6 +18,13 @@ import {
   users,
 } from "@/db/schema";
 import { resolveDimension, type ResolvableOption } from "@/lib/events/resolve";
+import {
+  NOTE_LIMITS,
+  loadEventNotes,
+  projectNotes,
+  summarizeNotesDeterministic,
+  type NoteRow,
+} from "@/lib/events/notes";
 import { displayName, formatSlot, statusSummary } from "@/lib/events/copy";
 import {
   MIN_COUNT_DISCLOSURE,
@@ -39,6 +46,8 @@ export type BoardSource = {
     name: string;
   }>;
   responses: Array<typeof eventResponses.$inferSelect>;
+  /** Free text people added to the event. Projected per viewer below. */
+  notes: NoteRow[];
 };
 
 /** Load everything the projection needs in one pass. */
@@ -54,7 +63,7 @@ export async function loadBoardSource(
     .limit(1);
   if (!row) return null;
 
-  const [dimensions, options, participantRows, responses] = await Promise.all([
+  const [dimensions, options, participantRows, responses, notes] = await Promise.all([
     db
       .select()
       .from(eventDimensions)
@@ -72,6 +81,7 @@ export async function loadBoardSource(
       .where(eq(eventParticipants.eventId, eventId))
       .orderBy(asc(eventParticipants.joinedAt)),
     db.select().from(eventResponses).where(eq(eventResponses.eventId, eventId)),
+    loadEventNotes(eventId),
   ]);
 
   return {
@@ -88,6 +98,7 @@ export async function loadBoardSource(
       name: displayName(p.name, p.email),
     })),
     responses,
+    notes,
   };
 }
 
@@ -304,6 +315,27 @@ export function projectBoard(
     event.status === "open" &&
     event.deadlineAt.getTime() > now.getTime();
 
+  // Notes carry names and prose, so they go through the same projection as
+  // everything else rather than being attached raw to the response.
+  const viewerNotes = projectNotes(
+    source.notes,
+    { role, userId: viewerUserId },
+    {
+      organizerUserId: event.organizerUserId,
+      timezone: event.timezone,
+      optionsById: new Map(
+        source.options.map((option) => [
+          option.id,
+          {
+            label: option.label,
+            startsAt: option.startsAt,
+            endsAt: option.endsAt,
+          },
+        ]),
+      ),
+    },
+  ).slice(-NOTE_LIMITS.feedLimit);
+
   return {
     event: {
       id: event.id,
@@ -371,6 +403,11 @@ export function projectBoard(
       now,
     }),
     countsSuppressed,
+    notes: viewerNotes,
+    notesSummary: event.notesDigest ?? summarizeNotesDeterministic(viewerNotes),
+    notesDigestIsLive: Boolean(event.notesDigest),
+    // Writing a note joins them, exactly as tapping an answer does.
+    canPostNote: viewerUserId != null && event.status !== "cancelled",
   };
 }
 
