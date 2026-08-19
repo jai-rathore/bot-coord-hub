@@ -56,6 +56,7 @@ const clerkIds = [
   `e2e-discovery-probe-host-${suffix}`,
   `e2e-dating-a-${suffix}`,
   `e2e-dating-b-${suffix}`,
+  `e2e-dating-austin-${suffix}`,
 ];
 
 function resolvedCity(userId: string, city: string, region = "NY") {
@@ -149,7 +150,16 @@ async function seedDiscoveryIntents() {
 
 async function main() {
   await seedDiscoveryIntents();
-  const [seeker, host, moderator, probeSeeker, probeHost, datingA, datingB] =
+  const [
+    seeker,
+    host,
+    moderator,
+    probeSeeker,
+    probeHost,
+    datingA,
+    datingB,
+    datingAustin,
+  ] =
     await db
       .insert(users)
       .values([
@@ -187,6 +197,15 @@ async function main() {
           clerkUserId: clerkIds[6],
           email: `dating-b-${suffix}@example.com`,
           name: "Dating B",
+        },
+        // The out-of-town candidate. Needs its own row: probeHost, which this
+        // used to borrow, is deleted earlier to prove pair history outlives a
+        // user, so enrolling it here hit a foreign key violation. That was
+        // hidden for as long as the script aborted before reaching this line.
+        {
+          clerkUserId: clerkIds[7],
+          email: `dating-austin-${suffix}@example.com`,
+          name: "Dating Austin",
         },
       ])
       .returning();
@@ -726,7 +745,7 @@ async function main() {
     },
   );
   await submitDiscoveryEnrollment(
-    { user: probeHost, kind: "user" },
+    { user: datingAustin, kind: "user" },
     {
       intentSlug: "dating_introduction",
       claims: {
@@ -736,7 +755,7 @@ async function main() {
         interests: ["hiking"],
         introductionSummary: "In town briefly",
       },
-      location: resolvedCity(probeHost.id, "Austin", "TX"),
+      location: resolvedCity(datingAustin.id, "Austin", "TX"),
       requestActivation: true,
     },
   );

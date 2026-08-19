@@ -553,6 +553,8 @@ const EVENT_TOOLS = [
   "add_event_option",
   "extend_event_deadline",
   "nudge_event_participants",
+  "post_event_note",
+  "retract_event_note",
   "record_meeting",
 ];
 

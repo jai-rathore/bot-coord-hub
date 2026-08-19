@@ -12,6 +12,8 @@ import {
   agentAddEventOption,
   agentCreateEvent,
   agentExtendEventDeadline,
+  agentPostEventNote,
+  agentRetractEventNote,
   agentGetEventBoard,
   agentHumanOnlyEventAction,
   agentJoinEvent,
@@ -753,6 +755,52 @@ export const MCP_TOOLS: McpToolDef[] = [
     },
   },
   {
+    name: "post_event_note",
+    description:
+      "Leave a note on an event — the reason a day does not work, a constraint, anything the others should know that a yes/no cannot carry. Notes appear on the event for everyone, or set audience to 'organizer' to send it to them alone. Read existing notes from board.notes on get_event_board.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventId: {
+          type: "string",
+          description:
+            "Event id, share slug, or full /e/<slug> link — any of the three.",
+        },
+        body: {
+          type: "string",
+          description: "The note, in your human's words. One or two sentences.",
+        },
+        audience: {
+          type: "string",
+          enum: ["everyone", "organizer"],
+          description:
+            "Who should read it. Defaults to everyone. On an event whose organizer keeps responses private, an 'everyone' note is kept for the organizer instead and the reply says so.",
+        },
+        optionId: {
+          type: "string",
+          description:
+            "Optional. The option this note is about, from get_event_board.",
+        },
+      },
+      required: ["eventId", "body"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "retract_event_note",
+    description:
+      "Take back a note your human left. If your human organizes the event, this removes anyone's note from the board.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventId: { type: "string" },
+        noteId: { type: "string", description: "From board.notes." },
+      },
+      required: ["eventId", "noteId"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "extend_event_deadline",
     description: "Move an event's response deadline later.",
     inputSchema: {
@@ -804,6 +852,8 @@ const EVENT_FLAGGED_TOOLS = new Set([
   "suggest_event_option",
   "add_event_option",
   "extend_event_deadline",
+  "post_event_note",
+  "retract_event_note",
   "nudge_event_participants",
   "set_event_notifications",
   "record_meeting",
@@ -1013,6 +1063,10 @@ export async function dispatchMcpTool(
       return agentAddEventOption(auth, args as never);
     case "extend_event_deadline":
       return agentExtendEventDeadline(auth, args as never);
+    case "post_event_note":
+      return agentPostEventNote(auth, args as never);
+    case "retract_event_note":
+      return agentRetractEventNote(auth, args as never);
     case "nudge_event_participants":
       return agentNudgeEventParticipants(auth, args as never);
     case "lock_event":

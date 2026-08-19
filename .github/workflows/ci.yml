@@ -23,9 +23,29 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # Discovery's rate limiter is Redis-backed and fails closed without it,
+      # so the discovery API suite needs one to run at all. Production gets
+      # this from the honeymatcha-rate-limit keyvalue service.
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     env:
       DATABASE_URL: postgres://honeymatcha:honeymatcha@127.0.0.1:5432/honeymatcha
+      REDIS_URL: redis://127.0.0.1:6379
+      ENABLE_DISCOVERY: "true"
+      # `next start` sets NODE_ENV=production, and the events flag defaults to
+      # off there, so the served app had events disabled and every event HTTP
+      # endpoint 404'd. Nothing caught it because the older event suites call
+      # the service layer directly from tsx, where the default is on — only an
+      # over-HTTP suite reaches the flag. Production sets this in render.yaml.
+      ENABLE_EVENTS: "true"
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
       CLERK_SECRET_KEY: sk_test_00000000000000000000000000000000
       GUEST_TOKEN_PEPPER: ci-guest-token-pepper
@@ -93,4 +113,7 @@ jobs:
           npm run test:e2e-events
           npm run test:e2e-events-agent
           npm run test:e2e-events-notes
+          npm run test:e2e-events-notes-api
           npm run test:e2e-meet
+          npm run test:e2e-discovery
+          npm run test:e2e-discovery-api

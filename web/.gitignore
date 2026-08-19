@@ -43,3 +43,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# redis dump written by a local redis-server during e2e runs
+dump.rdb

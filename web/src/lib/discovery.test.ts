@@ -10,6 +10,7 @@ import {
   validateIntentDefinition,
 } from "./intent-contract";
 import { registeredIntentHandler } from "./discovery-match";
+import { validateCombinedClaims } from "./discovery-service";
 import { decryptJson, encryptJson } from "./secret-crypto";
 import { distributedRateLimit } from "./distributed-rate-limit";
 import { jsonFromAgentError } from "./http";
@@ -418,4 +419,90 @@ test("unexpected agent errors never expose SQL parameters", async () => {
   assert.equal(body.error, "Internal server error");
   assert.equal(JSON.stringify(body).includes("user-secret-id"), false);
   assert.equal(JSON.stringify(body).includes("compatible"), false);
+});
+
+/* ------------------------------------------------------------------ */
+/* claim validation — a closed enum is not free text                   */
+/* ------------------------------------------------------------------ */
+
+test("every relationshipIntent option the UI offers is actually accepted", () => {
+  // Regression: the anonymous-card content filter treated enum values as free
+  // text and rejected any character outside [letters, digits, space, & + , ' -].
+  // "long_term" and "figuring_out" contain an underscore, so half of a
+  // required field's options were refused in production with the misleading
+  // message "relationshipIntent cannot contain contact identifiers".
+  const dating = DATING_INTRODUCTION_DEFINITION;
+  const field = dating.enrollment.fields.find(
+    (f) => f.key === "relationshipIntent",
+  )!;
+  assert.ok(field.options && field.options.length > 0);
+
+  for (const option of field.options) {
+    assert.doesNotThrow(
+      () =>
+        validateCombinedClaims(dating, {
+          age: 28,
+          relationshipIntent: option,
+          headline: "Weekend hiker",
+          interests: ["hiking"],
+          introductionSummary: "Happy to grab coffee",
+        }),
+      `relationshipIntent option "${option}" must be accepted`,
+    );
+  }
+});
+
+test("a value outside the enum is still refused", () => {
+  const dating = DATING_INTRODUCTION_DEFINITION;
+  assert.throws(
+    () =>
+      validateCombinedClaims(dating, {
+        age: 28,
+        relationshipIntent: "whatever_i_typed",
+        headline: "Weekend hiker",
+        interests: ["hiking"],
+        introductionSummary: "Happy to grab coffee",
+      }),
+    /must be one of/,
+  );
+});
+
+test("exempting enums does not weaken the filter on free text", () => {
+  const dating = DATING_INTRODUCTION_DEFINITION;
+  for (const headline of [
+    "Reach me at me@example.com",
+    "instagram: someone",
+    "https://t.me/someone",
+    "Call 5551234567 anytime",
+  ]) {
+    assert.throws(
+      () =>
+        validateCombinedClaims(dating, {
+          age: 28,
+          relationshipIntent: "long_term",
+          headline,
+          interests: ["hiking"],
+          introductionSummary: "Happy to grab coffee",
+        }),
+      /contact identifiers/,
+      `"${headline}" must still be refused`,
+    );
+  }
+});
+
+test("an underage claim surfaces the age error, not a content error", () => {
+  // With the enum wrongly rejected first, this used to fail on
+  // "cannot contain contact identifiers" and the age rule never ran.
+  const dating = DATING_INTRODUCTION_DEFINITION;
+  assert.throws(
+    () =>
+      validateCombinedClaims(dating, {
+        age: 17,
+        relationshipIntent: "long_term",
+        headline: "Weekend hiker",
+        interests: ["hiking"],
+        introductionSummary: "Happy to grab coffee",
+      }),
+    /18 or older/,
+  );
 });

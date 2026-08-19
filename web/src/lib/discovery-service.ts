@@ -241,7 +241,12 @@ function validateClaimValue(field: IntentFieldDefinition, value: unknown) {
   }
 }
 
-function validateCombinedClaims(
+/**
+ * Exported for tests: this is where a claim is coerced, scrubbed for
+ * identifying content, and age-checked, in that order. The ordering matters —
+ * a scrub that wrongly rejects a value hides the age failure behind it.
+ */
+export function validateCombinedClaims(
   definition: IntentDefinition,
   claims: Record<string, unknown>,
 ) {
@@ -292,6 +297,13 @@ function assertSafeSharedContent(
   value: unknown,
 ) {
   if (field.sensitivity === "private" || value === undefined) return;
+  // An enum is a closed set we author, and validateClaimValue has already
+  // checked the value against field.options — there is no user-supplied
+  // content in it to scrub. Running the anonymous-card character rules over
+  // one rejects our own option names: "long_term" and "figuring_out" fail on
+  // the underscore, which is half of relationshipIntent's options on a
+  // required field, and the error blamed the person for "contact identifiers".
+  if (field.type === "enum") return;
   const values = Array.isArray(value) ? value : [value];
   for (const item of values) {
     if (typeof item !== "string") continue;

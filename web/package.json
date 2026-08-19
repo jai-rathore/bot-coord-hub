@@ -24,6 +24,7 @@
     "test:e2e-discovery-api": "node scripts/e2e-discovery-api.mjs",
     "test:e2e-events": "tsx scripts/e2e-events.ts",
     "test:e2e-events-notes": "tsx scripts/e2e-events-notes.ts",
+    "test:e2e-events-notes-api": "node scripts/e2e-events-notes-api.mjs",
     "events:tick": "tsx scripts/events-tick.ts",
     "email:test": "tsx scripts/send-test-email.ts",
     "sms:test": "tsx scripts/send-test-sms.ts",

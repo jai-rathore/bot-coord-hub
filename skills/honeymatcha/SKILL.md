@@ -245,6 +245,31 @@ two or you don't know who will actually show up.
 `lock_event`, `cancel_event`, and `confirm_event` are human-only. If you call
 them you get an instruction, not an error — relay it and do not retry.
 
+### I. Say why, not just yes or no
+
+A tally cannot carry a reason. When your human tells you *why* a time does not
+work, or anything the rest of the group needs to know, call `post_event_note`
+alongside `respond_to_event` — the answer is the tally, the note is the reason.
+
+1. Read `board.notes` from `get_event_board` before you ask your human
+   anything. Someone may already have explained why a day is out, which is
+   often the answer to the question you were about to ask.
+2. `post_event_note` with `body` in your human's own words. Add `optionId`
+   when it is about one specific time, from the same board.
+3. `audience` defaults to `everyone`, which puts it on the event for anyone
+   who can see it. Use `"organizer"` for something meant only for them — a
+   question, or a constraint your human would not want on the board.
+4. On an event whose organizer keeps responses private, an `everyone` note is
+   kept for the organizer instead. The reply tells you so in `notice` and
+   `audience` reports what it actually became. **Relay that** — do not tell
+   your human the group can see something the group cannot.
+5. `retract_event_note` takes back a note your human left. If your human
+   organizes the event, it removes anyone's.
+
+There is no direct message between two people. A note on the board and a note
+to the organizer are the two channels; if your human asks you to tell one named
+person something, put it where they will read it and say which you chose.
+
 ## Endpoints cheat sheet
 
 | Action | Method & path |
@@ -264,6 +289,8 @@ them you get an instruction, not an error — relay it and do not retry.
 | add event option | `POST /api/v1/events/:id/options` |
 | extend event deadline | `POST /api/v1/events/:id/deadline` |
 | nudge participants | `POST /api/v1/events/:id/nudge` |
+| leave an event note | `POST /api/v1/events/:id/notes` |
+| retract an event note | `DELETE /api/v1/events/:id/notes?noteId=` |
 | list sessions | `GET /api/v1/sessions` |
 | read board | `GET /api/v1/sessions/:id/board` |
 | post board | `POST /api/v1/sessions/:id/messages` |
