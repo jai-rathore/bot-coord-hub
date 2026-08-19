@@ -316,7 +316,9 @@ export function projectBoard(
     event.deadlineAt.getTime() > now.getTime();
 
   // Notes carry names and prose, so they go through the same projection as
-  // everything else rather than being attached raw to the response.
+  // everything else rather than being attached raw to the response. Signing in
+  // is the bar to read any of it — the summary included.
+  const canReadNotes = viewerUserId != null;
   const viewerNotes = projectNotes(
     source.notes,
     { role, userId: viewerUserId },
@@ -404,8 +406,15 @@ export function projectBoard(
     }),
     countsSuppressed,
     notes: viewerNotes,
-    notesSummary: event.notesDigest ?? summarizeNotesDeterministic(viewerNotes),
-    notesDigestIsLive: Boolean(event.notesDigest),
+    // The digest is a summary OF the notes, so it is note content and follows
+    // their disclosure rule exactly. Reading it off the event row and handing
+    // it to everyone would have published people's words to any signed-out
+    // visitor holding the share link — invisible in any environment without a
+    // model key, because there the digest is always null.
+    notesSummary: canReadNotes
+      ? (event.notesDigest ?? summarizeNotesDeterministic(viewerNotes))
+      : null,
+    notesDigestIsLive: canReadNotes && Boolean(event.notesDigest),
     // Writing a note joins them, exactly as tapping an answer does.
     canPostNote: viewerUserId != null && event.status !== "cancelled",
   };

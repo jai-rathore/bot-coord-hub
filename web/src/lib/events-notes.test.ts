@@ -19,7 +19,67 @@ import {
 } from "./events/notes-digest";
 import { appendNotices, composeFallbackReply } from "./events/turn";
 import { buildParticipantSystemPrompt } from "./events/context";
+import { projectBoard, type BoardSource } from "./events/board";
 import type { EventBoard, NoteView } from "./events/types";
+
+/** A minimal one-option, one-note board source for projection tests. */
+function sourceWithNotes(opts: { notesDigest: string | null }): BoardSource {
+  const deadline = new Date("2099-01-01T00:00:00Z");
+  return {
+    event: {
+      id: "e1",
+      publicId: "pub-1",
+      shareSlug: "slug1",
+      organizerUserId: ORGANIZER,
+      sessionId: null,
+      title: "Coffee",
+      description: null,
+      timezone: "UTC",
+      status: "open",
+      visibility: "open",
+      lockPolicy: "at_deadline",
+      quorumMin: null,
+      capacityMax: null,
+      deadlineAt: deadline,
+      lockedAt: null,
+      confirmedAt: null,
+      cancelledAt: null,
+      agentMode: "hosted",
+      agentName: "Sage",
+      allowChat: true,
+      allowGuestOptions: true,
+      outcome: {},
+      notesDigest: opts.notesDigest,
+      notesDigestKey: opts.notesDigest ? "k1" : null,
+      notesDigestAt: opts.notesDigest ? new Date() : null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as BoardSource["event"],
+    organizerName: "Jai",
+    dimensions: [],
+    options: [],
+    participants: [
+      {
+        participant: {
+          id: "p-alice",
+          eventId: "e1",
+          userId: ALICE,
+          role: "invitee",
+          attendance: "pending",
+          notifyUpdates: false,
+          chatTurnsUsed: 0,
+          source: "share_link",
+          joinedAt: new Date(),
+          lastSeenAt: null,
+          respondedAt: null,
+        } as BoardSource["participants"][number]["participant"],
+        name: "Alice",
+      },
+    ],
+    responses: [],
+    notes: [row()],
+  };
+}
 
 /** The smallest board a prompt builder will accept. */
 function baseBoard(): EventBoard {
@@ -397,4 +457,38 @@ test("one enormous note cannot crowd every other note out of the prompt", () => 
   // And the fence still holds under the truncation limit.
   const fenced = prompt.match(/<event_notes[\s\S]*?<\/event_notes>/)![0];
   assert.ok(fenced.length < 2_100, `fence grew to ${fenced.length}`);
+});
+
+/* ------------------------------------------------------------------ */
+/* the digest is note content, and follows the notes' disclosure rule  */
+/* ------------------------------------------------------------------ */
+
+test("a signed-out visitor never receives Sage's summary of the notes", () => {
+  // Regression: notesSummary read the cached digest off the event row and
+  // handed it to every viewer, so a share link published a summary of
+  // everyone's notes to anyone holding it. It was invisible anywhere without
+  // a model key — the digest is null there — so only production had it. The
+  // fixture therefore MUST carry a digest, or this passes for the wrong
+  // reason exactly as the original e2e did.
+  const source = sourceWithNotes({ notesDigest: "Alice can't do Friday." });
+
+  const anonymous = projectBoard(source, null);
+  assert.equal(anonymous.notes.length, 0, "no notes for a signed-out visitor");
+  assert.equal(
+    anonymous.notesSummary,
+    null,
+    "and no summary of them either — the summary IS the notes",
+  );
+  assert.equal(anonymous.notesDigestIsLive, false);
+
+  // A signed-in viewer still gets it.
+  const signedIn = projectBoard(source, BOB);
+  assert.equal(signedIn.notesSummary, "Alice can't do Friday.");
+  assert.equal(signedIn.notesDigestIsLive, true);
+});
+
+test("with no digest cached, the rollup is still per-viewer", () => {
+  const source = sourceWithNotes({ notesDigest: null });
+  assert.equal(projectBoard(source, null).notesSummary, null);
+  assert.ok(projectBoard(source, BOB).notesSummary);
 });

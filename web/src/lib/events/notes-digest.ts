@@ -139,8 +139,16 @@ export async function refreshNotesDigest(
     digest = boundDigest(result.text);
   } catch (error) {
     console.error("[events] notes digest failed", error);
-    // Leave the key unset so the next write retries rather than caching a
-    // failure forever.
+    // Clear the stale sentence but leave the key alone, so the next write
+    // retries instead of caching a failure forever. Returning here without
+    // clearing would leave the previous digest on the row describing a note
+    // set that no longer exists — the feed would show a note the summary
+    // above it had never heard of. A wrong summary is worse than none, and
+    // the deterministic rollup takes over the moment this is null.
+    await db
+      .update(events)
+      .set({ notesDigest: null, notesDigestAt: new Date() })
+      .where(eq(events.id, event.id));
     return null;
   }
 

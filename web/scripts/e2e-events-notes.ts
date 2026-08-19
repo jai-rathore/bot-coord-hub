@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
 import { getDb } from "../src/db";
-import { eventOptions, users } from "../src/db/schema";
+import { eventOptions, events, users } from "../src/db/schema";
 import {
   createEvent,
   joinEvent,
@@ -137,11 +137,46 @@ async function main() {
   ok(`rollup present: "${bobSees.notesSummary}"`);
 
   console.log("\n2. A signed-out visitor gets prose from nobody");
+  // Force a digest onto the row. Without a model key the digest is always
+  // null, so asserting "the public sees no summary" against the natural state
+  // proves nothing — it passes whether or not the projection gates it. Only
+  // production has a key, so this is the one place the leak could appear.
+  await db
+    .update(events)
+    .set({ notesDigest: "Alice can't do Friday.", notesDigestKey: "forced" })
+    .where(eq(events.id, event.id));
+  const seeded = await loadBoardSource(event.id);
+  assert.equal(
+    seeded!.event.notesDigest,
+    "Alice can't do Friday.",
+    "the fixture must actually carry a digest or this check is vacuous",
+  );
+
   const publicBoard = await board(event.id, null);
   assert.equal(publicBoard.notes.length, 0, "notes must not reach the public view");
-  assert.equal(publicBoard.notesSummary, null);
+  assert.equal(
+    publicBoard.notesSummary,
+    null,
+    "a summary of the notes is note content and must not reach them either",
+  );
+  assert.equal(publicBoard.notesDigestIsLive, false);
   assert.equal(publicBoard.canPostNote, false);
-  ok("the share link exposes tallies, never other people's words");
+  ok("the share link exposes tallies, never other people's words or a summary of them");
+
+  const withDigest = await board(event.id, bob.id);
+  assert.equal(
+    withDigest.notesSummary,
+    "Alice can't do Friday.",
+    "a signed-in participant does get the digest",
+  );
+  assert.equal(withDigest.notesDigestIsLive, true);
+  ok("a signed-in participant reads Sage's summary");
+
+  // Put the row back so later assertions see the real cached state.
+  await db
+    .update(events)
+    .set({ notesDigest: null, notesDigestKey: null })
+    .where(eq(events.id, event.id));
 
   // But a signed-in invitee who has not answered yet does read them — the
   // reason Friday is out is what they need in order to answer at all.
