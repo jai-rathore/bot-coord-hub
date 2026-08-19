@@ -16,7 +16,7 @@ type MeetResponse = {
 };
 
 const CHIP_CLASS =
-  "flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-line bg-white/80 px-3 py-4 text-center text-sm font-semibold text-matcha-deep transition hover:border-matcha-soft disabled:opacity-60";
+  "flex min-h-[5.5rem] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-line bg-white px-3 py-4 text-center text-sm font-semibold text-matcha-deep no-underline transition hover:border-matcha-soft disabled:opacity-60";
 
 const CHIPS: Array<{ intent: MeetChoice; emoji: string; label: string }> = [
   { intent: "coffee", emoji: "☕️", label: MEET_INTENTS.coffee.label },
@@ -96,10 +96,10 @@ export function MeetCard({
 
   if (result) {
     return (
-      <div className="surface-card p-6 sm:p-7">
-        <p className="text-xs font-semibold tracking-[0.14em] text-matcha uppercase">
+      <div className="lane-you rounded-2xl p-6 sm:p-7">
+        <span className="lane-tag">
           {result.event ? "Nearly there" : "Request sent"}
-        </p>
+        </span>
         {result.event ? (
           <>
             <h2 className="mt-2 font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
@@ -138,16 +138,14 @@ export function MeetCard({
   }
 
   return (
-    <div className="surface-card p-6 sm:p-7">
-      <p className="text-xs font-semibold tracking-[0.14em] text-matcha uppercase">
-        You just met
-      </p>
-      <h2 className="mt-2 font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
-        Put something in the diary before this fades
+    <div className="lane-you rounded-2xl p-6 sm:p-7">
+      <span className="lane-tag">You just met</span>
+      <h2 className="mt-3 font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
+        Find a time now
       </h2>
-      <p className="mt-3 text-muted">
-        Pick a shape. You&apos;ll get a few times to choose from, {displayName}{" "}
-        gets the same, and whichever one you both mark is the one that happens.
+      <p className="mt-2 text-sm leading-6 text-muted">
+        Pick one. You both get the same few times, and the one you both mark is
+        the one that happens.
       </p>
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">

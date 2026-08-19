@@ -10,13 +10,13 @@ export const dynamic = "force-dynamic";
 export default async function SetupPage() {
   const user = await ensureCurrentUser();
   if (!user) redirect("/sign-in");
-  if (await getProfileForUser(user.id)) redirect("/app");
+  if (await getProfileForUser(user.id)) redirect("/");
 
   return (
     <div className="flex min-h-full flex-col">
       <div className="relative border-b border-line/80 bg-[linear-gradient(150deg,rgba(250,252,249,0.98)_0%,rgba(237,244,238,0.96)_52%,rgba(249,242,223,0.92)_100%)]">
         <BrandAtmosphere />
-        <SiteHeader showHowToStart={false} />
+        <SiteHeader />
       </div>
       <main className="mx-auto w-[min(36rem,calc(100%-2rem))] flex-1 py-12">
         <p className="section-kicker">First sign-in</p>

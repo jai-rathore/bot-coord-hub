@@ -53,6 +53,10 @@ html {
   /* Decorative blurs and drifting blobs sit outside the layout box. `clip`
      rather than `hidden` so sticky headers inside still work. */
   overflow-x: clip;
+  /* Safari inflates body text on rotation unless this is pinned, which changes
+     the layout width and is one of the ways a page ends up looking "zoomed". */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 :where(p, li, h1, h2, h3, h4, dd, dt) {
@@ -68,6 +72,21 @@ body {
   font-family: var(--font-sora), "Segoe UI", sans-serif;
   line-height: 1.55;
   min-height: 100vh;
+  /* A single element wider than the screen makes mobile Safari scale the whole
+     page down to fit. Clip at the body too so nothing can ever do that. */
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+/* Mobile Safari zooms the page in when a form control smaller than 16px takes
+   focus, and never zooms back out on its own. Touch devices get 16px controls
+   so focusing a field can never change the page scale. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: max(1rem, 16px);
+  }
 }
 
 ::selection {
@@ -523,4 +542,76 @@ a[href^="https://go.clerk.com"] {
 
 .cap-card:hover .cap-mark {
   transform: translateY(-2px) scale(1.05);
+}
+
+
+/* ── Swipe rails ───────────────────────────────────────────────────────────
+   The marketing page is read on a phone with a thumb, so its content sits on
+   horizontal rails that snap card by card instead of stacking into a scroll
+   that never ends. On a desktop the same rail simply shows more cards at once. */
+
+.rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: min(20rem, 82%);
+  gap: 0.75rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 1.25rem;
+  padding-bottom: 0.5rem;
+  scrollbar-width: none;
+}
+
+.rail::-webkit-scrollbar {
+  display: none;
+}
+
+.rail > * {
+  scroll-snap-align: center;
+}
+
+@media (min-width: 640px) {
+  .rail {
+    grid-auto-columns: 21rem;
+  }
+
+  .rail > * {
+    scroll-snap-align: start;
+  }
+}
+
+/* Who is doing the work — the one distinction the product turns on. Marked the
+   same way everywhere so "I do this" and "my agent does this" never blur. */
+.lane-you {
+  border: 1px solid color-mix(in srgb, var(--matcha-soft) 45%, white);
+  background: linear-gradient(155deg, rgba(255, 255, 252, 0.96), rgba(233, 243, 235, 0.9));
+}
+
+.lane-agent {
+  border: 1px solid var(--matcha-deep);
+  background: linear-gradient(155deg, #1d4834 0%, #173f2e 60%, #122f22 100%);
+  color: #eaf3ec;
+}
+
+.lane-tag {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.66rem;
+  font-weight: 700;
+  gap: 0.35rem;
+  letter-spacing: 0.12em;
+  padding: 0.25rem 0.6rem;
+  text-transform: uppercase;
+}
+
+.lane-you .lane-tag {
+  background: color-mix(in srgb, var(--matcha-soft) 22%, white);
+  color: var(--matcha-deep);
+}
+
+.lane-agent .lane-tag {
+  background: rgba(240, 220, 168, 0.16);
+  color: var(--honey-soft);
 }

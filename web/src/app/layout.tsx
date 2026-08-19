@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Fraunces, Sora } from "next/font/google";
 import { clerkAppearance, clerkLocalization } from "@/lib/clerk-appearance";
@@ -61,6 +61,24 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
+};
+
+/**
+ * Mobile is the primary surface, so the viewport is pinned rather than left to
+ * the browser. `minimumScale: 1` is the important one: without it Safari lets a
+ * pinch settle below 100% and every later navigation keeps that scale, which is
+ * why switching tabs could land you on a shrunken page with no easy way back.
+ * Zooming *in* stays available (up to 5x) — only zooming out past the device
+ * width is refused, so the page always snaps back to its natural size.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  minimumScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover",
+  themeColor: "#f7f9f6",
 };
 
 export default function RootLayout({
