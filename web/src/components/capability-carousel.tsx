@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CapabilityMark } from "@/components/capability-mark";
 import {
   CAPABILITIES,
@@ -20,6 +20,9 @@ import {
  * turns four dimmed cards live, and that single change of state explains the
  * offer better than a paragraph could.
  */
+
+/** Matches the `gap` on `.rail`; the step maths needs it in pixels. */
+const CARD_GAP = 12;
 
 const OPERATORS: Array<{
   id: Operator;
@@ -43,18 +46,59 @@ const OPERATORS: Array<{
 export function CapabilityCarousel() {
   const [operator, setOperator] = useState<Operator>("sage");
   const [index, setIndex] = useState(0);
+  const [ends, setEnds] = useState({ start: true, finish: false });
   const railRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<number | null>(null);
   const active = OPERATORS.find((item) => item.id === operator) ?? OPERATORS[0];
   const locked = lockedCount(CAPABILITIES);
 
+  /**
+   * A flick fires scroll events faster than the screen refreshes, and reading
+   * `offsetWidth` inside one forces the browser to lay the page out again
+   * before it can answer. Doing that per event is what makes a rail feel like
+   * it is catching on something, so the work is coalesced into one animation
+   * frame and skipped entirely while a frame is already pending.
+   */
   const syncIndex = useCallback(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const card = rail.firstElementChild as HTMLElement | null;
-    if (!card) return;
-    const step = card.offsetWidth + 12;
-    setIndex(Math.round(rail.scrollLeft / step));
+    if (frameRef.current !== null) return;
+    frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = null;
+      const rail = railRef.current;
+      const card = rail?.firstElementChild as HTMLElement | null;
+      if (!rail || !card) return;
+      const cardStep = card.offsetWidth + CARD_GAP;
+      const remaining = rail.scrollWidth - rail.clientWidth - rail.scrollLeft;
+      const start = rail.scrollLeft <= 1;
+      const finish = remaining <= 1;
+      setEnds({ start, finish });
+
+      /**
+       * Where the rail runs out, several cards share the last scroll position,
+       * and dividing by a card width claims you are on the first of them. Both
+       * ends are pinned to the card you can actually see arriving.
+       */
+      const position = finish
+        ? CAPABILITIES.length - 1
+        : start
+          ? 0
+          : Math.round(rail.scrollLeft / cardStep);
+      setIndex(Math.min(CAPABILITIES.length - 1, Math.max(0, position)));
+    });
   }, []);
+
+  useEffect(() => {
+    // A wide window can show the whole rail at once, which means "next" has
+    // nowhere to go before anyone has scrolled. Measure once on arrival, and
+    // again whenever a resize changes how many cards fit.
+    syncIndex();
+    window.addEventListener("resize", syncIndex, { passive: true });
+    return () => {
+      window.removeEventListener("resize", syncIndex);
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current);
+      }
+    };
+  }, [syncIndex]);
 
   function selectOperator(next: Operator) {
     // The cards stay put across a switch — only their state changes — so the
@@ -62,13 +106,32 @@ export function CapabilityCarousel() {
     setOperator(next);
   }
 
-  function scrollBy(direction: 1 | -1) {
+  function step(direction: 1 | -1) {
     const rail = railRef.current;
-    const card = rail?.firstElementChild as HTMLElement | null;
-    if (!rail || !card) return;
-    rail.scrollBy({
-      left: direction * (card.offsetWidth + 12),
-      behavior: "smooth",
+    if (!rail) return;
+    const target = rail.children[
+      Math.min(CAPABILITIES.length - 1, Math.max(0, index + direction))
+    ] as HTMLElement | undefined;
+    if (!target) return;
+
+    /**
+     * Scroll to the card itself, never by a pixel step.
+     *
+     * The rail snaps `mandatory`, so a smooth scroll that comes to rest between
+     * two snap points gets hauled to the nearest one the moment it lands — the
+     * visible jerk at the end of the glide. Handing the browser a real element
+     * means the destination is already a snap point. The alignment has to match
+     * the CSS (`center` on a phone, `start` from 640px) or the same fight
+     * happens at the two ends of the rail.
+     */
+    target.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+      block: "nearest",
+      inline: window.matchMedia("(min-width: 640px)").matches
+        ? "start"
+        : "center",
     });
   }
 
@@ -176,28 +239,33 @@ export function CapabilityCarousel() {
         <div className="mt-4 flex items-center gap-3 px-5 sm:px-6">
           <div className="flex flex-1 gap-1.5" aria-hidden="true">
             {CAPABILITIES.map((capability, position) => (
-              <span
-                key={capability.id}
-                className={`h-1 rounded-full transition-all duration-300 ${
-                  position === index ? "w-5 bg-matcha" : "w-1.5 bg-line"
-                }`}
-              />
+              <span key={capability.id} className="h-1 w-5 overflow-hidden">
+                <span
+                  className={`block h-full w-full rounded-full transition-[transform,background-color] duration-300 ${
+                    position === index
+                      ? "scale-x-100 bg-matcha"
+                      : "scale-x-[0.3] bg-line"
+                  }`}
+                />
+              </span>
             ))}
           </div>
           <div className="hidden gap-2 sm:flex">
             <button
               type="button"
-              onClick={() => scrollBy(-1)}
+              onClick={() => step(-1)}
+              disabled={ends.start}
               aria-label="Previous"
-              className="grid h-11 w-11 cursor-pointer place-items-center rounded-full border border-line bg-white/70 text-matcha-deep"
+              className="grid h-11 w-11 cursor-pointer place-items-center rounded-full border border-line bg-white/70 text-matcha-deep transition-opacity disabled:cursor-default disabled:opacity-35"
             >
               <span aria-hidden="true">&larr;</span>
             </button>
             <button
               type="button"
-              onClick={() => scrollBy(1)}
+              onClick={() => step(1)}
+              disabled={ends.finish}
               aria-label="Next"
-              className="grid h-11 w-11 cursor-pointer place-items-center rounded-full border border-line bg-white/70 text-matcha-deep"
+              className="grid h-11 w-11 cursor-pointer place-items-center rounded-full border border-line bg-white/70 text-matcha-deep transition-opacity disabled:cursor-default disabled:opacity-35"
             >
               <span aria-hidden="true">&rarr;</span>
             </button>
