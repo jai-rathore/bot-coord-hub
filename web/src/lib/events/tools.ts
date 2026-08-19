@@ -15,6 +15,8 @@ export const PARTICIPANT_TOOLS = [
   "set_option_preference",
   "set_attendance",
   "propose_option",
+  "post_note",
+  "retract_note",
   "ask_organizer",
   "reply",
 ] as const;
@@ -22,6 +24,9 @@ export const PARTICIPANT_TOOLS = [
 export const ORGANIZER_TOOLS = [
   "add_option",
   "extend_deadline",
+  "post_note",
+  "retract_note",
+  "remove_note",
   "reply",
 ] as const;
 
@@ -52,6 +57,67 @@ const REPLY: LlmToolDef = {
       text: { type: "string", description: "What to say." },
     },
     required: ["text"],
+  },
+};
+
+/**
+ * The note tools, shared by both roles.
+ *
+ * `audience` is deliberately plain English rather than the stored
+ * `visibility` value — the model picks who should read it, and the server
+ * decides what that means on this board (a non-open event keeps every note
+ * for the organizer, whatever was asked for).
+ */
+const POST_NOTE: LlmToolDef = {
+  name: "post_note",
+  description:
+    "Add a note to the event so it is not lost in this conversation. Use it when the person gives a reason, a constraint, or anything the others should know — \"can't do Friday, intern lunch\". Set audience to 'everyone' to put it on the event board, or 'organizer' to send it to the organizer alone.",
+  parameters: {
+    type: "object",
+    properties: {
+      body: {
+        type: "string",
+        description: "The note, in the person's own words. One or two sentences.",
+      },
+      audience: {
+        type: "string",
+        enum: ["everyone", "organizer"],
+        description:
+          "Who should read it. Default to 'everyone' unless they asked to keep it private.",
+      },
+      optionId: {
+        type: "string",
+        description:
+          "Optional. The id of the option this note is about, from the list in the context.",
+      },
+    },
+    required: ["body"],
+  },
+};
+
+const RETRACT_NOTE: LlmToolDef = {
+  name: "retract_note",
+  description:
+    "Take one of this person's own notes back off the event. Use the note id from the context.",
+  parameters: {
+    type: "object",
+    properties: {
+      noteId: { type: "string", description: "The note id." },
+    },
+    required: ["noteId"],
+  },
+};
+
+const REMOVE_NOTE: LlmToolDef = {
+  name: "remove_note",
+  description:
+    "Remove someone else's note from the event board. Organizer only. Use the note id from the context.",
+  parameters: {
+    type: "object",
+    properties: {
+      noteId: { type: "string", description: "The note id." },
+    },
+    required: ["noteId"],
   },
 };
 
@@ -86,10 +152,12 @@ export function participantToolDefs(allowProposals: boolean): LlmToolDef[] {
         required: ["value"],
       },
     },
+    POST_NOTE,
+    RETRACT_NOTE,
     {
       name: "ask_organizer",
       description:
-        "Pass a question to the organizer when you cannot answer it from the event itself.",
+        "Pass a question to the organizer when you cannot answer it from the event itself. It reaches them as a note only they can see.",
       parameters: {
         type: "object",
         properties: {
@@ -147,6 +215,9 @@ export function organizerToolDefs(): LlmToolDef[] {
         required: ["deadlineAt"],
       },
     },
+    POST_NOTE,
+    RETRACT_NOTE,
+    REMOVE_NOTE,
     REPLY,
   ];
 }

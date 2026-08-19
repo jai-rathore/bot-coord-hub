@@ -1259,6 +1259,16 @@ export const events = pgTable(
     allowChat: boolean("allow_chat").notNull().default(true),
     allowGuestOptions: boolean("allow_guest_options").notNull().default(true),
     outcome: jsonb("outcome").$type<Record<string, unknown>>().notNull().default({}),
+    /**
+     * Sage's rollup of the shared notes, written when a note changes rather
+     * than when the page is read — the board is polled every few seconds by
+     * every viewer, and a model call per poll would be absurd. `notesDigestKey`
+     * is a hash of the note set it was built from, so a write only pays for a
+     * regeneration when the notes actually changed.
+     */
+    notesDigest: text("notes_digest"),
+    notesDigestKey: text("notes_digest_key"),
+    notesDigestAt: timestamp("notes_digest_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -1452,6 +1462,59 @@ export const eventMessages = pgTable(
 );
 
 /**
+ * Free text that people add to an event — the shared layer chat never had.
+ *
+ * A note is the only way one person's words reach another person on the
+ * event. `visibility` is the whole contract: 'everyone' puts it on the board
+ * for anyone who can see the event, 'organizer' routes it to the organizer
+ * alone. Nothing here is ever a private message between two participants.
+ */
+export const eventNotes = pgTable(
+  "event_notes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    /** Null when the organizer wrote it — they are not always a participant row. */
+    participantId: uuid("participant_id").references(() => eventParticipants.id, {
+      onDelete: "cascade",
+    }),
+    authorUserId: uuid("author_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** Set when the note is about one option — "can't do Friday, intern lunch". */
+    optionId: uuid("option_id").references(() => eventOptions.id, {
+      onDelete: "set null",
+    }),
+    body: text("body").notNull(),
+    visibility: text("visibility").notNull().default("everyone"),
+    source: text("source").notNull().default("chat"),
+    status: text("status").notNull().default("active"),
+    removedByUserId: uuid("removed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("event_notes_event_created_idx").on(t.eventId, t.createdAt),
+    index("event_notes_event_status_idx").on(t.eventId, t.status),
+    index("event_notes_author_idx").on(t.eventId, t.authorUserId),
+    check(
+      "event_notes_visibility_check",
+      sql`${t.visibility} in ('everyone', 'organizer')`,
+    ),
+    check("event_notes_source_check", sql`${t.source} in ('chat', 'ui')`),
+    check("event_notes_status_check", sql`${t.status} in ('active', 'removed')`),
+  ],
+);
+
+/**
  * Durable, idempotent notification queue. `dedupeKey` is unique, so a cron
  * retry can never double-send.
  */
@@ -1523,4 +1586,5 @@ export type EventParticipant = typeof eventParticipants.$inferSelect;
 export type EventResponse = typeof eventResponses.$inferSelect;
 export type EventActivity = typeof eventActivity.$inferSelect;
 export type EventMessage = typeof eventMessages.$inferSelect;
+export type EventNote = typeof eventNotes.$inferSelect;
 export type NotificationOutbox = typeof notificationOutbox.$inferSelect;

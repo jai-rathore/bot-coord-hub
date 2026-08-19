@@ -11,6 +11,7 @@ import {
 import {
   HUMAN_ONLY_ACTIONS,
   ORGANIZER_TOOLS,
+  PARTICIPANT_TOOLS,
   allowedToolsFor,
   isToolAllowed,
   organizerToolDefs,
@@ -111,14 +112,31 @@ test("replies to participants are length-capped", () => {
 /* ------------------------------------------------------------------ */
 
 test("a participant turn cannot reach organizer-only tools", () => {
-  for (const tool of ORGANIZER_TOOLS) {
-    if (tool === "reply") continue;
+  // Some tools are deliberately shared — both roles reply, and both leave
+  // notes. What matters is that everything NOT shared stays out of reach.
+  const shared = new Set<string>(PARTICIPANT_TOOLS);
+  const organizerOnly = ORGANIZER_TOOLS.filter((tool) => !shared.has(tool));
+
+  assert.ok(
+    organizerOnly.includes("add_option") &&
+      organizerOnly.includes("extend_deadline") &&
+      organizerOnly.includes("remove_note"),
+    "the organizer-only set must still contain the tools that move the event",
+  );
+  for (const tool of organizerOnly) {
     assert.equal(
       isToolAllowed("participant", tool),
       false,
       `participant must not call ${tool}`,
     );
   }
+});
+
+test("a participant can only take back their own note", () => {
+  // retract_note is shared; remove_note — someone else's words — is not.
+  assert.equal(isToolAllowed("participant", "retract_note"), true);
+  assert.equal(isToolAllowed("participant", "remove_note"), false);
+  assert.equal(isToolAllowed("organizer", "remove_note"), true);
 });
 
 test("an organizer turn cannot write another person's responses", () => {
@@ -165,8 +183,15 @@ test("proposing options is withheld when the organizer turned it off", () => {
 test("participant tools carry prose only where it is meant to go", () => {
   // Identifiers and enums are not prose. The tools that accept free-form text
   // are exactly: reply (back to the person), ask_organizer (to the organizer),
-  // and propose_option's optional place label.
-  const IDENTIFIERS = new Set(["optionId", "dimensionId", "startsAt", "endsAt"]);
+  // post_note (onto the event, which is the point of it), and
+  // propose_option's optional place label.
+  const IDENTIFIERS = new Set([
+    "optionId",
+    "dimensionId",
+    "startsAt",
+    "endsAt",
+    "noteId",
+  ]);
   const prose = participantToolDefs(true)
     .filter((def) =>
       Object.entries(def.parameters.properties).some(([name, schema]) => {
@@ -176,7 +201,12 @@ test("participant tools carry prose only where it is meant to go", () => {
     )
     .map((def) => def.name)
     .sort();
-  assert.deepEqual(prose, ["ask_organizer", "propose_option", "reply"]);
+  assert.deepEqual(prose, [
+    "ask_organizer",
+    "post_note",
+    "propose_option",
+    "reply",
+  ]);
 
   // set_option_preference takes an id and a closed enum — no prose at all.
   const pref = participantToolDefs(true).find(
@@ -236,6 +266,9 @@ function source(visibility: "open" | "counts_only" | "blind"): BoardSource {
       allowChat: true,
       allowGuestOptions: true,
       outcome: {},
+      notesDigest: null,
+      notesDigestKey: null,
+      notesDigestAt: null,
       createdAt: new Date("2026-01-01T00:00:00Z"),
       updatedAt: new Date("2026-01-01T00:00:00Z"),
     } as BoardSource["event"],
@@ -303,6 +336,7 @@ function source(visibility: "open" | "counts_only" | "blind"): BoardSource {
         updatedAt: new Date(),
       } as BoardSource["responses"][number],
     ],
+    notes: [],
   };
 }
 

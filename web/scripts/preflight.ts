@@ -7,6 +7,7 @@ import {
   agentCapabilities,
   eventActivity,
   eventDimensions,
+  eventNotes,
   eventOptions,
   eventParticipants,
   eventResponses,
@@ -201,6 +202,7 @@ async function main() {
           .limit(1),
         db.select({ id: eventResponses.id }).from(eventResponses).limit(1),
         db.select({ id: eventActivity.id }).from(eventActivity).limit(1),
+        db.select({ id: eventNotes.id }).from(eventNotes).limit(1),
       ]);
       checks.push({
         name: "Current schema",

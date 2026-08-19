@@ -40,11 +40,14 @@ import {
 import {
   addOption,
   extendDeadline,
+  publishNote,
   recordActivity,
+  removeNoteAndRefresh,
+  retractNoteAndRefresh,
   setResponses,
 } from "@/lib/events/service";
+import { isNoteVisibility, type NoteVisibility } from "@/lib/events/notes";
 import { boardFor } from "@/lib/events/access";
-import { displayName } from "@/lib/events/copy";
 import type { EventBoard } from "@/lib/events/types";
 
 export const DEFAULT_TURN_CAP = 12;
@@ -183,12 +186,34 @@ export function composeFallbackReply(
     if (applied.includes("question_sent")) {
       parts.push("passed your question to the organizer");
     }
+    if (applied.includes("note_shared")) {
+      parts.push("put your note on the event for everyone");
+    }
+    if (applied.includes("note_to_organizer")) {
+      parts.push("sent your note to the organizer");
+    }
+    if (applied.includes("note_retracted")) parts.push("taken that note back");
+    if (applied.includes("note_removed")) parts.push("removed that note");
     const done = parts.length > 0 ? parts.join(" and ") : "saved that";
     return `Done — I've ${done}. ${summary}`;
   }
   return role === "organizer"
     ? "I didn't catch that. You can ask me what's leading, who hasn't answered, or tell me a time or place to add."
     : "I didn't catch that. Tell me which of the listed times work for you, or name another time and I'll suggest it.";
+}
+
+/**
+ * Fold anything the server has to say into the reply the person reads. The
+ * model does not get to omit it — the notice describes what the board actually
+ * did, which may not be what the model said it did.
+ */
+export function appendNotices(reply: string, notices: string[]): string {
+  const unseen = notices.filter(
+    (notice, index) =>
+      notices.indexOf(notice) === index && !reply.includes(notice),
+  );
+  if (unseen.length === 0) return reply;
+  return [reply, ...unseen].join(" ");
 }
 
 /**
@@ -201,7 +226,12 @@ async function applyToolCall(opts: {
   event: Event;
   user: User;
   participant: EventParticipant | null;
-}): Promise<{ applied: string | null; reply: string | null }> {
+}): Promise<{
+  applied: string | null;
+  reply: string | null;
+  /** Something the person must be told regardless of what the model wrote. */
+  notice?: string | null;
+}> {
   const { call, role, event, user, participant } = opts;
   const args = call.args ?? {};
 
@@ -307,23 +337,62 @@ async function applyToolCall(opts: {
       return { applied: "deadline_extended", reply: null };
     }
 
+    case "post_note": {
+      const body = String(args.body ?? "").trim();
+      if (!body) {
+        return {
+          applied: null,
+          reply: "Tell me what you'd like the note to say and I'll add it.",
+        };
+      }
+      const audience = String(args.audience ?? "everyone");
+      const visibility: NoteVisibility = isNoteVisibility(audience)
+        ? audience
+        : "everyone";
+      const { note, notice } = await publishNote({
+        event,
+        user,
+        participant,
+        input: {
+          body,
+          visibility,
+          optionId: args.optionId ? String(args.optionId) : null,
+          source: "chat",
+        },
+      });
+      return {
+        applied:
+          note.visibility === "everyone" ? "note_shared" : "note_to_organizer",
+        reply: null,
+        notice,
+      };
+    }
+
+    case "retract_note": {
+      const noteId = String(args.noteId ?? "");
+      if (!noteId) return { applied: null, reply: null };
+      await retractNoteAndRefresh({ event, user, noteId });
+      return { applied: "note_retracted", reply: null };
+    }
+
+    case "remove_note": {
+      const noteId = String(args.noteId ?? "");
+      if (!noteId) return { applied: null, reply: null };
+      await removeNoteAndRefresh({ event, user, noteId });
+      return { applied: "note_removed", reply: null };
+    }
+
     case "ask_organizer": {
       const question = String(args.question ?? "").slice(0, 600);
       if (!question) return { applied: null, reply: null };
-      await recordActivity({
-        eventId: event.id,
-        actorUserId: user.id,
-        kind: "question_asked",
-        summary: `${displayName(user.name, user.email)} asked: ${question}`,
-        body: { question },
-      });
-      const { enqueueEventNotification } = await import("@/lib/events/notify");
-      await enqueueEventNotification({
-        eventId: event.id,
-        template: "organizer_digest",
-        dedupeKey: `question:${event.id}:${user.id}:${Date.now()}`,
-        payload: { title: event.title, summary: `New question: ${question}` },
-        toOrganizerOnly: true,
+      // A question is a note only the organizer can read. Before this it was
+      // an activity row plus an email, which meant the person asking had no
+      // way to see that it had gone anywhere.
+      await publishNote({
+        event,
+        user,
+        participant,
+        input: { body: question, visibility: "organizer", source: "chat" },
       });
       return { applied: "question_sent", reply: null };
     }
@@ -442,6 +511,7 @@ export async function runEventChatTurn(opts: {
   }
 
   const applied: string[] = [];
+  const notices: string[] = [];
   let reply: string | null = null;
   for (const call of result.toolCalls) {
     try {
@@ -454,6 +524,7 @@ export async function runEventChatTurn(opts: {
       });
       if (outcome.applied) applied.push(outcome.applied);
       if (outcome.reply) reply = outcome.reply;
+      if (outcome.notice) notices.push(outcome.notice);
     } catch (error) {
       // A rejected write is normal (closed event, bad id) — tell the person
       // rather than failing the turn.
@@ -473,6 +544,11 @@ export async function runEventChatTurn(opts: {
       boundReply(result.text) ??
       composeFallbackReply(applied, role, freshSummary);
   }
+
+  // A downgraded note is a promise the model may have made and the board
+  // could not keep, so the person is told even when the model wrote its own
+  // confident reply over the top of it.
+  reply = appendNotices(reply, notices);
 
   await persistMessage({
     eventId: event.id,

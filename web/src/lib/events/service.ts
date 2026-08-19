@@ -21,6 +21,15 @@ import { AgentApiError } from "@/lib/agent-errors";
 import { writeAudit } from "@/lib/audit";
 import { boundedText } from "@/lib/validation";
 import { displayName, formatSlot } from "@/lib/events/copy";
+import {
+  loadEventNotes,
+  postNote,
+  removeNote,
+  retractNote,
+  type PostNoteInput,
+} from "@/lib/events/notes";
+import { refreshNotesDigest } from "@/lib/events/notes-digest";
+import type { EventNote } from "@/db/schema";
 import type { EventPref, EventVisibility } from "@/lib/events/types";
 
 export const EVENT_LIMITS = {
@@ -781,6 +790,92 @@ export async function listEventsForUser(user: User) {
     .filter((e) => e.organizerUserId !== user.id);
 
   return { organized, joined };
+}
+
+/** A one-line preview of a note, for an activity row or an email. */
+function notePreview(body: string, max = 140): string {
+  const clean = body.replace(/\s+/g, " ").trim();
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
+}
+
+/**
+ * Write a note and tell everyone who should know.
+ *
+ * The single entry point for both surfaces — Sage's `post_note` tool and the
+ * composer on the event page land here, so a note written by the assistant and
+ * a note typed by hand are indistinguishable afterwards, as they should be.
+ */
+export async function publishNote(opts: {
+  event: Event;
+  user: User;
+  participant: EventParticipant | null;
+  input: PostNoteInput;
+}): Promise<{ note: EventNote; notice: string | null }> {
+  const { event, user } = opts;
+  const { note, notice } = await postNote(opts);
+  const who = displayName(user.name, user.email);
+  const preview = notePreview(note.body);
+  const shared = note.visibility === "everyone";
+
+  await recordActivity({
+    eventId: event.id,
+    actorUserId: user.id,
+    kind: shared ? "note_added" : "question_asked",
+    summary: shared
+      ? `${who} added a note: ${preview}`
+      : `${who} sent the organizer a note: ${preview}`,
+    body: { noteId: note.id, visibility: note.visibility, source: note.source },
+  });
+
+  if (shared) {
+    // The note is on the board for everyone who can open the event, so
+    // repeating it in the update mail discloses nothing new.
+    await notifySubscribersOfUpdate(event, user.id, {
+      kind: "note_added",
+      summary: `${who} added a note: ${preview}`,
+    });
+  } else {
+    const { enqueueEventNotification } = await import("@/lib/events/notify");
+    await enqueueEventNotification({
+      eventId: event.id,
+      template: "organizer_digest",
+      dedupeKey: `note:${event.id}:${note.id}`,
+      payload: { title: event.title, summary: `New note: ${preview}` },
+      toOrganizerOnly: true,
+    });
+  }
+
+  await refreshNotesDigest(event, await loadEventNotes(event.id));
+  return { note, notice };
+}
+
+/** The author takes their own note back, and the rollup catches up. */
+export async function retractNoteAndRefresh(opts: {
+  event: Event;
+  user: User;
+  noteId: string;
+}): Promise<EventNote> {
+  const note = await retractNote(opts);
+  await refreshNotesDigest(opts.event, await loadEventNotes(opts.event.id));
+  return note;
+}
+
+/** The organizer takes someone else's note off the board. */
+export async function removeNoteAndRefresh(opts: {
+  event: Event;
+  user: User;
+  noteId: string;
+}): Promise<EventNote> {
+  const note = await removeNote(opts);
+  await recordActivity({
+    eventId: opts.event.id,
+    actorUserId: opts.user.id,
+    kind: "note_removed",
+    summary: "The organizer removed a note.",
+    body: { noteId: note.id },
+  });
+  await refreshNotesDigest(opts.event, await loadEventNotes(opts.event.id));
+  return note;
 }
 
 export async function recordActivity(entry: {

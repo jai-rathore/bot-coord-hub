@@ -20,6 +20,7 @@ export const RECIPIENT_UPDATE_KINDS = [
   "option_added",
   "joined",
   "question_asked",
+  "note_added",
 ] as const;
 
 export type RecipientUpdateKind = (typeof RECIPIENT_UPDATE_KINDS)[number];
@@ -52,6 +53,8 @@ export function namelessUpdateCopy(kind: string): string {
       return "Someone opened the event";
     case "question_asked":
       return "There's a new question";
+    case "note_added":
+      return "Someone added a note";
     default:
       return "There's a new update";
   }
