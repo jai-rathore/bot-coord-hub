@@ -93,7 +93,7 @@ services:
     rootDir: web
     schedule: "*/5 * * * *"
     buildCommand: npm install
-    startCommand: npm run events:tick
+    startCommand: npx --yes tsx scripts/events-tick.ts
     envVars:
       - key: NODE_ENV
         value: production
@@ -103,8 +103,11 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
+      # Send-only Resend keys cannot use unverified domains. onboarding@resend.dev
+      # can reach the account owner. Switch to no-reply@honeymatcha.io after
+      # honeymatcha.io is verified in the Resend dashboard.
       - key: EVENT_EMAIL_FROM
-        sync: false
+        value: HoneyMatcha <onboarding@resend.dev>
       - key: NEXT_PUBLIC_APP_ORIGIN
         value: https://honeymatcha.io
       - key: GOOGLE_CALENDAR_ENABLED

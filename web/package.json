@@ -24,6 +24,7 @@
     "test:e2e-discovery-api": "node scripts/e2e-discovery-api.mjs",
     "test:e2e-events": "tsx scripts/e2e-events.ts",
     "events:tick": "tsx scripts/events-tick.ts",
+    "email:test": "tsx scripts/send-test-email.ts",
     "test:e2e-events-agent": "tsx scripts/e2e-events-agent.ts",
     "test:e2e-meet": "tsx scripts/e2e-meet.ts"
   },
@@ -37,7 +38,8 @@
     "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "redis": "^6.2.1"
+    "redis": "^6.2.1",
+    "tsx": "^4.23.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -50,7 +52,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
-    "tsx": "^4.23.12",
     "typescript": "^5"
   }
 }

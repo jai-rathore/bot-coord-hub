@@ -19,7 +19,8 @@ import {
 } from "@/db/schema";
 import { deliverEventInbox } from "@/lib/agent-inbox";
 
-const FROM = process.env.EVENT_EMAIL_FROM || "HoneyMatcha <no-reply@honeymatcha.io>";
+const FROM =
+  process.env.EVENT_EMAIL_FROM || "HoneyMatcha <onboarding@resend.dev>";
 
 export function emailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY?.trim());
@@ -243,7 +244,7 @@ function renderTemplate(
   }
 }
 
-async function sendEmail(to: string, rendered: Rendered): Promise<void> {
+async function sendEmail(to: string, rendered: Rendered): Promise<string | undefined> {
   const key = process.env.RESEND_API_KEY?.trim();
   if (!key) throw new Error("RESEND_API_KEY is not configured");
 
@@ -260,10 +261,24 @@ async function sendEmail(to: string, rendered: Rendered): Promise<void> {
       text: rendered.body,
     }),
   });
+  const detail = await res.text().catch(() => "");
   if (!res.ok) {
-    const detail = await res.text().catch(() => "");
     throw new Error(`Resend ${res.status}: ${detail.slice(0, 200)}`);
   }
+  try {
+    const parsed = JSON.parse(detail) as { id?: string };
+    return parsed.id;
+  } catch {
+    return undefined;
+  }
+}
+
+/** One-off send used by `npm run email:test` to prove Resend is wired. */
+export async function sendTestEmail(to: string): Promise<string | undefined> {
+  return sendEmail(to, {
+    subject: "HoneyMatcha email test",
+    body: "This is a test from HoneyMatcha. Event notifications will use this same Resend path.",
+  });
 }
 
 export type DrainResult = { sent: number; failed: number; skipped: number };

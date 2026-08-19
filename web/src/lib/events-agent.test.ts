@@ -22,7 +22,7 @@ import {
 } from "./events/context";
 import { projectBoard, type BoardSource } from "./events/board";
 import { composeFallbackReply } from "./events/turn";
-import { renderTemplate } from "./events/notify";
+import { emailConfigured, renderTemplate, sendTestEmail } from "./events/notify";
 import { getMcpTools } from "./mcp-tools";
 
 /* ------------------------------------------------------------------ */
@@ -373,6 +373,54 @@ test("every template renders a subject, a body, and the event link", () => {
     );
     assert.ok(rendered.subject.length > 0, template);
     assert.ok(rendered.body.includes(url), `${template} must link the event`);
+  }
+});
+
+test("emailConfigured is false without RESEND_API_KEY", () => {
+  const saved = process.env.RESEND_API_KEY;
+  delete process.env.RESEND_API_KEY;
+  try {
+    assert.equal(emailConfigured(), false);
+  } finally {
+    if (saved !== undefined) process.env.RESEND_API_KEY = saved;
+  }
+});
+
+test("sendTestEmail refuses to send without RESEND_API_KEY", async () => {
+  const saved = process.env.RESEND_API_KEY;
+  delete process.env.RESEND_API_KEY;
+  try {
+    await assert.rejects(
+      () => sendTestEmail("jaiadityarathore@gmail.com"),
+      /RESEND_API_KEY is not configured/,
+    );
+  } finally {
+    if (saved !== undefined) process.env.RESEND_API_KEY = saved;
+  }
+});
+
+test("sendTestEmail posts to Resend when a key is set", async () => {
+  const saved = process.env.RESEND_API_KEY;
+  const savedFetch = globalThis.fetch;
+  process.env.RESEND_API_KEY = "re_test";
+  let posted: { url: string; body: { to: string[]; subject: string } } | undefined;
+  globalThis.fetch = (async (url, init) => {
+    posted = {
+      url: String(url),
+      body: JSON.parse(String(init?.body)),
+    };
+    return new Response(JSON.stringify({ id: "email_test" }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    const id = await sendTestEmail("jaiadityarathore@gmail.com");
+    assert.equal(id, "email_test");
+    assert.equal(posted?.url, "https://api.resend.com/emails");
+    assert.equal(posted?.body.to[0], "jaiadityarathore@gmail.com");
+    assert.match(posted?.body.subject ?? "", /HoneyMatcha email test/);
+  } finally {
+    globalThis.fetch = savedFetch;
+    if (saved !== undefined) process.env.RESEND_API_KEY = saved;
+    else delete process.env.RESEND_API_KEY;
   }
 });
 
