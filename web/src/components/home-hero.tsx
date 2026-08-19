@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { HomeLivePreview } from "@/components/home-live-preview";
@@ -7,9 +8,11 @@ import { HomeLivePreview } from "@/components/home-live-preview";
 function SignedInHero({
   firstName,
   setupComplete,
+  hasUpdates,
 }: {
   firstName: string | null;
   setupComplete: boolean;
+  hasUpdates: boolean;
 }) {
   return (
     <>
@@ -17,13 +20,22 @@ function SignedInHero({
         {firstName ? `Welcome back, ${firstName}` : "Welcome back"}
       </p>
       <p className="animate-rise-delay-2 mt-3 max-w-[46ch] text-[1.05rem] leading-7 text-muted sm:text-[1.1rem]">
-        {setupComplete
-          ? "Your Grok Bot is already coordinating. Jump in to approve what’s waiting — or send it the next plan."
-          : "Two steps left, then talk to your Grok Bot. HoneyMatcha is only for the moments that need your yes."}
+        {hasUpdates
+          ? "There's a new reply on one of your events. Open it to catch up — or send your Grok Bot the next plan."
+          : setupComplete
+            ? "Your Grok Bot is already coordinating. Jump in to approve what’s waiting — or send it the next plan."
+            : "Two steps left, then talk to your Grok Bot. HoneyMatcha is only for the moments that need your yes."}
       </p>
       <div className="animate-rise-delay-3 mt-8">
-        <Link href="/app" className="button-primary min-h-12 px-5">
-          {setupComplete ? "Open dashboard" : "Continue setup"}
+        <Link
+          href={hasUpdates ? "/app/events" : "/app"}
+          className="button-primary min-h-12 px-5"
+        >
+          {hasUpdates
+            ? "See updates"
+            : setupComplete
+              ? "Open dashboard"
+              : "Continue setup"}
         </Link>
       </div>
     </>
@@ -74,10 +86,14 @@ export function HomeHero({
   signedIn,
   setupComplete,
   firstName,
+  hasUpdates = false,
+  preview,
 }: {
   signedIn: boolean;
   setupComplete: boolean;
   firstName: string | null;
+  hasUpdates?: boolean;
+  preview?: ReactNode;
 }) {
   return (
     <div className="relative z-0 mx-auto grid w-full max-w-[72rem] items-center gap-12 px-5 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:pb-24 lg:pt-16">
@@ -97,13 +113,17 @@ export function HomeHero({
           className="hero-rule mt-6 block h-px w-full max-w-[22rem] bg-[linear-gradient(90deg,var(--matcha-soft),rgba(200,146,45,0.55),transparent)]"
         />
         {signedIn ? (
-          <SignedInHero firstName={firstName} setupComplete={setupComplete} />
+          <SignedInHero
+            firstName={firstName}
+            setupComplete={setupComplete}
+            hasUpdates={hasUpdates}
+          />
         ) : (
           <SignedOutHero />
         )}
       </div>
       <div className="animate-rise-delay-2 lg:pt-2">
-        <HomeLivePreview />
+        {preview ?? <HomeLivePreview />}
       </div>
     </div>
   );

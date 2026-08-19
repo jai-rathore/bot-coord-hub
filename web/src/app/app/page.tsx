@@ -10,8 +10,12 @@ import {
   googleOAuthConfigured,
 } from "@/lib/google-oauth";
 import { ensureCurrentUser } from "@/lib/users";
+import { EventUpdatePill } from "@/components/event-update-pill";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
+import { relativeDeadline } from "@/lib/events/copy";
+import { eventsForDashboard } from "@/lib/events/updates";
+import { listEventsWithUpdates } from "@/lib/events/load-updates";
 
 export default async function AppHomePage() {
   const [clerkUser, user] = await Promise.all([
@@ -22,9 +26,20 @@ export default async function AppHomePage() {
   if (!user) {
     return <p className="text-danger">Unable to resolve your account.</p>;
   }
-  const [status, conn] = await Promise.all([
+  const [status, conn, eventUpdates] = await Promise.all([
     getHomeStatus(user),
     getGoogleConnection(user.id),
+    eventsFeatureEnabled()
+      ? listEventsWithUpdates(user)
+      : Promise.resolve({
+          organized: [],
+          joined: [],
+          unreadEventCount: 0,
+        }),
+  ]);
+  const dashboardEvents = eventsForDashboard([
+    ...eventUpdates.organized,
+    ...eventUpdates.joined,
   ]);
   const setupComplete = isSetupComplete(status);
   const discoveryEnabled = discoveryFeatureEnabled();
@@ -71,6 +86,53 @@ export default async function AppHomePage() {
       {/* Until setup is done, connecting is the most useful thing on the page.
           After that it is just confirmation, so the actions come first. */}
       {setupComplete ? null : setupPanel}
+
+      {dashboardEvents.length > 0 ? (
+        <section aria-labelledby="events-title">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="section-kicker">Your events</p>
+              <h2
+                id="events-title"
+                className="mt-1 font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-[-0.03em] text-matcha-deep"
+              >
+                {eventUpdates.unreadEventCount > 0
+                  ? "What's waiting"
+                  : "What's moving"}
+              </h2>
+            </div>
+            <Link
+              href="/app/events"
+              className="rounded-lg px-3 py-2 text-sm font-semibold no-underline transition hover:bg-white/75"
+            >
+              See all
+            </Link>
+          </div>
+          <ul className="mt-5 space-y-3">
+            {dashboardEvents.map((event) => (
+              <li key={event.id}>
+                <Link
+                  href={event.href}
+                  className="surface-card surface-card-interactive flex flex-wrap items-center justify-between gap-3 p-4 no-underline"
+                >
+                  <span>
+                    <span className="block font-semibold text-ink">
+                      {event.title}
+                    </span>
+                    <span className="mt-1 block text-sm text-muted">
+                      {event.latestUpdate ??
+                        (event.status === "open"
+                          ? relativeDeadline(event.deadlineAt)
+                          : event.status)}
+                    </span>
+                  </span>
+                  <EventUpdatePill unreadCount={event.unreadCount} />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* Mirrors the three ways in on the marketing page, so what the product
           offers reads the same before and after signing in. */}

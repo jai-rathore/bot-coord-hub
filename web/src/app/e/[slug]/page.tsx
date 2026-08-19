@@ -4,6 +4,7 @@ import { BrandLink } from "@/components/brand-link";
 import { EventClient } from "@/components/event-client";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import { findEventBySlug, loadBoardSource, projectBoard } from "@/lib/events/board";
+import { markEventSeen } from "@/lib/events/updates";
 import { ensureCurrentUser } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +79,9 @@ export default async function PublicEventPage({
   if (!source) notFound();
 
   const board = projectBoard(source, user?.id ?? null);
+  if (user) {
+    await markEventSeen(event.id, user.id);
+  }
   const signInUrl = `/sign-in?redirect_url=${encodeURIComponent(`/e/${slug}`)}`;
 
   return (

@@ -7,6 +7,8 @@ import { getProfileForUser } from "@/lib/agent-profiles";
 import { ensureCurrentUser } from "@/lib/users";
 import { getHomeStatus } from "@/lib/home-status";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
+import { eventsFeatureEnabled } from "@/lib/events-feature";
+import { listEventsWithUpdates } from "@/lib/events/load-updates";
 
 export default async function AppLayout({
   children,
@@ -15,6 +17,7 @@ export default async function AppLayout({
 }) {
   // Sync Clerk user into Postgres on first /app visit.
   let attentionCount = 0;
+  let eventsUnreadCount = 0;
   let agentConnected = false;
   try {
     const user = await ensureCurrentUser();
@@ -22,17 +25,25 @@ export default async function AppLayout({
       redirect("/setup");
     }
     if (user) {
-      const [row] = await getDb()
-        .select({ count: count() })
-        .from(confirms)
-        .where(
-          and(
-            eq(confirms.userId, user.id),
-            eq(confirms.status, "pending"),
-          ),
-        );
+      const [row, home, eventUpdates] = await Promise.all([
+        getDb()
+          .select({ count: count() })
+          .from(confirms)
+          .where(
+            and(
+              eq(confirms.userId, user.id),
+              eq(confirms.status, "pending"),
+            ),
+          )
+          .then((rows) => rows[0]),
+        getHomeStatus(user),
+        eventsFeatureEnabled()
+          ? listEventsWithUpdates(user)
+          : Promise.resolve({ unreadEventCount: 0 }),
+      ]);
       attentionCount = Number(row?.count ?? 0);
-      agentConnected = (await getHomeStatus(user)).agent.connected;
+      eventsUnreadCount = eventUpdates.unreadEventCount;
+      agentConnected = home.agent.connected;
     }
   } catch (error) {
     // redirect() throws; a bare catch would skip first-login handle setup.
@@ -51,6 +62,7 @@ export default async function AppLayout({
     <div className="flex min-h-full flex-col bg-[radial-gradient(circle_at_8%_0%,rgba(117,161,132,0.12),transparent_25rem),radial-gradient(circle_at_94%_20%,rgba(240,220,168,0.15),transparent_24rem),linear-gradient(180deg,#f9fbf8_0%,#f4f7f3_55%,#f6f3eb_100%)]">
       <AppNav
         attentionCount={attentionCount}
+        eventsUnreadCount={eventsUnreadCount}
         discoveryEnabled={discoveryFeatureEnabled()}
         agentConnected={agentConnected}
       />

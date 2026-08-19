@@ -125,10 +125,12 @@ function NavLink({
 
 export function AppNav({
   attentionCount = 0,
+  eventsUnreadCount = 0,
   discoveryEnabled = false,
   agentConnected = false,
 }: {
   attentionCount?: number;
+  eventsUnreadCount?: number;
   discoveryEnabled?: boolean;
   agentConnected?: boolean;
 }) {
@@ -171,7 +173,12 @@ export function AppNav({
             className="flex w-max snap-x items-center gap-1"
           >
             {primary.map((item) => (
-              <NavLink key={item.href} item={item} active={isActive(item)} />
+              <NavLink
+                key={item.href}
+                item={item}
+                active={isActive(item)}
+                badge={item.href === "/app/events" ? eventsUnreadCount : 0}
+              />
             ))}
 
             <span
