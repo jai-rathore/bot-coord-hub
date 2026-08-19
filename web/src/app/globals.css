@@ -615,3 +615,29 @@ a[href^="https://go.clerk.com"] {
   background: rgba(240, 220, 168, 0.16);
   color: var(--honey-soft);
 }
+
+/* A capability Sage has not learned yet. Marked rather than hidden: the point
+   is that you can see exactly what you would get, and that it is one agent
+   connection away rather than one release away.
+
+   The state is carried by the dashed edge and the badge, never by opacity —
+   fading the card took its body text to 2.6:1 against the page, and a card
+   nobody can read is a worse answer than no card. */
+.cap-dimmed {
+  background: color-mix(in srgb, var(--honey-soft) 10%, white);
+  border-color: color-mix(in srgb, var(--honey) 40%, white);
+  border-style: dashed;
+}
+
+.cap-tag-soon,
+.lane-you .cap-tag-soon {
+  background: color-mix(in srgb, var(--honey-soft) 55%, white);
+  color: #7a5610;
+}
+
+/* A locked tile on the signed-in home. Same idea as .cap-dimmed, but it has to
+   stay legible next to live tiles rather than sitting in its own rail. */
+.cap-locked {
+  background: color-mix(in srgb, var(--honey-soft) 12%, white);
+  border: 1px dashed color-mix(in srgb, var(--honey) 45%, white);
+}
