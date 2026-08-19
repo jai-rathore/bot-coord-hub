@@ -37,7 +37,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Optional, default `/sign-in` |
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Optional, default `/sign-up` |
 | `RESEND_API_KEY` | Event notification email. Without it, outbox rows stay queued. |
-| `EVENT_EMAIL_FROM` | Resend From address. Use `HoneyMatcha <beth.t@example.com>` until `honeymatcha.io` is verified. |
+| `EVENT_EMAIL_FROM` | Resend From address. Use `HoneyMatcha <onboarding@resend.dev>` until `honeymatcha.io` is verified. |
 
 ## Scripts
 

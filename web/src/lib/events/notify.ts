@@ -19,7 +19,8 @@ import {
 } from "@/db/schema";
 import { deliverEventInbox } from "@/lib/agent-inbox";
 
-const FROM = process.env.EVENT_EMAIL_FROM || "HoneyMatcha <no-reply@honeymatcha.io>";
+const FROM =
+  process.env.EVENT_EMAIL_FROM || "HoneyMatcha <onboarding@resend.dev>";
 
 export function emailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY?.trim());
