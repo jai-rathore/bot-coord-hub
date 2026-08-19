@@ -4,7 +4,8 @@
  */
 
 import { randomBytes } from "crypto";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "@/db";
 import {
   eventActivity,
@@ -13,6 +14,7 @@ import {
   eventParticipants,
   eventResponses,
   events,
+  notificationOutbox,
   type Event,
   type EventParticipant,
   type User,
@@ -748,6 +750,91 @@ export async function cancelEvent(event: Event, user: User): Promise<void> {
   });
 }
 
+/**
+ * Take an event off *your* list.
+ *
+ * The organizer is a participant like everyone else, so archiving is one write
+ * to your own row and nobody else's view changes. Any status can be archived —
+ * a confirmed dinner you have already been to is as done as a cancelled one.
+ */
+export async function archiveEvent(
+  event: Event,
+  user: User,
+  archived: boolean,
+): Promise<void> {
+  const db = getDb();
+  const updated = await db
+    .update(eventParticipants)
+    .set({ archivedAt: archived ? new Date() : null })
+    .where(
+      and(
+        eq(eventParticipants.eventId, event.id),
+        eq(eventParticipants.userId, user.id),
+      ),
+    )
+    .returning({ id: eventParticipants.id });
+  if (!updated[0]) {
+    throw new AgentApiError(404, "You are not part of this event.");
+  }
+  await writeAudit({
+    actorUserId: user.id,
+    action: archived ? "event.archive" : "event.unarchive",
+    entityType: "event",
+    entityId: event.id,
+  });
+}
+
+/**
+ * Destroy an event for everyone.
+ *
+ * Only the organizer, and only once it is cancelled — cancelling is what tells
+ * the other people it is off, and deleting an event nobody was told about
+ * would just make it vanish from their lists.
+ *
+ * The guard that matters is the outbox one. Every child table cascades from
+ * `events`, and `notification_outbox` is one of them, so deleting between the
+ * cancel and the send would take the "it's cancelled" emails down with it and
+ * nobody would ever hear. If any are still queued, the delete waits.
+ */
+export async function deleteEvent(event: Event, user: User): Promise<void> {
+  assertOrganizer(event, user);
+  if (event.status !== "cancelled") {
+    throw new AgentApiError(
+      409,
+      "Cancel the event first so everyone is told it is off.",
+    );
+  }
+
+  const db = getDb();
+  const pending = await db
+    .select({ id: notificationOutbox.id })
+    .from(notificationOutbox)
+    .where(
+      and(
+        eq(notificationOutbox.eventId, event.id),
+        isNull(notificationOutbox.sentAt),
+        isNull(notificationOutbox.failedAt),
+      ),
+    )
+    .limit(1);
+  if (pending[0]) {
+    throw new AgentApiError(
+      409,
+      "Still telling everyone it is off. Try again in a minute.",
+    );
+  }
+
+  // Written before the row goes, because the audit references it.
+  await writeAudit({
+    actorUserId: user.id,
+    action: "event.delete",
+    entityType: "event",
+    entityId: event.id,
+    metadata: { title: event.title },
+  });
+  await db.delete(events).where(eq(events.id, event.id));
+}
+
 export async function rotateShareSlug(
   event: Event,
   user: User,
@@ -768,28 +855,71 @@ export async function rotateShareSlug(
   return slug;
 }
 
-export async function listEventsForUser(user: User) {
+/** How many events one page of the list holds. */
+export const EVENT_PAGE_SIZE = 20;
+
+/**
+ * The ceiling for callers that are not paging — the nav's unread badge counts
+ * across whatever this returns, so it stays where the old two-query cap was
+ * rather than dropping to a page.
+ */
+const UNPAGED_LIMIT = 100;
+
+export type EventListPage = {
+  organized: Event[];
+  joined: Event[];
+  /** True when another page exists after this one. */
+  hasMore: boolean;
+};
+
+/**
+ * The events one person can see, one page at a time.
+ *
+ * This was two queries — organized and joined — each capped at 50 with no way
+ * to reach anything past that, so a busy account silently lost its older
+ * plans. It is one query now, which is what makes a page boundary mean
+ * anything: paging two independently-sorted lists and merging them afterwards
+ * cannot produce a stable second page.
+ *
+ * The join is left, not inner, on purpose. Creating an event also writes the
+ * organizer a participant row, so the inner join would be enough today — but
+ * an organizer who somehow lacks one would lose their own event from their own
+ * list, and that is not a failure worth risking to save a condition.
+ */
+export async function listEventsForUser(
+  user: User,
+  opts: { archived?: boolean; limit?: number; offset?: number } = {},
+): Promise<EventListPage> {
   const db = getDb();
-  const organized = await db
-    .select()
-    .from(events)
-    .where(eq(events.organizerUserId, user.id))
-    .orderBy(desc(events.createdAt))
-    .limit(50);
+  const limit = opts.limit ?? UNPAGED_LIMIT;
+  const offset = opts.offset ?? 0;
+  const archived = opts.archived ?? false;
 
-  const joinedRows = await db
+  const mine = alias(eventParticipants, "mine");
+  const rows = await db
     .select({ event: events })
-    .from(eventParticipants)
-    .innerJoin(events, eq(eventParticipants.eventId, events.id))
-    .where(eq(eventParticipants.userId, user.id))
+    .from(events)
+    .leftJoin(
+      mine,
+      and(eq(mine.eventId, events.id), eq(mine.userId, user.id)),
+    )
+    .where(
+      and(
+        or(eq(events.organizerUserId, user.id), isNotNull(mine.id)),
+        archived ? isNotNull(mine.archivedAt) : isNull(mine.archivedAt),
+      ),
+    )
     .orderBy(desc(events.createdAt))
-    .limit(50);
+    // One extra row is the cheapest way to know whether a next page exists.
+    .limit(limit + 1)
+    .offset(offset);
 
-  const joined = joinedRows
-    .map((r) => r.event)
-    .filter((e) => e.organizerUserId !== user.id);
-
-  return { organized, joined };
+  const page = rows.slice(0, limit).map((row) => row.event);
+  return {
+    organized: page.filter((event) => event.organizerUserId === user.id),
+    joined: page.filter((event) => event.organizerUserId !== user.id),
+    hasMore: rows.length > limit,
+  };
 }
 
 /** A one-line preview of a note, for an activity row or an email. */

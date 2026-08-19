@@ -4,7 +4,8 @@ import { EventUpdatePill } from "@/components/event-update-pill";
 import { PageHeading } from "@/components/page-heading";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import { relativeDeadline } from "@/lib/events/copy";
-import { listEventsWithUpdates } from "@/lib/events/load-updates";
+import { listEventsWithUpdates } from "@/lib/events/updates";
+import { EVENT_PAGE_SIZE } from "@/lib/events/service";
 import {
   eventsForDashboard,
   type EventWithUpdates,
@@ -22,26 +23,50 @@ export const dynamic = "force-dynamic";
  * a property of the event, not a place to file it — so it is a label on the
  * card and the list is one list, ordered by what needs you first.
  */
-export default async function EventsPage() {
+export default async function EventsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; view?: string }>;
+}) {
   if (!eventsFeatureEnabled()) notFound();
   const user = await ensureCurrentUser();
   if (!user) {
     return <p className="text-danger">Unable to resolve your account.</p>;
   }
 
-  const { organized, joined } = await listEventsWithUpdates(user);
+  const query = await searchParams;
+  const archived = query.view === "archived";
+  const page = Math.max(1, Number.parseInt(query.page ?? "1", 10) || 1);
+
+  const { organized, joined, hasMore } = await listEventsWithUpdates(user, {
+    archived,
+    limit: EVENT_PAGE_SIZE,
+    offset: (page - 1) * EVENT_PAGE_SIZE,
+  });
   const organizedIds = new Set(organized.map((event) => event.id));
   const all = eventsForDashboard(
     [...organized, ...joined],
     organized.length + joined.length,
   );
 
+  const hrefFor = (next: number) => {
+    const params = new URLSearchParams();
+    if (archived) params.set("view", "archived");
+    if (next > 1) params.set("page", String(next));
+    const qs = params.toString();
+    return qs ? `/app/events?${qs}` : "/app/events";
+  };
+
   return (
     <div className="space-y-8">
       <PageHeading
         eyebrow="Events"
-        title="Events"
-        description="Everything you're planning or have been invited to, newest news first."
+        title={archived ? "Archived events" : "Events"}
+        description={
+          archived
+            ? "Plans you have taken off your list. Everyone else still has theirs."
+            : "Everything you're planning or have been invited to, newest news first."
+        }
         action={
           <Link href="/app/events/new" className="button-primary w-full sm:w-auto">
             Create an event
@@ -51,8 +76,9 @@ export default async function EventsPage() {
 
       {all.length === 0 ? (
         <p className="text-sm leading-6 text-muted">
-          Nothing yet. Create one and share the link in a group chat — people
-          can see it straight away and sign in only when they answer.
+          {archived
+            ? "Nothing archived yet."
+            : "Nothing yet. Create one and share the link in a group chat — people can see it straight away and sign in only when they answer."}
         </p>
       ) : (
         <ul className="space-y-3">
@@ -66,6 +92,44 @@ export default async function EventsPage() {
           ))}
         </ul>
       )}
+
+      {(page > 1 || hasMore) && (
+        <nav
+          aria-label="Pages"
+          className="flex items-center justify-between gap-3"
+        >
+          {page > 1 ? (
+            <Link href={hrefFor(page - 1)} className="button-secondary">
+              &larr; Newer
+            </Link>
+          ) : (
+            <span />
+          )}
+          <span className="text-sm text-muted">Page {page}</span>
+          {hasMore ? (
+            <Link href={hrefFor(page + 1)} className="button-secondary">
+              Older &rarr;
+            </Link>
+          ) : (
+            <span />
+          )}
+        </nav>
+      )}
+
+      <p className="border-t border-line pt-5 text-sm text-muted">
+        {archived ? (
+          <Link href="/app/events" className="font-semibold text-matcha-deep">
+            Back to your events
+          </Link>
+        ) : (
+          <Link
+            href="/app/events?view=archived"
+            className="font-semibold text-matcha-deep"
+          >
+            See archived events
+          </Link>
+        )}
+      </p>
     </div>
   );
 }

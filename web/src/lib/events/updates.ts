@@ -147,13 +147,17 @@ export async function markEventSeen(
     );
 }
 
-export async function listEventsWithUpdates(user: User): Promise<{
+export async function listEventsWithUpdates(
+  user: User,
+  opts: { archived?: boolean; limit?: number; offset?: number } = {},
+): Promise<{
   organized: EventWithUpdates[];
   joined: EventWithUpdates[];
   unreadEventCount: number;
   featured: EventWithUpdates | null;
+  hasMore: boolean;
 }> {
-  const { organized, joined } = await listEventsForUser(user);
+  const { organized, joined, hasMore } = await listEventsForUser(user, opts);
   const all = [...organized, ...joined];
   if (all.length === 0) {
     return {
@@ -161,6 +165,7 @@ export async function listEventsWithUpdates(user: User): Promise<{
       joined: [],
       unreadEventCount: 0,
       featured: null,
+      hasMore: false,
     };
   }
 
@@ -229,5 +234,6 @@ export async function listEventsWithUpdates(user: User): Promise<{
     joined: joinedOut,
     unreadEventCount: combined.filter((event) => event.unreadCount > 0).length,
     featured: pickFeaturedEvent(combined),
+    hasMore,
   };
 }

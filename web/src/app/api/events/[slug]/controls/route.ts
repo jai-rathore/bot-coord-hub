@@ -2,7 +2,9 @@ import { ensureCurrentUser } from "@/lib/users";
 import { jsonError } from "@/lib/http";
 import { boardFor, eventBySlug } from "@/lib/events/access";
 import {
+  archiveEvent,
   cancelEvent,
+  deleteEvent,
   extendDeadline,
   lockEvent,
   rotateShareSlug,
@@ -53,6 +55,17 @@ export async function POST(
       case "rotate":
         nextSlug = await rotateShareSlug(event, user);
         break;
+      case "archive":
+        await archiveEvent(event, user, true);
+        return Response.json({ archived: true });
+      case "unarchive":
+        await archiveEvent(event, user, false);
+        return Response.json({ archived: false });
+      case "delete":
+        // The board is gone with the event, so there is nothing to return but
+        // the fact that it worked; the client sends the reader somewhere else.
+        await deleteEvent(event, user);
+        return Response.json({ deleted: true });
       default:
         return Response.json({ error: "Unknown action" }, { status: 400 });
     }
