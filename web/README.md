@@ -36,8 +36,12 @@ Open [http://localhost:3000](http://localhost:3000).
 | `DATABASE_URL` | Postgres connection string |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Optional, default `/sign-in` |
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Optional, default `/sign-up` |
-| `RESEND_API_KEY` | Event notification email. Without it, outbox rows stay queued. |
+| `RESEND_API_KEY` | Event notification email. Without it, email outbox rows stay queued. |
 | `EVENT_EMAIL_FROM` | Resend From address. Use `HoneyMatcha <onboarding@resend.dev>` until `honeymatcha.io` is verified. |
+| `TWILIO_ACCOUNT_SID` | Twilio account SID for event texts. |
+| `TWILIO_AUTH_TOKEN` | Twilio auth token. Without Twilio, SMS outbox rows stay queued. |
+| `TWILIO_FROM_NUMBER` | Feature flag + Twilio From number (`+15551234567`). Unset hides Text and skips SMS. |
+| `TWILIO_MESSAGING_SERVICE_SID` | Optional. Use instead of `TWILIO_FROM_NUMBER` after A2P 10DLC. |
 
 ## Scripts
 
@@ -55,8 +59,9 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run test:e2e-lib` | DB/lib smoke for invite → activity → confirm |
 | `npm run test:e2e-api` | Bearer API smoke against a running server |
 | `npm run test:e2e-platform` | Pairing + guest + A2A integration smoke |
-| `npm run events:tick` | Lock/expire events and drain the email outbox (needs `RESEND_API_KEY` to send) |
+| `npm run events:tick` | Lock/expire events and drain the outbox (needs Resend and/or Twilio to send) |
 | `npm run email:test -- you@example.com` | Send one Resend test email |
+| `npm run sms:test -- +15551234567` | Send one Twilio test text |
 
 ## Product surface
 

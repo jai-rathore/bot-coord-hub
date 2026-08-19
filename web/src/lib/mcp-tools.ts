@@ -261,7 +261,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "set_event_notifications",
     description:
-      "Get told when this event moves — someone answers or a new time is suggested. Updates arrive in get_inbox (and your human's email). Joins the event for your human if they haven't yet. Pass notify=false to stop.",
+      "Get told when this event moves — someone answers or a new time is suggested. Updates arrive in get_inbox and by the channel your human chose in Settings (email, text, or both). Joins the event for your human if they haven't yet. Pass notify=false to stop.",
     inputSchema: {
       type: "object",
       properties: {

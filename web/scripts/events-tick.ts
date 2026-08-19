@@ -1,6 +1,10 @@
 import "dotenv/config";
 import { runEventsTick, purgeOldEventMessages } from "../src/lib/events/tick";
-import { drainNotificationOutbox, emailConfigured } from "../src/lib/events/notify";
+import {
+  drainNotificationOutbox,
+  emailConfigured,
+  smsConfigured,
+} from "../src/lib/events/notify";
 import { eventsFeatureEnabled } from "../src/lib/events-feature";
 
 async function main() {
@@ -17,7 +21,8 @@ async function main() {
   const drain = await drainNotificationOutbox();
   console.log(
     `outbox: sent=${drain.sent} failed=${drain.failed} skipped=${drain.skipped}` +
-      (emailConfigured() ? "" : " (email not configured — rows stay queued)"),
+      (emailConfigured() ? "" : " (email not configured — rows stay queued)") +
+      (smsConfigured() ? "" : " (sms not configured — text rows stay queued)"),
   );
 
   const purged = await purgeOldEventMessages();

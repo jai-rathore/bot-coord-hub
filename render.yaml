@@ -65,6 +65,10 @@ services:
         value: /sign-in
       - key: NEXT_PUBLIC_CLERK_SIGN_UP_URL
         value: /sign-up
+      # Setting this number turns Text on in Settings and on event pages.
+      # Leave unset until A2P 10DLC is approved.
+      - key: TWILIO_FROM_NUMBER
+        sync: false
   - type: keyvalue
     name: honeymatcha-rate-limit
     plan: starter
@@ -108,6 +112,14 @@ services:
       # honeymatcha.io is verified in the Resend dashboard.
       - key: EVENT_EMAIL_FROM
         value: HoneyMatcha <onboarding@resend.dev>
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: TWILIO_MESSAGING_SERVICE_SID
+        sync: false
       - key: NEXT_PUBLIC_APP_ORIGIN
         value: https://honeymatcha.io
       - key: GOOGLE_CALENDAR_ENABLED

@@ -3,8 +3,15 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { EventChat } from "@/components/event-chat";
+import { NotificationChannelPicker } from "@/components/notification-channel-picker";
 import { ShareQr } from "@/components/share-qr";
 import type { EventBoard, EventPref, OptionTally } from "@/lib/events/types";
+import {
+  followCopy,
+  parseNotifyChannel,
+  wantsSms,
+  type NotifyChannel,
+} from "@/lib/phone";
 
 const CYCLE: Record<string, EventPref> = {
   none: "yes",
@@ -99,7 +106,13 @@ export function EventClient({
   /** Which copy action just fired, so only that button says "Copied". */
   const [copied, setCopied] = useState<"link" | "status" | null>(null);
   const [showQr, setShowQr] = useState(false);
+  const [channelDraft, setChannelDraft] = useState<NotifyChannel>(
+    parseNotifyChannel(initialBoard.viewer.notifyChannel),
+  );
+  const [phoneDraft, setPhoneDraft] = useState("");
+  const [needPhone, setNeedPhone] = useState(false);
 
+  const smsEnabled = board.viewer.smsEnabled;
   const slug = board.event.shareSlug;
   // Only read on the client; the QR panel cannot open before hydration.
   const shareUrl =
@@ -135,7 +148,15 @@ export function EventClient({
           setError(data.error ?? "Something went wrong. Try again.");
           return null;
         }
-        if (data.board) setBoard(data.board as EventBoard);
+        if (data.board) {
+          const next = data.board as EventBoard;
+          setBoard(next);
+          setChannelDraft(parseNotifyChannel(next.viewer.notifyChannel));
+          if (next.viewer.hasPhone) {
+            setNeedPhone(false);
+            setPhoneDraft("");
+          }
+        }
         return data;
       } catch {
         setError("Could not reach HoneyMatcha. Check your connection.");
@@ -173,7 +194,56 @@ export function EventClient({
   }
 
   async function toggleNotifications() {
-    await post("/subscribe", { notify: !board.viewer.notifyUpdates });
+    const turningOff = Boolean(board.viewer.notifyUpdates);
+    if (turningOff) {
+      setNeedPhone(false);
+      await post("/subscribe", { notify: false });
+      return;
+    }
+    if (
+      smsEnabled &&
+      wantsSms(channelDraft) &&
+      !board.viewer.hasPhone &&
+      !phoneDraft.trim()
+    ) {
+      setNeedPhone(true);
+      return;
+    }
+    const result = await post("/subscribe", {
+      notify: true,
+      ...(smsEnabled
+        ? {
+            channel: channelDraft,
+            ...(phoneDraft.trim() ? { phone: phoneDraft.trim() } : {}),
+          }
+        : {}),
+    });
+    if (result) setNeedPhone(false);
+  }
+
+  async function chooseChannel(next: NotifyChannel) {
+    setChannelDraft(next);
+    const needsNumber = wantsSms(next) && !board.viewer.hasPhone;
+    setNeedPhone(needsNumber);
+    if (needsNumber) return;
+    if (!board.viewer.notifyUpdates) return;
+    await post("/subscribe", { notify: true, channel: next });
+  }
+
+  async function followByEmail() {
+    setChannelDraft("email");
+    setNeedPhone(false);
+    await post("/subscribe", { notify: true, channel: "email" });
+  }
+
+  async function savePhoneAndFollow() {
+    if (!phoneDraft.trim()) return;
+    const result = await post("/subscribe", {
+      notify: true,
+      channel: channelDraft,
+      phone: phoneDraft.trim(),
+    });
+    if (result) setNeedPhone(false);
   }
 
   async function copyToClipboard(kind: "link" | "status") {
@@ -463,33 +533,96 @@ export function EventClient({
 
       {/* ---------- update notifications ---------- */}
       {signedIn && board.event.status === "open" && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[0.9rem] border border-line bg-white/60 px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-ink">
-              {board.viewer.notifyUpdates
-                ? "You're getting updates"
-                : "Follow this event"}
-            </p>
-            <p className="text-xs text-muted">
-              {board.viewer.notifyUpdates
-                ? "We'll email you when someone answers or suggests a time."
-                : "Get an email when someone answers or suggests a time."}
-            </p>
+        <div className="rounded-[0.9rem] border border-line bg-white/60 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink">
+                {
+                  followCopy(
+                    smsEnabled ? channelDraft : "email",
+                    Boolean(board.viewer.notifyUpdates),
+                  ).title
+                }
+              </p>
+              <p className="text-xs text-muted">
+                {
+                  followCopy(
+                    smsEnabled ? channelDraft : "email",
+                    Boolean(board.viewer.notifyUpdates),
+                  ).detail
+                }
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void toggleNotifications()}
+              disabled={busy}
+              role="switch"
+              aria-checked={Boolean(board.viewer.notifyUpdates)}
+              className={
+                board.viewer.notifyUpdates
+                  ? "button-secondary shrink-0"
+                  : "button-primary shrink-0"
+              }
+            >
+              {board.viewer.notifyUpdates ? "Turn off" : "Notify me"}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => void toggleNotifications()}
-            disabled={busy}
-            role="switch"
-            aria-checked={Boolean(board.viewer.notifyUpdates)}
-            className={
-              board.viewer.notifyUpdates
-                ? "button-secondary shrink-0"
-                : "button-primary shrink-0"
-            }
-          >
-            {board.viewer.notifyUpdates ? "Turn off" : "Notify me"}
-          </button>
+          {smsEnabled ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <NotificationChannelPicker
+                value={channelDraft}
+                onChange={(next) => void chooseChannel(next)}
+                disabled={busy}
+                size="compact"
+              />
+              <Link
+                href="/app/settings#notifications"
+                className="text-xs text-muted no-underline hover:text-matcha"
+              >
+                Change in Settings
+              </Link>
+            </div>
+          ) : null}
+          {smsEnabled && needPhone ? (
+            <div className="mt-3 border-t border-line pt-3">
+              <label className="grid gap-2 text-sm">
+                <span className="font-medium text-ink">
+                  What&apos;s the best number?
+                </span>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={phoneDraft}
+                  onChange={(event) => setPhoneDraft(event.target.value)}
+                  placeholder="(555) 123-4567"
+                  className="field"
+                />
+              </label>
+              <p className="mt-2 text-xs text-muted">
+                We&apos;ll save it on your profile and use it for event texts.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="button-primary"
+                  disabled={busy || !phoneDraft.trim()}
+                  onClick={() => void savePhoneAndFollow()}
+                >
+                  Start texts
+                </button>
+                <button
+                  type="button"
+                  className="button-secondary"
+                  disabled={busy}
+                  onClick={() => void followByEmail()}
+                >
+                  Email only
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
 

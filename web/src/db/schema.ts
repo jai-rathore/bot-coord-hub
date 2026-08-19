@@ -119,6 +119,10 @@ export const users = pgTable(
     name: text("name"),
     /** Default display name for the platform-provided agent. */
     hostedAgentName: text("hosted_agent_name"),
+    /** E.164 mobile number for event texts. Null until they opt into SMS. */
+    phoneE164: text("phone_e164"),
+    /** How this person wants event updates: email, sms, or both. */
+    notifyChannel: text("notify_channel").notNull().default("email"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -129,6 +133,11 @@ export const users = pgTable(
   (t) => [
     uniqueIndex("users_clerk_user_id_uidx").on(t.clerkUserId),
     uniqueIndex("users_email_uidx").on(t.email),
+    uniqueIndex("users_phone_e164_uidx").on(t.phoneE164),
+    check(
+      "users_notify_channel_check",
+      sql`${t.notifyChannel} in ('email', 'sms', 'both')`,
+    ),
   ],
 );
 
