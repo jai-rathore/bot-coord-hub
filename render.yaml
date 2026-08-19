@@ -108,6 +108,14 @@ services:
       # honeymatcha.io is verified in the Resend dashboard.
       - key: EVENT_EMAIL_FROM
         value: HoneyMatcha <onboarding@resend.dev>
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: TWILIO_MESSAGING_SERVICE_SID
+        sync: false
       - key: NEXT_PUBLIC_APP_ORIGIN
         value: https://honeymatcha.io
       - key: GOOGLE_CALENDAR_ENABLED

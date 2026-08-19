@@ -25,6 +25,7 @@
     "test:e2e-events": "tsx scripts/e2e-events.ts",
     "events:tick": "tsx scripts/events-tick.ts",
     "email:test": "tsx scripts/send-test-email.ts",
+    "sms:test": "tsx scripts/send-test-sms.ts",
     "test:e2e-events-agent": "tsx scripts/e2e-events-agent.ts",
     "test:e2e-meet": "tsx scripts/e2e-meet.ts"
   },

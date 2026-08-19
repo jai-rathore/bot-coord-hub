@@ -415,7 +415,7 @@ export async function agentSetEventNotifications(
     eventId: event.id,
     notify: participant.notifyUpdates,
     human_note: notify
-      ? "Updates about this event will arrive in your inbox (get_inbox) and by email when someone answers or suggests a time."
+      ? "Updates about this event will arrive in your inbox (get_inbox) and by the channel your human chose in Settings — email, text, or both."
       : "Updates for this event are off.",
   };
 }

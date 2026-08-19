@@ -339,6 +339,8 @@ export function projectBoard(
       notifyUpdates: viewerParticipant
         ? viewerParticipant.participant.notifyUpdates
         : null,
+      notifyChannel: "email",
+      hasPhone: false,
     },
     dimensions,
     participants,

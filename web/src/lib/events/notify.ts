@@ -5,11 +5,11 @@
  * cron drain, so a retry can never double-send: `dedupeKey` is unique and the
  * insert is a no-op on conflict.
  *
- * Delivery degrades quietly. Without RESEND_API_KEY nothing is sent and rows
- * stay queued — the product still works, people just aren't emailed.
+ * Delivery degrades quietly per channel. Without RESEND_API_KEY email rows
+ * stay queued. Without Twilio, text rows stay queued. The product still works.
  */
 
-import { and, asc, eq, isNull, lte } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   eventParticipants,
@@ -18,12 +18,27 @@ import {
   users,
 } from "@/db/schema";
 import { deliverEventInbox } from "@/lib/agent-inbox";
+import {
+  humanChannelsFor,
+  normalizePhoneE164,
+  parseNotifyChannel,
+  type NotifyChannel,
+} from "@/lib/phone";
 
 const FROM =
   process.env.EVENT_EMAIL_FROM || "HoneyMatcha <onboarding@resend.dev>";
 
 export function emailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY?.trim());
+}
+
+export function smsConfigured(): boolean {
+  const sid = process.env.TWILIO_ACCOUNT_SID?.trim();
+  const token = process.env.TWILIO_AUTH_TOKEN?.trim();
+  const from =
+    process.env.TWILIO_FROM_NUMBER?.trim() ||
+    process.env.TWILIO_MESSAGING_SERVICE_SID?.trim();
+  return Boolean(sid && token && from);
 }
 
 export function publicOrigin(): string {
@@ -95,7 +110,7 @@ function agentSummary(
  * Both channels share `dedupeKey`, so a retried tick delivers neither twice.
  * Agent delivery is best-effort: a failure there must never cost the email.
  *
- * Returns true when a new email row was queued (false when deduped).
+ * Returns true when a new human-channel row was queued (false when deduped).
  */
 export async function enqueueEventNotification(
   input: EnqueueInput,
@@ -139,6 +154,27 @@ export async function enqueueEventNotification(
     recipients = recipients.filter((id) => id !== input.excludeUserId);
   }
 
+  const prefs = new Map<
+    string,
+    { channel: NotifyChannel; phoneE164: string | null }
+  >();
+  if (recipients.length > 0 && input.notifyHumans !== false) {
+    const rows = await db
+      .select({
+        id: users.id,
+        notifyChannel: users.notifyChannel,
+        phoneE164: users.phoneE164,
+      })
+      .from(users)
+      .where(inArray(users.id, recipients));
+    for (const row of rows) {
+      prefs.set(row.id, {
+        channel: parseNotifyChannel(row.notifyChannel),
+        phoneE164: row.phoneE164,
+      });
+    }
+  }
+
   let queued = 0;
   for (const userId of recipients) {
     const dedupeKey =
@@ -146,20 +182,27 @@ export async function enqueueEventNotification(
         ? `${input.dedupeKey}:${userId}`
         : input.dedupeKey;
     if (input.notifyHumans !== false) {
-      const inserted = await db
-        .insert(notificationOutbox)
-        .values({
-          userId,
-          eventId: input.eventId,
-          channel: "email",
-          template: input.template,
-          payload: input.payload ?? {},
-          dedupeKey,
-          scheduledFor: input.scheduledFor ?? new Date(),
-        })
-        .onConflictDoNothing({ target: notificationOutbox.dedupeKey })
-        .returning({ id: notificationOutbox.id });
-      if (inserted[0]) queued += 1;
+      const pref = prefs.get(userId) ?? {
+        channel: "email" as const,
+        phoneE164: null,
+      };
+      for (const channel of humanChannelsFor(pref)) {
+        const channelKey = channel === "email" ? dedupeKey : `${dedupeKey}:sms`;
+        const inserted = await db
+          .insert(notificationOutbox)
+          .values({
+            userId,
+            eventId: input.eventId,
+            channel,
+            template: input.template,
+            payload: input.payload ?? {},
+            dedupeKey: channelKey,
+            scheduledFor: input.scheduledFor ?? new Date(),
+          })
+          .onConflictDoNothing({ target: notificationOutbox.dedupeKey })
+          .returning({ id: notificationOutbox.id });
+        if (inserted[0]) queued += 1;
+      }
     }
 
     if (input.notifyAgents === false) continue;
@@ -178,7 +221,7 @@ export async function enqueueEventNotification(
         dedupeKey: `agent:${dedupeKey}`,
       });
     } catch (error) {
-      // Email is the contract; the agent copy is additive. Never fail the queue.
+      // Human delivery is the contract; the agent copy is additive.
       console.error("[events] agent inbox delivery failed", error);
     }
   }
@@ -244,6 +287,40 @@ function renderTemplate(
   }
 }
 
+function shortTitle(title: string): string {
+  return title.length > 40 ? `${title.slice(0, 37)}…` : title;
+}
+
+function renderSms(
+  template: string,
+  payload: Record<string, unknown>,
+  eventUrl: string,
+): string {
+  const title = shortTitle(String(payload.title ?? "your event"));
+  switch (template) {
+    case "event_locked":
+      return payload.winner
+        ? `HoneyMatcha: ${payload.winner} led for “${title}”. The organizer is confirming it. ${eventUrl}`
+        : `HoneyMatcha: responses for “${title}” are closed. ${eventUrl}`;
+    case "event_confirmed":
+      return `HoneyMatcha: “${title}” is confirmed${payload.winner ? ` for ${payload.winner}` : ""}. ${eventUrl}`;
+    case "event_cancelled":
+      return `HoneyMatcha: “${title}” was cancelled. ${eventUrl}`;
+    case "event_invited":
+      return `HoneyMatcha: you're invited to “${title}”. Pick what works: ${eventUrl}`;
+    case "quorum_missed":
+      return `HoneyMatcha: “${title}” closed without enough people. ${eventUrl}`;
+    case "deadline_soon":
+      return `HoneyMatcha: “${title}” still needs your answer. ${eventUrl}`;
+    case "event_update":
+      return `HoneyMatcha: ${payload.summary ?? "there's a new update"} — “${title}”. ${eventUrl}`;
+    case "organizer_digest":
+      return `HoneyMatcha: ${payload.summary ?? "there's a new update"} on “${title}”. ${eventUrl}`;
+    default:
+      return `HoneyMatcha: update on “${title}”. ${eventUrl}`;
+  }
+}
+
 async function sendEmail(to: string, rendered: Rendered): Promise<string | undefined> {
   const key = process.env.RESEND_API_KEY?.trim();
   if (!key) throw new Error("RESEND_API_KEY is not configured");
@@ -273,12 +350,60 @@ async function sendEmail(to: string, rendered: Rendered): Promise<string | undef
   }
 }
 
+async function sendSms(to: string, body: string): Promise<string | undefined> {
+  const sid = process.env.TWILIO_ACCOUNT_SID?.trim();
+  const token = process.env.TWILIO_AUTH_TOKEN?.trim();
+  const fromNumber = process.env.TWILIO_FROM_NUMBER?.trim();
+  const messagingService = process.env.TWILIO_MESSAGING_SERVICE_SID?.trim();
+  if (!sid || !token || (!fromNumber && !messagingService)) {
+    throw new Error("Twilio is not configured");
+  }
+
+  const params = new URLSearchParams({ To: to, Body: body });
+  if (messagingService) params.set("MessagingServiceSid", messagingService);
+  else if (fromNumber) params.set("From", fromNumber);
+
+  const res = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params,
+    },
+  );
+  const detail = await res.text().catch(() => "");
+  if (!res.ok) {
+    throw new Error(`Twilio ${res.status}: ${detail.slice(0, 200)}`);
+  }
+  try {
+    const parsed = JSON.parse(detail) as { sid?: string };
+    return parsed.sid;
+  } catch {
+    return undefined;
+  }
+}
+
 /** One-off send used by `npm run email:test` to prove Resend is wired. */
 export async function sendTestEmail(to: string): Promise<string | undefined> {
   return sendEmail(to, {
     subject: "HoneyMatcha email test",
     body: "This is a test from HoneyMatcha. Event notifications will use this same Resend path.",
   });
+}
+
+/** One-off send used by `npm run sms:test` to prove Twilio is wired. */
+export async function sendTestSms(to: string): Promise<string | undefined> {
+  const normalized = normalizePhoneE164(to);
+  if (!normalized) {
+    throw new Error("That doesn't look like a mobile number.");
+  }
+  return sendSms(
+    normalized,
+    "HoneyMatcha text test. Event notifications will use this same Twilio path.",
+  );
 }
 
 export type DrainResult = { sent: number; failed: number; skipped: number };
@@ -295,6 +420,7 @@ export async function drainNotificationOutbox(
     .select({
       row: notificationOutbox,
       email: users.email,
+      phoneE164: users.phoneE164,
       shareSlug: events.shareSlug,
     })
     .from(notificationOutbox)
@@ -309,17 +435,25 @@ export async function drainNotificationOutbox(
     .orderBy(asc(notificationOutbox.scheduledFor))
     .limit(limit);
 
-  if (!emailConfigured()) {
-    result.skipped = pending.length;
-    return result;
-  }
-
   for (const entry of pending) {
-    if (!entry.email) {
+    if (entry.row.attempts >= 5) {
       result.skipped += 1;
       continue;
     }
-    if (entry.row.attempts >= 5) {
+    const channel = entry.row.channel === "sms" ? "sms" : "email";
+    if (channel === "email" && !emailConfigured()) {
+      result.skipped += 1;
+      continue;
+    }
+    if (channel === "sms" && !smsConfigured()) {
+      result.skipped += 1;
+      continue;
+    }
+    if (channel === "email" && !entry.email) {
+      result.skipped += 1;
+      continue;
+    }
+    if (channel === "sms" && !entry.phoneE164) {
       result.skipped += 1;
       continue;
     }
@@ -327,10 +461,17 @@ export async function drainNotificationOutbox(
       ? `${publicOrigin()}/e/${entry.shareSlug}`
       : publicOrigin();
     try {
-      await sendEmail(
-        entry.email,
-        renderTemplate(entry.row.template, entry.row.payload, eventUrl),
-      );
+      if (channel === "sms") {
+        await sendSms(
+          entry.phoneE164 as string,
+          renderSms(entry.row.template, entry.row.payload, eventUrl),
+        );
+      } else {
+        await sendEmail(
+          entry.email as string,
+          renderTemplate(entry.row.template, entry.row.payload, eventUrl),
+        );
+      }
       await db
         .update(notificationOutbox)
         .set({ sentAt: new Date(), attempts: entry.row.attempts + 1 })
@@ -352,4 +493,4 @@ export async function drainNotificationOutbox(
   return result;
 }
 
-export { renderTemplate };
+export { renderTemplate, renderSms };

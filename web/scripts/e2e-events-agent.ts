@@ -272,14 +272,68 @@ async function main() {
   assert.ok(recipients.size >= 3, "organizer + both participants");
   ok(`${recipients.size} people queued for the lock notice`);
 
-  console.log("\n10. A closed event refuses further responses");
+  console.log("\n10. SMS preference queues a second outbox row");
+  await db
+    .update(users)
+    .set({
+      notifyChannel: "both",
+      phoneE164: `+1555${String(parseInt(suffix, 16) % 10_000_000).padStart(7, "0")}`,
+    })
+    .where(eq(users.id, alice.id));
+  const smsFirst = await enqueueEventNotification({
+    eventId: event.id,
+    template: "event_update",
+    dedupeKey: `test_sms:${event.id}`,
+    payload: { title: event.title, summary: "someone answered" },
+    userId: alice.id,
+    notifyAgents: false,
+  });
+  const smsRepeat = await enqueueEventNotification({
+    eventId: event.id,
+    template: "event_update",
+    dedupeKey: `test_sms:${event.id}`,
+    payload: { title: event.title, summary: "someone answered" },
+    userId: alice.id,
+    notifyAgents: false,
+  });
+  assert.equal(smsFirst, true);
+  assert.equal(smsRepeat, false);
+  const aliceRows = await db
+    .select()
+    .from(notificationOutbox)
+    .where(
+      and(
+        eq(notificationOutbox.eventId, event.id),
+        eq(notificationOutbox.userId, alice.id),
+        eq(notificationOutbox.template, "event_update"),
+      ),
+    );
+  const channels = new Set(aliceRows.map((row) => row.channel));
+  assert.ok(channels.has("email"), "email row for both");
+  assert.ok(channels.has("sms"), "sms row for both");
+  ok("email + text are queued separately and still deduped");
+
+  const savedSmsSid = process.env.TWILIO_ACCOUNT_SID;
+  const savedSmsToken = process.env.TWILIO_AUTH_TOKEN;
+  delete process.env.TWILIO_ACCOUNT_SID;
+  delete process.env.TWILIO_AUTH_TOKEN;
+  delete process.env.RESEND_API_KEY;
+  const mixedDrain = await drainNotificationOutbox();
+  assert.equal(mixedDrain.sent, 0);
+  assert.ok(mixedDrain.skipped > 0);
+  if (savedKey) process.env.RESEND_API_KEY = savedKey;
+  if (savedSmsSid) process.env.TWILIO_ACCOUNT_SID = savedSmsSid;
+  if (savedSmsToken) process.env.TWILIO_AUTH_TOKEN = savedSmsToken;
+  ok("missing Twilio leaves text rows queued, same as missing Resend");
+
+  console.log("\n11. A closed event refuses further responses");
   await expectReject("a confirmed event refuses new responses", () =>
     setResponses(confirmed, aliceP, [
       { optionId: options[0].id, value: "yes" },
     ]),
   );
 
-  console.log("\n11. Cleanup");
+  console.log("\n12. Cleanup");
   await db.delete(events).where(eq(events.id, event.id));
   await db.delete(events).where(eq(events.id, lonely.id));
   await db.delete(events).where(eq(events.id, rsvp.id));

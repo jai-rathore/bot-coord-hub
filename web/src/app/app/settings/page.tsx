@@ -2,6 +2,7 @@ import { ConnectCalendar } from "@/components/connect-calendar";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { PageHeading } from "@/components/page-heading";
+import { NotificationSettingsForm } from "@/components/notification-settings-form";
 import { ProfileSettingsForm } from "@/components/profile-settings-form";
 import {
   connectPromptForHandle,
@@ -62,6 +63,22 @@ export default async function SettingsPage({
             : "Calendar connection failed."}
         </p>
       ) : null}
+
+      <section className="surface-card mt-9 p-5 sm:p-7">
+        <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
+          Notifications
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+          How should we reach you when an event you follow changes? Your Grok
+          Bot still gets every update in its inbox. This is just for you.
+        </p>
+        <div className="mt-5">
+          <NotificationSettingsForm
+            initialChannel={user.notifyChannel}
+            initialPhone={user.phoneE164}
+          />
+        </div>
+      </section>
 
       {profile ? (
         <section className="surface-card mt-9 p-5 sm:p-7">

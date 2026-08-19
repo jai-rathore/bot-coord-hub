@@ -22,7 +22,14 @@ import {
 } from "./events/context";
 import { projectBoard, type BoardSource } from "./events/board";
 import { composeFallbackReply } from "./events/turn";
-import { emailConfigured, renderTemplate, sendTestEmail } from "./events/notify";
+import {
+  emailConfigured,
+  renderSms,
+  renderTemplate,
+  sendTestEmail,
+  sendTestSms,
+  smsConfigured,
+} from "./events/notify";
 import { getMcpTools } from "./mcp-tools";
 
 /* ------------------------------------------------------------------ */
@@ -373,6 +380,13 @@ test("every template renders a subject, a body, and the event link", () => {
     );
     assert.ok(rendered.subject.length > 0, template);
     assert.ok(rendered.body.includes(url), `${template} must link the event`);
+    const sms = renderSms(
+      template,
+      { title: "Coffee", winner: "Tue 6pm", quorumMin: 4, hours: 24 },
+      url,
+    );
+    assert.ok(sms.includes(url), `${template} sms must link the event`);
+    assert.ok(sms.length < 320, `${template} sms should stay short`);
   }
 });
 
@@ -421,6 +435,72 @@ test("sendTestEmail posts to Resend when a key is set", async () => {
     globalThis.fetch = savedFetch;
     if (saved !== undefined) process.env.RESEND_API_KEY = saved;
     else delete process.env.RESEND_API_KEY;
+  }
+});
+
+test("smsConfigured is false without Twilio", () => {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_FROM_NUMBER;
+  const service = process.env.TWILIO_MESSAGING_SERVICE_SID;
+  delete process.env.TWILIO_ACCOUNT_SID;
+  delete process.env.TWILIO_AUTH_TOKEN;
+  delete process.env.TWILIO_FROM_NUMBER;
+  delete process.env.TWILIO_MESSAGING_SERVICE_SID;
+  try {
+    assert.equal(smsConfigured(), false);
+  } finally {
+    if (sid !== undefined) process.env.TWILIO_ACCOUNT_SID = sid;
+    if (token !== undefined) process.env.TWILIO_AUTH_TOKEN = token;
+    if (from !== undefined) process.env.TWILIO_FROM_NUMBER = from;
+    if (service !== undefined) process.env.TWILIO_MESSAGING_SERVICE_SID = service;
+  }
+});
+
+test("sendTestSms refuses to send without Twilio", async () => {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_FROM_NUMBER;
+  delete process.env.TWILIO_ACCOUNT_SID;
+  delete process.env.TWILIO_AUTH_TOKEN;
+  delete process.env.TWILIO_FROM_NUMBER;
+  delete process.env.TWILIO_MESSAGING_SERVICE_SID;
+  try {
+    await assert.rejects(() => sendTestSms("+15551234567"), /Twilio is not configured/);
+  } finally {
+    if (sid !== undefined) process.env.TWILIO_ACCOUNT_SID = sid;
+    if (token !== undefined) process.env.TWILIO_AUTH_TOKEN = token;
+    if (from !== undefined) process.env.TWILIO_FROM_NUMBER = from;
+  }
+});
+
+test("sendTestSms posts to Twilio when credentials are set", async () => {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_FROM_NUMBER;
+  const savedFetch = globalThis.fetch;
+  process.env.TWILIO_ACCOUNT_SID = "ACtest";
+  process.env.TWILIO_AUTH_TOKEN = "token";
+  process.env.TWILIO_FROM_NUMBER = "+15550001111";
+  let posted: { url: string; body: string } | undefined;
+  globalThis.fetch = (async (url, init) => {
+    posted = { url: String(url), body: String(init?.body) };
+    return new Response(JSON.stringify({ sid: "SMtest" }), { status: 201 });
+  }) as typeof fetch;
+  try {
+    const id = await sendTestSms("(555) 123-4567");
+    assert.equal(id, "SMtest");
+    assert.match(posted?.url ?? "", /Accounts\/ACtest\/Messages\.json/);
+    assert.match(posted?.body ?? "", /To=%2B15551234567/);
+    assert.match(posted?.body ?? "", /From=%2B15550001111/);
+  } finally {
+    globalThis.fetch = savedFetch;
+    if (sid !== undefined) process.env.TWILIO_ACCOUNT_SID = sid;
+    else delete process.env.TWILIO_ACCOUNT_SID;
+    if (token !== undefined) process.env.TWILIO_AUTH_TOKEN = token;
+    else delete process.env.TWILIO_AUTH_TOKEN;
+    if (from !== undefined) process.env.TWILIO_FROM_NUMBER = from;
+    else delete process.env.TWILIO_FROM_NUMBER;
   }
 });
 

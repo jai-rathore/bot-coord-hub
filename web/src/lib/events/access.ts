@@ -9,6 +9,7 @@ import { and, eq } from "drizzle-orm";
 import { AgentApiError } from "@/lib/agent-errors";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import { loadBoardSource, projectBoard } from "@/lib/events/board";
+import { parseNotifyChannel } from "@/lib/phone";
 import type { EventBoard } from "@/lib/events/types";
 
 export function assertEventsEnabled(): void {
@@ -63,7 +64,16 @@ export async function boardFor(
 ): Promise<EventBoard> {
   const source = await loadBoardSource(eventId);
   if (!source) throw new AgentApiError(404, "That event does not exist.");
-  return projectBoard(source, user?.id ?? null);
+  const board = projectBoard(source, user?.id ?? null);
+  if (!user) return board;
+  return {
+    ...board,
+    viewer: {
+      ...board.viewer,
+      notifyChannel: parseNotifyChannel(user.notifyChannel),
+      hasPhone: Boolean(user.phoneE164),
+    },
+  };
 }
 
 export function requireParticipant(
