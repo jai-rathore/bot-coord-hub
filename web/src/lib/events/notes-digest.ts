@@ -24,6 +24,19 @@ import { sharedNoteIds, type NoteRow } from "@/lib/events/notes";
 export const DIGEST_MAX_LENGTH = 320;
 
 /**
+ * Least time between two paid regenerations of one event's digest.
+ *
+ * The cache key stops a *repeated* note set from costing anything, but it does
+ * nothing about a changing one: retract a note, post it again, and the key is
+ * different every time. At twelve note writes a minute per person that is
+ * twelve model calls a minute per person, from an action that costs the caller
+ * nothing. Inside the cooldown the digest is cleared rather than rewritten, so
+ * the section falls back to the deterministic rollup — which is accurate, just
+ * plainer. Busy minutes are exactly when paying per keystroke is least worth it.
+ */
+export const DIGEST_MIN_INTERVAL_MS = 30_000;
+
+/**
  * A stable fingerprint of the shared note set. Ids only: a note's body never
  * changes after it is written, so the set of ids is the whole state.
  */
@@ -105,6 +118,18 @@ export async function refreshNotesDigest(
     await db
       .update(events)
       .set({ notesDigest: null, notesDigestKey: key, notesDigestAt: new Date() })
+      .where(eq(events.id, event.id));
+    return null;
+  }
+
+  const since = event.notesDigestAt
+    ? Date.now() - event.notesDigestAt.getTime()
+    : Number.POSITIVE_INFINITY;
+  if (since < DIGEST_MIN_INTERVAL_MS) {
+    // Leave the key unset so the next write past the cooldown regenerates.
+    await db
+      .update(events)
+      .set({ notesDigest: null })
       .where(eq(events.id, event.id));
     return null;
   }
