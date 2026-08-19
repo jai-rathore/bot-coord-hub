@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { EventUpdatePill } from "@/components/event-update-pill";
 import { PageHeading } from "@/components/page-heading";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
-import { listEventsForUser } from "@/lib/events/service";
 import { relativeDeadline } from "@/lib/events/copy";
+import { listEventsWithUpdates } from "@/lib/events/load-updates";
+import { type EventWithUpdates } from "@/lib/events/updates";
 import { ensureCurrentUser } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +17,7 @@ export default async function EventsPage() {
     return <p className="text-danger">Unable to resolve your account.</p>;
   }
 
-  const { organized, joined } = await listEventsForUser(user);
+  const { organized, joined } = await listEventsWithUpdates(user);
 
   return (
     <div className="space-y-10">
@@ -42,22 +44,7 @@ export default async function EventsPage() {
           <ul className="mt-4 space-y-3">
             {organized.map((event) => (
               <li key={event.id}>
-                <Link
-                  href={`/app/events/${event.id}`}
-                  className="surface-card surface-card-interactive flex flex-wrap items-center justify-between gap-3 p-4"
-                >
-                  <span>
-                    <span className="block font-semibold text-ink">
-                      {event.title}
-                    </span>
-                    <span className="block text-xs text-muted">
-                      {event.status === "open"
-                        ? relativeDeadline(event.deadlineAt)
-                        : event.status}
-                    </span>
-                  </span>
-                  <span className="text-xs text-muted">/e/{event.shareSlug}</span>
-                </Link>
+                <EventListCard event={event} href={event.href} showSlug />
               </li>
             ))}
           </ul>
@@ -74,26 +61,48 @@ export default async function EventsPage() {
           <ul className="mt-4 space-y-3">
             {joined.map((event) => (
               <li key={event.id}>
-                <Link
-                  href={`/e/${event.shareSlug}`}
-                  className="surface-card surface-card-interactive flex flex-wrap items-center justify-between gap-3 p-4"
-                >
-                  <span>
-                    <span className="block font-semibold text-ink">
-                      {event.title}
-                    </span>
-                    <span className="block text-xs text-muted">
-                      {event.status === "open"
-                        ? relativeDeadline(event.deadlineAt)
-                        : event.status}
-                    </span>
-                  </span>
-                </Link>
+                <EventListCard event={event} href={event.href} />
               </li>
             ))}
           </ul>
         )}
       </section>
     </div>
+  );
+}
+
+function EventListCard({
+  event,
+  href,
+  showSlug = false,
+}: {
+  event: EventWithUpdates;
+  href: string;
+  showSlug?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className="surface-card surface-card-interactive flex flex-wrap items-center justify-between gap-3 p-4 no-underline"
+    >
+      <span>
+        <span className="block font-semibold text-ink">{event.title}</span>
+        <span className="block text-xs text-muted">
+          {event.status === "open"
+            ? relativeDeadline(event.deadlineAt)
+            : event.status}
+        </span>
+        {event.latestUpdate ? (
+          <span className="mt-1 block text-xs font-medium text-matcha-deep">
+            {event.latestUpdate}
+          </span>
+        ) : null}
+      </span>
+      {event.unreadCount > 0 ? (
+        <EventUpdatePill unreadCount={event.unreadCount} />
+      ) : showSlug ? (
+        <span className="text-xs text-muted">/e/{event.shareSlug}</span>
+      ) : null}
+    </Link>
   );
 }

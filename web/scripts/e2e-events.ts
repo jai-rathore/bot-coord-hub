@@ -15,6 +15,10 @@ import {
   setResponses,
 } from "../src/lib/events/service";
 import { loadBoardSource, projectBoard } from "../src/lib/events/board";
+import {
+  listEventsWithUpdates,
+  markEventSeen,
+} from "../src/lib/events/updates";
 
 function ok(label: string) {
   console.log(`  ✓ ${label}`);
@@ -148,6 +152,24 @@ async function main() {
     "Alice must appear exactly once",
   );
   ok("changing an answer overwrites instead of duplicating");
+
+  console.log("\n3b. Organizer sees nameless unread updates");
+  const beforeSeen = await listEventsWithUpdates(organizer);
+  const coffee = beforeSeen.organized.find((row) => row.id === event.id);
+  assert.ok(coffee, "organizer list includes the event");
+  assert.ok(coffee.unreadCount >= 2, "joins and answers count as unread");
+  assert.equal(coffee.latestUpdate, "Someone answered");
+  assert.equal(beforeSeen.unreadEventCount, 1);
+  assert.doesNotMatch(coffee.latestUpdate ?? "", /Alice|Bob/);
+  ok("dashboard listing flags recipient activity without names");
+
+  await markEventSeen(event.id, organizer.id);
+  const afterSeen = await listEventsWithUpdates(organizer);
+  const caughtUp = afterSeen.organized.find((row) => row.id === event.id);
+  assert.equal(caughtUp?.unreadCount, 0);
+  assert.equal(caughtUp?.latestUpdate, null);
+  assert.equal(afterSeen.unreadEventCount, 0);
+  ok("opening the event clears the unread badge");
 
   console.log("\n4. Board reflects both card taps and totals");
   const organizerBoard = await board(event.id, organizer.id);

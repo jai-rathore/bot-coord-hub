@@ -8,6 +8,7 @@ import {
   loadEventActivity,
   projectBoard,
 } from "@/lib/events/board";
+import { markEventSeen } from "@/lib/events/updates";
 import { ensureCurrentUser } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,8 @@ export default async function OrganizerEventPage({
 
   const source = await loadBoardSource(id);
   if (!source) notFound();
+
+  await markEventSeen(id, user.id);
 
   // Non-organizers get the participant view at the public URL instead.
   const isOrganizer = source.event.organizerUserId === user.id;

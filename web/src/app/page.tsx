@@ -2,13 +2,17 @@ import Link from "next/link";
 import { currentUser } from "@clerk/nextjs/server";
 import { BrandAtmosphere } from "@/components/brand-atmosphere";
 import { HomeGetStarted } from "@/components/home-get-started";
+import { HomeEventPreview } from "@/components/home-event-preview";
 import { HomeHero } from "@/components/home-hero";
+import { HomeLivePreview } from "@/components/home-live-preview";
 import { HomeLadder } from "@/components/home-ladder";
 import { SiteHeader } from "@/components/site-header";
 import { getHomeStatus, isSetupComplete } from "@/lib/home-status";
 import { ensureCurrentUser } from "@/lib/users";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
+import { relativeDeadline } from "@/lib/events/copy";
+import { listEventsWithUpdates } from "@/lib/events/load-updates";
 
 export const dynamic = "force-dynamic";
 
@@ -178,18 +182,32 @@ const TRUST = [
 async function loadSignedInHome(): Promise<{
   firstName: string | null;
   setupComplete: boolean;
+  featured: Awaited<ReturnType<typeof listEventsWithUpdates>>["featured"];
+  unreadEventCount: number;
 } | null> {
   const clerkUser = await currentUser();
   if (!clerkUser) return null;
   const firstName = clerkUser.firstName?.trim() || null;
   try {
     const user = await ensureCurrentUser();
-    if (!user) return { firstName, setupComplete: false };
-    const status = await getHomeStatus(user);
-    return { firstName, setupComplete: isSetupComplete(status) };
+    if (!user) {
+      return { firstName, setupComplete: false, featured: null, unreadEventCount: 0 };
+    }
+    const [status, eventUpdates] = await Promise.all([
+      getHomeStatus(user),
+      eventsFeatureEnabled()
+        ? listEventsWithUpdates(user)
+        : Promise.resolve({ featured: null, unreadEventCount: 0 }),
+    ]);
+    return {
+      firstName,
+      setupComplete: isSetupComplete(status),
+      featured: eventUpdates.featured,
+      unreadEventCount: eventUpdates.unreadEventCount,
+    };
   } catch {
     // Don't nag a signed-in person about setup if status cannot be loaded.
-    return { firstName, setupComplete: true };
+    return { firstName, setupComplete: true, featured: null, unreadEventCount: 0 };
   }
 }
 
@@ -209,6 +227,24 @@ export default async function HomePage() {
           signedIn={signedIn}
           setupComplete={setupComplete}
           firstName={signedInHome?.firstName ?? null}
+          hasUpdates={(signedInHome?.unreadEventCount ?? 0) > 0}
+          preview={
+            signedInHome?.featured ? (
+              <HomeEventPreview
+                title={signedInHome.featured.title}
+                href={signedInHome.featured.href}
+                deadlineLabel={
+                  signedInHome.featured.status === "open"
+                    ? relativeDeadline(signedInHome.featured.deadlineAt)
+                    : signedInHome.featured.status
+                }
+                unreadCount={signedInHome.featured.unreadCount}
+                latestUpdate={signedInHome.featured.latestUpdate}
+              />
+            ) : (
+              <HomeLivePreview />
+            )
+          }
         />
         <div
           className="relative z-0 overflow-hidden border-t border-white/50 bg-white/35 py-3 backdrop-blur-sm"
