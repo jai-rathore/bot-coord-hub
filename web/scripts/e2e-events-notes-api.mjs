@@ -93,7 +93,10 @@ async function main() {
       slots: [{ startsAt: new Date(soon + 24 * 3600_000).toISOString() }],
     },
   });
-  assert(created?.event?.id, "the organizer's agent created an event");
+  assert(
+    created?.event?.id,
+    `the organizer's agent created an event (server said: ${JSON.stringify(created)})`,
+  );
   const eventId = created.event.id;
 
   const posted = await api(`/api/v1/events/${eventId}/notes`, {

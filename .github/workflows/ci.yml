@@ -40,6 +40,12 @@ jobs:
       DATABASE_URL: postgres://honeymatcha:honeymatcha@127.0.0.1:5432/honeymatcha
       REDIS_URL: redis://127.0.0.1:6379
       ENABLE_DISCOVERY: "true"
+      # `next start` sets NODE_ENV=production, and the events flag defaults to
+      # off there, so the served app had events disabled and every event HTTP
+      # endpoint 404'd. Nothing caught it because the older event suites call
+      # the service layer directly from tsx, where the default is on — only an
+      # over-HTTP suite reaches the flag. Production sets this in render.yaml.
+      ENABLE_EVENTS: "true"
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
       CLERK_SECRET_KEY: sk_test_00000000000000000000000000000000
       GUEST_TOKEN_PEPPER: ci-guest-token-pepper
