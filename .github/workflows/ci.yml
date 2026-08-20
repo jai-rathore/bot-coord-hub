@@ -90,6 +90,13 @@ jobs:
           npm run lint
           npm run build
 
+      # Whether a route is prerendered or rendered per request is a performance
+      # contract. A page silently flipping mode is a latency regression (or a
+      # staleness bug) that nothing else here would catch.
+      - name: Verify route rendering modes
+        working-directory: web
+        run: npm run test:routes
+
       - name: Start production server
         working-directory: web
         run: |
@@ -107,6 +114,7 @@ jobs:
       - name: Database and API integration
         working-directory: web
         run: |
+          npm run test:e2e-html
           npm run test:e2e-lib
           npm run test:e2e-api
           npm run test:e2e-platform
