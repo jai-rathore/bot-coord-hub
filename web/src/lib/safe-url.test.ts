@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import {
   callbackUrlSyntaxAllowed,
+  fetchResolvedCallback,
   isBlockedIpAddress,
   isSafeCallbackUrl,
+  pinnedLookup,
+  resolveSafeCallbackUrl,
 } from "./safe-url";
 
 test("blocks loopback, RFC1918, link-local, and IPv6-mapped forms", () => {
@@ -73,4 +78,54 @@ test("resolves hostnames at check time so nip.io and rebinding fail closed", asy
     },
   });
   assert.equal(unresolved, false);
+});
+
+test("pinned lookup never asks DNS and ignores a rebound hostname", () => {
+  const lookup = pinnedLookup([{ address: "203.0.113.10", family: 4 }]);
+  let address = "";
+  let family = 0;
+  lookup("hooks.example.com", {}, (err, value, fam) => {
+    assert.equal(err, null);
+    address = value as string;
+    family = fam ?? 0;
+  });
+  assert.equal(address, "203.0.113.10");
+  assert.equal(family, 4);
+});
+
+test("delivery POSTs to the resolved address, not a later DNS answer", async () => {
+  const seen: string[] = [];
+  const server = http.createServer((req, res) => {
+    seen.push(`${req.method} ${req.url} host=${req.headers.host}`);
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end("ok");
+  });
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const { port } = server.address() as AddressInfo;
+  try {
+    const resolved = await resolveSafeCallbackUrl(
+      `http://hooks.example.com:${port}/inbox`,
+      {
+        production: false,
+        resolve: async () => [{ address: "127.0.0.1" }],
+      },
+    );
+    assert.ok(resolved);
+    const response = await fetchResolvedCallback(resolved, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{\"source\":\"honeymatcha\"}",
+    });
+    assert.equal(response.ok, true);
+    assert.equal(await response.text(), "ok");
+    assert.deepEqual(seen, [
+      `POST /inbox host=hooks.example.com:${port}`,
+    ]);
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()));
+    });
+  }
 });

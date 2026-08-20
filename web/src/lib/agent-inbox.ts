@@ -2,7 +2,11 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { agentInbox, apiKeys, type User } from "@/db/schema";
 import { AgentApiError } from "@/lib/agent-errors";
-import { isSafeCallbackUrl } from "@/lib/safe-url";
+import {
+  fetchResolvedCallback,
+  isSafeCallbackUrl,
+  resolveSafeCallbackUrl,
+} from "@/lib/safe-url";
 import { boundedText } from "@/lib/validation";
 
 export type AgentReach =
@@ -392,14 +396,12 @@ async function postAgentCallbacks(opts: {
         .filter((url): url is string => Boolean(url)),
     ),
   ];
-  const urls = (
+  const targets = (
     await Promise.all(
-      candidates.map(async (url) =>
-        (await isSafeCallbackUrl(url)) ? url : null,
-      ),
+      candidates.map((url) => resolveSafeCallbackUrl(url)),
     )
-  ).filter((url): url is string => url !== null);
-  if (urls.length === 0) return "none";
+  ).filter((row): row is NonNullable<typeof row> => row !== null);
+  if (targets.length === 0) return "none";
 
   const payload = JSON.stringify({
     source: "honeymatcha",
@@ -417,18 +419,17 @@ async function postAgentCallbacks(opts: {
   let delivered = false;
   let failed = false;
   await Promise.all(
-    urls.map(async (url) => {
+    targets.map(async (target) => {
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 4_000);
-        const response = await fetch(url, {
+        const response = await fetchResolvedCallback(target, {
           method: "POST",
           headers: {
             "content-type": "application/json",
             "x-honeymatcha-event": "agent_inbox",
           },
           body: payload,
-          redirect: "error",
           signal: controller.signal,
         });
         clearTimeout(timer);
