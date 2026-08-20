@@ -60,7 +60,7 @@ export function MobileTabBar({
       badge: eventsUnreadCount,
     },
     { href: "/app/people", label: "People", glyph: "people" },
-    { href: handle ? `/${handle}` : "/setup", label: "My code", glyph: "code" },
+    { href: handle ? "/app/code" : "/setup", label: "My code", glyph: "code" },
   ];
 
   const overflow: Destination[] = [];

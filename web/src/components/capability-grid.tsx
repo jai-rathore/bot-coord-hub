@@ -15,9 +15,12 @@ import { stateFor, type Capability } from "@/lib/capabilities";
 export function CapabilityGrid({
   capabilities,
   agentConnected,
+  sageName,
 }: {
   capabilities: Capability[];
   agentConnected: boolean;
+  /** What this person calls the agent that came with the account. */
+  sageName: string;
 }) {
   const operator = agentConnected ? "own" : "sage";
 
@@ -51,17 +54,20 @@ export function CapabilityGrid({
               <span className="mt-1 block text-xs leading-5 text-muted">
                 {capability.line}
               </span>
-              <span
-                className={`mt-auto block pt-3 text-[0.7rem] font-semibold ${
-                  ready ? "text-matcha-deep" : "text-[#7a5610]"
-                }`}
-              >
-                {ready
-                  ? agentConnected
-                    ? "Your agent runs this"
-                    : "Sage runs this"
-                  : "Connect an agent to use it"}
-              </span>
+              <span className="flex-1" aria-hidden="true" />
+              {/* Only when it distinguishes one tile from another. With an
+                  agent connected every tile is ready, so this said "Your agent
+                  runs this" five times under a heading that had just said your
+                  agent runs all of these. */}
+              {agentConnected ? null : (
+                <span
+                  className={`mt-auto block pt-3 text-[0.7rem] font-semibold ${
+                    ready ? "text-matcha-deep" : "text-[#7a5610]"
+                  }`}
+                >
+                  {ready ? `${sageName} runs this` : "Connect an agent to use it"}
+                </span>
+              )}
             </Link>
           </li>
         );

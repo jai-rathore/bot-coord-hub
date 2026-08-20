@@ -184,6 +184,7 @@ export function SignedInHome({
               <CapabilityGrid
                 capabilities={capabilities}
                 agentConnected={agentConnected}
+                sageName={sageName}
               />
             </div>
           </section>
