@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EventUpdatePill } from "@/components/event-update-pill";
 import { PageHeading } from "@/components/page-heading";
+import { SagePortrait } from "@/components/sage-avatar";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import { relativeDeadline } from "@/lib/events/copy";
 import { listEventsWithUpdates } from "@/lib/events/updates";
@@ -75,11 +76,16 @@ export default async function EventsPage({
       />
 
       {all.length === 0 ? (
-        <p className="text-sm leading-6 text-muted">
-          {archived
-            ? "Nothing archived yet."
-            : "Nothing yet. Create one and share the link in a group chat — people can see it straight away and sign in only when they answer."}
-        </p>
+        <div className="flex items-center gap-4">
+          {archived ? null : (
+            <SagePortrait width={104} className="hidden shrink-0 sm:block" />
+          )}
+          <p className="text-sm leading-6 text-muted">
+            {archived
+              ? "Nothing archived yet."
+              : "Nothing yet. Create one and share the link in a group chat — people can see it straight away and sign in only when they answer."}
+          </p>
+        </div>
       ) : (
         <ul className="space-y-3">
           {all.map((event) => (

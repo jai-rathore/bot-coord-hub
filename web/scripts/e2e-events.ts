@@ -33,6 +33,7 @@ import {
   agentConnectedUserIds,
   listPeopleMetThroughEvents,
 } from "../src/lib/people";
+import { sageNameFor, setSageName } from "../src/lib/sage";
 
 function ok(label: string) {
   console.log(`  ✓ ${label}`);
@@ -541,7 +542,41 @@ async function main() {
 
   await db.delete(events).where(eq(events.id, social.id));
 
-  console.log("\n18. Cleanup");
+  console.log("\n18. Naming your own agent");
+  assert.equal(sageNameFor(organizer), "Sage", "the default is Sage");
+  const renamed = await setSageName(organizer, "  Mochi  ");
+  assert.equal(renamed, "Mochi", "the name is trimmed on the way in");
+
+  const [afterRename] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, organizer.id));
+  const namedEvent = await createEvent(afterRename, {
+    title: `Named agent ${suffix}`,
+    timezone: "UTC",
+    deadlineAt: new Date(soon).toISOString(),
+    fixedStartsAt: new Date(soon + 24 * 3600_000).toISOString(),
+    place: "Anywhere",
+  });
+  assert.equal(
+    namedEvent.agentName,
+    "Mochi",
+    "a new event is run by the agent you named",
+  );
+  ok("the chosen name is stamped on events at creation");
+
+  // Control characters and angle brackets would let a name impersonate the UI
+  // it is rendered into, and it is rendered into other people's mail.
+  assert.equal(await setSageName(afterRename, "<b>Evil</b>"), "bEvil/b");
+  assert.equal(
+    await setSageName(afterRename, ""),
+    "Sage",
+    "clearing it goes back to the default",
+  );
+  ok("names are cleaned, and clearing restores the default");
+  await db.delete(events).where(eq(events.id, namedEvent.id));
+
+  console.log("\n19. Cleanup");
   await db.delete(events).where(eq(events.id, event.id));
   await db.delete(events).where(eq(events.id, past.id));
   await db.delete(events).where(eq(events.id, rsvp.id));
