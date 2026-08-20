@@ -6,10 +6,10 @@ import { confirms } from "@/db/schema";
 import { isNextControlFlowError } from "@/lib/next-errors";
 import { getProfileForUser } from "@/lib/agent-profiles";
 import { ensureCurrentUser } from "@/lib/users";
-import { getHomeStatus } from "@/lib/home-status";
+import { agentIsConnected } from "@/lib/home-status";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
-import { listEventsWithUpdates } from "@/lib/events/load-updates";
+import { listEventsWithUpdates } from "@/lib/events/updates";
 
 export default async function AppLayout({
   children,
@@ -23,11 +23,14 @@ export default async function AppLayout({
   let handle: string | null = null;
   try {
     const user = await ensureCurrentUser();
-    if (user && !(await getProfileForUser(user.id))) {
-      redirect("/setup");
-    }
     if (user) {
-      const [row, home, eventUpdates] = await Promise.all([
+      // getProfileForUser is request-scoped, so the page below reuses this read
+      // rather than issuing its own. It also carries the handle, which the shell
+      // previously paid for a second time inside getHomeStatus.
+      const profile = await getProfileForUser(user.id);
+      if (!profile) redirect("/setup");
+
+      const [row, connected, eventUpdates] = await Promise.all([
         getDb()
           .select({ count: count() })
           .from(confirms)
@@ -38,15 +41,15 @@ export default async function AppLayout({
             ),
           )
           .then((rows) => rows[0]),
-        getHomeStatus(user),
+        agentIsConnected(user.id),
         eventsFeatureEnabled()
           ? listEventsWithUpdates(user)
           : Promise.resolve({ unreadEventCount: 0 }),
       ]);
       attentionCount = Number(row?.count ?? 0);
       eventsUnreadCount = eventUpdates.unreadEventCount;
-      agentConnected = home.agent.connected;
-      handle = home.handle;
+      agentConnected = connected;
+      handle = profile.handle;
     }
   } catch (error) {
     // Next signals redirect(), notFound(), and the static-generation bailout by

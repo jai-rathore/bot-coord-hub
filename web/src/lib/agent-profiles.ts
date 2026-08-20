@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, eq, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
@@ -87,7 +88,13 @@ function displayNameFor(user: User, profile: AgentProfile): string {
   );
 }
 
-export async function getProfileForUser(
+/**
+ * Request-scoped: the /app layout and the page under it both read the profile
+ * of the same user while rendering concurrently.
+ */
+export const getProfileForUser = cache(loadProfileForUser);
+
+async function loadProfileForUser(
   userId: string,
 ): Promise<AgentProfile | null> {
   const [row] = await getDb()

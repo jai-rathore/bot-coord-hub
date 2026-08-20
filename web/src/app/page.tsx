@@ -16,9 +16,9 @@ import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import {
   eventsForDashboard,
+  listEventsWithUpdates,
   type EventWithUpdates,
 } from "@/lib/events/updates";
-import { listEventsWithUpdates } from "@/lib/events/load-updates";
 
 export const dynamic = "force-dynamic";
 

@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, notInArray } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, notInArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   agentProfiles,
@@ -23,6 +23,28 @@ export function isVisibleHomeTask(status: string) {
   return !HIDDEN_HOME_TASK_STATUSES.includes(
     status as (typeof HIDDEN_HOME_TASK_STATUSES)[number],
   );
+}
+
+/**
+ * Whether the user has an agent that has actually called the API.
+ *
+ * The /app shell needs this one boolean on every navigation. Reading it via
+ * getHomeStatus cost six queries — including full scans of `links` and
+ * `confirms` whose rows were only ever counted — to produce two scalars.
+ */
+export async function agentIsConnected(userId: string): Promise<boolean> {
+  const [row] = await getDb()
+    .select({ id: apiKeys.id })
+    .from(apiKeys)
+    .where(
+      and(
+        eq(apiKeys.userId, userId),
+        isNull(apiKeys.revokedAt),
+        isNotNull(apiKeys.lastUsedAt),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
 }
 
 export async function getHomeStatus(user: User) {

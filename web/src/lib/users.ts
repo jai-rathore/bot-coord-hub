@@ -1,5 +1,6 @@
+import { cache } from "react";
 import { eq } from "drizzle-orm";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { getDb } from "@/db";
 import { users, type User } from "@/db/schema";
 import { AgentApiError } from "@/lib/agent-errors";
@@ -11,6 +12,7 @@ import {
   type NotifyChannel,
 } from "@/lib/phone";
 import { smsOffered } from "@/lib/sms-flag";
+import { timed } from "@/lib/perf";
 
 function isUniqueViolation(error: unknown): boolean {
   return Boolean(
@@ -189,14 +191,53 @@ export async function updateNotificationPrefs(
   }
 }
 
-export async function ensureCurrentUser(): Promise<User | null> {
-  const clerkUser = await currentUser();
-  if (!clerkUser) return null;
+/**
+ * The signed-in user, synced into Postgres.
+ *
+ * Request-scoped: the /app layout and the page under it both need this, and
+ * they render concurrently, so without memoisation every authenticated
+ * navigation made two round trips to Clerk's Backend API and wrote to `users`
+ * twice. React's cache() collapses that to one per request.
+ */
+export const ensureCurrentUser = cache(loadCurrentUser);
+
+/**
+ * How long a locally-stored identity is trusted before being re-read from
+ * Clerk. Email and display name can change in Clerk without this app hearing
+ * about it (there is no webhook wired up), so the row is refreshed
+ * periodically rather than never.
+ */
+const IDENTITY_REFRESH_MS = Number(
+  process.env.IDENTITY_REFRESH_MS ?? 10 * 60 * 1000,
+);
+
+function identityIsStale(user: User): boolean {
+  return Date.now() - user.updatedAt.getTime() > IDENTITY_REFRESH_MS;
+}
+
+async function loadCurrentUser(): Promise<User | null> {
+  // auth() verifies the session cookie locally against cached JWKS; currentUser()
+  // is a round trip to Clerk's Backend API. Every authenticated request used to
+  // pay that round trip, including the ~100 route handlers, where React's
+  // cache() cannot help because route handlers are not React renders.
+  const { userId } = await auth();
+  if (!userId) return null;
+
+  const [existing] = await getDb()
+    .select()
+    .from(users)
+    .where(eq(users.clerkUserId, userId))
+    .limit(1);
+  if (existing && !identityIsStale(existing)) return existing;
+
+  // First sight of this Clerk user, or the local copy is due a refresh.
+  const clerkUser = await timed("clerk.currentUser", () => currentUser());
+  if (!clerkUser) return existing ?? null;
 
   const email =
     clerkUser.primaryEmailAddress?.emailAddress ??
     clerkUser.emailAddresses[0]?.emailAddress;
-  if (!email) return null;
+  if (!email) return existing ?? null;
 
   const name =
     [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||

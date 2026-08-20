@@ -18,11 +18,12 @@
  */
 import "dotenv/config";
 import { randomBytes } from "node:crypto";
-import { inArray } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { getDb } from "../src/db";
-import { users, type User } from "../src/db/schema";
+import { confirms, users, type User } from "../src/db/schema";
 import { perfSnapshot } from "../src/lib/perf";
-import { getHomeStatus } from "../src/lib/home-status";
+import { agentIsConnected, getHomeStatus } from "../src/lib/home-status";
+import { getProfileForUser } from "../src/lib/agent-profiles";
 import { listSessionsForUser, createSessionForUser } from "../src/lib/sessions";
 import { listLinksForUser, createInviteLink, acceptInviteLink } from "../src/lib/links";
 import { listConfirmsForUser, requestConfirm } from "../src/lib/confirms";
@@ -33,6 +34,15 @@ const ORIGIN = "http://localhost:3000";
 /** How much history the benchmarked user has. Higher makes N+1 loops obvious. */
 const PEERS = Number(process.env.BENCH_PEERS ?? 8);
 const SESSIONS = Number(process.env.BENCH_SESSIONS ?? 12);
+
+/** Mirrors the pending-approvals badge query in src/app/app/layout.tsx. */
+async function countPendingConfirms(userId: string) {
+  const rows = await getDb()
+    .select({ count: count() })
+    .from(confirms)
+    .where(and(eq(confirms.userId, userId), eq(confirms.status, "pending")));
+  return Number(rows[0]?.count ?? 0);
+}
 
 type Case = { name: string; queries: number; ms: number };
 
@@ -151,13 +161,20 @@ async function main() {
   const rows: Case[] = [];
 
   try {
-    // The /app shell runs on every authenticated navigation.
-    rows.push(await measure("app layout: getHomeStatus", () => getHomeStatus(owner)));
+    // The /app shell renders on every authenticated navigation, so its badge
+    // queries are the most-repeated work in the product.
     rows.push(
-      await measure("app layout: listEventsWithUpdates", () =>
-        listEventsWithUpdates(owner),
-      ),
+      await measure("app shell: badges", async () => {
+        const profile = await getProfileForUser(owner.id);
+        await Promise.all([
+          countPendingConfirms(owner.id),
+          agentIsConnected(owner.id),
+          listEventsWithUpdates(owner),
+        ]);
+        return profile;
+      }),
     );
+    rows.push(await measure("dashboard: getHomeStatus", () => getHomeStatus(owner)));
     rows.push(await measure("/app/activity: listSessionsForUser", () => listSessionsForUser(owner)));
     rows.push(await measure("/app/people: listLinksForUser", () => listLinksForUser(owner, ORIGIN)));
     rows.push(
