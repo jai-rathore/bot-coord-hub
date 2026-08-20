@@ -1,3 +1,16 @@
+/**
+ * The light behind the page.
+ *
+ * This used to also draw two hairline rings — a 12rem one at `left-[42%]` and
+ * a floating 4rem one at `right-[18%]`. They outlined nothing, referred to
+ * nothing, and because both were positioned in percentages they landed
+ * somewhere different at every width; on a phone the large one sat squarely
+ * behind the headline and read as a printing fault rather than a decision.
+ *
+ * What is left is light: two soft washes anchored off opposite corners, in the
+ * two brand colours, under a grain. Atmosphere should be something you notice
+ * only if you go looking for it, and never something the text has to survive.
+ */
 export function BrandAtmosphere({
   className = "",
 }: {
@@ -11,8 +24,6 @@ export function BrandAtmosphere({
       <span className="brand-grain" />
       <span className="animate-drift absolute -top-40 -left-28 h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(117,161,132,0.28),transparent_68%)] blur-3xl" />
       <span className="animate-drift-alt absolute -right-24 -bottom-16 h-[30rem] w-[30rem] rounded-full bg-[radial-gradient(circle,rgba(240,220,168,0.42),transparent_70%)] blur-3xl" />
-      <span className="absolute top-24 left-[42%] h-48 w-48 rounded-full border border-matcha-soft/12" />
-      <span className="animate-float-soft absolute top-[38%] right-[18%] h-16 w-16 rounded-full border border-honey/20" />
     </div>
   );
 }
