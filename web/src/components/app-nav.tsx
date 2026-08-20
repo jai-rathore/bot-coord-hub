@@ -94,7 +94,7 @@ export function AppNav({
   }
   if (handle) {
     items.push({
-      item: { href: `/${handle}`, label: "My code", hint: "Your QR code and public page" },
+      item: { href: "/app/code", label: "My code", hint: "Your QR code and public page" },
       icon: "code",
     });
   }
