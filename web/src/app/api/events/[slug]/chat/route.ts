@@ -22,10 +22,11 @@ export async function GET(
     const participant = await participantFor(event, user);
     // `loadThread(eventId, null)` is the organizer thread. A signed-in visitor
     // who has the slug but has not joined must not fall through to that.
-    const messages =
-      !isOrganizer && !participant
-        ? []
-        : await loadThread(event.id, isOrganizer ? null : participant.id);
+    const messages = isOrganizer
+      ? await loadThread(event.id, null)
+      : participant
+        ? await loadThread(event.id, participant.id)
+        : [];
 
     return Response.json({
       available: hostedAgentAvailable() && event.allowChat,
