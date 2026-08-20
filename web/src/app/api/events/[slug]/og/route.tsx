@@ -139,6 +139,18 @@ export async function GET(
         </div>
       </div>
     ),
-    { width: WIDTH, height: HEIGHT },
+    {
+      width: WIDTH,
+      height: HEIGHT,
+      // Satori renders this from scratch on every request, and it is a
+      // single-threaded instance: one link pasted into a busy group chat means
+      // every platform that unfurls it triggers another render, slowing
+      // unrelated requests. Event titles can change, so this is a short cache
+      // with a long grace window rather than an immutable one.
+      headers: {
+        "Cache-Control":
+          "public, max-age=300, s-maxage=300, stale-while-revalidate=86400",
+      },
+    },
   );
 }

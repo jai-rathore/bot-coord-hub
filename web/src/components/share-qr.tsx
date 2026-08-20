@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
 
 /**
  * A scannable code for any HoneyMatcha share URL.
@@ -40,19 +39,24 @@ export function ShareQr({
 
   useEffect(() => {
     let active = true;
-    void QRCode.toDataURL(url, {
-      // Render at 2x so the same code stays crisp when a layout scales it up.
-      width: size * 2,
-      margin: 2,
-      errorCorrectionLevel: size >= 320 ? "Q" : "M",
-      color: { dark: "#1f4a36", light: "#ffffff" },
-    })
-      .then((value) => {
+    // Imported here rather than at module scope. The QR panel sits behind a
+    // toggle, but a static import pulled the encoder into the initial bundle of
+    // every page that can reach it — People and the event page among them.
+    void (async () => {
+      try {
+        const { default: QRCode } = await import("qrcode");
+        const value = await QRCode.toDataURL(url, {
+          // Render at 2x so the same code stays crisp when a layout scales it up.
+          width: size * 2,
+          margin: 2,
+          errorCorrectionLevel: size >= 320 ? "Q" : "M",
+          color: { dark: "#1f4a36", light: "#ffffff" },
+        });
         if (active) setRender({ url, dataUrl: value, error: false });
-      })
-      .catch(() => {
+      } catch {
         if (active) setRender({ url, dataUrl: null, error: true });
-      });
+      }
+    })();
     return () => {
       active = false;
     };

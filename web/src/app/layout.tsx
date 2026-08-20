@@ -4,17 +4,26 @@ import { Fraunces, Sora } from "next/font/google";
 import { clerkAppearance, clerkLocalization } from "@/lib/clerk-appearance";
 import "./globals.css";
 
+/*
+ * Explicit weights, and measured rather than assumed. Dropping them to use the
+ * variable files looks like the obvious win, but next/font preloads three files
+ * either way and the variable versions carry the whole weight axis: 116KB
+ * preloaded against 107KB for the static instances. `display` is pinned to the
+ * current default so a future change to it cannot regress this silently.
+ */
 const fraunces = Fraunces({
   variable: "--font-fraunces",
   subsets: ["latin"],
   weight: ["500", "600", "700"],
   style: ["normal", "italic"],
+  display: "swap",
 });
 
 const sora = Sora({
   variable: "--font-sora",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
+  display: "swap",
 });
 
 const siteUrl = "https://honeymatcha.io";

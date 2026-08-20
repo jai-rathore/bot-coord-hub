@@ -80,7 +80,7 @@ dynamic  /api/v1/events/[id]/suggest-option
 dynamic  /api/v1/guest-tasks
 dynamic  /api/v1/guest-tasks/[publicId]
 dynamic  /api/v1/guest-tasks/[publicId]/revoke
-dynamic  /api/v1/health
+static   /api/v1/health
 dynamic  /api/v1/inbox
 dynamic  /api/v1/inbox/[id]/ack
 dynamic  /api/v1/intents
