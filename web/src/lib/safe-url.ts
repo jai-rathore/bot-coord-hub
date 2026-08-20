@@ -18,11 +18,6 @@ const RFC1918 = [
 const LINK_LOCAL_V4 = [0xa9fe0000, 16] as const;
 const CGNAT_V4 = [0x64400000, 10] as const;
 const THIS_NETWORK = [0x00000000, 8] as const;
-const TEST_NET = [
-  [0xc0000200, 24],
-  [0xc6336400, 24],
-  [0xcb007100, 24],
-] as const;
 
 function ipv4ToInt(ip: string): number | null {
   const parts = ip.split(".");
@@ -42,6 +37,10 @@ function inCidr(ip: number, base: number, bits: number): boolean {
   return (ip & mask) === (base & mask);
 }
 
+function normalizeHostname(host: string): string {
+  return host.toLowerCase().replace(/^\[|\]$/g, "");
+}
+
 function mappedIpv4(host: string): string | null {
   const dotted = host.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
   if (dotted) return dotted[1];
@@ -53,7 +52,7 @@ function mappedIpv4(host: string): string | null {
 }
 
 export function isBlockedIpAddress(ip: string): boolean {
-  const host = ip.toLowerCase().replace(/^\[|\]$/g, "");
+  const host = normalizeHostname(ip);
   const v4 = mappedIpv4(host);
   if (v4) return isBlockedIpAddress(v4);
 
@@ -66,9 +65,6 @@ export function isBlockedIpAddress(ip: string): boolean {
     if (inCidr(n, CGNAT_V4[0], CGNAT_V4[1])) return true;
     if (inCidr(n, THIS_NETWORK[0], THIS_NETWORK[1])) return true;
     for (const [base, bits] of RFC1918) {
-      if (inCidr(n, base, bits)) return true;
-    }
-    for (const [base, bits] of TEST_NET) {
       if (inCidr(n, base, bits)) return true;
     }
     return false;
@@ -96,7 +92,7 @@ export function callbackUrlSyntaxAllowed(
   if (production && parsed.protocol !== "https:") return false;
   if (parsed.username || parsed.password) return false;
 
-  const host = parsed.hostname.toLowerCase();
+  const host = normalizeHostname(parsed.hostname);
   if (
     host === "localhost" ||
     host === "::1" ||
@@ -137,7 +133,7 @@ export async function isSafeCallbackUrl(
   } catch {
     return false;
   }
-  const host = parsed.hostname.toLowerCase();
+  const host = normalizeHostname(parsed.hostname);
   if (isIP(host) || mappedIpv4(host)) {
     return !isBlockedIpAddress(host) || (!production && isLoopbackOnly(host));
   }

@@ -250,6 +250,7 @@ async function main() {
     .find((d) => d.kind === "time")!
     .options.find((o) => o.id === timeOptions[0].id)!;
   assert.equal(blindOption.yes, null, "counts hidden under blind");
+  assert.equal(blindOption.atCapacity, false, "capacity must not leak from hidden tallies");
   assert.equal(blindOption.mine, "yes", "own answer still visible");
   ok("blind hides others but keeps the viewer's own answer");
 

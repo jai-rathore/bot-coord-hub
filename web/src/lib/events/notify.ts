@@ -89,7 +89,8 @@ export function payloadForRecipient(
     return payload;
   }
   if (!("winner" in payload)) return payload;
-  const { winner: _winner, ...rest } = payload;
+  const rest = { ...payload };
+  delete rest.winner;
   return rest;
 }
 

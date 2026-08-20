@@ -272,6 +272,39 @@ async function main() {
   assert.ok(recipients.size >= 3, "organizer + both participants");
   ok(`${recipients.size} people queued for the lock notice`);
 
+  console.log("\n9b. Blind events hide the winner from participants");
+  const blind = await createEvent(organizer, {
+    title: `Blind ${suffix}`,
+    timezone: "UTC",
+    visibility: "blind",
+    deadlineAt: new Date(Date.now() + 3600_000).toISOString(),
+    slots: [{ startsAt: new Date(soon).toISOString() }],
+  });
+  await joinEvent(blind, alice);
+  await enqueueEventNotification({
+    eventId: blind.id,
+    template: "event_locked",
+    dedupeKey: `test_blind_winner:${blind.id}`,
+    payload: { title: blind.title, winner: "Tue 6pm" },
+    toAllParticipants: true,
+    notifyAgents: false,
+  });
+  const blindRows = await db
+    .select()
+    .from(notificationOutbox)
+    .where(eq(notificationOutbox.eventId, blind.id));
+  const orgRow = blindRows.find((row) => row.userId === organizer.id);
+  const aliceRow = blindRows.find((row) => row.userId === alice.id);
+  assert.equal(
+    (orgRow?.payload as { winner?: string } | undefined)?.winner,
+    "Tue 6pm",
+  );
+  assert.equal(
+    (aliceRow?.payload as { winner?: string } | undefined)?.winner,
+    undefined,
+  );
+  ok("blind lock notices name the slot only for the organizer");
+
   console.log("\n10. SMS preference queues a second outbox row");
   const savedFrom = process.env.TWILIO_FROM_NUMBER;
   process.env.TWILIO_FROM_NUMBER = "+15550001111";

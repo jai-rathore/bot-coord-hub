@@ -37,6 +37,10 @@ test("production syntax rejects http, localhost, and private literals", () => {
     false,
   );
   assert.equal(
+    callbackUrlSyntaxAllowed("https://[::ffff:7f00:1]/", true),
+    false,
+  );
+  assert.equal(
     callbackUrlSyntaxAllowed("https://[::ffff:169.254.169.254]/", true),
     false,
   );
