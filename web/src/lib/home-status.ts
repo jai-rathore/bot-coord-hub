@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, isNull, notInArray } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, isNull, notInArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   agentProfiles,
@@ -63,8 +63,9 @@ export async function getHomeStatus(user: User) {
           and(eq(apiKeys.userId, user.id), isNull(apiKeys.revokedAt)),
         )
         .orderBy(desc(apiKeys.createdAt)),
+      // Counted in Postgres rather than by loading every row to read .length.
       db
-        .select({ id: links.id })
+        .select({ value: count() })
         .from(links)
         .where(
           and(
@@ -73,7 +74,7 @@ export async function getHomeStatus(user: User) {
           ),
         ),
       db
-        .select({ id: confirms.id })
+        .select({ value: count() })
         .from(confirms)
         .where(
           and(
@@ -114,8 +115,8 @@ export async function getHomeStatus(user: User) {
     },
     calendarConnected: calendar.length > 0,
     handle: profile[0]?.handle ?? null,
-    peopleCount: activeLinks.length,
-    attentionCount: pendingConfirms.length,
+    peopleCount: Number(activeLinks[0]?.value ?? 0),
+    attentionCount: Number(pendingConfirms[0]?.value ?? 0),
     recentTasks: recentSessions.map((session) => ({
       id: session.id,
       intentType: session.intentType,
