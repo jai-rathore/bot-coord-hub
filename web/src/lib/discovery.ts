@@ -66,9 +66,12 @@ export function getDiscoveryDocument(baseUrl?: string) {
       whoami: { method: "GET", path: "/api/v1/me" },
       health: { method: "GET", path: "/api/v1/health" },
       list_links: { method: "GET", path: "/api/v1/links" },
+      list_people: { method: "GET", path: "/api/v1/people" },
       create_invite: { method: "POST", path: "/api/v1/links/invite" },
       accept_invite: { method: "POST", path: "/api/v1/links/accept" },
+      approve_connection: { method: "POST", path: "/api/v1/links/:id/approve" },
       revoke_link: { method: "POST", path: "/api/v1/links/:id/revoke" },
+      update_link_policy: { method: "PATCH", path: "/api/v1/links/:id" },
       list_public_invites: { method: "GET", path: "/api/v1/public-invites" },
       create_public_invite: {
         method: "POST",
@@ -93,9 +96,15 @@ export function getDiscoveryDocument(baseUrl?: string) {
       record_meeting: { method: "POST", path: "/api/v1/meet/:handle" },
       list_events: { method: "GET", path: "/api/v1/events" },
       create_event: { method: "POST", path: "/api/v1/events" },
+      archive_event: { method: "POST", path: "/api/v1/events/:id/archive" },
       get_event_board: { method: "GET", path: "/api/v1/events/:id" },
       join_event: { method: "POST", path: "/api/v1/events/:id/join" },
       respond_to_event: { method: "POST", path: "/api/v1/events/:id/respond" },
+      post_event_note: { method: "POST", path: "/api/v1/events/:id/notes" },
+      retract_event_note: {
+        method: "DELETE",
+        path: "/api/v1/events/:id/notes",
+      },
       suggest_event_option: {
         method: "POST",
         path: "/api/v1/events/:id/suggest-option",
@@ -170,6 +179,7 @@ export function getDiscoveryDocument(baseUrl?: string) {
       request_schedule_meeting: { method: "POST", path: "/api/v1/schedule" },
       list_confirms: { method: "GET", path: "/api/v1/confirms" },
       request_confirm: { method: "POST", path: "/api/v1/confirms" },
+      respond_confirm: { method: "POST", path: "/api/v1/confirms/respond" },
       list_guest_tasks: { method: "GET", path: "/api/v1/guest-tasks" },
       create_guest_task: { method: "POST", path: "/api/v1/guest-tasks" },
       read_guest_task: {

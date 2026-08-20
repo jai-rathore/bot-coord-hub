@@ -64,8 +64,12 @@ See `/docs` on the website for curl examples. Plugin package: `plugins/honeymatc
 | ack_inbox | `POST /api/v1/inbox/:id/ack` |
 | register_agent_callback | `POST /api/v1/me/callback` |
 | list_links | `GET /api/v1/links` |
+| list_people | `GET /api/v1/people` |
 | create_invite | `POST /api/v1/links/invite` |
 | accept_invite | `POST /api/v1/links/accept` |
+| approve_connection | `POST /api/v1/links/:id/approve` |
+| revoke_link | `POST /api/v1/links/:id/revoke` |
+| update_link_policy | `PATCH /api/v1/links/:id` |
 | list_sessions | `GET /api/v1/sessions` |
 | post_board_message | `POST /api/v1/sessions/:id/messages` |
 | read_board | `GET /api/v1/sessions/:id/board` |
@@ -73,10 +77,19 @@ See `/docs` on the website for curl examples. Plugin package: `plugins/honeymatc
 | propose_intent | `POST /api/v1/intents/propose` |
 | request_schedule_meeting | `POST /api/v1/schedule` |
 | list_confirms | `GET /api/v1/confirms` |
+| respond_confirm | `POST /api/v1/confirms/respond` (needs `approvals:write`) |
 | list_guest_tasks | `GET /api/v1/guest-tasks` |
 | create_guest_task | `POST /api/v1/guest-tasks` |
 | read_guest_task | `GET /api/v1/guest-tasks/:publicId` |
 | revoke_guest_task | `POST /api/v1/guest-tasks/:publicId/revoke` |
+| create_event | `POST /api/v1/events` |
+| list_events | `GET /api/v1/events` |
+| archive_event | `POST /api/v1/events/:id/archive` |
+| get_event_board | `GET /api/v1/events/:id` |
+| join_event | `POST /api/v1/events/:id/join` |
+| respond_to_event | `POST /api/v1/events/:id/respond` |
+| post_event_note | `POST /api/v1/events/:id/notes` |
+| retract_event_note | `DELETE /api/v1/events/:id/notes` |
 
 `request_schedule_meeting` starts coordination. It does not book a calendar
 event. If the other person is missing, it returns a share URL for the human

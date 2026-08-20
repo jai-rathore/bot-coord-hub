@@ -520,7 +520,86 @@ async function main() {
   ok("blind events keep responses out of follower updates");
 
   /* ---------------------------------------------------------------- */
-  console.log("\n13. Cleanup");
+  console.log("\n13. Human-first pages are agentic too");
+  const people = (await call(host, "list_people")) as {
+    met: Array<{ userId: string; viaEventId: string }>;
+  };
+  assert.ok(
+    people.met.some((person) => person.userId === stranger.user.id),
+    "list_people should surface someone you only met on an event",
+  );
+  ok("list_people returns people met through events");
+
+  const liveBefore = (await call(host, "list_events")) as {
+    organized: Array<{ id: string; shareUrl?: string; timezone?: string }>;
+    archived: boolean;
+  };
+  assert.equal(liveBefore.archived, false);
+  assert.ok(
+    liveBefore.organized.some((event) => event.id === createdEvent.event.id),
+  );
+  assert.ok(
+    liveBefore.organized.every((event) => event.shareUrl?.includes("/e/")),
+    "list_events must return pasteable share URLs",
+  );
+  ok("list_events includes share URLs and the live event");
+
+  const archived = (await call(host, "archive_event", {
+    eventId: slug,
+  })) as { archived: boolean };
+  assert.equal(archived.archived, true);
+  const liveAfter = (await call(host, "list_events")) as {
+    organized: Array<{ id: string }>;
+  };
+  assert.equal(
+    liveAfter.organized.some((event) => event.id === createdEvent.event.id),
+    false,
+  );
+  const hidden = (await call(host, "list_events", { archived: true })) as {
+    organized: Array<{ id: string }>;
+    archived: boolean;
+  };
+  assert.equal(hidden.archived, true);
+  assert.ok(
+    hidden.organized.some((event) => event.id === createdEvent.event.id),
+  );
+  await call(host, "archive_event", { eventId: slug, archived: false });
+  ok("archive_event hides and restores an event on this human's list");
+
+  const approved = (await call(host, "approve_connection", {
+    linkId: pending.id,
+  })) as { ok: boolean; link: { status: string } };
+  assert.equal(approved.ok, true);
+  assert.equal(approved.link.status, "active");
+  ok("approve_connection activates a pending public-page request");
+
+  const policy = (await call(host, "update_link_policy", {
+    linkId: pending.id,
+    confirmRequired: true,
+    timezone: "America/New_York",
+  })) as { ok: boolean; link: { timezone: string | null } };
+  assert.equal(policy.ok, true);
+  assert.equal(policy.link.timezone, "America/New_York");
+  ok("update_link_policy writes the same policy the People page edits");
+
+  const revoked = (await call(host, "revoke_link", {
+    linkId: pending.id,
+  })) as { ok: boolean };
+  assert.equal(revoked.ok, true);
+  ok("revoke_link closes a connection the agent just approved");
+
+  await expectReject(
+    "default pairings cannot decide a confirm gate",
+    () =>
+      call(host, "respond_confirm", {
+        action: "approve",
+        confirmId: createdEvent.event.id,
+      }),
+    /approvals:write|insufficient_scope/i,
+  );
+
+  /* ---------------------------------------------------------------- */
+  console.log("\n14. Cleanup");
   const users_ = [host.user, guest.user, stranger.user] as User[];
   await db.delete(events).where(inArray(events.id, created));
   await db.delete(agentProfiles).where(eq(agentProfiles.userId, host.user.id));

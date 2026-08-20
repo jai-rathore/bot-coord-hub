@@ -344,9 +344,11 @@ curl -s "$BASE/api/mcp" \\
 {MCP_CONFIG}
           </pre>
           <p className="mt-3 text-[0.9rem] text-muted">
-            Tools include linking, tasks, scheduling, supported-task discovery,
-            private guest requests, and read-only approval status. Human
-            approval itself stays in the browser.
+            Tools include linking, people you have already coordinated with,
+            incoming connection approval, tasks, scheduling, supported-task
+            discovery, private guest requests, and read-only approval status.
+            Booking approval itself stays in the browser unless a credential
+            was explicitly granted <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">approvals:write</code>.
           </p>
           <h3 className="mt-5 text-[0.95rem] font-semibold text-ink">
             Events, from either side
@@ -356,7 +358,8 @@ curl -s "$BASE/api/mcp" \\
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">create_event</code>,{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">add_event_option</code>,{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">extend_event_deadline</code>,{" "}
-            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">nudge_event_participants</code>
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">nudge_event_participants</code>,{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">archive_event</code>
             ) and take part in someone else&apos;s (
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">get_event_board</code>,{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">join_event</code>,{" "}

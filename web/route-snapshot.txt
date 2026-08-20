@@ -68,6 +68,7 @@ dynamic  /api/v1/discovery/locations/resolve
 dynamic  /api/v1/discovery/search
 dynamic  /api/v1/events
 dynamic  /api/v1/events/[id]
+dynamic  /api/v1/events/[id]/archive
 dynamic  /api/v1/events/[id]/board
 dynamic  /api/v1/events/[id]/deadline
 dynamic  /api/v1/events/[id]/join
@@ -88,6 +89,7 @@ dynamic  /api/v1/intents/propose
 dynamic  /api/v1/intents/triage
 dynamic  /api/v1/links
 dynamic  /api/v1/links/[id]
+dynamic  /api/v1/links/[id]/approve
 dynamic  /api/v1/links/[id]/revoke
 dynamic  /api/v1/links/accept
 dynamic  /api/v1/links/invite
@@ -98,6 +100,7 @@ dynamic  /api/v1/meet/[handle]
 dynamic  /api/v1/openapi
 dynamic  /api/v1/pairings/start
 dynamic  /api/v1/pairings/token
+dynamic  /api/v1/people
 dynamic  /api/v1/perf
 dynamic  /api/v1/profiles/[handle]
 dynamic  /api/v1/profiles/[handle]/connect

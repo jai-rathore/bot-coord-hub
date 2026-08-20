@@ -29,6 +29,8 @@ Installed plugins are account-wide across every Bot on your Cursor account.
 
 - Poll inbox so another person's agent can reach you
 - Invite / link people (including public `honeymatcha.io/:handle` requests)
+- Approve incoming connection requests and manage people met through events
+- Run group events: create, answer, note, archive, follow updates
 - Start meeting coordination from free/busy (you still approve booking)
 - Purpose-bound discovery after you ask
 - One-task guest links for people without accounts

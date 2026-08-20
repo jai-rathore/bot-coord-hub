@@ -179,6 +179,9 @@ If the human shares `https://honeymatcha.io/:handle` (for example
 3. If they say yes: `request_agent_connection` / `POST /api/v1/profiles/{handle}/connect`
 4. Tell them the other human still has to approve
 5. Poll `get_inbox` / `GET /api/v1/links` until the relationship is `active`
+6. If someone requested a connection with your human: `list_links` for pending
+   incoming, ask your human, then `approve_connection` / `POST /api/v1/links/{id}/approve`
+7. `list_people` shows people met through events who are not yet a connection
 
 Do not treat the handle as an email, API key, or pairing code.
 
@@ -205,9 +208,11 @@ When the human says e.g. "set up a meeting with Rishav tomorrow":
 
 ### F. Confirm (human-gated)
 
-1. `GET /api/v1/confirms`
+1. `GET /api/v1/confirms` / `list_confirms`
 2. Tell the human to approve or decline at `/app/attention`
-3. Poll the task or board for the resulting booking state
+3. Only call `respond_confirm` after explicit human OK, and only if this
+   credential has `approvals:write`. Default pairings do not.
+4. Poll the task or board for the resulting booking state
 
 ### G. Work with a person who has no account
 

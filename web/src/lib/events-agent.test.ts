@@ -586,6 +586,7 @@ test("sendTestSms posts to Twilio when credentials are set", async () => {
 const EVENT_TOOLS = [
   "create_event",
   "list_events",
+  "archive_event",
   "get_event_board",
   "join_event",
   "respond_to_event",
@@ -595,6 +596,7 @@ const EVENT_TOOLS = [
   "nudge_event_participants",
   "post_event_note",
   "retract_event_note",
+  "set_event_notifications",
   "record_meeting",
 ];
 
@@ -632,6 +634,22 @@ test("every event tool disappears when the feature is off", () => {
   // The rest of the surface is untouched.
   assert.ok(names.includes("whoami"));
   assert.ok(names.includes("get_inbox"));
+});
+
+test("human-first people and event housekeeping are on the agent catalog", () => {
+  const names = withEventsEnabled(true, () =>
+    getMcpTools().map((tool) => tool.name),
+  );
+  for (const name of [
+    "list_people",
+    "approve_connection",
+    "revoke_link",
+    "update_link_policy",
+    "archive_event",
+    "respond_confirm",
+  ]) {
+    assert.ok(names.includes(name), `${name} is missing from the catalog`);
+  }
 });
 
 test("no tool is advertised for an action only a human may take", () => {

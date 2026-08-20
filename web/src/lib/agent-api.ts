@@ -22,11 +22,13 @@ import { normalizeIntentName, slugify } from "@/lib/slug";
 import type { AgentAuth } from "@/lib/agent-auth";
 import {
   acceptInviteLink,
+  approveConnectionRequest,
   createInviteLink,
   listLinksForUser,
   revokeLinkForUser,
   updateLinkPolicyForUser,
 } from "@/lib/links";
+import { listPeopleMetThroughEvents } from "@/lib/people";
 import { runScheduleMeeting } from "@/lib/schedule-meeting";
 import type { AllowedHours } from "@/db/schema";
 import { writeAudit } from "@/lib/audit";
@@ -205,6 +207,71 @@ export async function listLinks(auth: AgentAuth, baseUrl?: string) {
   try {
     const rows = await listLinksForUser(auth.user, baseUrl ?? "");
     return { ok: true, links: rows };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
+}
+
+/**
+ * People you coordinated with on an event who are not yet a connection.
+ * The same list the People page shows under "met through events".
+ */
+export async function listPeople(auth: AgentAuth) {
+  assertAgentScope(auth, "people:read");
+  try {
+    const links = await listLinksForUser(auth.user, "");
+    const linkedUserIds = new Set(
+      links
+        .map((link) => link.peer?.id)
+        .filter((id): id is string => Boolean(id)),
+    );
+    const met = await listPeopleMetThroughEvents(auth.user, {
+      excludeUserIds: linkedUserIds,
+    });
+    return {
+      ok: true,
+      met,
+      note: "People you have already coordinated with who are not a connection yet. Incoming connection requests appear in list_links as pending. Use create_invite, request_agent_connection, or approve_connection after your human agrees.",
+    };
+  } catch (err) {
+    rethrowAsAgentError(err);
+  }
+}
+
+/**
+ * Approve an incoming public-page or public-invite request.
+ * The same button the People page offers. Ask your human first.
+ */
+export async function approveConnection(
+  auth: AgentAuth,
+  body: { linkId?: string },
+  baseUrl?: string,
+) {
+  assertAgentScope(auth, "people:write");
+  const linkId = body.linkId?.trim();
+  if (!linkId) {
+    throw new AgentApiError(400, "linkId is required — take it from list_links.");
+  }
+  try {
+    const result = await approveConnectionRequest({
+      user: auth.user,
+      linkId,
+      origin: baseUrl ?? "",
+    });
+    await writeAudit({
+      actorUserId: auth.user.id,
+      actorApiKeyId: auth.apiKey.id,
+      actorKind: "agent",
+      action: "link.connection_approved",
+      entityType: "link",
+      entityId: result.link.id,
+    });
+    return {
+      ok: true,
+      ...result,
+      agent_instructions:
+        "The connection is active. You can now coordinate with their agent. Do not approve requests your human has not seen.",
+    };
   } catch (err) {
     rethrowAsAgentError(err);
   }
