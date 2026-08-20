@@ -4,6 +4,10 @@
  * plain fetch so HoneyMatcha takes on no new dependency.
  */
 
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
+
+/** A model turn is awaited inline in the event chat request. */
+const GEMINI_TIMEOUT_MS = 25_000;
 import {
   LlmUnavailableError,
   type LlmProvider,
@@ -73,7 +77,7 @@ export class GeminiProvider implements LlmProvider {
       ];
     }
 
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${ENDPOINT}/${encodeURIComponent(this.model)}:generateContent`,
       {
         method: "POST",
@@ -84,6 +88,7 @@ export class GeminiProvider implements LlmProvider {
         body: JSON.stringify(body),
         signal: request.signal,
       },
+      GEMINI_TIMEOUT_MS,
     );
 
     if (!res.ok) {

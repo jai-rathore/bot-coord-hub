@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   agentProfiles,
@@ -590,11 +590,11 @@ export async function revokeLinkForUser(opts: {
     }
   }
 
-  for (const id of ids) {
+  if (ids.length > 0) {
     await db
       .update(links)
       .set({ status: "revoked", updatedAt: now })
-      .where(eq(links.id, id));
+      .where(inArray(links.id, ids));
   }
 
   return { id: link.id, status: "revoked", revokedIds: ids };
@@ -617,12 +617,14 @@ export async function listLinksForUser(
     if (row.toUserId && row.toUserId !== user.id) peerIds.add(row.toUserId);
   }
 
+  // One query for every peer, not one query per peer.
   const peerMap = new Map<string, User>();
   if (peerIds.size > 0) {
-    for (const id of peerIds) {
-      const found = await db.select().from(users).where(eq(users.id, id)).limit(1);
-      if (found[0]) peerMap.set(id, found[0]);
-    }
+    const found = await db
+      .select()
+      .from(users)
+      .where(inArray(users.id, [...peerIds]));
+    for (const row of found) peerMap.set(row.id, row);
   }
 
   // Prefer the outgoing perspective for active mutual pairs; keep pending invites.

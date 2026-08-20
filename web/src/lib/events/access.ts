@@ -3,6 +3,7 @@
  * here so authorization lives in one place.
  */
 
+import { cache } from "react";
 import { getDb } from "@/db";
 import { eventParticipants, events, type Event, type User } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -19,7 +20,10 @@ export function assertEventsEnabled(): void {
   }
 }
 
-export async function eventBySlug(slug: string): Promise<Event> {
+/** Request-scoped, so repeated lookups within one request cost one query. */
+export const eventBySlug = cache(loadEventBySlug);
+
+async function loadEventBySlug(slug: string): Promise<Event> {
   assertEventsEnabled();
   const db = getDb();
   const [row] = await db

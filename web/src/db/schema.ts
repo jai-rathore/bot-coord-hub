@@ -288,6 +288,8 @@ export const links = pgTable(
     index("links_to_user_id_idx").on(t.toUserId),
     index("links_public_invite_id_idx").on(t.publicInviteId),
     index("links_profile_handle_idx").on(t.profileHandle),
+    index("links_from_created_idx").on(t.fromUserId, t.createdAt),
+    index("links_to_created_idx").on(t.toUserId, t.createdAt),
     uniqueIndex("links_public_invite_user_uidx").on(
       t.publicInviteId,
       t.toUserId,
@@ -331,6 +333,11 @@ export const sessions = pgTable(
     index("sessions_initiator_user_id_idx").on(t.initiatorUserId),
     index("sessions_peer_user_id_idx").on(t.peerUserId),
     index("sessions_status_idx").on(t.status),
+    // listSessionsForUser and getHomeStatus filter by one of these and sort by
+    // updated_at; the single-column indexes above left that as an in-memory sort.
+    index("sessions_initiator_updated_idx").on(t.initiatorUserId, t.updatedAt),
+    index("sessions_peer_updated_idx").on(t.peerUserId, t.updatedAt),
+    index("sessions_link_id_idx").on(t.linkId),
     uniqueIndex("sessions_initiator_idempotency_uidx")
       .on(t.initiatorUserId, t.idempotencyKey)
       .where(sql`${t.idempotencyKey} is not null`),
@@ -388,7 +395,12 @@ export const sessionMessages = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (t) => [index("session_messages_session_id_idx").on(t.sessionId)],
+  (t) => [index("session_messages_session_id_idx").on(t.sessionId),
+    index("session_messages_session_created_idx").on(
+      t.sessionId,
+      t.createdAt,
+    ),
+  ],
 );
 
 export const intentTypes = pgTable(
@@ -650,6 +662,14 @@ export const discoveryInterests = pgTable(
     index("discovery_interests_requester_idx").on(
       t.requesterUserId,
       t.createdAt,
+    ),
+    // Enrollment revoke and the hourly cleanup cron filter on these directly,
+    // and neither had an index, so both full-scanned the table.
+    index("discovery_interests_requester_enrollment_idx").on(
+      t.requesterEnrollmentId,
+    ),
+    index("discovery_interests_recipient_enrollment_idx").on(
+      t.recipientEnrollmentId,
     ),
   ],
 );
@@ -1093,6 +1113,12 @@ export const confirms = pgTable(
     index("confirms_session_id_idx").on(t.sessionId),
     index("confirms_user_id_idx").on(t.userId),
     index("confirms_status_idx").on(t.status),
+    // listConfirmsForUser: where user_id [+ status] order by created_at.
+    index("confirms_user_status_created_idx").on(
+      t.userId,
+      t.status,
+      t.createdAt,
+    ),
   ],
 );
 
@@ -1168,6 +1194,12 @@ export const agentInbox = pgTable(
     index("agent_inbox_session_kind_idx").on(t.sessionId, t.kind),
     index("agent_inbox_discovery_interest_idx").on(t.discoveryInterestId),
     index("agent_inbox_event_idx").on(t.eventId),
+    // Interest cleanup matches rows by a value inside the JSON body as well as
+    // by the column, and that half of the OR full-scanned the table once per
+    // interest, inside an open transaction.
+    index("agent_inbox_body_interest_idx").on(
+      sql`((${t.body} ->> 'interestId'))`,
+    ),
     uniqueIndex("agent_inbox_dedupe_uidx").on(t.dedupeKey),
   ],
 );
@@ -1281,6 +1313,8 @@ export const events = pgTable(
     uniqueIndex("events_share_slug_uidx").on(t.shareSlug),
     index("events_organizer_idx").on(t.organizerUserId),
     index("events_status_deadline_idx").on(t.status, t.deadlineAt),
+    // listEvents sorts every page by created_at; there was no index on it.
+    index("events_created_at_idx").on(t.createdAt),
     check(
       "events_quorum_min_check",
       sql`${t.quorumMin} is null or ${t.quorumMin} >= 1`,
@@ -1552,6 +1586,9 @@ export const notificationOutbox = pgTable(
     index("notification_outbox_pending_idx")
       .on(t.scheduledFor)
       .where(sql`${t.sentAt} is null`),
+    // Both are joined and filtered on, and this is the fastest-growing table.
+    index("notification_outbox_user_idx").on(t.userId),
+    index("notification_outbox_event_idx").on(t.eventId),
   ],
 );
 

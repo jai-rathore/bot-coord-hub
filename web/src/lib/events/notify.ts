@@ -9,6 +9,7 @@
  * stay queued. Without Twilio, text rows stay queued. The product still works.
  */
 
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import { and, asc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
@@ -173,59 +174,77 @@ export async function enqueueEventNotification(
     }
   }
 
+  const dedupeKeyFor = (userId: string) =>
+    recipients.length > 1 || !input.userId
+      ? `${input.dedupeKey}:${userId}`
+      : input.dedupeKey;
+
+  // One multi-row insert rather than one per recipient per channel. Dedupe keys
+  // are unique per recipient and channel, so ON CONFLICT DO NOTHING still only
+  // skips rows that already existed, and the returned rows are still exactly
+  // the ones actually queued.
   let queued = 0;
-  for (const userId of recipients) {
-    const dedupeKey =
-      recipients.length > 1 || !input.userId
-        ? `${input.dedupeKey}:${userId}`
-        : input.dedupeKey;
-    if (input.notifyHumans !== false) {
+  if (input.notifyHumans !== false) {
+    const scheduledFor = input.scheduledFor ?? new Date();
+    const outboxRows = recipients.flatMap((userId) => {
+      const dedupeKey = dedupeKeyFor(userId);
       const pref = prefs.get(userId) ?? {
         channel: "email" as const,
         phoneE164: null,
       };
-      for (const channel of humanChannelsFor({
-        ...pref,
-        smsOffered: smsOffered(),
-      })) {
-        const channelKey = channel === "email" ? dedupeKey : `${dedupeKey}:sms`;
-        const inserted = await db
-          .insert(notificationOutbox)
-          .values({
-            userId,
-            eventId: input.eventId,
-            channel,
-            template: input.template,
-            payload: input.payload ?? {},
-            dedupeKey: channelKey,
-            scheduledFor: input.scheduledFor ?? new Date(),
-          })
-          .onConflictDoNothing({ target: notificationOutbox.dedupeKey })
-          .returning({ id: notificationOutbox.id });
-        if (inserted[0]) queued += 1;
-      }
-    }
-
-    if (input.notifyAgents === false) continue;
-    try {
-      await deliverEventInbox({
-        userId,
-        eventId: input.eventId,
-        kind: `event.${input.template}`,
-        summary: agentSummary(input.template, input.payload ?? {}),
-        body: {
-          ...(input.payload ?? {}),
+      return humanChannelsFor({ ...pref, smsOffered: smsOffered() }).map(
+        (channel) => ({
+          userId,
           eventId: input.eventId,
+          channel,
           template: input.template,
-          eventUrl: event ? `${publicOrigin()}/e/${event.shareSlug}` : undefined,
-        },
-        dedupeKey: `agent:${dedupeKey}`,
-      });
-    } catch (error) {
-      // Human delivery is the contract; the agent copy is additive.
-      console.error("[events] agent inbox delivery failed", error);
+          payload: input.payload ?? {},
+          dedupeKey: channel === "email" ? dedupeKey : `${dedupeKey}:sms`,
+          scheduledFor,
+        }),
+      );
+    });
+
+    if (outboxRows.length > 0) {
+      const inserted = await db
+        .insert(notificationOutbox)
+        .values(outboxRows)
+        .onConflictDoNothing({ target: notificationOutbox.dedupeKey })
+        .returning({ id: notificationOutbox.id });
+      queued = inserted.length;
     }
   }
+
+  // Agent copies fan out concurrently. Each one is several queries plus an
+  // outbound webhook with a 4s timeout, so serially this was up to 4s per
+  // recipient before the caller's request could return.
+  if (input.notifyAgents !== false) {
+    await Promise.all(
+      recipients.map(async (userId) => {
+        try {
+          await deliverEventInbox({
+            userId,
+            eventId: input.eventId,
+            kind: `event.${input.template}`,
+            summary: agentSummary(input.template, input.payload ?? {}),
+            body: {
+              ...(input.payload ?? {}),
+              eventId: input.eventId,
+              template: input.template,
+              eventUrl: event
+                ? `${publicOrigin()}/e/${event.shareSlug}`
+                : undefined,
+            },
+            dedupeKey: `agent:${dedupeKeyFor(userId)}`,
+          });
+        } catch (error) {
+          // Human delivery is the contract; the agent copy is additive.
+          console.error("[events] agent inbox delivery failed", error);
+        }
+      }),
+    );
+  }
+
   return queued > 0;
 }
 
@@ -326,7 +345,7 @@ async function sendEmail(to: string, rendered: Rendered): Promise<string | undef
   const key = process.env.RESEND_API_KEY?.trim();
   if (!key) throw new Error("RESEND_API_KEY is not configured");
 
-  const res = await fetch("https://api.resend.com/emails", {
+  const res = await fetchWithTimeout("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
@@ -364,7 +383,7 @@ async function sendSms(to: string, body: string): Promise<string | undefined> {
   if (messagingService) params.set("MessagingServiceSid", messagingService);
   else if (fromNumber) params.set("From", fromNumber);
 
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`,
     {
       method: "POST",

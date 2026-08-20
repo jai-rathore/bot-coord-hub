@@ -6,6 +6,7 @@
  * anywhere else, that is the bug.
  */
 
+import { cache } from "react";
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
@@ -102,7 +103,13 @@ export async function loadBoardSource(
   };
 }
 
-export async function findEventBySlug(slug: string) {
+/**
+ * Request-scoped: /e/[slug] looks the event up in generateMetadata and again
+ * in the page body, which are separate calls on the same request.
+ */
+export const findEventBySlug = cache(loadEventBySlug);
+
+async function loadEventBySlug(slug: string) {
   const db = getDb();
   const [row] = await db
     .select()

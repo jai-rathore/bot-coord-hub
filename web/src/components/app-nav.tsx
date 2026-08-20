@@ -6,6 +6,7 @@ import { UserButton } from "@clerk/nextjs";
 import { BrandLink } from "@/components/brand-link";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { NavIcon, type NavGlyph } from "@/components/nav-icon";
+import { NavPending } from "@/components/nav-pending";
 
 type NavItem = { href: string; label: string; hint: string; exact?: boolean };
 
@@ -42,6 +43,7 @@ function NavLink({
           {badge}
         </span>
       ) : null}
+      <NavPending />
     </Link>
   );
 }

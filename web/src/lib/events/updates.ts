@@ -5,6 +5,7 @@
  * outside the board's visibility projection.
  */
 
+import { cache } from "react";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
@@ -147,7 +148,15 @@ export async function markEventSeen(
     );
 }
 
-export async function listEventsWithUpdates(
+/**
+ * Request-scoped. The /app layout and the dashboard under it both load this,
+ * and previously the layout imported a cached wrapper while the events page
+ * imported this module directly, so the dedup never fired where it mattered
+ * most. Caching at the source removes the chance of importing the wrong one.
+ */
+export const listEventsWithUpdates = cache(loadEventsWithUpdates);
+
+async function loadEventsWithUpdates(
   user: User,
   opts: { archived?: boolean; limit?: number; offset?: number } = {},
 ): Promise<{

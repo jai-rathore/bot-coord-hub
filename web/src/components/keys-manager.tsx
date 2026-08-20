@@ -22,36 +22,52 @@ export function KeysManager({ initialKeys }: { initialKeys: KeyRow[] }) {
   const [createdRaw, setCreatedRaw] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  async function createKey(e: React.FormEvent) {
+  function createKey(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setCreatedRaw(null);
     setCopied(false);
 
-    const res = await fetch("/api/keys", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/keys", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error ?? "Failed to create key");
+          return;
+        }
+        setCreatedRaw(data.rawKey);
+        setName("Manual agent");
+        router.refresh();
+      } catch {
+        setError("Failed to create key");
+      }
     });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Failed to create key");
-      return;
-    }
-    setCreatedRaw(data.rawKey);
-    setName("Manual agent");
-    startTransition(() => router.refresh());
   }
 
-  async function revokeKey(id: string) {
+  function revokeKey(id: string) {
     setError(null);
-    const res = await fetch(`/api/keys/${id}`, { method: "DELETE" });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(data.error ?? "Failed to revoke key");
-      return;
-    }
-    startTransition(() => router.refresh());
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const res = await fetch(`/api/keys/${id}`, { method: "DELETE" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error ?? "Failed to revoke key");
+          return;
+        }
+        router.refresh();
+      } catch {
+        setError("Failed to revoke key");
+      }
+    });
   }
 
   async function copyRaw() {

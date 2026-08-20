@@ -24,29 +24,37 @@ export function HandleSetupForm({
     [email, handle],
   );
 
-  async function submit(event: React.FormEvent) {
+  function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     if (localError) {
       setError(localError);
       return;
     }
-    const response = await fetch("/api/profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        handle,
-        displayName: displayName || undefined,
-        headline: headline.trim() || undefined,
-        websiteUrl: websiteUrl.trim() || undefined,
-      }),
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            handle,
+            displayName: displayName || undefined,
+            headline: headline.trim() || undefined,
+            websiteUrl: websiteUrl.trim() || undefined,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setError(data.error ?? "Could not claim that handle");
+          return;
+        }
+        router.replace("/");
+      } catch {
+        setError("Could not claim that handle");
+      }
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(data.error ?? "Could not claim that handle");
-      return;
-    }
-    startTransition(() => router.replace("/"));
   }
 
   return (

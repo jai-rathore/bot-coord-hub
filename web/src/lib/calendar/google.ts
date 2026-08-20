@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import type { CalendarConnection } from "@/db/schema";
 import { getValidGoogleAccessToken } from "@/lib/google-oauth";
 import type {
@@ -25,7 +26,7 @@ export class GoogleCalendarPort implements CalendarPort {
   async getFreeBusy(query: FreeBusyQuery): Promise<FreeBusyResult> {
     const token = await this.token();
     const items = query.calendarIds.map((id) => ({ id }));
-    const res = await fetch("https://www.googleapis.com/calendar/v3/freeBusy", {
+    const res = await fetchWithTimeout("https://www.googleapis.com/calendar/v3/freeBusy", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -60,7 +61,7 @@ export class GoogleCalendarPort implements CalendarPort {
     const calendarId = encodeURIComponent(
       this.connection.calendarId || "primary",
     );
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?conferenceDataVersion=1`,
       {
         method: "POST",

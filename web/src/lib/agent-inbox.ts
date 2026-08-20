@@ -198,22 +198,23 @@ export async function notifyPeerAgents(opts: {
   /** Reuse an existing unacked inbox row and skip the callback. */
   skipIfUnacked?: boolean;
 }): Promise<AgentNotifyResult[]> {
-  const results: AgentNotifyResult[] = [];
-  for (const recipient of opts.recipients) {
-    if (!recipient.userId) {
-      results.push({
-        userId: null,
-        email: recipient.email,
-        name: recipient.name,
-        hasPairedAgent: false,
-        inboxId: null,
-        callback: "none",
-        reach: "not_on_honeymatcha",
-      });
-      continue;
-    }
-    results.push(
-      await deliverToUserAgent({
+  // Concurrent rather than serial: each delivery is several queries plus an
+  // outbound callback with its own timeout, and recipients are independent.
+  // Promise.all preserves the input order, so the result shape is unchanged.
+  return Promise.all(
+    opts.recipients.map(async (recipient): Promise<AgentNotifyResult> => {
+      if (!recipient.userId) {
+        return {
+          userId: null,
+          email: recipient.email,
+          name: recipient.name,
+          hasPairedAgent: false,
+          inboxId: null,
+          callback: "none",
+          reach: "not_on_honeymatcha",
+        };
+      }
+      return deliverToUserAgent({
         userId: recipient.userId,
         email: recipient.email,
         name: recipient.name,
@@ -226,10 +227,9 @@ export async function notifyPeerAgents(opts: {
           sessionId: opts.sessionId,
         },
         skipIfUnacked: opts.skipIfUnacked,
-      }),
-    );
-  }
-  return results;
+      });
+    }),
+  );
 }
 
 export async function deliverDiscoveryInbox(opts: {

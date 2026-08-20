@@ -430,19 +430,37 @@ export async function setResponses(
       if (!["yes", "no", "maybe"].includes(entry.value)) {
         throw new AgentApiError(400, "A response must be yes, no, or maybe.");
       }
-      const option = byId.get(entry.optionId)!;
+    }
+
+    // Deduplicated by option, last value winning, which is what the previous
+    // per-entry loop produced. It also has to be deduplicated before the
+    // insert: ON CONFLICT DO UPDATE rejects a command that touches the same
+    // row twice.
+    const latestByOption = new Map(
+      entries.map((entry) => [entry.optionId, entry.value] as const),
+    );
+    const now = new Date();
+    const responseRows = [...latestByOption].map(([optionId, value]) => {
+      const option = byId.get(optionId)!;
+      return {
+        eventId: event.id,
+        participantId: participant.id,
+        dimensionId: option.dimensionId,
+        optionId: option.id,
+        value,
+      };
+    });
+
+    if (responseRows.length > 0) {
       await db
         .insert(eventResponses)
-        .values({
-          eventId: event.id,
-          participantId: participant.id,
-          dimensionId: option.dimensionId,
-          optionId: option.id,
-          value: entry.value,
-        })
+        .values(responseRows)
         .onConflictDoUpdate({
           target: [eventResponses.participantId, eventResponses.optionId],
-          set: { value: entry.value, updatedAt: new Date() },
+          set: {
+            value: sql`excluded.value`,
+            updatedAt: now,
+          },
         });
     }
   }

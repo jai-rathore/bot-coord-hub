@@ -22,8 +22,8 @@ export function BrandAtmosphere({
       aria-hidden="true"
     >
       <span className="brand-grain" />
-      <span className="animate-drift absolute -top-40 -left-28 h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(117,161,132,0.28),transparent_68%)] blur-3xl" />
-      <span className="animate-drift-alt absolute -right-24 -bottom-16 h-[30rem] w-[30rem] rounded-full bg-[radial-gradient(circle,rgba(240,220,168,0.42),transparent_70%)] blur-3xl" />
+      <span className="animate-drift [will-change:transform] absolute -top-40 -left-28 h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(117,161,132,0.28),transparent_68%)] blur-3xl" />
+      <span className="animate-drift-alt [will-change:transform] absolute -right-24 -bottom-16 h-[30rem] w-[30rem] rounded-full bg-[radial-gradient(circle,rgba(240,220,168,0.42),transparent_70%)] blur-3xl" />
     </div>
   );
 }

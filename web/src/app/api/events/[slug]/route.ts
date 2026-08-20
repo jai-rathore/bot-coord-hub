@@ -10,8 +10,12 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
-    const event = await eventBySlug(slug);
-    const user = await ensureCurrentUser();
+    // The event page polls this every 15 seconds; the lookup and the auth read
+    // are independent, so they no longer wait on each other.
+    const [event, user] = await Promise.all([
+      eventBySlug(slug),
+      ensureCurrentUser(),
+    ]);
     return Response.json({ board: await boardFor(event.id, user) });
   } catch (err) {
     return jsonError(err, "Failed to load event");

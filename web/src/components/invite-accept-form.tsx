@@ -8,19 +8,27 @@ export function InviteAcceptForm({ inviteCode }: { inviteCode: string }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  async function accept() {
+  function accept() {
     setError(null);
-    const res = await fetch("/api/links/accept", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inviteCode }),
+    // The await runs inside the transition so `pending` covers the request,
+    // not just what follows it.
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/links/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inviteCode }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error ?? "Failed to accept invite");
+          return;
+        }
+        router.push("/app/people");
+      } catch {
+        setError("Failed to accept invite");
+      }
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(data.error ?? "Failed to accept invite");
-      return;
-    }
-    startTransition(() => router.push("/app/people"));
   }
 
   return (

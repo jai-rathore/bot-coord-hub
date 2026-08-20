@@ -14,17 +14,26 @@ export function ProfileConnectForm({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  async function connect() {
+  function connect() {
     setError(null);
-    const response = await fetch(`/api/profiles/${encodeURIComponent(handle)}/connect`, {
-      method: "POST",
+    // The await runs inside the transition so `pending` covers the request,
+    // not just what follows it.
+    startTransition(async () => {
+      try {
+        const response = await fetch(
+          `/api/profiles/${encodeURIComponent(handle)}/connect`,
+          { method: "POST" },
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setError(data.error ?? "Failed to send connection request");
+          return;
+        }
+        router.push("/app/people");
+      } catch {
+        setError("Failed to send connection request");
+      }
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(data.error ?? "Failed to send connection request");
-      return;
-    }
-    startTransition(() => router.push("/app/people"));
   }
 
   return (

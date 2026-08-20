@@ -19,6 +19,7 @@ export function ActivityBoard({
   initialSelectedId?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
+  const [posting, startPosting] = useTransition();
   const [showStopped, setShowStopped] = useState(false);
   const [requestedSelectedId, setRequestedSelectedId] = useState<string | null>(
     initialSessions.some((session) => session.id === initialSelectedId)
@@ -73,28 +74,37 @@ export function ActivityBoard({
     };
   }, [selectedId]);
 
-  async function postNote(e: React.FormEvent) {
+  function postNote(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedId || !note.trim()) return;
     setError(null);
-    const res = await fetch(`/api/sessions/${selectedId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "note", text: note.trim() }),
+    // Its own transition: the Post button used to be gated on `pending`, which
+    // belongs to the message-load effect above, so it stayed live for the whole
+    // POST and could be submitted twice.
+    startPosting(async () => {
+      try {
+        const res = await fetch(`/api/sessions/${selectedId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "note", text: note.trim() }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error ?? "Failed to post note");
+          return;
+        }
+        setNote("");
+        setLoadedMessages((current) => ({
+          sessionId: selectedId,
+          items:
+            current?.sessionId === selectedId
+              ? [...current.items, data.message]
+              : [data.message],
+        }));
+      } catch {
+        setError("Failed to post note");
+      }
     });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Failed to post note");
-      return;
-    }
-    setNote("");
-    setLoadedMessages((current) => ({
-      sessionId: selectedId,
-      items:
-        current?.sessionId === selectedId
-          ? [...current.items, data.message]
-          : [data.message],
-    }));
   }
 
   const selected = initialSessions.find((s) => s.id === selectedId) ?? null;
@@ -238,10 +248,10 @@ export function ActivityBoard({
               </label>
               <button
                 type="submit"
-                disabled={pending || !note.trim()}
+                disabled={posting || !note.trim()}
                 className="button-primary cursor-pointer disabled:opacity-60"
               >
-                Post
+                {posting ? "Posting…" : "Post"}
               </button>
             </form>
           </>

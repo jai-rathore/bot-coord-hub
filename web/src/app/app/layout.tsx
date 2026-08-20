@@ -3,12 +3,13 @@ import { redirect } from "next/navigation";
 import { AppNav } from "@/components/app-nav";
 import { getDb } from "@/db";
 import { confirms } from "@/db/schema";
+import { isNextControlFlowError } from "@/lib/next-errors";
 import { getProfileForUser } from "@/lib/agent-profiles";
 import { ensureCurrentUser } from "@/lib/users";
-import { getHomeStatus } from "@/lib/home-status";
+import { agentIsConnected } from "@/lib/home-status";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
-import { listEventsWithUpdates } from "@/lib/events/load-updates";
+import { listEventsWithUpdates } from "@/lib/events/updates";
 
 export default async function AppLayout({
   children,
@@ -22,11 +23,14 @@ export default async function AppLayout({
   let handle: string | null = null;
   try {
     const user = await ensureCurrentUser();
-    if (user && !(await getProfileForUser(user.id))) {
-      redirect("/setup");
-    }
     if (user) {
-      const [row, home, eventUpdates] = await Promise.all([
+      // getProfileForUser is request-scoped, so the page below reuses this read
+      // rather than issuing its own. It also carries the handle, which the shell
+      // previously paid for a second time inside getHomeStatus.
+      const profile = await getProfileForUser(user.id);
+      if (!profile) redirect("/setup");
+
+      const [row, connected, eventUpdates] = await Promise.all([
         getDb()
           .select({ count: count() })
           .from(confirms)
@@ -37,27 +41,25 @@ export default async function AppLayout({
             ),
           )
           .then((rows) => rows[0]),
-        getHomeStatus(user),
+        agentIsConnected(user.id),
         eventsFeatureEnabled()
           ? listEventsWithUpdates(user)
           : Promise.resolve({ unreadEventCount: 0 }),
       ]);
       attentionCount = Number(row?.count ?? 0);
       eventsUnreadCount = eventUpdates.unreadEventCount;
-      agentConnected = home.agent.connected;
-      handle = home.handle;
+      agentConnected = connected;
+      handle = profile.handle;
     }
   } catch (error) {
-    // redirect() throws; a bare catch would skip first-login handle setup.
-    if (
-      error &&
-      typeof error === "object" &&
-      "digest" in error &&
-      String((error as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")
-    ) {
-      throw error;
-    }
+    // Next signals redirect(), notFound(), and the static-generation bailout by
+    // throwing; all of them have to reach the framework. Previously only
+    // redirect() was re-thrown, so the dynamic-usage bailout was swallowed too.
+    if (isNextControlFlowError(error)) throw error;
     // DB may be unavailable in local UI-only runs; pages that need DB surface errors.
+    // The shell still renders with zeroed badges, but the cause is logged
+    // rather than swallowed — this ran on every /app navigation.
+    console.error("[app-shell] layout data load failed", error);
   }
 
   return (

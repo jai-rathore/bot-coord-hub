@@ -21,15 +21,23 @@ export function ConnectCalendar({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  async function disconnect() {
+  function disconnect() {
     setError(null);
-    const res = await fetch("/api/google/disconnect", { method: "POST" });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(data.error ?? "Failed to disconnect");
-      return;
-    }
-    startTransition(() => router.refresh());
+    // The await runs inside the transition so `pending` covers the request,
+    // not just what follows it.
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/google/disconnect", { method: "POST" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error ?? "Failed to disconnect");
+          return;
+        }
+        router.refresh();
+      } catch {
+        setError("Failed to disconnect");
+      }
+    });
   }
 
   if (!initial.enabled) {

@@ -250,6 +250,104 @@ async function isSessionParticipant(
   return Boolean(row);
 }
 
+/**
+ * Which of these sessions the user may still see, for discovery-mediated ones.
+ *
+ * Applies exactly the rules assertDiscoverySessionAccess applies to a single
+ * session — the interest must still be accepted and bound to this session, the
+ * user must be one of its two sides, neither side may be non-active in
+ * user_safety, and neither may have blocked the other — but resolves them for
+ * the whole list in three queries instead of three per session.
+ *
+ * Non-discovery sessions are not included here; the caller keeps those as-is.
+ */
+async function discoveryAccessibleSessionIds(
+  allRows: Session[],
+  userId: string,
+): Promise<Set<string>> {
+  const discoveryRows = allRows.filter(isDiscoveryMediatedSession);
+  const accessible = new Set<string>();
+  if (discoveryRows.length === 0) return accessible;
+
+  const db = getDb();
+  const interestIds = [
+    ...new Set(
+      discoveryRows.map((row) =>
+        String((row.payload as Record<string, unknown>).discoveryInterestId),
+      ),
+    ),
+  ];
+
+  const interests = await db
+    .select()
+    .from(discoveryInterests)
+    .where(
+      and(
+        inArray(discoveryInterests.id, interestIds),
+        eq(discoveryInterests.status, "accepted"),
+      ),
+    );
+  if (interests.length === 0) return accessible;
+
+  const interestById = new Map(interests.map((row) => [row.id, row]));
+  const partyIds = [
+    ...new Set(
+      interests.flatMap((row) => [row.requesterUserId, row.recipientUserId]),
+    ),
+  ];
+
+  const [safetyRows, blockRows] = await Promise.all([
+    db.select().from(userSafety).where(inArray(userSafety.userId, partyIds)),
+    db
+      .select({
+        blockerUserId: discoveryBlocks.blockerUserId,
+        blockedUserId: discoveryBlocks.blockedUserId,
+      })
+      .from(discoveryBlocks)
+      .where(
+        and(
+          inArray(discoveryBlocks.blockerUserId, partyIds),
+          inArray(discoveryBlocks.blockedUserId, partyIds),
+        ),
+      ),
+  ]);
+
+  const restricted = new Set(
+    safetyRows.filter((row) => row.status !== "active").map((row) => row.userId),
+  );
+  const blocked = new Set(
+    blockRows.map((row) => `${row.blockerUserId}:${row.blockedUserId}`),
+  );
+
+  for (const row of discoveryRows) {
+    const payload = (row.payload as Record<string, unknown>) ?? {};
+    const interest = interestById.get(String(payload.discoveryInterestId));
+    if (!interest) continue;
+    if (interest.sessionId !== row.id) continue;
+    if (
+      interest.requesterUserId !== userId &&
+      interest.recipientUserId !== userId
+    ) {
+      continue;
+    }
+    if (
+      restricted.has(interest.requesterUserId) ||
+      restricted.has(interest.recipientUserId)
+    ) {
+      continue;
+    }
+    if (
+      blocked.has(`${interest.requesterUserId}:${interest.recipientUserId}`) ||
+      blocked.has(`${interest.recipientUserId}:${interest.requesterUserId}`)
+    ) {
+      continue;
+    }
+    accessible.add(row.id);
+  }
+
+  return accessible;
+}
+
 export async function listSessionsForUser(
   user: User,
 ): Promise<PublicSession[]> {
@@ -276,15 +374,12 @@ export async function listSessionsForUser(
           ),
     )
     .orderBy(desc(sessions.updatedAt));
-  const rows: Session[] = [];
-  for (const row of allRows) {
-    try {
-      await assertDiscoverySessionAccess(row, user.id);
-      rows.push(row);
-    } catch {
-      if (!isDiscoveryMediatedSession(row)) throw new Error("Session access failed");
-    }
-  }
+  // Discovery access used to be checked one session at a time, at three
+  // queries each. Same rules, evaluated over three batched reads.
+  const accessible = await discoveryAccessibleSessionIds(allRows, user.id);
+  const rows = allRows.filter(
+    (row) => !isDiscoveryMediatedSession(row) || accessible.has(row.id),
+  );
 
   const peerIds = new Set<string>();
   for (const row of rows) {
@@ -294,10 +389,14 @@ export async function listSessionsForUser(
     if (peerId) peerIds.add(peerId);
   }
 
+  // One query for every peer, not one query per peer.
   const peerMap = new Map<string, User>();
-  for (const id of peerIds) {
-    const found = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    if (found[0]) peerMap.set(id, found[0]);
+  if (peerIds.size > 0) {
+    const found = await db
+      .select()
+      .from(users)
+      .where(inArray(users.id, [...peerIds]));
+    for (const row of found) peerMap.set(row.id, row);
   }
 
   const ids = rows.map((r) => r.id);
@@ -309,6 +408,14 @@ export async function listSessionsForUser(
           .from(sessionParticipants)
           .where(inArray(sessionParticipants.sessionId, ids));
 
+  // Grouped once rather than re-scanned per session.
+  const partsBySession = new Map<string, typeof allParts>();
+  for (const part of allParts) {
+    const list = partsBySession.get(part.sessionId);
+    if (list) list.push(part);
+    else partsBySession.set(part.sessionId, [part]);
+  }
+
   return rows.map((row) => {
     const peerId = isDiscoveryMediatedSession(row)
       ? null
@@ -316,8 +423,7 @@ export async function listSessionsForUser(
         ? row.peerUserId
         : row.initiatorUserId;
     const peer = peerId ? peerMap.get(peerId) ?? null : null;
-    const participants = allParts
-      .filter((p) => p.sessionId === row.id)
+    const participants = (partsBySession.get(row.id) ?? [])
       .map((p) => ({
         userId: p.userId,
         email: p.email,

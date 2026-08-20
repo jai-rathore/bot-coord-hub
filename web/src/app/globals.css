@@ -171,9 +171,9 @@ body {
   .live-dot {
     background: var(--honey);
     border-radius: 999px;
-    box-shadow: 0 0 0 0 rgba(200, 146, 45, 0.55);
     display: inline-block;
     height: 0.42rem;
+    position: relative;
     width: 0.42rem;
   }
 
@@ -295,15 +295,31 @@ body {
   }
 }
 
+/*
+ * The live dot used to animate box-shadow, which cannot be composited: it
+ * repainted every frame, forever, in eight places — including inside the
+ * sticky backdrop-blur header. Same look, expressed as a ring that scales and
+ * fades, so both halves stay on the compositor.
+ */
 @keyframes pulse-live {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(200, 146, 45, 0.5);
     transform: scale(1);
   }
   55% {
-    box-shadow: 0 0 0 8px rgba(200, 146, 45, 0);
     transform: scale(1.08);
+  }
+}
+
+@keyframes pulse-live-ring {
+  0% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  55%,
+  100% {
+    opacity: 0;
+    transform: scale(3.4);
   }
 }
 
@@ -371,6 +387,17 @@ body {
 
 .animate-pulse-live {
   animation: pulse-live 1.8s ease-out infinite;
+  will-change: transform;
+}
+
+.animate-pulse-live::after {
+  animation: pulse-live-ring 1.8s ease-out infinite;
+  background: rgba(200, 146, 45, 0.5);
+  border-radius: 999px;
+  content: "";
+  inset: 0;
+  position: absolute;
+  will-change: opacity, transform;
 }
 
 .animate-shimmer {
@@ -399,6 +426,10 @@ body {
   *::after {
     animation: none !important;
     transition: none !important;
+  }
+  /* Without its animation the ring would be a static disc over the dot. */
+  .animate-pulse-live::after {
+    display: none;
   }
 }
 

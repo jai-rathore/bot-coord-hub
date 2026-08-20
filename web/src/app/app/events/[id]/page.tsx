@@ -30,21 +30,29 @@ export default async function OrganizerEventPage({
   if (!eventsFeatureEnabled()) notFound();
   const { id } = await params;
 
-  const user = await ensureCurrentUser();
+  // Independent of each other: the account read does not gate the board load.
+  const [user, source] = await Promise.all([
+    ensureCurrentUser(),
+    loadBoardSource(id),
+  ]);
   if (!user) {
     return <p className="text-danger">Unable to resolve your account.</p>;
   }
-
-  const source = await loadBoardSource(id);
   if (!source) notFound();
-
-  await markEventSeen(id, user.id);
 
   // Non-organizers get the participant view at the public URL instead.
   const isOrganizer = source.event.organizerUserId === user.id;
   const board = projectBoard(source, user.id);
-  const activity = isOrganizer ? await loadEventActivity(id) : [];
-  const shareUrl = `${await currentOrigin()}/e/${board.event.shareSlug}`;
+
+  // markEventSeen is a write the render does not read back, and the activity
+  // list does not depend on it, so all three run together instead of the page
+  // waiting on each in turn.
+  const [, activity, origin] = await Promise.all([
+    markEventSeen(id, user.id),
+    isOrganizer ? loadEventActivity(id) : Promise.resolve([]),
+    currentOrigin(),
+  ]);
+  const shareUrl = `${origin}/e/${board.event.shareSlug}`;
 
   return (
     <div className="space-y-8">

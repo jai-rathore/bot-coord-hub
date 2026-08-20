@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 import {
   LocationAutocomplete,
   type CanonicalLocationSuggestion,
@@ -191,13 +192,18 @@ export function DiscoveryManager({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const selected = useMemo(
     () => intents.find((intent) => intent.slug === selectedSlug),
     [intents, selectedSlug],
   );
 
   function refresh() {
-    window.location.reload();
+    // Was window.location.reload(). That re-downloaded the document and all of
+    // the JS, re-initialised Clerk, re-ran the app shell's queries, and wiped
+    // the success message set just above before anyone could read it.
+    startTransition(() => router.refresh());
   }
 
   async function submitEnrollment() {
@@ -756,14 +762,16 @@ export function DiscoveryManager({
                       <button
                         type="button"
                         onClick={() => interestAction(interest.id!, "block")}
-                        className="font-semibold text-muted"
+                        disabled={busy}
+                        className="font-semibold text-muted disabled:opacity-60"
                       >
                         Block
                       </button>
                       <button
                         type="button"
                         onClick={() => interestAction(interest.id!, "report")}
-                        className="font-semibold text-danger"
+                        disabled={busy}
+                        className="font-semibold text-danger disabled:opacity-60"
                       >
                         Report and block
                       </button>

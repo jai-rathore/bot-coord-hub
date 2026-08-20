@@ -24,27 +24,31 @@ export function AgentNameForm({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  async function save(event: React.FormEvent) {
+  function save(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     setSaved(false);
-    try {
-      const res = await fetch("/api/settings/agent-name", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error ?? "Could not save that name.");
-        return;
+    // The await runs inside the transition so `pending` covers the request,
+    // not just what follows it.
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/settings/agent-name", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error ?? "Could not save that name.");
+          return;
+        }
+        setName(data.name ?? defaultName);
+        setSaved(true);
+        router.refresh();
+      } catch {
+        setError("Could not reach HoneyMatcha. Check your connection.");
       }
-      setName(data.name ?? defaultName);
-      setSaved(true);
-      startTransition(() => router.refresh());
-    } catch {
-      setError("Could not reach HoneyMatcha. Check your connection.");
-    }
+    });
   }
 
   return (

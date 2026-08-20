@@ -37,45 +37,61 @@ export function IntentModeration({
     {},
   );
 
-  async function runTriage() {
+  function runTriage() {
     setError(null);
     setInfo(null);
-    const res = await fetch("/api/intents/triage", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ limit: 20 }),
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/intents/triage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ limit: 20 }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error ?? "Triage failed");
+          return;
+        }
+        setInfo(`Triaged ${data.processed} proposal(s).`);
+        router.refresh();
+      } catch {
+        setError("Triage failed");
+      }
     });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Triage failed");
-      return;
-    }
-    setInfo(`Triaged ${data.processed} proposal(s).`);
-    startTransition(() => router.refresh());
   }
 
-  async function decide(id: string, action: "publish" | "reject") {
+  function decide(id: string, action: "publish" | "reject") {
     setError(null);
     setInfo(null);
-    const res = await fetch(`/api/intents/${id}/decide`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action,
-        reason: action === "reject" ? rejectReasons[id] ?? "" : undefined,
-      }),
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const res = await fetch(`/api/intents/${id}/decide`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            reason: action === "reject" ? rejectReasons[id] ?? "" : undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error ?? `Failed to ${action}`);
+          return;
+        }
+        setInfo(
+          action === "publish"
+            ? `Published “${data.proposal.name}”.`
+            : `Rejected “${data.proposal.name}”.`,
+        );
+        router.refresh();
+      } catch {
+        setError(`Failed to ${action}`);
+      }
     });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? `Failed to ${action}`);
-      return;
-    }
-    setInfo(
-      action === "publish"
-        ? `Published “${data.proposal.name}”.`
-        : `Rejected “${data.proposal.name}”.`,
-    );
-    startTransition(() => router.refresh());
   }
 
   return (

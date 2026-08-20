@@ -29,7 +29,12 @@
     "email:test": "tsx scripts/send-test-email.ts",
     "sms:test": "tsx scripts/send-test-sms.ts",
     "test:e2e-events-agent": "tsx scripts/e2e-events-agent.ts",
-    "test:e2e-meet": "tsx scripts/e2e-meet.ts"
+    "test:e2e-meet": "tsx scripts/e2e-meet.ts",
+    "perf:baseline": "node scripts/perf-baseline.mjs",
+    "perf:bench": "tsx scripts/perf-bench.ts",
+    "test:e2e-html": "node scripts/e2e-html.mjs",
+    "test:routes": "node scripts/route-snapshot.mjs --check",
+    "routes:snapshot": "node scripts/route-snapshot.mjs --write"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.4",

@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, notInArray } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, isNull, notInArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   agentProfiles,
@@ -25,6 +25,28 @@ export function isVisibleHomeTask(status: string) {
   );
 }
 
+/**
+ * Whether the user has an agent that has actually called the API.
+ *
+ * The /app shell needs this one boolean on every navigation. Reading it via
+ * getHomeStatus cost six queries — including full scans of `links` and
+ * `confirms` whose rows were only ever counted — to produce two scalars.
+ */
+export async function agentIsConnected(userId: string): Promise<boolean> {
+  const [row] = await getDb()
+    .select({ id: apiKeys.id })
+    .from(apiKeys)
+    .where(
+      and(
+        eq(apiKeys.userId, userId),
+        isNull(apiKeys.revokedAt),
+        isNotNull(apiKeys.lastUsedAt),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
 export async function getHomeStatus(user: User) {
   const db = getDb();
   const [keys, activeLinks, pendingConfirms, recentSessions, calendar, profile] =
@@ -41,8 +63,9 @@ export async function getHomeStatus(user: User) {
           and(eq(apiKeys.userId, user.id), isNull(apiKeys.revokedAt)),
         )
         .orderBy(desc(apiKeys.createdAt)),
+      // Counted in Postgres rather than by loading every row to read .length.
       db
-        .select({ id: links.id })
+        .select({ value: count() })
         .from(links)
         .where(
           and(
@@ -51,7 +74,7 @@ export async function getHomeStatus(user: User) {
           ),
         ),
       db
-        .select({ id: confirms.id })
+        .select({ value: count() })
         .from(confirms)
         .where(
           and(
@@ -92,8 +115,8 @@ export async function getHomeStatus(user: User) {
     },
     calendarConnected: calendar.length > 0,
     handle: profile[0]?.handle ?? null,
-    peopleCount: activeLinks.length,
-    attentionCount: pendingConfirms.length,
+    peopleCount: Number(activeLinks[0]?.value ?? 0),
+    attentionCount: Number(pendingConfirms[0]?.value ?? 0),
     recentTasks: recentSessions.map((session) => ({
       id: session.id,
       intentType: session.intentType,
