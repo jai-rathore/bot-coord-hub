@@ -32,107 +32,155 @@ export function LinksManager({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [acceptCode, setAcceptCode] = useState("");
 
-  async function createInvite(e: React.FormEvent) {
+  function createInvite(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setCreated(null);
     setCopiedId(null);
 
-    const res = await fetch("/api/links", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        toEmail: toEmail.trim() || undefined,
-        toName: toName.trim() || undefined,
-      }),
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/links", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            toEmail: toEmail.trim() || undefined,
+            toName: toName.trim() || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error ?? "Failed to create invite");
+          return;
+        }
+        setCreated(data.link);
+        setToEmail("");
+        setToName("");
+        router.refresh();
+      } catch {
+        setError("Failed to create invite");
+      }
     });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Failed to create invite");
-      return;
-    }
-    setCreated(data.link);
-    setToEmail("");
-    setToName("");
-    startTransition(() => router.refresh());
   }
 
-  async function createPublicInvite(e: React.FormEvent) {
+  function createPublicInvite(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setCreatedPublic(null);
     setCopiedId(null);
-    const response = await fetch("/api/public-invites", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        label: publicLabel.trim() || undefined,
-        maxRedemptions: Number(publicMaxRedemptions),
-      }),
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/public-invites", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            label: publicLabel.trim() || undefined,
+            maxRedemptions: Number(publicMaxRedemptions),
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setError(data.error ?? "Failed to create public invite");
+          return;
+        }
+        setCreatedPublic(data.publicInvite);
+        setPublicLabel("");
+        router.refresh();
+      } catch {
+        setError("Failed to create public invite");
+      }
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(data.error ?? "Failed to create public invite");
-      return;
-    }
-    setCreatedPublic(data.publicInvite);
-    setPublicLabel("");
-    startTransition(() => router.refresh());
   }
 
-  async function acceptInvite(e: React.FormEvent) {
+  function acceptInvite(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const res = await fetch("/api/links/accept", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inviteCode: acceptCode.trim() }),
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/links/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inviteCode: acceptCode.trim() }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error ?? "Failed to accept invite");
+          return;
+        }
+        setAcceptCode("");
+        router.refresh();
+      } catch {
+        setError("Failed to accept invite");
+      }
     });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Failed to accept invite");
-      return;
-    }
-    setAcceptCode("");
-    startTransition(() => router.refresh());
   }
 
-  async function revokeLink(id: string) {
+  function revokeLink(id: string) {
     setError(null);
-    const res = await fetch(`/api/links/${id}/revoke`, { method: "POST" });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(data.error ?? "Failed to revoke link");
-      return;
-    }
-    startTransition(() => router.refresh());
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const res = await fetch(`/api/links/${id}/revoke`, { method: "POST" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error ?? "Failed to revoke link");
+          return;
+        }
+        router.refresh();
+      } catch {
+        setError("Failed to revoke link");
+      }
+    });
   }
 
-  async function approveRequest(id: string) {
+  function approveRequest(id: string) {
     setError(null);
-    const response = await fetch(`/api/links/${id}/approve`, {
-      method: "POST",
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const response = await fetch(`/api/links/${id}/approve`, {
+          method: "POST",
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setError(data.error ?? "Failed to approve connection request");
+          return;
+        }
+        router.refresh();
+      } catch {
+        setError("Failed to approve connection request");
+      }
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(data.error ?? "Failed to approve connection request");
-      return;
-    }
-    startTransition(() => router.refresh());
   }
 
-  async function revokePublicInvite(id: string) {
+  function revokePublicInvite(id: string) {
     setError(null);
-    const response = await fetch(`/api/public-invites/${id}/revoke`, {
-      method: "POST",
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const response = await fetch(`/api/public-invites/${id}/revoke`, {
+          method: "POST",
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setError(data.error ?? "Failed to revoke public invite");
+          return;
+        }
+        if (createdPublic?.id === id) setCreatedPublic(null);
+        router.refresh();
+      } catch {
+        setError("Failed to revoke public invite");
+      }
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(data.error ?? "Failed to revoke public invite");
-      return;
-    }
-    if (createdPublic?.id === id) setCreatedPublic(null);
-    startTransition(() => router.refresh());
   }
 
   async function copyInviteUrl(id: string, inviteUrl: string) {
@@ -340,7 +388,8 @@ export function LinksManager({
                 <button
                   type="button"
                   onClick={() => revokeLink(link.id)}
-                  className="cursor-pointer rounded-md border border-line px-3 py-1.5 text-sm font-semibold text-muted"
+                  disabled={pending}
+                  className="cursor-pointer rounded-md border border-line px-3 py-1.5 text-sm font-semibold text-muted disabled:opacity-60"
                 >
                   Cancel request
                 </button>
@@ -375,6 +424,7 @@ export function LinksManager({
                 link={link}
                 hasAgent
                 onRevoke={revokeLink}
+                busy={pending}
               />
             ))}
           </ul>
@@ -400,6 +450,7 @@ export function LinksManager({
                 link={link}
                 hasAgent={false}
                 onRevoke={revokeLink}
+                busy={pending}
               />
             ))}
           </ul>
@@ -430,7 +481,8 @@ export function LinksManager({
                   <button
                     type="button"
                     onClick={() => revokeLink(link.id)}
-                    className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-sm font-medium text-danger"
+                    disabled={pending}
+                    className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-sm font-medium text-danger disabled:opacity-60"
                   >
                     Revoke
                   </button>
@@ -535,7 +587,8 @@ export function LinksManager({
                           <button
                             type="button"
                             onClick={() => revokePublicInvite(invite.id)}
-                            className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-xs font-semibold text-danger"
+                            disabled={pending}
+                            className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-xs font-semibold text-danger disabled:opacity-60"
                           >
                             Revoke link
                           </button>
@@ -583,10 +636,13 @@ function ConnectionRow({
   link,
   hasAgent,
   onRevoke,
+  busy = false,
 }: {
   link: PublicLink;
   hasAgent: boolean;
   onRevoke: (id: string) => void;
+  /** Disables the row's action while another mutation is in flight. */
+  busy?: boolean;
 }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -603,7 +659,8 @@ function ConnectionRow({
       <button
         type="button"
         onClick={() => onRevoke(link.id)}
-        className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-sm font-medium text-danger transition hover:bg-danger/5"
+        disabled={busy}
+        className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-60"
       >
         Revoke
       </button>

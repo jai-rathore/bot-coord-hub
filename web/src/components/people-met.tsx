@@ -19,9 +19,12 @@ export function PeopleMet({ people }: { people: MetPerson[] }) {
   const [invited, setInvited] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  async function connect(person: MetPerson) {
+  function connect(person: MetPerson) {
     setBusyId(person.userId);
     setError(null);
+    // Inside the transition so the row stays busy through the refresh, not
+    // just until the POST returns.
+    startTransition(async () => {
     try {
       const res = await fetch("/api/links", {
         method: "POST",
@@ -37,12 +40,13 @@ export function PeopleMet({ people }: { people: MetPerson[] }) {
         return;
       }
       setInvited((current) => new Set(current).add(person.userId));
-      startTransition(() => router.refresh());
+      router.refresh();
     } catch {
       setError("Could not reach HoneyMatcha. Check your connection.");
     } finally {
       setBusyId(null);
     }
+    });
   }
 
   if (people.length === 0) return null;

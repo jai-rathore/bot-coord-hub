@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { IntentRegistryItem } from "@/lib/intents";
 
@@ -10,6 +10,9 @@ type DedupeHit = {
   status: string;
   source: string;
 };
+
+/** Long enough to skip mid-word keystrokes, short enough to feel live. */
+const DEDUPE_DEBOUNCE_MS = 300;
 
 export function IntentsRegistry({
   initialItems,
@@ -30,6 +33,8 @@ export function IntentsRegistry({
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const dedupeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dedupeAbort = useRef<AbortController | null>(null);
   const [dedupeHits, setDedupeHits] = useState<DedupeHit[]>([]);
   const [force, setForce] = useState(false);
 
@@ -44,46 +49,72 @@ export function IntentsRegistry({
     );
   }, [initialItems, query]);
 
-  async function checkDedupe(nextName: string) {
+  /**
+   * Debounced and abortable: this used to fire a request on every keystroke,
+   * and slow responses could land out of order and overwrite newer hits.
+   */
+  function checkDedupe(nextName: string) {
+    if (dedupeTimer.current) clearTimeout(dedupeTimer.current);
+    dedupeAbort.current?.abort();
+
     if (!nextName.trim()) {
       setDedupeHits([]);
       return;
     }
-    const params = new URLSearchParams({ name: nextName });
-    const res = await fetch(`/api/intents/dedupe?${params}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    setDedupeHits(data.hits ?? []);
+
+    dedupeTimer.current = setTimeout(async () => {
+      const controller = new AbortController();
+      dedupeAbort.current = controller;
+      try {
+        const params = new URLSearchParams({ name: nextName });
+        const res = await fetch(`/api/intents/dedupe?${params}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setDedupeHits(data.hits ?? []);
+      } catch {
+        // An aborted or failed lookup is advisory only; leave the hits as-is.
+      }
+    }, DEDUPE_DEBOUNCE_MS);
   }
 
-  async function submitProposal(e: React.FormEvent) {
+  function submitProposal(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSuccess(null);
 
-    const res = await fetch("/api/intents/propose", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        description,
-        force,
-      }),
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/intents/propose", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            description,
+            force,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          if (data.hits) setDedupeHits(data.hits);
+          setError(data.error ?? "Failed to submit proposal");
+          return;
+        }
+        setSuccess(
+          `Thanks—we recorded “${data.proposal.name}” for product review.`,
+        );
+        setName("");
+        setDescription("");
+        setForce(false);
+        setDedupeHits([]);
+        router.refresh();
+      } catch {
+        setError("Failed to submit proposal");
+      }
     });
-    const data = await res.json();
-    if (!res.ok) {
-      if (data.hits) setDedupeHits(data.hits);
-      setError(data.error ?? "Failed to submit proposal");
-      return;
-    }
-    setSuccess(
-      `Thanks—we recorded “${data.proposal.name}” for product review.`,
-    );
-    setName("");
-    setDescription("");
-    setForce(false);
-    setDedupeHits([]);
-    startTransition(() => router.refresh());
   }
 
   return (
@@ -139,7 +170,7 @@ export function IntentsRegistry({
                 onChange={(e) => {
                   const v = e.target.value;
                   setName(v);
-                  void checkDedupe(v);
+                  checkDedupe(v);
                 }}
                 name="requested-task"
                 placeholder="For example: coordinate an interview panel"

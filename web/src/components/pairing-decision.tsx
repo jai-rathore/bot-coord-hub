@@ -1,31 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 export function PairingDecision({ userCode }: { userCode: string }) {
   const router = useRouter();
   const [pending, setPending] = useState<"approved" | "denied" | null>(null);
+  const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  async function decide(decision: "approved" | "denied") {
+  function decide(decision: "approved" | "denied") {
     setPending(decision);
     setError(null);
-    const response = await fetch(
-      `/api/pairings/${encodeURIComponent(userCode)}/decision`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision }),
-      },
-    );
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(data.error ?? "Could not decide this connection");
-      setPending(null);
-      return;
-    }
-    router.refresh();
+    // Inside a transition, so `pending` is held until the refreshed page has
+    // rendered rather than being dropped the moment the request returns. The
+    // finally clears it on every path — previously a successful decision left
+    // the button stuck reading "Connecting…" indefinitely.
+    startTransition(async () => {
+      try {
+        const response = await fetch(
+          `/api/pairings/${encodeURIComponent(userCode)}/decision`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ decision }),
+          },
+        );
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setError(data.error ?? "Could not decide this connection");
+          return;
+        }
+        router.refresh();
+      } catch {
+        setError("Could not decide this connection");
+      } finally {
+        setPending(null);
+      }
+    });
   }
 
   return (

@@ -21,27 +21,35 @@ export function ProfileSettingsForm({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  async function save(event: React.FormEvent) {
+  function save(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     setSaved(false);
-    const response = await fetch("/api/profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        displayName: displayName.trim() || null,
-        headline: headline.trim() || null,
-        websiteUrl: websiteUrl.trim() || null,
-        isPublished,
-      }),
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            displayName: displayName.trim() || null,
+            headline: headline.trim() || null,
+            websiteUrl: websiteUrl.trim() || null,
+            isPublished,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setError(data.error ?? "Could not update your public page");
+          return;
+        }
+        setSaved(true);
+        router.refresh();
+      } catch {
+        setError("Could not update your public page");
+      }
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(data.error ?? "Could not update your public page");
-      return;
-    }
-    setSaved(true);
-    startTransition(() => router.refresh());
   }
 
   return (

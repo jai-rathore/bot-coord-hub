@@ -12,20 +12,33 @@ export function ConfirmQueue({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  async function decide(id: string, decision: "approved" | "denied") {
+  function decide(id: string, decision: "approved" | "denied") {
     setError(null);
-    const res = await fetch(`/api/confirms/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision }),
+    setBusyId(id);
+    // The await lives inside the transition so `pending` covers the request
+    // itself, not just the refresh that follows it. Otherwise the buttons stay
+    // live and unchanged for the whole round trip.
+    startTransition(async () => {
+      try {
+        const res = await fetch(`/api/confirms/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ decision }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error ?? "Failed to update confirmation");
+          return;
+        }
+        router.refresh();
+      } catch {
+        setError("Failed to update confirmation");
+      } finally {
+        setBusyId(null);
+      }
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(data.error ?? "Failed to update confirmation");
-      return;
-    }
-    startTransition(() => router.refresh());
   }
 
   return (
@@ -79,7 +92,7 @@ export function ConfirmQueue({
                   onClick={() => decide(confirm.id, "approved")}
                   className="button-primary min-h-9 cursor-pointer px-3 py-1.5 text-sm disabled:opacity-60"
                 >
-                  Approve
+                  {busyId === confirm.id ? "Saving…" : "Approve"}
                 </button>
                 <button
                   type="button"
@@ -87,7 +100,7 @@ export function ConfirmQueue({
                   onClick={() => decide(confirm.id, "denied")}
                   className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-sm font-medium text-danger disabled:opacity-60"
                 >
-                  Decline
+                  {busyId === confirm.id ? "Saving…" : "Decline"}
                 </button>
               </div>
             </li>

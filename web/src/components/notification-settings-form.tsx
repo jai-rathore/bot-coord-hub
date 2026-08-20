@@ -29,28 +29,36 @@ export function NotificationSettingsForm({
   const [saved, setSaved] = useState(false);
   const needsPhone = wantsSms(channel);
 
-  async function save(event: React.FormEvent) {
+  function save(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     setSaved(false);
-    const response = await fetch("/api/settings/notifications", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        channel,
-        phone: needsPhone ? phone.trim() : phone.trim() || null,
-      }),
+    // The await runs inside the transition so `pending` covers the
+    // request, not just what follows it.
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/settings/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            channel,
+            phone: needsPhone ? phone.trim() : phone.trim() || null,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setError(data.error ?? "Could not save notification preferences");
+          return;
+        }
+        if (typeof data.phone === "string") {
+          setPhone(formatPhoneForInput(data.phone));
+        }
+        setSaved(true);
+        router.refresh();
+      } catch {
+        setError("Could not save notification preferences");
+      }
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      setError(data.error ?? "Could not save notification preferences");
-      return;
-    }
-    if (typeof data.phone === "string") {
-      setPhone(formatPhoneForInput(data.phone));
-    }
-    setSaved(true);
-    startTransition(() => router.refresh());
   }
 
   if (!smsEnabled) {
