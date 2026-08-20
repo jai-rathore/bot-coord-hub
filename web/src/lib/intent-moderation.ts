@@ -18,6 +18,26 @@ export function isIntentAdmin(user: User): boolean {
   return admins.includes(user.email.toLowerCase());
 }
 
+/**
+ * Production fails closed: an unset admin list must not let any signed-in
+ * user run the LLM triage worker. Locally the empty list still means
+ * "any signed-in user", so a laptop without the env var can iterate.
+ */
+export function canRunIntentTriage(
+  user: Pick<User, "email">,
+  env: { production?: boolean; adminEmails?: string } = {},
+): boolean {
+  const raw = env.adminEmails ?? process.env.INTENT_ADMIN_EMAILS ?? "";
+  const configured = Boolean(raw.trim());
+  const production = env.production ?? process.env.NODE_ENV === "production";
+  if (!configured) return !production;
+  const admins = raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return admins.includes(user.email.toLowerCase());
+}
+
 /** Publishing executable task types is restricted to configured admins. */
 export function canModerateProposal(user: User, proposal: IntentProposal): boolean {
   void proposal;

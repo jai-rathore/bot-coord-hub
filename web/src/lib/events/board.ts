@@ -37,6 +37,19 @@ import {
   type ViewerRole,
 } from "@/lib/events/types";
 
+export const PUBLIC_EVENT_DESCRIPTION =
+  "Pick what works for you. HoneyMatcha handles the back-and-forth.";
+
+/** Share-card copy. Restricted events keep the title and hide the description. */
+export function eventShareDescription(event: {
+  visibility: string;
+  description: string | null;
+}): string {
+  if (event.visibility !== "open") return PUBLIC_EVENT_DESCRIPTION;
+  const copy = event.description?.trim();
+  return copy || PUBLIC_EVENT_DESCRIPTION;
+}
+
 export type BoardSource = {
   event: typeof events.$inferSelect;
   organizerName: string;
@@ -239,7 +252,7 @@ export function projectBoard(
               .sort((a, b) => a.name.localeCompare(b.name))
           : null,
         mine: myResponses.get(option.id) ?? null,
-        atCapacity: option.capacity != null && yes > option.capacity,
+        atCapacity: showCounts && option.capacity != null && yes > option.capacity,
       };
     });
 

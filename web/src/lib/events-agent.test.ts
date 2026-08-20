@@ -25,6 +25,7 @@ import { projectBoard, type BoardSource } from "./events/board";
 import { composeFallbackReply } from "./events/turn";
 import {
   emailConfigured,
+  payloadForRecipient,
   renderSms,
   renderTemplate,
   sendTestEmail,
@@ -395,6 +396,45 @@ test("no prompt ever contains a raw email address", () => {
 /* ------------------------------------------------------------------ */
 /* notification rendering                                              */
 /* ------------------------------------------------------------------ */
+
+test("restricted events strip winner from participant notification payloads", () => {
+  const payload = { title: "Coffee", winner: "Tue 6pm" };
+  const organizer = "org-1";
+  const guest = "guest-1";
+
+  assert.deepEqual(
+    payloadForRecipient(payload, {
+      visibility: "open",
+      recipientUserId: guest,
+      organizerUserId: organizer,
+    }),
+    payload,
+  );
+  assert.deepEqual(
+    payloadForRecipient(payload, {
+      visibility: "blind",
+      recipientUserId: organizer,
+      organizerUserId: organizer,
+    }),
+    payload,
+  );
+  assert.deepEqual(
+    payloadForRecipient(payload, {
+      visibility: "blind",
+      recipientUserId: guest,
+      organizerUserId: organizer,
+    }),
+    { title: "Coffee" },
+  );
+  assert.deepEqual(
+    payloadForRecipient(payload, {
+      visibility: "counts_only",
+      recipientUserId: guest,
+      organizerUserId: organizer,
+    }),
+    { title: "Coffee" },
+  );
+});
 
 test("every template renders a subject, a body, and the event link", () => {
   const url = "https://honeymatcha.io/e/abc123";

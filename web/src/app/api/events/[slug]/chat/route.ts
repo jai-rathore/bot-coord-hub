@@ -20,14 +20,18 @@ export async function GET(
     const event = await eventBySlug(slug);
     const isOrganizer = event.organizerUserId === user.id;
     const participant = await participantFor(event, user);
+    // `loadThread(eventId, null)` is the organizer thread. A signed-in visitor
+    // who has the slug but has not joined must not fall through to that.
+    const messages = isOrganizer
+      ? await loadThread(event.id, null)
+      : participant
+        ? await loadThread(event.id, participant.id)
+        : [];
 
     return Response.json({
       available: hostedAgentAvailable() && event.allowChat,
       agentName: event.agentName,
-      messages: await loadThread(
-        event.id,
-        isOrganizer ? null : (participant?.id ?? null),
-      ),
+      messages,
     });
   } catch (err) {
     return jsonError(err, "Failed to load the conversation");

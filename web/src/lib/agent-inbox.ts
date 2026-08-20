@@ -2,6 +2,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { agentInbox, apiKeys, type User } from "@/db/schema";
 import { AgentApiError } from "@/lib/agent-errors";
+import { isSafeCallbackUrl } from "@/lib/safe-url";
 import { boundedText } from "@/lib/validation";
 
 export type AgentReach =
@@ -30,32 +31,6 @@ export type InboxItem = {
   createdAt: string;
   acked: boolean;
 };
-
-function isSafeCallbackUrl(value: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return false;
-  }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
-  if (process.env.NODE_ENV === "production" && parsed.protocol !== "https:") {
-    return false;
-  }
-  const host = parsed.hostname.toLowerCase();
-  if (
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host === "::1" ||
-    host.endsWith(".local") ||
-    host.endsWith(".internal")
-  ) {
-    return process.env.NODE_ENV !== "production";
-  }
-  if (/^(10\.|192\.168\.|169\.254\.|0\.0\.0\.0)/.test(host)) return false;
-  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return false;
-  return true;
-}
 
 export async function userHasPairedAgent(userId: string): Promise<{
   hasPairedAgent: boolean;
@@ -145,7 +120,7 @@ export async function registerAgentCallback(opts: {
     opts.callbackUrl === null
       ? null
       : (boundedText(opts.callbackUrl, "callbackUrl", 500) ?? null);
-  if (url && !isSafeCallbackUrl(url)) {
+  if (url && !(await isSafeCallbackUrl(url))) {
     throw new AgentApiError(
       400,
       "callbackUrl must be a public http(s) URL",
@@ -410,13 +385,20 @@ async function postAgentCallbacks(opts: {
     })
     .from(apiKeys)
     .where(and(eq(apiKeys.userId, opts.userId), isNull(apiKeys.revokedAt)));
-  const urls = [
+  const candidates = [
     ...new Set(
       keys
         .map((key) => key.callbackUrl)
-        .filter((url): url is string => Boolean(url && isSafeCallbackUrl(url))),
+        .filter((url): url is string => Boolean(url)),
     ),
   ];
+  const urls = (
+    await Promise.all(
+      candidates.map(async (url) =>
+        (await isSafeCallbackUrl(url)) ? url : null,
+      ),
+    )
+  ).filter((url): url is string => url !== null);
   if (urls.length === 0) return "none";
 
   const payload = JSON.stringify({

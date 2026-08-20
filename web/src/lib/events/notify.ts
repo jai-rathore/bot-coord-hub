@@ -68,6 +68,33 @@ export type EnqueueInput = {
 };
 
 /**
+ * Blind and counts-only events hide the winning slot from everyone but the
+ * organizer. Email, SMS, and agent inbox used to carry `winner` to every
+ * participant and skip that projection.
+ */
+export function payloadForRecipient(
+  payload: Record<string, unknown>,
+  opts: {
+    visibility: string | null | undefined;
+    recipientUserId: string;
+    organizerUserId: string;
+  },
+): Record<string, unknown> {
+  if (opts.visibility === "open") return payload;
+  if (
+    opts.recipientUserId &&
+    opts.organizerUserId &&
+    opts.recipientUserId === opts.organizerUserId
+  ) {
+    return payload;
+  }
+  if (!("winner" in payload)) return payload;
+  const rest = { ...payload };
+  delete rest.winner;
+  return rest;
+}
+
+/**
  * One-line summary for the agent copy of a notification.
  *
  * Deliberately terser than the email: an agent relays or acts on this, it does
@@ -121,6 +148,7 @@ export async function enqueueEventNotification(
     .select({
       organizerUserId: events.organizerUserId,
       shareSlug: events.shareSlug,
+      visibility: events.visibility,
     })
     .from(events)
     .where(eq(events.id, input.eventId))
@@ -179,6 +207,13 @@ export async function enqueueEventNotification(
       ? `${input.dedupeKey}:${userId}`
       : input.dedupeKey;
 
+  const payloadFor = (userId: string) =>
+    payloadForRecipient(input.payload ?? {}, {
+      visibility: event?.visibility,
+      recipientUserId: userId,
+      organizerUserId: event?.organizerUserId ?? "",
+    });
+
   // One multi-row insert rather than one per recipient per channel. Dedupe keys
   // are unique per recipient and channel, so ON CONFLICT DO NOTHING still only
   // skips rows that already existed, and the returned rows are still exactly
@@ -198,7 +233,7 @@ export async function enqueueEventNotification(
           eventId: input.eventId,
           channel,
           template: input.template,
-          payload: input.payload ?? {},
+          payload: payloadFor(userId),
           dedupeKey: channel === "email" ? dedupeKey : `${dedupeKey}:sms`,
           scheduledFor,
         }),
@@ -226,9 +261,9 @@ export async function enqueueEventNotification(
             userId,
             eventId: input.eventId,
             kind: `event.${input.template}`,
-            summary: agentSummary(input.template, input.payload ?? {}),
+            summary: agentSummary(input.template, payloadFor(userId)),
             body: {
-              ...(input.payload ?? {}),
+              ...payloadFor(userId),
               eventId: input.eventId,
               template: input.template,
               eventUrl: event
