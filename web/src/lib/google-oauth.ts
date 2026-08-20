@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import {
   createHmac,
   randomBytes,
@@ -138,7 +139,7 @@ export async function exchangeCodeForTokens(
     redirect_uri: googleRedirectUri(requestOrigin),
     grant_type: "authorization_code",
   });
-  const res = await fetch(GOOGLE_TOKEN, {
+  const res = await fetchWithTimeout(GOOGLE_TOKEN, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
@@ -164,7 +165,7 @@ export async function exchangeCodeForTokens(
 
   let email: string | null = null;
   try {
-    const infoRes = await fetch(
+    const infoRes = await fetchWithTimeout(
       "https://www.googleapis.com/oauth2/v2/userinfo",
       { headers: { Authorization: `Bearer ${data.access_token}` } },
     );
@@ -286,7 +287,7 @@ export async function disconnectGoogle(userId: string): Promise<boolean> {
       connection.refreshToken || connection.accessToken,
     );
     try {
-      await fetch(
+      await fetchWithTimeout(
         `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token)}`,
         {
           method: "POST",
@@ -325,7 +326,7 @@ export async function getValidGoogleAccessToken(
     refresh_token: decryptSecret(connection.refreshToken),
     grant_type: "refresh_token",
   });
-  const res = await fetch(GOOGLE_TOKEN, {
+  const res = await fetchWithTimeout(GOOGLE_TOKEN, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,

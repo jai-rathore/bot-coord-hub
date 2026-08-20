@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { timingSafeEqual } from "crypto";
 import { getDb } from "@/db";
@@ -119,7 +120,7 @@ Description: ${proposal.description ?? "(none)"}`;
 
   if (openaiKey) {
     try {
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      const res = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${openaiKey}`,
@@ -152,7 +153,7 @@ Description: ${proposal.description ?? "(none)"}`;
 
   if (grokKey) {
     try {
-      const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      const res = await fetchWithTimeout("https://api.x.ai/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${grokKey}`,

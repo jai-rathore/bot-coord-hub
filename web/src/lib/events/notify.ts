@@ -9,6 +9,7 @@
  * stay queued. Without Twilio, text rows stay queued. The product still works.
  */
 
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import { and, asc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
@@ -344,7 +345,7 @@ async function sendEmail(to: string, rendered: Rendered): Promise<string | undef
   const key = process.env.RESEND_API_KEY?.trim();
   if (!key) throw new Error("RESEND_API_KEY is not configured");
 
-  const res = await fetch("https://api.resend.com/emails", {
+  const res = await fetchWithTimeout("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
@@ -382,7 +383,7 @@ async function sendSms(to: string, body: string): Promise<string | undefined> {
   if (messagingService) params.set("MessagingServiceSid", messagingService);
   else if (fromNumber) params.set("From", fromNumber);
 
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`,
     {
       method: "POST",
