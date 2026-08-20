@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppNav } from "@/components/app-nav";
 import { getDb } from "@/db";
 import { confirms } from "@/db/schema";
+import { isNextControlFlowError } from "@/lib/next-errors";
 import { getProfileForUser } from "@/lib/agent-profiles";
 import { ensureCurrentUser } from "@/lib/users";
 import { getHomeStatus } from "@/lib/home-status";
@@ -48,16 +49,14 @@ export default async function AppLayout({
       handle = home.handle;
     }
   } catch (error) {
-    // redirect() throws; a bare catch would skip first-login handle setup.
-    if (
-      error &&
-      typeof error === "object" &&
-      "digest" in error &&
-      String((error as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")
-    ) {
-      throw error;
-    }
+    // Next signals redirect(), notFound(), and the static-generation bailout by
+    // throwing; all of them have to reach the framework. Previously only
+    // redirect() was re-thrown, so the dynamic-usage bailout was swallowed too.
+    if (isNextControlFlowError(error)) throw error;
     // DB may be unavailable in local UI-only runs; pages that need DB surface errors.
+    // The shell still renders with zeroed badges, but the cause is logged
+    // rather than swallowed — this ran on every /app navigation.
+    console.error("[app-shell] layout data load failed", error);
   }
 
   return (

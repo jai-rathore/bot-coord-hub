@@ -10,6 +10,7 @@ import { SiteHeader } from "@/components/site-header";
 import { getProfileForUser } from "@/lib/agent-profiles";
 import { getHomeStatus } from "@/lib/home-status";
 import { sageNameFor } from "@/lib/sage";
+import { isNextControlFlowError } from "@/lib/next-errors";
 import { ensureCurrentUser } from "@/lib/users";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
@@ -93,7 +94,14 @@ async function loadSignedInHome(): Promise<SignedInData | null> {
       attentionCount: status.attentionCount,
       sageName: sageNameFor(user),
     };
-  } catch {
+  } catch (error) {
+    // headers() throws the static-generation bailout, and redirect()/notFound()
+    // throw too; those have to reach Next rather than be turned into `null`.
+    if (isNextControlFlowError(error)) throw error;
+    // Falling back to the public page is deliberate (see above), but the
+    // failure itself must not vanish — this catch hid every DB error on the
+    // busiest route in the product.
+    console.error("[home] signed-in load failed, showing public page", error);
     return null;
   }
 }
