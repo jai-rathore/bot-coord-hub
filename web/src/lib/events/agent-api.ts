@@ -23,6 +23,7 @@ import { loadBoardSource, projectBoard } from "@/lib/events/board";
 import { isNoteVisibility, NOTE_LIMITS } from "@/lib/events/notes";
 import {
   addOption,
+  archiveEvent,
   assertOrganizer,
   createEvent,
   extendDeadline,
@@ -99,14 +100,33 @@ function eventRefFrom(body: {
   return body.eventId ?? body.shareSlug ?? body.shareUrl;
 }
 
-export async function agentListEvents(auth: AgentAuth, baseUrl?: string) {
+export async function agentListEvents(
+  auth: AgentAuth,
+  baseUrl?: string,
+  opts: { archived?: unknown; limit?: unknown; offset?: unknown } = {},
+) {
   assertEnabled();
   assertAgentScope(auth, "events:read");
-  const { organized, joined } = await listEventsForUser(auth.user);
+  const archived = opts.archived === true;
+  const limit =
+    typeof opts.limit === "number" && Number.isFinite(opts.limit)
+      ? Math.min(Math.max(Math.trunc(opts.limit), 1), 100)
+      : undefined;
+  const offset =
+    typeof opts.offset === "number" && Number.isFinite(opts.offset)
+      ? Math.max(Math.trunc(opts.offset), 0)
+      : undefined;
+  const { organized, joined, hasMore } = await listEventsForUser(auth.user, {
+    archived,
+    limit,
+    offset,
+  });
   const shape = (event: (typeof organized)[number]) => ({
     id: event.id,
     title: event.title,
     status: event.status,
+    timezone: event.timezone,
+    visibility: event.visibility,
     shareSlug: event.shareSlug,
     shareUrl: baseUrl ? `${baseUrl}/e/${event.shareSlug}` : undefined,
     deadlineAt: event.deadlineAt.toISOString(),
@@ -114,6 +134,8 @@ export async function agentListEvents(auth: AgentAuth, baseUrl?: string) {
   });
   return {
     ok: true,
+    archived,
+    hasMore,
     organized: organized.map(shape),
     joined: joined.map(shape),
   };
@@ -496,6 +518,35 @@ export async function agentExtendEventDeadline(
   if (!body.deadlineAt) throw new AgentApiError(400, "deadlineAt is required");
   await extendDeadline(event, auth.user, body.deadlineAt);
   return { ok: true };
+}
+
+/**
+ * Hide or restore an event on this human's list. Per-person and reversible —
+ * the same button the Events page offers — so an agent can clean up without
+ * cancelling for everyone else.
+ */
+export async function agentArchiveEvent(
+  auth: AgentAuth,
+  body: {
+    eventId?: unknown;
+    shareSlug?: unknown;
+    shareUrl?: unknown;
+    archived?: unknown;
+  },
+) {
+  assertEnabled();
+  assertAgentScope(auth, "events:write");
+  const event = await resolveEventRef(eventRefFrom(body));
+  const archived = body.archived !== false;
+  await archiveEvent(event, auth.user, archived);
+  return {
+    ok: true,
+    eventId: event.id,
+    archived,
+    human_note: archived
+      ? "This event is off your list. It is still on everyone else's. Call list_events with archived=true to find it again."
+      : "This event is back on your list.",
+  };
 }
 
 export async function agentNudgeEventParticipants(

@@ -10,6 +10,7 @@ import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import {
   agentAddEventOption,
+  agentArchiveEvent,
   agentCreateEvent,
   agentExtendEventDeadline,
   agentPostEventNote,
@@ -28,6 +29,7 @@ import {
   acceptInvite,
   ackInbox,
   AgentApiError,
+  approveConnection,
   createGuestTask,
   createInvite,
   createPublicInvite,
@@ -38,8 +40,10 @@ import {
   listInbox,
   listIntents,
   listLinks,
+  listPeople,
   listPublicInvites,
   listSessions,
+  patchLinkPolicy,
   postBoardMessage,
   proposeIntent,
   readGuestTask,
@@ -47,10 +51,12 @@ import {
   requestScheduleMeeting,
   requestDiscoveryInterest,
   resolveDiscoveryLocation,
+  respondConfirm,
   getAgentProfile,
   redeemPublicInvite,
   requestAgentConnection,
   revokeGuestTask,
+  revokeLink,
   revokePublicInvite,
   setAgentCallback,
   setDiscoveryCapabilityManifest,
@@ -119,10 +125,75 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "list_links",
     description:
-      "List peer links (pending/active/revoked) for the authenticated user.",
+      "List peer links (pending/active/revoked) for the authenticated user. Pending incoming public-page or public-invite requests wait here for approve_connection.",
     inputSchema: {
       type: "object",
       properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "list_people",
+    description:
+      "People your human coordinated with on an event who are not yet a connection. The same list the People page shows. Use create_invite or request_agent_connection after your human agrees; incoming requests are in list_links.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "approve_connection",
+    description:
+      "Approve an incoming public-page or public-invite connection request. Ask your human first — this is the same button they have on People. Take linkId from list_links (pending, incoming).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        linkId: {
+          type: "string",
+          description: "The pending link id from list_links.",
+        },
+      },
+      required: ["linkId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "revoke_link",
+    description:
+      "Revoke a connection or pending invite. The other person can no longer coordinate through it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        linkId: {
+          type: "string",
+          description: "The link id from list_links.",
+        },
+      },
+      required: ["linkId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "update_link_policy",
+    description:
+      "Update booking policy on an active connection: whether your human must confirm, timezone, and allowed hours.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        linkId: { type: "string" },
+        confirmRequired: { type: "boolean" },
+        timezone: {
+          type: "string",
+          description: "IANA timezone, or empty to clear",
+        },
+        allowedHours: {
+          type: "object",
+          description: '{ start: "09:00", end: "17:00", days?: number[] }',
+          additionalProperties: true,
+        },
+      },
+      required: ["linkId"],
       additionalProperties: false,
     },
   },
@@ -532,10 +603,32 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "list_confirms",
     description:
-      "List decisions waiting for the human. The human responds at /app/attention.",
+      "List decisions waiting for the human. The human responds at /app/attention. Default credentials cannot decide; respond_confirm needs explicit approvals:write.",
     inputSchema: {
       type: "object",
       properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "respond_confirm",
+    description:
+      "Record a decision on a confirm gate after your human said yes. Default pairings lack approvals:write and will be refused — those humans decide at /app/attention. Call only after explicit human OK.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        confirmId: { type: "string" },
+        sessionId: {
+          type: "string",
+          description: "Used when confirmId is omitted: the pending gate on this session.",
+        },
+        action: {
+          type: "string",
+          enum: ["approve", "decline", "defer"],
+        },
+        note: { type: "string" },
+      },
+      required: ["action"],
       additionalProperties: false,
     },
   },
@@ -638,8 +731,41 @@ export const MCP_TOOLS: McpToolDef[] = [
   },
   {
     name: "list_events",
-    description: "List events this human organizes or was invited to.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    description:
+      "List events this human organizes or was invited to. Pass archived=true for the ones they hid from their list.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        archived: {
+          type: "boolean",
+          description: "When true, list archived events instead of the live list.",
+        },
+        limit: { type: "number", description: "Page size, 1–100." },
+        offset: { type: "number" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "archive_event",
+    description:
+      "Hide an event from your human's list, or put it back. Per-person and reversible — it does not cancel the event for anyone else. Use list_events with archived=true to find hidden ones.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        eventId: {
+          type: "string",
+          description:
+            "Event id, share slug, or full /e/<slug> link — any of the three.",
+        },
+        archived: {
+          type: "boolean",
+          description: "Omit or true to archive; false to restore.",
+        },
+      },
+      required: ["eventId"],
+      additionalProperties: false,
+    },
   },
   {
     name: "get_event_board",
@@ -846,6 +972,7 @@ const DISCOVERY_FLAGGED_TOOLS = new Set([
 const EVENT_FLAGGED_TOOLS = new Set([
   "create_event",
   "list_events",
+  "archive_event",
   "get_event_board",
   "join_event",
   "respond_to_event",
@@ -901,6 +1028,30 @@ export async function dispatchMcpTool(
       );
     case "list_links":
       return listLinks(auth, baseUrl);
+    case "list_people":
+      return listPeople(auth);
+    case "approve_connection":
+      return approveConnection(
+        auth,
+        { linkId: args.linkId as string | undefined },
+        baseUrl,
+      );
+    case "revoke_link":
+      return revokeLink(auth, String(args.linkId ?? args.id ?? ""));
+    case "update_link_policy":
+      return patchLinkPolicy(
+        auth,
+        String(args.linkId ?? args.id ?? ""),
+        {
+          confirmRequired: args.confirmRequired as boolean | undefined,
+          timezone: args.timezone as string | null | undefined,
+          allowedHours: args.allowedHours as
+            | { start: string; end: string; days?: number[] }
+            | null
+            | undefined,
+        },
+        baseUrl,
+      );
     case "create_invite":
       return createInvite(
         auth,
@@ -1025,6 +1176,13 @@ export async function dispatchMcpTool(
       });
     case "list_confirms":
       return listConfirms(auth);
+    case "respond_confirm":
+      return respondConfirm(auth, {
+        confirmId: args.confirmId as string | undefined,
+        sessionId: args.sessionId as string | undefined,
+        action: args.action as string | undefined,
+        note: args.note as string | undefined,
+      });
     case "list_guest_tasks":
       return listGuestTasks(auth);
     case "create_guest_task":
@@ -1050,7 +1208,9 @@ export async function dispatchMcpTool(
     case "create_event":
       return agentCreateEvent(auth, args, baseUrl);
     case "list_events":
-      return agentListEvents(auth, baseUrl);
+      return agentListEvents(auth, baseUrl, args);
+    case "archive_event":
+      return agentArchiveEvent(auth, args as never);
     case "get_event_board":
       return agentGetEventBoard(auth, args.eventId, baseUrl);
     case "join_event":

@@ -269,6 +269,23 @@ test("connect copy uses the production origin and never asks agents to sign in",
     discovery.endpoints.request_agent_connection.path,
     "/api/v1/profiles/:handle/connect",
   );
+  assert.equal(discovery.endpoints.list_people.path, "/api/v1/people");
+  assert.equal(
+    discovery.endpoints.approve_connection.path,
+    "/api/v1/links/:id/approve",
+  );
+  assert.equal(
+    discovery.endpoints.update_link_policy.path,
+    "/api/v1/links/:id",
+  );
+  assert.equal(
+    discovery.endpoints.archive_event.path,
+    "/api/v1/events/:id/archive",
+  );
+  assert.equal(
+    discovery.endpoints.respond_confirm.path,
+    "/api/v1/confirms/respond",
+  );
 });
 
 test("schedule_meeting sessions require a counterparty; hiring does not", () => {
