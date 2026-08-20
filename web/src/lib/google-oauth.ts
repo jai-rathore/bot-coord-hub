@@ -1,4 +1,7 @@
-import { fetchWithTimeout } from "@/lib/fetch-timeout";
+import {
+  fetchWithTimeout,
+  OAUTH_FETCH_TIMEOUT_MS,
+} from "@/lib/fetch-timeout";
 import {
   createHmac,
   randomBytes,
@@ -139,11 +142,15 @@ export async function exchangeCodeForTokens(
     redirect_uri: googleRedirectUri(requestOrigin),
     grant_type: "authorization_code",
   });
-  const res = await fetchWithTimeout(GOOGLE_TOKEN, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
+  const res = await fetchWithTimeout(
+    GOOGLE_TOKEN,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    },
+    OAUTH_FETCH_TIMEOUT_MS,
+  );
   if (!res.ok) {
     const text = await res.text();
     throw Object.assign(new Error(`Google token exchange failed: ${text}`), {
@@ -326,11 +333,15 @@ export async function getValidGoogleAccessToken(
     refresh_token: decryptSecret(connection.refreshToken),
     grant_type: "refresh_token",
   });
-  const res = await fetchWithTimeout(GOOGLE_TOKEN, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
+  const res = await fetchWithTimeout(
+    GOOGLE_TOKEN,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    },
+    OAUTH_FETCH_TIMEOUT_MS,
+  );
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Google token refresh failed: ${text}`);

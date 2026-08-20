@@ -161,8 +161,9 @@ export function KeysManager({ initialKeys }: { initialKeys: KeyRow[] }) {
                 </div>
                 <button
                   type="button"
+                  disabled={pending}
                   onClick={() => revokeKey(key.id)}
-                  className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-sm font-medium text-danger transition hover:bg-danger/5"
+                  className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-60"
                 >
                   Revoke
                 </button>
