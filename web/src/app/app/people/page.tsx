@@ -48,7 +48,7 @@ export default async function PeoplePage() {
       <PageHeading
         eyebrow="Your network"
         title="People"
-        description="Everyone you have coordinated with. Connect to someone and your agents can settle times between them; being listed on its own grants nothing."
+        description="Everyone you have coordinated with. A connection is what lets two agents settle a time between them — so what it does depends on whether the other person has one yet. To make a plan with anybody today, agent or not, send them an event link."
       />
       <div className="mt-9 space-y-10">
         <LinksManager
