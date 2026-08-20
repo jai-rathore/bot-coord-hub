@@ -11,6 +11,9 @@
 /** Deliberately shorter than any human's patience for a page that is loading. */
 export const DEFAULT_FETCH_TIMEOUT_MS = 10_000;
 
+/** Token exchange and refresh can sit behind Google's consent hop. */
+export const OAUTH_FETCH_TIMEOUT_MS = 25_000;
+
 export async function fetchWithTimeout(
   input: string | URL | Request,
   init: RequestInit = {},

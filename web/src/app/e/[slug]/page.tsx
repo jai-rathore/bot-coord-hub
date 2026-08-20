@@ -1,4 +1,3 @@
-import { after } from "next/server";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { BrandLink } from "@/components/brand-link";
@@ -81,10 +80,9 @@ export default async function PublicEventPage({
 
   const board = projectBoard(source, user?.id ?? null);
   if (user) {
-    // A write the render never reads back. after() runs it once the response
-    // has been sent, instead of holding up the most-shared page in the product.
-    const userId = user.id;
-    after(() => markEventSeen(event.id, userId));
+    // Must finish before this response, otherwise a click through to /app
+    // can still see the unread Events badge for a page the viewer just left.
+    await markEventSeen(event.id, user.id);
   }
   const signInUrl = `/sign-in?redirect_url=${encodeURIComponent(`/e/${slug}`)}`;
 

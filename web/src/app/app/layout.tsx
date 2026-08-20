@@ -30,25 +30,46 @@ export default async function AppLayout({
       const profile = await getProfileForUser(user.id);
       if (!profile) redirect("/setup");
 
-      const [row, connected, eventUpdates] = await Promise.all([
-        getDb()
-          .select({ count: count() })
-          .from(confirms)
-          .where(
-            and(
-              eq(confirms.userId, user.id),
-              eq(confirms.status, "pending"),
-            ),
-          )
-          .then((rows) => rows[0]),
-        agentIsConnected(user.id),
-        eventsFeatureEnabled()
-          ? listEventsWithUpdates(user)
-          : Promise.resolve({ unreadEventCount: 0 }),
-      ]);
-      attentionCount = Number(row?.count ?? 0);
-      eventsUnreadCount = eventUpdates.unreadEventCount;
-      agentConnected = connected;
+      // Isolated so a failure in event updates cannot zero the attention
+      // badge or the agent-connected state, and vice versa.
+      const [rowResult, connectedResult, eventUpdatesResult] =
+        await Promise.allSettled([
+          getDb()
+            .select({ count: count() })
+            .from(confirms)
+            .where(
+              and(
+                eq(confirms.userId, user.id),
+                eq(confirms.status, "pending"),
+              ),
+            )
+            .then((rows) => rows[0]),
+          agentIsConnected(user.id),
+          eventsFeatureEnabled()
+            ? listEventsWithUpdates(user)
+            : Promise.resolve({ unreadEventCount: 0 }),
+        ]);
+      if (rowResult.status === "fulfilled") {
+        attentionCount = Number(rowResult.value?.count ?? 0);
+      } else {
+        console.error("[app-shell] attention count failed", rowResult.reason);
+      }
+      if (connectedResult.status === "fulfilled") {
+        agentConnected = connectedResult.value;
+      } else {
+        console.error(
+          "[app-shell] agent connected check failed",
+          connectedResult.reason,
+        );
+      }
+      if (eventUpdatesResult.status === "fulfilled") {
+        eventsUnreadCount = eventUpdatesResult.value.unreadEventCount;
+      } else {
+        console.error(
+          "[app-shell] event updates failed",
+          eventUpdatesResult.reason,
+        );
+      }
       handle = profile.handle;
     }
   } catch (error) {

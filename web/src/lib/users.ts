@@ -13,6 +13,7 @@ import {
 } from "@/lib/phone";
 import { smsOffered } from "@/lib/sms-flag";
 import { timed } from "@/lib/perf";
+import { identityIsStale } from "@/lib/identity-refresh";
 
 function isUniqueViolation(error: unknown): boolean {
   return Boolean(
@@ -83,7 +84,16 @@ export async function syncUserIdentity(identity: {
         throw error;
       }
     }
-    return existing;
+    // Nothing changed, but this call is still a successful Clerk read.
+    // Touch updatedAt so identityIsStale() treats the row as fresh —
+    // otherwise a stable profile stays "stale" forever and every request
+    // pays another currentUser() round trip.
+    const [touched] = await db
+      .update(users)
+      .set({ updatedAt: new Date() })
+      .where(eq(users.id, existing.id))
+      .returning();
+    return touched ?? existing;
   }
 
   // A verified email may already exist after changing Clerk instances. Keep
@@ -201,20 +211,6 @@ export async function updateNotificationPrefs(
  */
 export const ensureCurrentUser = cache(loadCurrentUser);
 
-/**
- * How long a locally-stored identity is trusted before being re-read from
- * Clerk. Email and display name can change in Clerk without this app hearing
- * about it (there is no webhook wired up), so the row is refreshed
- * periodically rather than never.
- */
-const IDENTITY_REFRESH_MS = Number(
-  process.env.IDENTITY_REFRESH_MS ?? 10 * 60 * 1000,
-);
-
-function identityIsStale(user: User): boolean {
-  return Date.now() - user.updatedAt.getTime() > IDENTITY_REFRESH_MS;
-}
-
 async function loadCurrentUser(): Promise<User | null> {
   // auth() verifies the session cookie locally against cached JWKS; currentUser()
   // is a round trip to Clerk's Backend API. Every authenticated request used to
@@ -228,6 +224,9 @@ async function loadCurrentUser(): Promise<User | null> {
     .from(users)
     .where(eq(users.clerkUserId, userId))
     .limit(1);
+  // Email and display name can change in Clerk without this app hearing
+  // about it (no webhook), so a locally-stored row is re-read after
+  // identityRefreshWindowMs rather than never.
   if (existing && !identityIsStale(existing)) return existing;
 
   // First sight of this Clerk user, or the local copy is due a refresh.

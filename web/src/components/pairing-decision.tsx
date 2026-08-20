@@ -5,17 +5,16 @@ import { useRouter } from "next/navigation";
 
 export function PairingDecision({ userCode }: { userCode: string }) {
   const router = useRouter();
-  const [pending, setPending] = useState<"approved" | "denied" | null>(null);
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useTransition();
+  const [busy, setBusy] = useState<"approved" | "denied" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function decide(decision: "approved" | "denied") {
-    setPending(decision);
+    setBusy(decision);
     setError(null);
-    // Inside a transition, so `pending` is held until the refreshed page has
-    // rendered rather than being dropped the moment the request returns. The
-    // finally clears it on every path — previously a successful decision left
-    // the button stuck reading "Connecting…" indefinitely.
+    // `pending` from the transition stays true through the request and the
+    // refresh. `busy` is only the label, and is cleared in finally so a
+    // failed decision does not leave the button reading "Connecting…".
     startTransition(async () => {
       try {
         const response = await fetch(
@@ -35,7 +34,7 @@ export function PairingDecision({ userCode }: { userCode: string }) {
       } catch {
         setError("Could not decide this connection");
       } finally {
-        setPending(null);
+        setBusy(null);
       }
     });
   }
@@ -50,19 +49,19 @@ export function PairingDecision({ userCode }: { userCode: string }) {
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          disabled={pending !== null}
+          disabled={pending}
           onClick={() => decide("approved")}
           className="button-primary cursor-pointer disabled:opacity-60"
         >
-          {pending === "approved" ? "Connecting…" : "Connect this agent"}
+          {busy === "approved" ? "Connecting…" : "Connect this agent"}
         </button>
         <button
           type="button"
-          disabled={pending !== null}
+          disabled={pending}
           onClick={() => decide("denied")}
           className="rounded-md border border-line px-4 py-2.5 text-sm font-medium text-muted disabled:opacity-60"
         >
-          {pending === "denied" ? "Declining…" : "Not mine"}
+          {busy === "denied" ? "Declining…" : "Not mine"}
         </button>
       </div>
     </div>
