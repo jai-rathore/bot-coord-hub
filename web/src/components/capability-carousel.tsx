@@ -24,6 +24,11 @@ import {
 /** Matches the `gap` on `.rail`; the step maths needs it in pixels. */
 const CARD_GAP = 12;
 
+/**
+ * Both of these are the reader's own agent — the switch is about where it came
+ * from, not who it works for. Labelling one "Sage runs it" against "My agent
+ * runs it" quietly said the opposite.
+ */
 const OPERATORS: Array<{
   id: Operator;
   tab: string;
@@ -31,15 +36,15 @@ const OPERATORS: Array<{
 }> = [
   {
     id: "sage",
-    tab: "Sage runs it",
+    tab: "Use Sage",
     tagline:
-      "Sage is our agent. It is already switched on — nothing to install, nothing to pay for.",
+      "Sage is your agent — it comes with the account, already running. Nothing to install, nothing to pay for.",
   },
   {
     id: "own",
-    tab: "My agent runs it",
+    tab: "Bring my own",
     tagline:
-      "Bring Grok, Claude, Cursor, or your own. It runs every capability here from day one.",
+      "Already have one? Grok, Claude, Cursor, anything speaking MCP. Connect it and it runs every capability here from day one.",
   },
 ];
 
@@ -142,7 +147,8 @@ export function CapabilityCarousel() {
           Everything here is run by an agent.
         </h2>
         <p className="mt-3 max-w-[46ch] text-base leading-7 text-muted">
-          The only question is whose. Try the switch.
+          Always yours. The only question is where it came from. Try the
+          switch.
         </p>
 
         <div
@@ -212,7 +218,7 @@ export function CapabilityCarousel() {
                   <span
                     className={`lane-tag ${ready ? "" : "cap-tag-soon"}`}
                   >
-                    {ready ? "Ready" : "Sage is learning"}
+    {ready ? "Ready" : "Sage is learning"}
                   </span>
                 </div>
                 <div className="mt-6">
@@ -284,7 +290,7 @@ export function CapabilityCarousel() {
               {locked} of these are still on Sage&apos;s list — but none of them
               are waiting on us.{" "}
               <Link href="/agents" className="font-semibold text-matcha-deep">
-                Connect your own agent
+                Bring an agent of your own
               </Link>{" "}
               and every one works today.
             </>

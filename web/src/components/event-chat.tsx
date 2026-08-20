@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SageAvatar } from "@/components/sage-avatar";
 import type { EventBoard } from "@/lib/events/types";
 
 type ChatMessage = { id: string; role: string; text: string; createdAt: string };
@@ -98,17 +99,12 @@ export function EventChat({
     return (
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[0.9rem] border border-matcha-soft/40 bg-matcha/6 p-4">
         <div className="flex min-w-0 items-start gap-3">
-          <span
-            aria-hidden
-            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-matcha-deep text-base text-white"
-          >
-            ✦
-          </span>
+          <SageAvatar className="mt-0.5" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-ink">
               {agentName}
               <span className="ml-2 rounded-full bg-matcha/12 px-2 py-0.5 text-[0.65rem] font-bold tracking-[0.08em] text-matcha uppercase">
-                Event assistant
+                Your agent
               </span>
             </p>
             <p className="mt-1 text-sm text-muted">

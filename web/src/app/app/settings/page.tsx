@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import { PageHeading } from "@/components/page-heading";
 import { NotificationSettingsForm } from "@/components/notification-settings-form";
 import { ProfileSettingsForm } from "@/components/profile-settings-form";
+import { AgentNameForm } from "@/components/agent-name-form";
+import { DEFAULT_SAGE_NAME } from "@/lib/sage";
 import {
   connectPromptForHandle,
   getOwnedProfile,
@@ -80,6 +82,23 @@ export default async function SettingsPage({
             initialChannel={user.notifyChannel}
             initialPhone={user.phoneE164}
             smsEnabled={smsOffered()}
+          />
+        </div>
+      </section>
+
+      <section className="surface-card mt-9 p-5 sm:p-7">
+        <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
+          Your agent
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+          {DEFAULT_SAGE_NAME} came with your account and works only for you —
+          on your events, with your permissions. Call it something else if you
+          like.
+        </p>
+        <div className="mt-5 max-w-md">
+          <AgentNameForm
+            initialName={user.hostedAgentName ?? ""}
+            defaultName={DEFAULT_SAGE_NAME}
           />
         </div>
       </section>

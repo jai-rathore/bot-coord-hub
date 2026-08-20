@@ -9,6 +9,7 @@ import { SignedInHome } from "@/components/signed-in-home";
 import { SiteHeader } from "@/components/site-header";
 import { getProfileForUser } from "@/lib/agent-profiles";
 import { getHomeStatus } from "@/lib/home-status";
+import { sageNameFor } from "@/lib/sage";
 import { ensureCurrentUser } from "@/lib/users";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
@@ -50,6 +51,7 @@ type SignedInData = {
   agentConnected: boolean;
   calendarConnected: boolean;
   attentionCount: number;
+  sageName: string;
 };
 
 /**
@@ -89,6 +91,7 @@ async function loadSignedInHome(): Promise<SignedInData | null> {
       agentConnected: status.agent.connected,
       calendarConnected: status.calendarConnected,
       attentionCount: status.attentionCount,
+      sageName: sageNameFor(user),
     };
   } catch {
     return null;
@@ -116,6 +119,7 @@ export default async function HomePage() {
         agentConnected={home.agentConnected}
         calendarConnected={home.calendarConnected}
         attentionCount={home.attentionCount}
+        sageName={home.sageName}
       />
     );
   }

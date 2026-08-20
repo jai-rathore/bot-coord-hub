@@ -22,6 +22,7 @@ import {
 import { AgentApiError } from "@/lib/agent-errors";
 import { writeAudit } from "@/lib/audit";
 import { boundedText } from "@/lib/validation";
+import { sageNameFor } from "@/lib/sage";
 import { displayName, formatSlot } from "@/lib/events/copy";
 import {
   loadEventNotes,
@@ -193,7 +194,7 @@ export async function createEvent(
           deadlineAt,
           allowChat: input.allowChat !== false,
           allowGuestOptions: input.allowGuestOptions !== false,
-          agentName: "Sage",
+          agentName: sageNameFor(organizer),
         })
         .returning();
       created = row;

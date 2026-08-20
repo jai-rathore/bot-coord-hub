@@ -6,8 +6,10 @@ import { HomeLivePreview } from "@/components/home-live-preview";
  *
  * Signed-in people no longer pass through this file at all — they get their own
  * home — so the hero only has one job: say what the thing is and offer the two
- * ways in. Those two are the product: use the agent we provide, or bring the
- * one you already have. Everything else is one swipeable rail below.
+ * ways in. Those two are the product: use the agent that comes with the
+ * account, or bring the one you already have. Either way it is yours — which
+ * is why the headline says "your agent" and not "ours". Everything else is one
+ * swipeable rail below.
  */
 export function HomeHero() {
   return (
@@ -18,14 +20,19 @@ export function HomeHero() {
           You keep the yes
         </div>
         <h1 className="display-title mt-5 text-[clamp(2.6rem,11vw,5.4rem)] leading-[0.96]">
-          <span className="hero-line hero-line-1 block">Sort it out</span>
+          <span className="hero-line hero-line-1 block">Let your agent</span>
+          {/* The hyphens are break opportunities, so a phone split it as
+              "back-and-" / "forth." Held together, the line breaks after
+              "the" instead — which is where a person would break it. */}
           <span className="display-accent hero-line hero-line-2 mt-1 block">
-            without the group chat.
+            handle the{" "}
+            <span className="whitespace-nowrap">back-and-forth.</span>
           </span>
         </h1>
         <p className="animate-rise-delay-2 mt-5 max-w-[38ch] text-[1.05rem] leading-7 text-muted">
-          Hand it to Sage, our agent, and it settles without you chasing
-          anyone. Already have an agent? Bring that one instead.
+          Sage is your agent, and it is already running — it chases the
+          replies, compares the calendars, and brings you the decision.
+          Already have an agent? Bring that one instead.
         </p>
         <div className="animate-rise-delay-3 mt-7 flex flex-col gap-3 sm:flex-row">
           <Link href="/sign-up" className="button-primary w-full sm:w-auto sm:px-5">
@@ -36,7 +43,7 @@ export function HomeHero() {
           </Link>
         </div>
         <p className="animate-rise-delay-3 mt-3 text-sm text-muted">
-          Free in beta. Sage is included — there is nothing to install.
+          Free in beta. Sage comes with your account — nothing to install.
         </p>
       </div>
       <div className="animate-rise-delay-2 lg:pt-2">

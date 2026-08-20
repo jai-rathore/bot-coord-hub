@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AgentStatusCard } from "@/components/agent-status-card";
 import { PageHeading } from "@/components/page-heading";
+import { SagePortrait } from "@/components/sage-avatar";
 import { SetupGuide } from "@/components/setup-guide";
 import { getHomeStatus } from "@/lib/home-status";
 import { intentLabel, taskStatusLabel } from "@/lib/intent-labels";
@@ -61,8 +62,17 @@ export default async function AgentPage() {
       <PageHeading
         eyebrow="Advanced"
         title="Agent setup"
-        description="Connect an AI agent and it does the back-and-forth: comparing calendars, chasing replies, and bringing you only the decisions that need a person. HoneyMatcha works without one — this is the layer on top."
+        description="You already have an agent — Sage came with the account and works only for you. Connect one of your own and it takes over the same job: comparing calendars, chasing replies, and bringing you only the decisions that need a person."
       />
+
+      <div className="flex items-center gap-4 rounded-2xl border border-matcha-soft/35 bg-matcha/5 p-4 sm:p-5">
+        <SagePortrait width={92} className="hidden shrink-0 sm:block" />
+        <p className="text-sm leading-6 text-muted">
+          Whichever one is running, the boundary is the same: it can ask,
+          compare, and propose. It cannot approve on your behalf, and it never
+          sees the titles on your calendar.
+        </p>
+      </div>
 
       <SetupGuide
         calendar={{

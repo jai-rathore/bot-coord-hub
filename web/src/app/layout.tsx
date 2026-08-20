@@ -20,7 +20,7 @@ const sora = Sora({
 const siteUrl = "https://honeymatcha.io";
 const siteTitle = "HoneyMatcha";
 const siteDescription =
-  "Give your Grok Bot a trusted place to schedule, invite, and coordinate — while you stay in control of every important decision.";
+  "Let your agent handle the back-and-forth. Sage comes with your account, or bring your own — either way nothing is booked without your yes.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

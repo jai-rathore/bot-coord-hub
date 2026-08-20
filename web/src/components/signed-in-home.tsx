@@ -3,6 +3,7 @@ import { AppNav } from "@/components/app-nav";
 import { CapabilityGrid } from "@/components/capability-grid";
 import { EventUpdatePill } from "@/components/event-update-pill";
 import { MeetCode } from "@/components/meet-code";
+import { SagePortrait } from "@/components/sage-avatar";
 import { enabledCapabilities, lockedCount } from "@/lib/capabilities";
 import { relativeDeadline } from "@/lib/events/copy";
 import type { EventWithUpdates } from "@/lib/events/updates";
@@ -29,6 +30,7 @@ export function SignedInHome({
   agentConnected,
   calendarConnected,
   attentionCount,
+  sageName,
 }: {
   firstName: string | null;
   handle: string | null;
@@ -40,8 +42,11 @@ export function SignedInHome({
   agentConnected: boolean;
   calendarConnected: boolean;
   attentionCount: number;
+  /** What this person calls the agent that came with the account. */
+  sageName: string;
 }) {
   const displayName = firstName ?? "there";
+  const agentLabel = agentConnected ? "your agent" : sageName;
   const capabilities = enabledCapabilities({
     events: eventsEnabled,
     discovery: discoveryEnabled,
@@ -126,10 +131,13 @@ export function SignedInHome({
           </div>
 
           {events.length === 0 ? (
-            <p className="mt-3 text-sm leading-6 text-muted">
-              Nothing yet. Create an event and share the link — people answer
-              without signing up first.
-            </p>
+            <div className="mt-3 flex items-center gap-4">
+              <SagePortrait width={104} className="hidden shrink-0 sm:block" />
+              <p className="text-sm leading-6 text-muted">
+                Nothing yet. Create an event and share the link — people answer
+                without signing up first, and {agentLabel} takes it from there.
+              </p>
+            </div>
           ) : (
             <ul className="mt-4 space-y-3">
               {events.map((event) => (
@@ -169,7 +177,7 @@ export function SignedInHome({
               <p className="text-sm text-muted">
                 {agentConnected
                   ? "Your agent runs all of these."
-                  : "Sage runs the first one today."}
+                  : `${sageName} runs the first one today.`}
               </p>
             </div>
             <div className="mt-4">
@@ -215,8 +223,8 @@ export function SignedInHome({
                 </span>
                 <span className="mt-1 block text-sm leading-6 text-muted">
                   Grok, Claude, Cursor, or anything speaking MCP. One browser
-                  approval and it runs everything above — Sage keeps handling
-                  the rest either way.
+                  approval and it runs everything above — {sageName} keeps
+                  handling the rest either way.
                 </span>
               </span>
               <span className="shrink-0 font-semibold text-matcha-deep">
