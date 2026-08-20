@@ -1,6 +1,6 @@
 import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
-import type { LookupAddress, LookupOptions } from "node:dns";
+import type { LookupAddress } from "node:dns";
 import http from "node:http";
 import https from "node:https";
 
@@ -201,43 +201,33 @@ export async function isSafeCallbackUrl(
  * DNS lookup that never asks the network. Delivery must use this so a
  * hostname that was public at resolve time cannot rebound to a private IP.
  */
-export function pinnedLookup(addresses: PinnedAddress[]) {
-  return (
-    hostname: string,
-    options: LookupOptions | ((err: NodeJS.ErrnoException | null, address: string, family: number) => void),
-    callback?: (
-      err: NodeJS.ErrnoException | null,
-      address: string | LookupAddress[],
-      family?: number,
-    ) => void,
-  ) => {
-    const cb =
-      typeof options === "function"
-        ? options
-        : (callback as (
-            err: NodeJS.ErrnoException | null,
-            address: string | LookupAddress[],
-            family?: number,
-          ) => void);
+export function pinnedLookup(
+  addresses: PinnedAddress[],
+): NonNullable<https.RequestOptions["lookup"]> {
+  return (hostname, options, callback) => {
+    const done = typeof options === "function" ? options : callback;
+    const err = Object.assign(new Error(`ENOTFOUND ${hostname}`), {
+      code: "ENOTFOUND",
+    }) as NodeJS.ErrnoException;
+    if (!done) return;
     if (addresses.length === 0) {
-      const err = Object.assign(
-        new Error(`ENOTFOUND ${hostname}`),
-        { code: "ENOTFOUND" },
-      ) as NodeJS.ErrnoException;
-      cb(err, "", 4);
+      done(err, "", 4);
       return;
     }
-    if (typeof options !== "function" && options.all) {
-      cb(
+    const wantsAll =
+      typeof options === "object" && options !== null && options.all === true;
+    if (wantsAll) {
+      const all: LookupAddress[] = addresses.map((row) => ({
+        address: row.address,
+        family: row.family,
+      }));
+      (done as (e: NodeJS.ErrnoException | null, list: LookupAddress[]) => void)(
         null,
-        addresses.map((row) => ({
-          address: row.address,
-          family: row.family,
-        })),
+        all,
       );
       return;
     }
-    cb(null, addresses[0].address, addresses[0].family);
+    done(null, addresses[0].address, addresses[0].family);
   };
 }
 
