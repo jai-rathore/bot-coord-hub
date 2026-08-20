@@ -156,6 +156,12 @@ export function LinksManager({
     (link) => !link.publicInviteId && !link.profileHandle,
   );
   const revoked = initialLinks.filter((l) => l.status === "revoked");
+  const withAgents = active.filter(
+    (link) => link.peer && agents.has(link.peer.id),
+  );
+  const withoutAgents = active.filter(
+    (link) => !link.peer || !agents.has(link.peer.id),
+  );
   const publicInviteMap = new Map(
     initialPublicInvites.map((invite) => [invite.id, invite]),
   );
@@ -164,116 +170,6 @@ export function LinksManager({
 
   return (
     <div className="space-y-10">
-      <section className="space-y-4">
-        <div>
-          <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
-            Public invite link or QR
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            Anyone with the link can request a connection. You approve every
-            person before either agent receives relationship permissions.
-          </p>
-        </div>
-        <form
-          onSubmit={createPublicInvite}
-          className="flex flex-wrap items-end gap-3"
-        >
-          <label className="grid gap-1 text-sm">
-            <span className="font-medium text-ink">Label (optional)</span>
-            <input
-              value={publicLabel}
-              onChange={(event) => setPublicLabel(event.target.value)}
-              maxLength={80}
-              placeholder="Conference QR"
-              className="field min-w-[16rem]"
-            />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="font-medium text-ink">Request limit</span>
-            <select
-              value={publicMaxRedemptions}
-              onChange={(event) =>
-                setPublicMaxRedemptions(event.target.value)
-              }
-              className="field"
-            >
-              <option value="10">10 people</option>
-              <option value="25">25 people</option>
-              <option value="50">50 people</option>
-              <option value="100">100 people</option>
-            </select>
-          </label>
-          <button
-            type="submit"
-            disabled={pending}
-            className="button-primary cursor-pointer disabled:opacity-60"
-          >
-            Create public invite
-          </button>
-        </form>
-
-        {publicInviteList.length > 0 ? (
-          <div className="grid gap-4 lg:grid-cols-2">
-            {publicInviteList.map((invite) => (
-              <article
-                key={invite.id}
-                className="rounded-xl border border-line bg-[rgba(255,252,246,0.72)] p-4"
-              >
-                <div className="flex flex-wrap gap-4">
-                  {invite.status === "active" ? (
-                    <PublicInviteQr
-                      inviteUrl={invite.inviteUrl}
-                      label={invite.label}
-                    />
-                  ) : null}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-matcha-deep">
-                      {invite.label || "Public connection invite"}
-                    </p>
-                    <p className="mt-1 text-xs text-muted">
-                      {invite.redemptionCount} of {invite.maxRedemptions}{" "}
-                      requests used · expires{" "}
-                      {new Date(invite.expiresAt).toLocaleDateString()}
-                    </p>
-                    <code className="mt-3 block break-all rounded bg-white/80 px-2 py-2 text-xs text-ink">
-                      {invite.inviteUrl}
-                    </code>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {invite.status === "active" ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              copyInviteUrl(invite.id, invite.inviteUrl)
-                            }
-                            className="cursor-pointer rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold text-matcha-deep"
-                          >
-                            {copiedId === invite.id
-                              ? "Copied"
-                              : "Copy public link"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => revokePublicInvite(invite.id)}
-                            className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-xs font-semibold text-danger"
-                          >
-                            Revoke link
-                          </button>
-                        </>
-                      ) : (
-                        <span className="text-xs font-semibold text-muted">
-                          Revoked
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : null}
-      </section>
-
       <section className="space-y-3">
         <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
           Invite someone
@@ -454,37 +350,57 @@ export function LinksManager({
         </section>
       ) : null}
 
+      {/* Two buckets, because a connection means two different things
+          depending on who is on the other end. Listing them together implied a
+          capability that only half of them have. */}
       <section>
         <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
-          Connected
+          Agent to agent
         </h2>
-        {active.length === 0 ? (
-          <p className="mt-2 text-sm text-muted">No active links yet.</p>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
+          These people run an agent of their own, so yours can settle a time
+          with theirs — comparing free/busy, never event titles, and never
+          booking until you both say yes.
+        </p>
+        {withAgents.length === 0 ? (
+          <p className="mt-2 text-sm text-muted">
+            Nobody yet. This turns on by itself when someone you are connected
+            to brings an agent.
+          </p>
         ) : (
           <ul className="mt-3 divide-y divide-line border-t border-b border-line">
-            {active.map((link) => (
-              <li
+            {withAgents.map((link) => (
+              <ConnectionRow
                 key={link.id}
-                className="flex flex-wrap items-center justify-between gap-3 py-3"
-              >
-                <div>
-                  <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
-                    {link.peer?.name || link.peer?.email || link.toEmail || "Peer"}
-                    {link.peer && agents.has(link.peer.id) ? <AgentBadge /> : null}
-                  </p>
-                  <p className="text-sm text-muted">
-                    {link.peer?.email ?? link.toEmail ?? "—"} · can coordinate
-                    meetings
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => revokeLink(link.id)}
-                  className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-sm font-medium text-danger transition hover:bg-danger/5"
-                >
-                  Revoke
-                </button>
-              </li>
+                link={link}
+                hasAgent
+                onRevoke={revokeLink}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
+          Connected, no agent yet
+        </h2>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
+          Nothing runs on these yet — they are a record that you know each
+          other, kept so the connection is already in place if they bring an
+          agent. To make a plan with them today, send them an event link.
+        </p>
+        {withoutAgents.length === 0 ? (
+          <p className="mt-2 text-sm text-muted">No one here.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-line border-t border-b border-line">
+            {withoutAgents.map((link) => (
+              <ConnectionRow
+                key={link.id}
+                link={link}
+                hasAgent={false}
+                onRevoke={revokeLink}
+              />
             ))}
           </ul>
         )}
@@ -525,6 +441,119 @@ export function LinksManager({
         </section>
       )}
 
+      <section className="space-y-4">
+        <div>
+          <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep">
+            Public invite link or QR
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted">
+            A reusable link for handing out at a conference or on a slide.
+            Anyone who uses it <em>requests</em> a connection — you approve
+            every person, and nothing is granted until you do. This is for
+            building the agent network; to get people into a single event,
+            share that event&apos;s own link instead.
+          </p>
+        </div>
+        <form
+          onSubmit={createPublicInvite}
+          className="flex flex-wrap items-end gap-3"
+        >
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium text-ink">Label (optional)</span>
+            <input
+              value={publicLabel}
+              onChange={(event) => setPublicLabel(event.target.value)}
+              maxLength={80}
+              placeholder="Conference QR"
+              className="field min-w-[16rem]"
+            />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium text-ink">Request limit</span>
+            <select
+              value={publicMaxRedemptions}
+              onChange={(event) =>
+                setPublicMaxRedemptions(event.target.value)
+              }
+              className="field"
+            >
+              <option value="10">10 people</option>
+              <option value="25">25 people</option>
+              <option value="50">50 people</option>
+              <option value="100">100 people</option>
+            </select>
+          </label>
+          <button
+            type="submit"
+            disabled={pending}
+            className="button-primary cursor-pointer disabled:opacity-60"
+          >
+            Create public invite
+          </button>
+        </form>
+
+        {publicInviteList.length > 0 ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {publicInviteList.map((invite) => (
+              <article
+                key={invite.id}
+                className="rounded-xl border border-line bg-[rgba(255,252,246,0.72)] p-4"
+              >
+                <div className="flex flex-wrap gap-4">
+                  {invite.status === "active" ? (
+                    <PublicInviteQr
+                      inviteUrl={invite.inviteUrl}
+                      label={invite.label}
+                    />
+                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-matcha-deep">
+                      {invite.label || "Public connection invite"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      {invite.redemptionCount} of {invite.maxRedemptions}{" "}
+                      requests used · expires{" "}
+                      {new Date(invite.expiresAt).toLocaleDateString()}
+                    </p>
+                    <code className="mt-3 block break-all rounded bg-white/80 px-2 py-2 text-xs text-ink">
+                      {invite.inviteUrl}
+                    </code>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {invite.status === "active" ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyInviteUrl(invite.id, invite.inviteUrl)
+                            }
+                            className="cursor-pointer rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold text-matcha-deep"
+                          >
+                            {copiedId === invite.id
+                              ? "Copied"
+                              : "Copy public link"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => revokePublicInvite(invite.id)}
+                            className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-xs font-semibold text-danger"
+                          >
+                            Revoke link
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-xs font-semibold text-muted">
+                          Revoked
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
       {revoked.length > 0 && (
         <section>
           <h2 className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-muted">
@@ -540,5 +569,44 @@ export function LinksManager({
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * One connection, in either bucket.
+ *
+ * The two lists differ only in what the row is allowed to claim: an agent on
+ * the far side is a capability, so it is stated; no agent is not a fault, so
+ * the row simply says less rather than apologising.
+ */
+function ConnectionRow({
+  link,
+  hasAgent,
+  onRevoke,
+}: {
+  link: PublicLink;
+  hasAgent: boolean;
+  onRevoke: (id: string) => void;
+}) {
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-3 py-3">
+      <div className="min-w-0">
+        <p className="flex flex-wrap items-center gap-2 font-medium text-ink">
+          {link.peer?.name || link.peer?.email || link.toEmail || "Peer"}
+          {hasAgent ? <AgentBadge /> : null}
+        </p>
+        <p className="text-sm text-muted">
+          {link.peer?.email ?? link.toEmail ?? "—"}
+          {hasAgent ? " · can coordinate meetings" : null}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => onRevoke(link.id)}
+        className="cursor-pointer rounded-md border border-danger/40 px-3 py-1.5 text-sm font-medium text-danger transition hover:bg-danger/5"
+      >
+        Revoke
+      </button>
+    </li>
   );
 }

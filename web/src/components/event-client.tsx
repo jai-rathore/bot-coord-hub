@@ -132,6 +132,13 @@ export function EventClient({
    */
   const finished =
     board.event.status === "cancelled" || board.event.status === "expired";
+  /**
+   * Nobody but the organizer is on it yet. `counts.joined` includes them, and
+   * is null when the viewer may not see the roster — which an organizer always
+   * may, so a null here means "do not guess" rather than "nobody".
+   */
+  const nobodyYet =
+    board.event.status === "open" && (board.counts.joined ?? 2) <= 1;
   const canRespond = board.viewer.canRespond;
 
   const openTimeDimension = useMemo(
@@ -391,6 +398,41 @@ export function EventClient({
                 </div>
               ))}
             </dl>
+          )}
+
+          {/* A brand-new event looks finished the moment it is created, and
+              nothing on the page says how anybody else finds out about it —
+              there is no invite step to complete, because the link is the
+              invite. So until someone has actually joined, the link stops
+              being one button among several and says what it is for. */}
+          {isOrganizer && nobodyYet && (
+            <div className="mt-5 rounded-2xl border border-honey/35 bg-honey-soft/20 p-4 sm:p-5">
+              <p className="font-semibold text-ink">
+                Nobody has seen this yet
+              </p>
+              <p className="mt-1 text-sm leading-6 text-muted">
+                There is no invite to send — the link is the invite. Paste it
+                into the group chat and people answer straight away, without
+                signing up first.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void copyToClipboard("link")}
+                  className="button-primary"
+                >
+                  {copied === "link" ? "Copied — now paste it" : "Copy the link"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowQr((open) => !open)}
+                  className="button-secondary"
+                  aria-expanded={showQr}
+                >
+                  {showQr ? "Hide QR" : "Show QR instead"}
+                </button>
+              </div>
+            </div>
           )}
 
           {isOrganizer && (
