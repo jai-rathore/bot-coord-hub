@@ -8,7 +8,12 @@ import {
   type ResolvableOption,
   type ResolvableVote,
 } from "./events/resolve";
-import { projectBoard, type BoardSource } from "./events/board";
+import {
+  eventShareDescription,
+  projectBoard,
+  PUBLIC_EVENT_DESCRIPTION,
+  type BoardSource,
+} from "./events/board";
 import { displayName } from "./events/copy";
 import { relativeDeadline, statusSummary } from "./events/copy";
 import { MIN_COUNT_DISCLOSURE } from "./events/types";
@@ -420,6 +425,50 @@ test("blind hides everything except the viewer's own answer", () => {
     "yes",
     "the viewer must still see their own response",
   );
+});
+
+test("share-card description stays generic unless the event is open", () => {
+  assert.equal(
+    eventShareDescription({
+      visibility: "blind",
+      description: "Confidential offsite at the lake house",
+    }),
+    PUBLIC_EVENT_DESCRIPTION,
+  );
+  assert.equal(
+    eventShareDescription({
+      visibility: "counts_only",
+      description: "Confidential offsite at the lake house",
+    }),
+    PUBLIC_EVENT_DESCRIPTION,
+  );
+  assert.equal(
+    eventShareDescription({
+      visibility: "open",
+      description: "Coffee on Thursday",
+    }),
+    "Coffee on Thursday",
+  );
+  assert.equal(
+    eventShareDescription({ visibility: "open", description: null }),
+    PUBLIC_EVENT_DESCRIPTION,
+  );
+});
+
+test("atCapacity does not leak raw yes counts under blind or counts_only", () => {
+  const src = source("blind", [ALICE, BOB, CARA]);
+  src.options[0] = { ...src.options[0], capacity: 2 };
+  const participant = projectBoard(src, ALICE);
+  assert.equal(participant.dimensions[0].options[0].yes, null);
+  assert.equal(
+    participant.dimensions[0].options[0].atCapacity,
+    false,
+    "capacity from hidden tallies must stay hidden",
+  );
+
+  const organizer = projectBoard(src, ORGANIZER);
+  assert.equal(organizer.dimensions[0].options[0].yes, 3);
+  assert.equal(organizer.dimensions[0].options[0].atCapacity, true);
 });
 
 test("a signed-out visitor is public, sees no own-answer, and cannot respond", () => {

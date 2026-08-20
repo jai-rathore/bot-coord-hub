@@ -1,13 +1,14 @@
 import { runTriageWorker } from "@/lib/triage";
-import { isIntentAdmin } from "@/lib/intent-moderation";
+import { canRunIntentTriage } from "@/lib/intent-moderation";
 import { errorMessage, errorStatus } from "@/lib/http";
 import { ensureCurrentUser } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Signed-in triage path (admin or any signed-in user when INTENT_ADMIN_EMAILS unset).
- * Uses heuristic + optional OPENAI/GROK keys. Does not publish.
+ * Signed-in triage path. Production fails closed unless INTENT_ADMIN_EMAILS
+ * is set and the caller is on that list. Locally, any signed-in user may run
+ * it when the list is unset.
  * POST /api/intents/triage  { limit?: number }
  */
 export async function POST(request: Request) {
@@ -16,8 +17,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const adminsConfigured = Boolean(process.env.INTENT_ADMIN_EMAILS?.trim());
-  if (adminsConfigured && !isIntentAdmin(user)) {
+  if (!canRunIntentTriage(user)) {
     return Response.json(
       { error: "Only intent admins can run triage" },
       { status: 403 },

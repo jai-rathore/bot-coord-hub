@@ -3,7 +3,12 @@ import type { Metadata } from "next";
 import { BrandLink } from "@/components/brand-link";
 import { EventClient } from "@/components/event-client";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
-import { findEventBySlug, loadBoardSource, projectBoard } from "@/lib/events/board";
+import {
+  eventShareDescription,
+  findEventBySlug,
+  loadBoardSource,
+  projectBoard,
+} from "@/lib/events/board";
 import { markEventSeen } from "@/lib/events/updates";
 import { ensureCurrentUser } from "@/lib/users";
 
@@ -24,9 +29,9 @@ export async function generateMetadata({
   if (!event) return { title: "Event · HoneyMatcha" };
 
   const title = `${event.title} · HoneyMatcha`;
-  const description =
-    event.description ??
-    "Pick what works for you. HoneyMatcha handles the back-and-forth.";
+  // Share-card unfurls are public. Confidential copy on blind / counts-only
+  // events must not leak into Slack, iMessage, or search previews.
+  const description = eventShareDescription(event);
 
   return {
     title,

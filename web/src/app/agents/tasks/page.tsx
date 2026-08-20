@@ -2,14 +2,22 @@ import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { SiteHeader } from "@/components/site-header";
 import { IntentsRegistry } from "@/components/intents-registry";
-import { listRegistryIntents } from "@/lib/intents";
+import { intentsForViewer, listRegistryIntents } from "@/lib/intents";
+import { isIntentAdmin } from "@/lib/intent-moderation";
+import { ensureCurrentUser } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
 export default async function AgentTasksPage() {
   const { userId } = await auth();
-  const rows = await listRegistryIntents();
-  const items = rows.map((item) => ({
+  const [rows, user] = await Promise.all([
+    listRegistryIntents(),
+    userId ? ensureCurrentUser() : Promise.resolve(null),
+  ]);
+  const items = intentsForViewer(rows, {
+    signedIn: Boolean(userId),
+    admin: Boolean(user && isIntentAdmin(user)),
+  }).map((item) => ({
     ...item,
     triagedAt: item.triagedAt?.toISOString() ?? null,
     createdAt: item.createdAt.toISOString(),

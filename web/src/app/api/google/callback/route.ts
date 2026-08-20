@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
@@ -65,6 +66,14 @@ export async function GET(request: Request) {
     .limit(1);
   if (!user) {
     return fail("User not found");
+  }
+
+  // HMAC state + nonce cookie are not a Clerk session. Bind the callback to
+  // the signed-in browser so a stolen state cannot attach calendar tokens
+  // to someone else's account.
+  const { userId: clerkUserId } = await auth();
+  if (!clerkUserId || clerkUserId !== user.clerkUserId) {
+    return fail("Sign in to finish connecting Google Calendar");
   }
 
   try {

@@ -1,8 +1,14 @@
 import { findDedupeHits } from "@/lib/intents";
+import { ensureCurrentUser } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const user = await ensureCurrentUser();
+  if (!user) {
+    return Response.json({ error: "Sign in to check task names" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const name = searchParams.get("name") ?? "";
   const slug = searchParams.get("slug") ?? undefined;

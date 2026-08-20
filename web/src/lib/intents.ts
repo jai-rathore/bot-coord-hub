@@ -22,6 +22,28 @@ export type IntentRegistryItem = {
   handler: string | null;
 };
 
+export function stripIntentTriage(item: IntentRegistryItem): IntentRegistryItem {
+  return {
+    ...item,
+    rejectionReason: null,
+    triageRecommendation: null,
+    triageReason: null,
+    triagedAt: null,
+    proposedByUserId: null,
+  };
+}
+
+export function intentsForViewer(
+  items: IntentRegistryItem[],
+  viewer: { signedIn: boolean; admin: boolean },
+): IntentRegistryItem[] {
+  if (viewer.admin) return items;
+  const visible = viewer.signedIn
+    ? items
+    : items.filter((item) => item.status === "live");
+  return visible.map(stripIntentTriage);
+}
+
 export async function listRegistryIntents(
   query?: string,
 ): Promise<IntentRegistryItem[]> {
