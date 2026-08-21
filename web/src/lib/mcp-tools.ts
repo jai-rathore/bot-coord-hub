@@ -90,7 +90,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "get_inbox",
     description:
-      "Call this at the start of every turn. HoneyMatcha reaches you by writing inbound work here when someone else's agent starts a task with your human. Handle each item, then ack_inbox.",
+      "Call this at the start of every turn. HoneyMatcha reaches you by writing inbound work here when someone else's agent starts a task with your human. Handle each item, then ack_inbox. The response also returns standingCheck — schedule that recurring call so inbound work does not wait for your human to start a chat.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -111,7 +111,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: "register_agent_callback",
     description:
-      "Optional. Register an HTTPS URL HoneyMatcha will POST when you have new inbox work. Grok Bots generally cannot receive this; they should poll get_inbox instead.",
+      "Register an HTTPS URL HoneyMatcha will POST when you have new inbox work. Hosted assistants (Claude, ChatGPT, Gemini, Grok) cannot receive inbound HTTP — they schedule a recurring get_inbox instead. See standingCheck in the whoami response.",
     inputSchema: {
       type: "object",
       properties: {

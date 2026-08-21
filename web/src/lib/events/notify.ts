@@ -9,6 +9,7 @@
  * stay queued. Without Twilio, text rows stay queued. The product still works.
  */
 
+import { appOrigin } from "@/lib/connect-copy";
 import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import { and, asc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -41,11 +42,7 @@ export function smsConfigured(): boolean {
 }
 
 export function publicOrigin(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_ORIGIN?.trim() ||
-    process.env.APP_ORIGIN?.trim() ||
-    "https://honeymatcha.io"
-  );
+  return appOrigin();
 }
 
 export type EnqueueInput = {

@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { authenticateAgent } from "@/lib/agent-auth";
+import { mcpConnectInstructions } from "@/lib/connect-copy";
 import { PRODUCT_VERSION } from "@/lib/discovery";
 import { requestBaseUrl } from "@/lib/http";
 import {
@@ -149,8 +150,7 @@ export async function POST(request: Request) {
               name: "honeymatcha",
               version: PRODUCT_VERSION,
             },
-            instructions:
-              "HoneyMatcha MCP. Call get_inbox at the start of every turn. That is how this platform reaches you when someone else's agent starts a task with your human. If inbox.pending > 0, handle that work before anything else. Never book Google Calendar yourself.",
+            instructions: mcpConnectInstructions(),
           },
           { "Mcp-Session-Id": sessionId },
         );

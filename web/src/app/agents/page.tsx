@@ -2,10 +2,12 @@ import Link from "next/link";
 import { BrandAtmosphere } from "@/components/brand-atmosphere";
 import { CopyBlock } from "@/components/copy-block";
 import { SiteHeader } from "@/components/site-header";
+import { AGENT_CLIENTS } from "@/lib/agent-clients";
 import {
   ASK_AGENT_PROMPT,
   FRIEND_INVITE_MESSAGE,
   GROK_BOT_URL,
+  MCP_URL,
 } from "@/lib/connect-copy";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
@@ -20,15 +22,16 @@ export default function AgentsPage() {
           For agents and builders
         </p>
         <h1 className="display-title mt-3 max-w-4xl text-[clamp(2.8rem,7vw,5.2rem)]">
-          Connect Grok Bot.
+          One MCP URL.
           <span className="display-accent mt-1 block">Authorize once.</span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-8 text-muted">
-          Open <a href={GROK_BOT_URL}>Grok Bot at x.ai/bot</a>, add HoneyMatcha
-          under <strong>Plugins</strong> (or the custom MCP URL{" "}
-          <code>https://honeymatcha.io/api/mcp</code>), and Authorize in your
-          browser. Paste the pairing prompt below only if Plugins OAuth is
-          unavailable.
+          Paste <code>{MCP_URL}</code> into Claude, ChatGPT, Gemini, Grok Bot or
+          Cursor and approve it in your browser. HoneyMatcha registers itself, so
+          there is no client secret to copy and no app to install. Then give your
+          assistant a{" "}
+          <Link href="/docs#standing-check">standing check</Link> so inbound work
+          does not wait for you to open a chat.
         </p>
         <div className="mt-6 max-w-3xl">
           <CopyBlock text={ASK_AGENT_PROMPT} />
@@ -37,13 +40,17 @@ export default function AgentsPage() {
         <div className="mt-14 grid gap-5 lg:grid-cols-3">
         <section className="surface-card surface-card-interactive p-5 sm:p-7">
           <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
-            New to Grok Bot?
+            Which assistant?
           </h2>
           <p className="mt-3 text-sm leading-6 text-muted">
-            Grok Bot is an AI teammate with its own persistent cloud computer,
-            browser, and terminal. Download it from{" "}
-            <a href={GROK_BOT_URL}>x.ai/bot</a>, then follow the{" "}
-            <Link href="/docs#grok-bot">HoneyMatcha setup guide</Link>.
+            Whichever you already pay for:{" "}
+            {AGENT_CLIENTS.map((client) => client.name).join(", ")}. Each one
+            takes the same MCP URL — the{" "}
+            <Link href="/docs#assistants">setup guide</Link> has the exact menu
+            for each. Grok Bot gets its own{" "}
+            <Link href="/docs#grok-bot">walkthrough</Link> because it can also
+            finish pairing from its own terminal at{" "}
+            <a href={GROK_BOT_URL}>x.ai/bot</a>.
           </p>
         </section>
 
@@ -62,22 +69,27 @@ export default function AgentsPage() {
 
         <section className="surface-card p-5 sm:p-7 lg:col-span-3">
           <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
-            Preferred: Plugins Authorize
+            Preferred: MCP OAuth
           </h2>
           <ol className="mt-5 grid gap-4 text-sm text-muted">
             <li>
-              <strong className="text-ink">1. Plugins.</strong> In Grok Bot open{" "}
-              <strong>Plugins</strong> and add HoneyMatcha, or paste{" "}
-              <code>https://honeymatcha.io/api/mcp</code> as a custom MCP URL.
+              <strong className="text-ink">1. Add the server.</strong> Paste{" "}
+              <code>{MCP_URL}</code> into your assistant&rsquo;s connector or
+              plugin settings.
             </li>
             <li>
               <strong className="text-ink">2. Authorize.</strong> Sign in to
               HoneyMatcha in your browser. The agent never gets your password.
             </li>
             <li>
-              <strong className="text-ink">3. Use it.</strong> Type{" "}
-              <code>@HoneyMatcha</code> (or let tools run automatically) and
-              connect Google Calendar under Settings when you need booking.
+              <strong className="text-ink">3. Use it.</strong> Ask it to check
+              HoneyMatcha (or let tools run automatically) and connect Google
+              Calendar under Settings when you need booking.
+            </li>
+            <li>
+              <strong className="text-ink">4. Schedule the check.</strong> Give
+              it a <Link href="/docs#standing-check">standing check</Link> so
+              HoneyMatcha work reaches you between conversations.
             </li>
           </ol>
           <h3 className="mt-8 font-semibold text-matcha-deep">
