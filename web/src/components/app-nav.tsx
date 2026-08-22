@@ -107,12 +107,16 @@ export function AppNav({
       badge: attentionCount,
     });
   }
-  if (agentConnected) {
-    items.push({
-      item: { href: "/app/agent", label: "Agent", hint: "Agent setup and activity" },
-      icon: "agent",
-    });
-  }
+  items.push({
+    item: {
+      href: "/app/agent",
+      label: agentConnected ? "Assistant" : "Connect assistant",
+      hint: agentConnected
+        ? "Assistant setup and activity"
+        : "Connect ChatGPT, Claude, Gemini, Grok, or Cursor",
+    },
+    icon: "agent",
+  });
   items.push({
     item: { href: "/app/settings", label: "Settings", hint: "Calendar and account" },
     icon: "settings",

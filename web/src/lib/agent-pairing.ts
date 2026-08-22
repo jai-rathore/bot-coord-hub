@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import { agentPairings, apiKeys, type User } from "@/db/schema";
 import { writeAudit } from "@/lib/audit";
 import { AgentApiError } from "@/lib/agent-errors";
+import { standingCheckInstruction } from "@/lib/agent-clients";
 import { generateApiKey } from "@/lib/keys";
 import {
   normalizeAgentScopes,
@@ -12,6 +13,10 @@ import {
 import { boundedText } from "@/lib/validation";
 
 const PAIRING_TTL_MS = 10 * 60 * 1_000;
+
+export function pairedAgentInstructions(): string {
+  return `Call get_inbox at the start of every turn. That is how HoneyMatcha reaches you when another person's agent starts a task with your human. ${standingCheckInstruction()}`;
+}
 
 function hashDeviceCode(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -235,7 +240,6 @@ export async function exchangeAgentPairing(deviceCode: unknown) {
     tokenType: "Bearer",
     scopes: pairing.requestedScopes,
     agentName: pairing.agentName,
-    instructions:
-      "Call get_inbox at the start of every turn. That is how HoneyMatcha reaches you when another person's agent starts a task with your human.",
+    instructions: pairedAgentInstructions(),
   };
 }

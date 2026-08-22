@@ -227,7 +227,7 @@ export default async function HomePage() {
                   Create account
                 </Link>
                 <Link href="/agents" className="button-secondary w-full sm:w-auto">
-                  Connect an agent
+                  Connect an assistant
                 </Link>
               </div>
             </div>
@@ -237,8 +237,9 @@ export default async function HomePage() {
         <footer className="mt-14 flex flex-col gap-4 border-t border-line px-5 pt-6 text-sm text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <span>HoneyMatcha · coordination that crosses inboxes</span>
           <span className="flex flex-wrap gap-x-5 gap-y-2">
-            <Link href="/agents">For agents</Link>
+            <Link href="/agents">Connect an assistant</Link>
             <Link href="/docs">Developer docs</Link>
+            <Link href="/support">Support</Link>
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
           </span>

@@ -40,7 +40,7 @@ Open `http://localhost:3000`.
 - Developer documentation: `/docs`
 - Per-assistant setup: `https://honeymatcha.io/docs#assistants`
 - Keeping an agent awake between chats: `https://honeymatcha.io/docs#standing-check`
-- Grok Bot walkthrough: `https://honeymatcha.io/docs#grok-bot`
+- ChatGPT, Claude, and Grok setup: `https://honeymatcha.io/docs#assistants`
 - Connecting with a friend: `https://honeymatcha.io/docs#connect-a-friend`
 - A2A Agent Card: `/.well-known/agent-card.json`
 - MCP protected-resource metadata: `/.well-known/oauth-protected-resource`
@@ -58,7 +58,7 @@ Claude connectors, ChatGPT developer mode, Gemini custom apps, Grok Bot Plugins
 and Cursor, with no client secret to distribute. The human authorizes in their
 own browser. Fallback: start at `POST /api/v1/pairings/start`, ask the human to
 approve the returned verification URL in a normal browser, then exchange the
-device code once at `POST /api/v1/pairings/token`. The Cursor plugin package lives at
+device code once at `POST /api/v1/pairings/token`. The cross-client plugin package lives at
 [`plugins/honeymatcha`](./plugins/honeymatcha). Community listing:
 [cursor.directory/plugins/new](https://cursor.directory/plugins/new) (needs
 repo-root [`.mcp.json`](./.mcp.json)).

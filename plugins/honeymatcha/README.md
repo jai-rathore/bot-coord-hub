@@ -1,75 +1,53 @@
-# HoneyMatcha — Grok Bot / Cursor connector
+# HoneyMatcha — personal-agent connector
 
-Let your Grok Bot or Cursor agent coordinate meetings, guest asks, and
-purpose-bound discovery through [HoneyMatcha](https://honeymatcha.io).
+Connect ChatGPT, Claude, Codex, Grok Bot, Cursor, or any compatible remote MCP
+client to the HoneyMatcha account its human already owns.
 
-This plugin ships:
+The package includes:
 
-- **1 remote MCP connector** at `https://honeymatcha.io/api/mcp` (OAuth Authorize)
-- **1 skill** that tells the agent to poll inbox, never book calendar itself, and
-  fall back to device-code pairing if OAuth is unavailable
+- a remote Streamable HTTP MCP connection at `https://honeymatcha.io/api/mcp`;
+- OAuth 2.1 authorization with DCR, PKCE S256, refresh rotation, and a
+  resource-bound access token;
+- HoneyMatcha workflow instructions under `skills/honeymatcha/`;
+- tool titles, schemas, OAuth security schemes, and safety annotations.
 
-After install, it shows up like other marketplace plugins: a connector you
-**Authorize** in the browser. It is not a grok.com chat connector; it is a
-Cursor / Grok Bot plugin with an MCP server.
+## Connect Claude
 
-## Install
+1. Open **Customize → Connectors → Add custom connector**.
+2. Name it **HoneyMatcha** and paste `https://honeymatcha.io/api/mcp`.
+3. Leave the optional OAuth client fields empty, select **Add**, then
+   **Connect**.
+4. Sign in to HoneyMatcha in the browser and approve the requested scopes.
+5. Enable HoneyMatcha from the chat **+ → Connectors** menu.
 
-1. Install **HoneyMatcha** from the Cursor Marketplace (Grok Bot → Plugins, or
-   Cursor → Customize), **or** add custom MCP `https://honeymatcha.io/api/mcp`.
-2. Click **Authorize** and sign in to HoneyMatcha in your own browser.
-3. In chat, type `@HoneyMatcha` or just ask it to check your inbox.
-4. Connect Google Calendar at
-   [honeymatcha.io/app/settings](https://honeymatcha.io/app/settings) if you want
-   scheduling.
+For Team and Enterprise, an owner first adds the custom Web connector in
+organization settings. Paid Claude plans can run the included standing-check
+prompt as a Cowork scheduled task.
 
-Installed plugins are account-wide across every Bot on your Cursor account.
+## Connect ChatGPT before directory publication
 
-## What the agent can do
+1. Open **Settings → Security and login** and turn on **Developer mode**.
+2. Open **ChatGPT Plugins**, select **+**, and create **HoneyMatcha**.
+3. Under Connection, paste `https://honeymatcha.io/api/mcp`.
+4. Create the connection, complete HoneyMatcha OAuth, and review the tools.
+5. Add HoneyMatcha from the tools menu in a new conversation.
 
-- Poll inbox so another person's agent can reach you
-- Invite / link people (including public `honeymatcha.io/:handle` requests)
-- Approve incoming connection requests and manage people met through events
-- Run group events: create, answer, note, archive, follow updates
-- Start meeting coordination from free/busy (you still approve booking)
-- Purpose-bound discovery after you ask
-- One-task guest links for people without accounts
+After OpenAI review and publication, users can install HoneyMatcha from the
+shared ChatGPT and Codex Plugins Directory instead. Account and workspace
+policy can affect developer-mode availability.
 
-Default agent credentials cannot approve bookings in your place.
+## Human approval boundary
 
-## Fallback (no Plugins OAuth)
+The connector never receives the human's HoneyMatcha password. OAuth access
+tokens are scoped, expiring, revocable, and bound to the MCP resource. Agents
+may coordinate the workflow, but they cannot use the standard connector to
+approve a consequential action on the human's behalf. Booking and introduction
+decisions remain explicit human actions.
 
-If your Bot cannot complete MCP OAuth, tell it:
+## Support and policies
 
-```text
-Connect to https://honeymatcha.io as my agent.
-```
-
-That uses device-code pairing and a scoped `hm_` credential.
-
-## Directory and marketplace submission
-
-Submit this repository at
-[cursor.directory/plugins/new](https://cursor.directory/plugins/new).
-The directory auto-detects the repo-root [`.mcp.json`](../../.mcp.json)
-connector and [`skills/honeymatcha`](../../skills/honeymatcha/SKILL.md).
-Keep `.mcp.json` in sync with `mcp.json` in this folder.
-
-The curated first-party form at
-[cursor.com/marketplace/publish](https://cursor.com/marketplace/publish)
-is slower and may not be the path Cursor processes.
-
-Suggested listing copy:
-
-> HoneyMatcha is the coordination layer between a human, their personal agent
-> (Grok Bot or Cursor), and other people. This plugin adds a remote MCP
-> connector. After Authorize, the agent can poll inbox, invite people, coordinate
-> meetings from free/busy, create guest links, and run purpose-bound discovery
-> when asked. It cannot approve bookings. Company: HoneyMatcha
-> (honeymatcha.io). Contact: hello@honeymatcha.io
-
-## Docs
-
-- Product: https://honeymatcha.io
-- Docs: https://honeymatcha.io/docs
-- MCP: https://honeymatcha.io/api/mcp
+- Setup: https://honeymatcha.io/docs#assistants
+- Support: https://honeymatcha.io/support
+- Privacy: https://honeymatcha.io/privacy
+- Terms: https://honeymatcha.io/terms
+- Submission runbook: [SUBMISSION.md](./SUBMISSION.md)

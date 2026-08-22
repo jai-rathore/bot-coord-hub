@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AgentStatusCard } from "@/components/agent-status-card";
+import { AssistantSetupGuide } from "@/components/assistant-setup-guide";
 import { PageHeading } from "@/components/page-heading";
 import { SagePortrait } from "@/components/sage-avatar";
 import { SetupGuide } from "@/components/setup-guide";
@@ -15,7 +16,7 @@ import { ensureCurrentUser } from "@/lib/users";
 export const dynamic = "force-dynamic";
 
 /**
- * Advanced agent mode, in one place.
+ * Assistant connection and controls, in one place.
  *
  * Everything an agent brings with it — pairing, credentials, capabilities, the
  * task log — used to be scattered through the dashboard and the nav, where it
@@ -60,8 +61,8 @@ export default async function AgentPage() {
   return (
     <div className="space-y-10">
       <PageHeading
-        eyebrow="Advanced"
-        title="Agent setup"
+        eyebrow="Your personal agent"
+        title="Your assistant"
         description="You already have an agent — Sage came with the account and works only for you. Connect one of your own and it takes over the same job: comparing calendars, chasing replies, and bringing you only the decisions that need a person."
       />
 
@@ -88,12 +89,14 @@ export default async function AgentPage() {
 
       {status.agent.connected ? <AgentStatusCard status={status} /> : null}
 
+      <AssistantSetupGuide />
+
       <section aria-labelledby="agent-links-title">
         <h2
           id="agent-links-title"
           className="font-[family-name:var(--font-fraunces)] text-xl font-semibold tracking-[-0.02em] text-matcha-deep"
         >
-          Agent controls
+          Assistant controls
         </h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {links.map((link) => (

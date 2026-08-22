@@ -8,6 +8,7 @@ type Props = {
   state: string | null;
   codeChallenge: string;
   scope: string | null;
+  resource: string | null;
   agentName: string;
 };
 
@@ -28,6 +29,7 @@ export function OAuthAuthorizeDecision(props: Props) {
         state: props.state,
         code_challenge: props.codeChallenge,
         scope: props.scope,
+        resource: props.resource,
         agent_name: props.agentName,
       }),
     });

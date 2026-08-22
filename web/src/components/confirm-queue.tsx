@@ -51,7 +51,7 @@ export function ConfirmQueue({
 
       {initialConfirms.length === 0 ? (
         <p className="text-sm text-muted">
-          You&apos;re all caught up. When your Grok Bot needs your OK—like
+          You&apos;re all caught up. When your assistant needs your OK—like
           confirming a meeting—it appears here.
         </p>
       ) : (

@@ -4,7 +4,7 @@ import { CapabilityGrid } from "@/components/capability-grid";
 import { EventUpdatePill } from "@/components/event-update-pill";
 import { MeetCode } from "@/components/meet-code";
 import { SagePortrait } from "@/components/sage-avatar";
-import { enabledCapabilities, lockedCount } from "@/lib/capabilities";
+import { enabledCapabilities } from "@/lib/capabilities";
 import { relativeDeadline } from "@/lib/events/copy";
 import type { EventWithUpdates } from "@/lib/events/updates";
 
@@ -51,7 +51,6 @@ export function SignedInHome({
     events: eventsEnabled,
     discovery: discoveryEnabled,
   });
-  const locked = agentConnected ? 0 : lockedCount(capabilities);
 
   return (
     <div className="flex min-h-full flex-col bg-[radial-gradient(circle_at_8%_0%,rgba(117,161,132,0.12),transparent_25rem),radial-gradient(circle_at_94%_20%,rgba(240,220,168,0.15),transparent_24rem),linear-gradient(180deg,#f9fbf8_0%,#f4f7f3_55%,#f6f3eb_100%)]">
@@ -108,6 +107,33 @@ export function SignedInHome({
             </span>
             <span className="shrink-0 font-semibold text-matcha-deep">
               Connect <span aria-hidden="true">&rarr;</span>
+            </span>
+          </Link>
+        ) : null}
+
+        {!agentConnected ? (
+          <Link
+            href="/app/agent#connect-assistant"
+            className="group relative mt-4 flex items-center justify-between gap-4 overflow-hidden rounded-2xl border border-matcha-soft/40 bg-[linear-gradient(115deg,rgba(255,255,252,0.9),rgba(233,243,236,0.88),rgba(249,239,210,0.72))] p-4 no-underline shadow-[0_12px_34px_rgba(23,63,46,0.08)]"
+          >
+            <span
+              className="absolute -right-10 -bottom-16 h-36 w-36 rounded-full bg-honey-soft/35 blur-2xl transition group-hover:scale-110"
+              aria-hidden="true"
+            />
+            <span className="relative min-w-0">
+              <span className="block text-[0.65rem] font-bold tracking-[0.12em] text-matcha uppercase">
+                Bring your own
+              </span>
+              <span className="mt-1 block font-semibold text-ink">
+                Connect the assistant you already use
+              </span>
+              <span className="mt-1 block text-sm leading-6 text-muted">
+                Pick ChatGPT, Claude, Gemini Spark, Grok Bot, or Cursor for the
+                exact three-step guide.
+              </span>
+            </span>
+            <span className="relative shrink-0 font-semibold text-matcha-deep">
+              Choose yours <span aria-hidden="true">→</span>
             </span>
           </Link>
         ) : null}
@@ -192,8 +218,8 @@ export function SignedInHome({
 
         {/* The agent layer, stated as what it is: the key to the locked tiles
             above, not a footnote for enthusiasts. */}
-        <section className="mt-12 border-t border-line pt-6">
-          {agentConnected ? (
+        {agentConnected ? (
+          <section className="mt-12 border-t border-line pt-6">
             <Link
               href="/app/agent"
               className="surface-card surface-card-interactive flex items-center justify-between gap-3 p-4 no-underline"
@@ -201,7 +227,7 @@ export function SignedInHome({
               <span>
                 <span className="flex items-center gap-2 font-semibold text-ink">
                   <span className="live-dot animate-pulse-live bg-matcha" />
-                  Your agent is connected
+                  Your assistant is connected
                 </span>
                 <span className="mt-1 block text-sm text-muted">
                   Status, activity, and what it is allowed to do.
@@ -211,29 +237,8 @@ export function SignedInHome({
                 Open <span aria-hidden="true">&rarr;</span>
               </span>
             </Link>
-          ) : (
-            <Link
-              href="/app/agent"
-              className="flex items-center justify-between gap-3 rounded-2xl border border-matcha-soft/40 bg-white/70 p-4 no-underline"
-            >
-              <span>
-                <span className="block font-semibold text-ink">
-                  {locked > 0
-                    ? `Unlock ${locked} more with your own agent`
-                    : "Bring your own agent"}
-                </span>
-                <span className="mt-1 block text-sm leading-6 text-muted">
-                  Grok, Claude, Cursor, or anything speaking MCP. One browser
-                  approval and it runs everything above — {sageName} keeps
-                  handling the rest either way.
-                </span>
-              </span>
-              <span className="shrink-0 font-semibold text-matcha-deep">
-                Connect <span aria-hidden="true">&rarr;</span>
-              </span>
-            </Link>
-          )}
-        </section>
+          </section>
+        ) : null}
       </main>
     </div>
   );

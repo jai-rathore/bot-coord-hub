@@ -1,5 +1,5 @@
 /**
- * MCP OAuth 2.1 authorization server helpers for Grok Bot / Cursor remote MCP.
+ * MCP OAuth 2.1 authorization server helpers for remote MCP clients.
  * Public clients use Dynamic Client Registration + authorization_code + PKCE S256.
  * Access tokens are scoped hm_ API keys (same as device-code pairing).
  */
@@ -31,12 +31,28 @@ export const REFRESH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1_000;
 export const MCP_OAUTH_SCOPES = PAIRING_AGENT_SCOPES;
 
 export const DEFAULT_REDIRECT_ALLOWLIST = [
+  // Claude hosted connectors.
+  "https://claude.ai/api/mcp/auth_callback",
+  // ChatGPT's stable callback when RFC 9207 issuer identification is enabled.
+  "https://chatgpt.com/connector_platform_oauth_redirect",
+  // Gemini Spark custom Connected Apps.
+  "https://gemini.google.com/oauth-redirect",
+  // Cursor cloud and desktop.
   "https://www.cursor.com/agents/mcp/oauth/callback",
   "https://cursor.com/agents/mcp/oauth/callback",
   "http://localhost:8787/callback",
   "http://127.0.0.1:8787/callback",
   "http://[::1]:8787/callback",
   "cursor://anysphere.cursor-mcp/oauth/callback",
+] as const;
+
+export const DEFAULT_MCP_ORIGINS = [
+  "https://chatgpt.com",
+  "https://claude.ai",
+  "https://cursor.com",
+  "https://www.cursor.com",
+  "https://x.ai",
+  "https://gemini.google.com",
 ] as const;
 
 const CURSOR_CUSTOM_SCHEME_CALLBACKS = [
@@ -73,6 +89,8 @@ export const AGENT_SCOPE_COPY: Record<string, string> = {
   "intents:request": "Suggest a new task type",
   "discovery:read": "See purpose-bound discovery capabilities",
   "discovery:write": "Enroll and search for purpose-matched people",
+  "events:read": "Read events, options, replies, and shared notes",
+  "events:write": "Create events and help coordinate participant responses",
 };
 
 export function corsHeaders(): HeadersInit {
@@ -113,6 +131,40 @@ export function redirectAllowlist(): string[] {
   return [...new Set([...DEFAULT_REDIRECT_ALLOWLIST, ...extra])];
 }
 
+/** MCP transport Origin validation required to prevent DNS-rebinding attacks. */
+export function isAllowedMcpOrigin(
+  origin: string | null,
+  issuer: string,
+): boolean {
+  // Native and server-to-server clients normally omit Origin.
+  if (!origin) return true;
+
+  let candidate: URL;
+  let server: URL;
+  try {
+    candidate = new URL(origin);
+    server = new URL(issuer);
+  } catch {
+    return false;
+  }
+  if (candidate.origin !== origin.replace(/\/$/, "")) return false;
+
+  const extra = (process.env.MCP_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  const allowed = new Set([
+    server.origin,
+    ...DEFAULT_MCP_ORIGINS,
+    ...extra,
+  ]);
+  if (allowed.has(candidate.origin)) return true;
+
+  // Keep local MCP Inspector usable without weakening a public deployment.
+  const loopback = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+  return loopback.has(server.hostname) && loopback.has(candidate.hostname);
+}
+
 export function isAllowedRedirectUri(uri: string): boolean {
   if (redirectAllowlist().includes(uri)) return true;
   if (
@@ -128,6 +180,31 @@ export function isAllowedRedirectUri(uri: string): boolean {
 export function mcpProtectedResourceMetadataUrl(issuer: string): string {
   const base = issuer.replace(/\/$/, "");
   return `${base}/.well-known/oauth-protected-resource/api/mcp`;
+}
+
+/** The only RFC 8707 resource this authorization server issues tokens for. */
+export function mcpResourceIdentifier(issuer: string): string {
+  return `${issuer.replace(/\/$/, "")}/api/mcp`;
+}
+
+/**
+ * Validate an RFC 8707 resource indicator while remaining compatible with
+ * older MCP clients that omit it. Because HoneyMatcha exposes one protected
+ * MCP resource, independently validating authorize/token requests binds every
+ * issued token to that resource without adding per-client exceptions.
+ */
+export function assertMcpResource(
+  resource: string | null | undefined,
+  issuer: string,
+): string {
+  const expected = mcpResourceIdentifier(issuer);
+  if (resource?.trim() && resource.trim() !== expected) {
+    throw new AgentApiError(400, "Unsupported OAuth resource", {
+      code: "invalid_target",
+      expected_resource: expected,
+    });
+  }
+  return expected;
 }
 
 /** RFC 9728 + MCP-style Bearer challenge. Path-appended metadata matches Linear/Sentry. */
@@ -181,6 +258,8 @@ export function getAuthorizationServerMetadata(issuer: string) {
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
     scopes_supported: [...MCP_OAUTH_SCOPES],
+    resource_indicators_supported: true,
+    authorization_response_iss_parameter_supported: true,
     service_documentation: `${base}/docs`,
   };
 }
@@ -188,7 +267,7 @@ export function getAuthorizationServerMetadata(issuer: string) {
 export function getProtectedResourceMetadata(issuer: string) {
   const base = issuer.replace(/\/$/, "");
   return {
-    resource: `${base}/api/mcp`,
+    resource: mcpResourceIdentifier(base),
     authorization_servers: [base],
     scopes_supported: [...MCP_OAUTH_SCOPES],
     bearer_methods_supported: ["header"],
@@ -212,13 +291,14 @@ export async function registerOAuthClient(input: {
   if (!requested.length) {
     throw new AgentApiError(400, "redirect_uris is required");
   }
-  const redirectUris = [...new Set(requested.filter(isAllowedRedirectUri))];
-  if (!redirectUris.length) {
-    throw new AgentApiError(400, `redirect_uri is not allowed: ${requested[0]}`, {
+  const unsupported = requested.find((uri) => !isAllowedRedirectUri(uri));
+  if (unsupported) {
+    throw new AgentApiError(400, `redirect_uri is not allowed: ${unsupported}`, {
       code: "invalid_redirect_uri",
       allowed: redirectAllowlist(),
     });
   }
+  const redirectUris = [...new Set(requested)];
 
   const clientName =
     boundedText(input.clientName, "client_name", 120) ?? "MCP Client";
@@ -272,6 +352,7 @@ export type AuthorizeRequest = {
   codeChallenge: string;
   codeChallengeMethod: string;
   scope: string | null;
+  resource: string | null;
   agentName: string;
 };
 
@@ -284,10 +365,11 @@ export function parseAuthorizeRequest(url: URL): AuthorizeRequest {
   const codeChallengeMethod =
     url.searchParams.get("code_challenge_method")?.trim() ?? "S256";
   const scope = url.searchParams.get("scope");
+  const resource = url.searchParams.get("resource")?.trim() || null;
   const agentName =
     url.searchParams.get("client_name")?.trim() ||
     url.searchParams.get("agent_name")?.trim() ||
-    "Grok Bot";
+    "Personal assistant";
 
   if (!clientId) throw new AgentApiError(400, "client_id is required");
   if (!redirectUri) throw new AgentApiError(400, "redirect_uri is required");
@@ -312,6 +394,7 @@ export function parseAuthorizeRequest(url: URL): AuthorizeRequest {
     codeChallenge,
     codeChallengeMethod,
     scope,
+    resource,
     agentName: agentName.slice(0, 80),
   };
 }
@@ -394,11 +477,15 @@ export async function exchangeAuthorizationCode(input: {
   clientId?: string | null;
   codeVerifier?: string | null;
   refreshToken?: string | null;
+  resource?: string | null;
+  issuer: string;
 }) {
+  const audience = assertMcpResource(input.resource, input.issuer);
   if (input.grantType === "refresh_token") {
     return refreshAccessToken({
       refreshToken: input.refreshToken,
       clientId: input.clientId,
+      audience,
     });
   }
   if (input.grantType !== "authorization_code") {
@@ -468,6 +555,7 @@ export async function exchangeAuthorizationCode(input: {
         keyHash,
         keyPrefix,
         scopes,
+        audience,
         expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_SEC * 1000),
       })
       .returning();
@@ -504,6 +592,7 @@ export async function exchangeAuthorizationCode(input: {
 async function refreshAccessToken(input: {
   refreshToken?: string | null;
   clientId?: string | null;
+  audience: string;
 }) {
   const refreshToken = input.refreshToken?.trim() ?? "";
   const clientId = input.clientId?.trim() ?? "";
@@ -564,6 +653,7 @@ async function refreshAccessToken(input: {
         keyHash,
         keyPrefix,
         scopes,
+        audience: input.audience,
         expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_SEC * 1000),
         callbackUrl: existingKey.callbackUrl,
       })

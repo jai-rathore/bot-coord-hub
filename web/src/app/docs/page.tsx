@@ -161,6 +161,14 @@ export default function DocsPage() {
                     <li key={step}>{step}</li>
                   ))}
                 </ol>
+                {client.connectDocsUrl ? (
+                  <p className="mt-3 text-[0.85rem] leading-6 text-muted">
+                    <a href={client.connectDocsUrl}>
+                      Read {client.name}&rsquo;s official connection guide
+                    </a>
+                    .
+                  </p>
+                ) : null}
                 {client.caveat ? (
                   <p className="mt-3 text-[0.85rem] leading-6 text-muted">
                     <strong className="text-ink">Worth knowing.</strong>{" "}
@@ -235,11 +243,12 @@ export default function DocsPage() {
             id="grok-bot-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
           >
-            Grok Bot, in more detail
+            Grok Bot fallback pairing
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
-            Grok Bot is the one assistant that can also finish pairing by
-            itself, so it gets its own walkthrough.{" "}
+            Most people should use the connector steps above. Grok Bot can also
+            finish device-style pairing from its own computer, so this fallback
+            remains available for existing users.{" "}
             <a href={GROK_BOT_URL}>Get Grok Bot at x.ai/bot</a>, then connect
             HoneyMatcha under Plugins and Google Calendar in HoneyMatcha
             settings.
@@ -311,8 +320,8 @@ export default function DocsPage() {
             Connecting with a friend
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
-            You do not connect their Bot to yours. Each person connects their
-            own Grok Bot to their own HoneyMatcha account. From{" "}
+            You do not connect their assistant to yours. Each person connects their
+            own assistant to their own HoneyMatcha account. From{" "}
             <Link href="/app/people">People</Link>, send a private
             email-targeted invite or create a reusable public link and QR code.
             Your handle page carries a code of its own — someone you just met
@@ -323,7 +332,7 @@ export default function DocsPage() {
           </p>
           <p className="mt-3 text-[0.95rem] leading-7 text-muted">
             Once they have a HoneyMatcha account, HoneyMatcha reaches{" "}
-            <em>their Grok Bot</em> through the agent inbox — not email, and not
+            <em>their assistant</em> through the agent inbox — not email, and not
             a Google invite. Their agent should call{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
               get_inbox
@@ -436,7 +445,7 @@ curl -s "$BASE/" -H "Accept: application/json"`}
             MCP
           </h2>
           <p className="mt-2 text-[0.95rem] text-muted">
-            Prefer Grok Bot / Cursor Plugins with MCP OAuth against{" "}
+            ChatGPT, Claude, Gemini Spark, Grok Bot, Cursor, and other remote MCP clients use OAuth against{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">https://honeymatcha.io/api/mcp</code>
             . Remote agents can also POST JSON-RPC with a scoped{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">hm_</code>{" "}
@@ -444,7 +453,7 @@ curl -s "$BASE/" -H "Accept: application/json"`}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">web/mcp</code>.
           </p>
           <h3 className="mt-5 text-[0.95rem] font-semibold text-ink">
-            Remote MCP URL (Grok Bot Plugins)
+            Remote MCP URL
           </h3>
           <pre className="mt-2 overflow-x-auto rounded-md border border-line bg-[rgba(255,252,246,0.75)] p-4 text-[0.82rem] leading-relaxed text-ink">
 {`{
@@ -513,20 +522,20 @@ curl -s "$BASE/api/mcp" \\
             id="skill-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
           >
-            Reuse the workflow in Grok Bot
+            Reuse the workflow in any supported agent
           </h2>
           <p className="mt-2 text-[0.95rem] text-muted">
-            Start with the Grok Bot pairing flow above. After it succeeds, ask
-            your Bot to save the process as a reusable skill. Builders can use{" "}
+            The packaged skill works alongside the same MCP server in ChatGPT,
+            Claude, Gemini Spark, Codex, Grok Bot, and Cursor. Builders can use{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
               skills/honeymatcha/SKILL.md
             </code>{" "}
             as the reference instructions. The skill preserves the same human
-            approval boundary and never automates human sign-in. See{" "}
-            <a href="#grok-bot">Connect with Grok Bot</a> and the official{" "}
-            <a href="https://docs.x.ai/grok-bot/skills-routines-and-automations">
-              Grok Bot skills guide
-            </a>
+            approval boundary and never automates human sign-in. The distributable
+            manifests and release runbook live under{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+              plugins/honeymatcha
+            </code>
             .
           </p>
         </section>
@@ -548,7 +557,7 @@ curl -s "$BASE/api/mcp" \\
             </li>
             <li className="relative pl-[1.15rem]">
               <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
-              Update your Grok Bot / MCP secrets (
+              Update your agent / MCP secrets (
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">HONEYMATCHA_API_KEY</code>
               ) to the new value and verify{" "}
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">GET /api/v1/me</code>.

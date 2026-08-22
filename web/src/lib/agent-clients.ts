@@ -32,6 +32,8 @@ export type AgentClient = {
   summary: string;
   /** Clicks the human makes to add the MCP server. */
   connectSteps: string[];
+  /** Vendor documentation for the connection flow, when published. */
+  connectDocsUrl?: string;
   /**
    * How this client runs the standing check with nobody in the chat.
    * `null` means it cannot, and the human relies on email instead.
@@ -79,36 +81,41 @@ export const AGENT_CLIENTS: AgentClient[] = [
   {
     id: "claude",
     name: "Claude",
-    homeUrl: "https://claude.ai",
+    homeUrl:
+      "https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=HoneyMatcha&connectorUrl=https%3A%2F%2Fhoneymatcha.io%2Fapi%2Fmcp",
     summary:
-      "Custom connectors are on every plan, including free. Scheduled tasks run in the cloud with your laptop closed.",
+      "Add HoneyMatcha as a remote MCP connector on Claude web, desktop, or mobile. Paid Cowork plans can keep it checking on a schedule.",
     connectSteps: [
-      "Open Claude → Customize → Connectors and click + next to Connectors.",
-      "Name it HoneyMatcha and paste the MCP URL. Leave the advanced OAuth fields empty — HoneyMatcha registers itself.",
+      "Open Claude → Customize → Connectors → Add custom connector.",
+      "Name it HoneyMatcha and paste the MCP URL. Leave the optional OAuth client fields empty — HoneyMatcha registers Claude securely.",
       "Click Add, then Connect, and approve in the browser tab that opens.",
     ],
+    connectDocsUrl: "https://claude.com/docs/connectors/custom/remote-mcp",
     standingCheck: {
-      featureName: "scheduled tasks",
+      featureName: "Cowork scheduled tasks",
       steps: [
-        "Start a chat with the HoneyMatcha connector enabled.",
-        "Paste the standing-check prompt below and ask Claude to run it on a schedule.",
+        "Open Scheduled in Cowork, choose New task, and create it with Claude or set it up manually.",
+        "Paste the standing-check prompt below and make sure the HoneyMatcha connector is enabled for the task.",
       ],
-      docsUrl: "https://www.anthropic.com/product/claude-cowork",
+      docsUrl:
+        "https://support.claude.com/en/articles/13854387-schedule-recurring-tasks-in-claude-cowork",
     },
     caveat:
-      "Free accounts are limited to one custom connector. Scheduled tasks need Pro, Max, or Team.",
+      "Team and Enterprise owners add the organization connector before members connect. Cowork scheduled tasks require a paid plan.",
   },
   {
     id: "chatgpt",
     name: "ChatGPT",
-    homeUrl: "https://chatgpt.com",
+    homeUrl: "https://chatgpt.com/plugins",
     summary:
-      "Developer mode is the one path with write access. The apps in the directory can only read.",
+      "Connect the MCP server in developer mode today; after review, HoneyMatcha can appear in the shared ChatGPT and Codex Plugins Directory.",
     connectSteps: [
-      "Open Settings → Apps & Connectors → Advanced and turn on developer mode.",
-      "Create a connector, paste the MCP URL, and sign in to HoneyMatcha when it asks.",
-      "Enable the HoneyMatcha tools you want in the chat's + menu.",
+      "Open Settings → Security and login and turn on Developer mode.",
+      "Open ChatGPT Plugins, select +, name it HoneyMatcha, and paste the MCP URL under Connection.",
+      "Create the connection, sign in to HoneyMatcha, review its tools, then enable it from the chat tools menu.",
     ],
+    connectDocsUrl:
+      "https://developers.openai.com/plugins/deploy/connect-chatgpt",
     standingCheck: {
       featureName: "tasks",
       steps: [
@@ -116,32 +123,33 @@ export const AGENT_CLIENTS: AgentClient[] = [
         "Ask ChatGPT to schedule it as a recurring task.",
       ],
       docsUrl:
-        "https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt",
+        "https://developers.openai.com/plugins/deploy/connect-chatgpt",
     },
     caveat:
-      "Developer mode asks you to confirm each write action, so a scheduled check will ask before it answers on your behalf. That is the behaviour we want anyway.",
+      "Developer mode availability depends on account and workspace policy. ChatGPT confirms write actions using HoneyMatcha's per-tool safety metadata.",
   },
   {
     id: "gemini",
     name: "Gemini",
     homeUrl: "https://gemini.google.com",
     summary:
-      "Custom MCP apps connect through Gemini Spark on the web, then work on mobile too.",
+      "Custom MCP apps connect through Gemini Spark on the web, then work in Spark on mobile too.",
     connectSteps: [
-      "Open Gemini on the web, signed in with a personal Google account.",
-      "Go to Connected apps, add a custom app, and paste the MCP URL.",
-      "Approve HoneyMatcha in the browser, then use it from Gemini Spark on web or mobile.",
+      "Open Gemini on the web with an eligible personal Google Account, then switch to Spark.",
+      "Open Settings & help → Connected Apps (sometimes under Personal Intelligence). Under Custom apps for Spark, add a custom app and paste the MCP URL.",
+      "Click Next, approve HoneyMatcha in the browser, then type @ and select HoneyMatcha in a Spark task on web or mobile.",
     ],
+    connectDocsUrl: "https://support.google.com/gemini/answer/17209137",
     standingCheck: {
-      featureName: "scheduled actions",
+      featureName: "Spark schedules",
       steps: [
-        "Paste the standing-check prompt below into a Gemini chat.",
-        "Ask Gemini to make it a recurring scheduled action.",
+        "Create a Spark task with HoneyMatcha enabled and paste the standing-check prompt below.",
+        "Tell Spark to run it on the requested recurring schedule.",
       ],
-      docsUrl: "https://support.google.com/gemini/answer/16316416",
+      docsUrl: "https://support.google.com/gemini/answer/17094507",
     },
     caveat:
-      "Custom MCP apps need a personal Google account — work and school accounts cannot add them yet. Gemini allows ten active scheduled actions at a time.",
+      "Google currently gates custom MCP apps to eligible Gemini Spark users: age 18+, a qualifying plan, a personal Google Account (not work or school), Keep Activity on, and, per Google's custom-app guide, US and English availability.",
   },
   {
     id: "grok",

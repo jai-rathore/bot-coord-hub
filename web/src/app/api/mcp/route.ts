@@ -5,6 +5,7 @@ import { PRODUCT_VERSION } from "@/lib/discovery";
 import { requestBaseUrl } from "@/lib/http";
 import {
   corsHeaders,
+  isAllowedMcpOrigin,
   jsonCors,
   mcpMethodNotAllowed,
   mcpUnauthorized,
@@ -73,6 +74,21 @@ function mcpAuth(request: Request) {
   return null;
 }
 
+function rejectInvalidOrigin(request: Request): Response | null {
+  if (
+    isAllowedMcpOrigin(
+      request.headers.get("origin"),
+      requestBaseUrl(request),
+    )
+  ) {
+    return null;
+  }
+  return jsonCors(
+    { error: "forbidden", error_description: "Origin is not allowed" },
+    403,
+  );
+}
+
 async function requireMcpAgent(request: Request) {
   const limited = mcpAuth(request);
   if (limited) return limited;
@@ -81,12 +97,14 @@ async function requireMcpAgent(request: Request) {
   return auth;
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(request: Request) {
+  const rejected = rejectInvalidOrigin(request);
+  if (rejected) return rejected;
   return optionsCors();
 }
 
 /**
- * Streamable HTTP MCP JSON-RPC for remote agents (Grok Bot, Cursor).
+ * Streamable HTTP MCP JSON-RPC for remote agent clients.
  *
  * POST /api/mcp
  * Authorization: Bearer hm_...
@@ -98,6 +116,8 @@ export async function OPTIONS() {
  * GET with Accept: text/event-stream returns 405 — this server does not offer SSE.
  */
 export async function POST(request: Request) {
+  const rejected = rejectInvalidOrigin(request);
+  if (rejected) return rejected;
   const auth = await requireMcpAgent(request);
   if (auth instanceof Response) return auth;
 
@@ -125,7 +145,7 @@ export async function POST(request: Request) {
         { headers: corsHeaders() },
       );
     } catch (err) {
-      return Response.json(mcpToolError(err), {
+      return Response.json(mcpToolError(err, requestBaseUrl(request)), {
         status: 400,
         headers: corsHeaders(),
       });
@@ -176,7 +196,7 @@ export async function POST(request: Request) {
           const data = await dispatchMcpTool(auth, name, args, request);
           return rpcResult(id, mcpToolResult(data));
         } catch (err) {
-          return rpcResult(id, mcpToolError(err));
+          return rpcResult(id, mcpToolError(err, requestBaseUrl(request)));
         }
       }
       default:
@@ -194,6 +214,8 @@ export async function POST(request: Request) {
  * Other GET Accept types return the tool catalog (auth required).
  */
 export async function GET(request: Request) {
+  const rejected = rejectInvalidOrigin(request);
+  if (rejected) return rejected;
   const accept = (request.headers.get("accept") ?? "").toLowerCase();
   if (accept.includes("text/event-stream")) {
     return mcpMethodNotAllowed("POST, OPTIONS");
@@ -217,6 +239,8 @@ export async function GET(request: Request) {
 }
 
 /** Session teardown is optional; Streamable HTTP clients accept 405. */
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  const rejected = rejectInvalidOrigin(request);
+  if (rejected) return rejected;
   return mcpMethodNotAllowed("POST, GET, OPTIONS");
 }

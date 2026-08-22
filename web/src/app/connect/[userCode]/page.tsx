@@ -23,7 +23,7 @@ export default async function ConnectAgentPage({
                 Connection code not found
               </h1>
               <p className="mt-3 text-muted">
-                Ask your Grok Bot to start a new HoneyMatcha connection.
+                Ask your assistant to start a new HoneyMatcha connection.
               </p>
             </>
           ) : pairing.status !== "pending" ? (

@@ -1,5 +1,5 @@
 import { AgentApiError } from "@/lib/agent-errors";
-import { jsonFromAgentError } from "@/lib/http";
+import { jsonFromAgentError, requestBaseUrl } from "@/lib/http";
 import {
   exchangeAuthorizationCode,
   jsonCors,
@@ -31,6 +31,7 @@ export async function POST(request: Request) {
     let clientId: string | null = null;
     let codeVerifier: string | null = null;
     let refreshToken: string | null = null;
+    let resource: string | null = null;
 
     if (contentType.includes("application/x-www-form-urlencoded")) {
       const form = await request.formData();
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
       refreshToken = form.get("refresh_token")
         ? String(form.get("refresh_token"))
         : null;
+      resource = form.get("resource") ? String(form.get("resource")) : null;
     } else {
       const body = (await request.json().catch(() => ({}))) as Record<
         string,
@@ -60,6 +62,7 @@ export async function POST(request: Request) {
         typeof body.code_verifier === "string" ? body.code_verifier : null;
       refreshToken =
         typeof body.refresh_token === "string" ? body.refresh_token : null;
+      resource = typeof body.resource === "string" ? body.resource : null;
     }
 
     const token = await exchangeAuthorizationCode({
@@ -69,6 +72,8 @@ export async function POST(request: Request) {
       clientId,
       codeVerifier,
       refreshToken,
+      resource,
+      issuer: requestBaseUrl(request).replace(/\/$/, ""),
     });
     return jsonCors(token);
   } catch (error) {

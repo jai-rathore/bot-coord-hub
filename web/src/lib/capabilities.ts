@@ -3,8 +3,9 @@
  *
  * The product is not "an events app with an optional agent". Every capability
  * here is run by an agent — the only question is whose. Sage is the one we
- * provide and it is already switched on; your own agent (Grok, Claude, Cursor,
- * anything speaking MCP or A2A) can run all of them today.
+ * provide and it is already switched on; your own agent (ChatGPT, Claude,
+ * Gemini, Grok, Cursor, or anything speaking MCP or A2A) can run all of them
+ * today.
  *
  * That distinction is the entire pitch, so it lives in one list that both the
  * signed-out page and the signed-in home read from. A capability that Sage has

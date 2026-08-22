@@ -46,6 +46,7 @@ If Plugins / MCP OAuth is unavailable, use the terminal on your persistent cloud
 4. Store that credential securely on your Grok Bot computer and GET https://honeymatcha.io/api/v1/me with Authorization: Bearer <hm_...>
 5. After that, use POST https://honeymatcha.io/api/mcp with the same Bearer token, or the REST API under /api/v1
 6. Call get_inbox at the start of every turn. That is how HoneyMatcha reaches you when another agent starts a task.
+7. Call whoami, read standingCheck, and create the requested recurring get_inbox schedule if your host supports schedules. Keep it silent when nothing is pending.
 
 If a step fails, stop and show me the exact error. Do not fall back to signing in as me.`;
 

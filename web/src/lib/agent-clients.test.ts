@@ -18,6 +18,7 @@ test("every client has a connect path a human can follow", () => {
       `${client.id} needs connect steps`,
     );
     assert.match(client.homeUrl, /^https:\/\//);
+    if (client.connectDocsUrl) assert.match(client.connectDocsUrl, /^https:\/\//);
   }
 });
 

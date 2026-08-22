@@ -5,6 +5,10 @@
 
 import { SCHEDULE_MEETING_TOOL_DESCRIPTION } from "@/lib/schedule-copy";
 import type { AgentAuth } from "@/lib/agent-auth";
+import {
+  MCP_OAUTH_SCOPES,
+  mcpProtectedResourceMetadataUrl,
+} from "@/lib/mcp-oauth";
 import { assertAgentScope } from "@/lib/scopes";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
@@ -65,7 +69,7 @@ import {
   whoami,
 } from "@/lib/agent-api";
 
-export type McpToolDef = {
+type McpBaseToolDef = {
   name: string;
   description: string;
   inputSchema: {
@@ -76,7 +80,24 @@ export type McpToolDef = {
   };
 };
 
-export const MCP_TOOLS: McpToolDef[] = [
+export type McpToolDef = McpBaseToolDef & {
+  title: string;
+  outputSchema: {
+    type: "object";
+    additionalProperties: true;
+  };
+  securitySchemes: Array<{
+    type: "oauth2";
+    scopes: string[];
+  }>;
+  annotations: {
+    readOnlyHint: boolean;
+    openWorldHint: boolean;
+    destructiveHint: boolean;
+  };
+};
+
+const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "whoami",
     description:
@@ -960,6 +981,99 @@ export const MCP_TOOLS: McpToolDef[] = [
   },
 ];
 
+/** Tools whose business operation cannot change user or service state. */
+const READ_ONLY_TOOLS = new Set([
+  "whoami",
+  "get_inbox",
+  "list_links",
+  "list_people",
+  "list_public_invites",
+  "get_agent_profile",
+  "list_sessions",
+  "read_board",
+  "list_intents",
+  "list_discovery_capabilities",
+  "resolve_discovery_location",
+  "search_discovery",
+  "list_discovery_interests",
+  "list_confirms",
+  "list_guest_tasks",
+  "read_guest_task",
+  "list_events",
+  "get_event_board",
+]);
+
+/** Write tools that send to people or can change an external system. */
+const OPEN_WORLD_TOOLS = new Set([
+  "create_invite",
+  "request_agent_connection",
+  "post_board_message",
+  "request_discovery_introduction",
+  "request_schedule_meeting",
+  "respond_confirm",
+  "create_guest_task",
+  "create_event",
+  "join_event",
+  "respond_to_event",
+  "suggest_event_option",
+  "add_event_option",
+  "post_event_note",
+  "nudge_event_participants",
+]);
+
+/** Write tools with an irreversible or difficult-to-reverse side effect. */
+const DESTRUCTIVE_TOOLS = new Set([
+  "ack_inbox",
+  "revoke_link",
+  "update_link_policy",
+  "create_invite",
+  "revoke_public_invite",
+  "request_agent_connection",
+  "post_board_message",
+  "set_agent_capabilities",
+  "submit_discovery_enrollment",
+  "request_discovery_introduction",
+  "request_schedule_meeting",
+  "respond_confirm",
+  "create_guest_task",
+  "create_event",
+  "archive_event",
+  "join_event",
+  "respond_to_event",
+  "suggest_event_option",
+  "add_event_option",
+  "post_event_note",
+  "retract_event_note",
+  "nudge_event_participants",
+  "revoke_guest_task",
+]);
+
+function toolTitle(name: string): string {
+  if (name === "whoami") return "Identify current HoneyMatcha account";
+  return name
+    .split("_")
+    .map((word) => word[0].toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+/**
+ * The wire catalog includes the metadata required by ChatGPT and Claude to
+ * render human-readable confirmations and make safe tool-use decisions.
+ */
+export const MCP_TOOLS: McpToolDef[] = BASE_MCP_TOOLS.map((tool) => ({
+  ...tool,
+  title: toolTitle(tool.name),
+  outputSchema: { type: "object", additionalProperties: true },
+  securitySchemes: [
+    { type: "oauth2", scopes: [...MCP_OAUTH_SCOPES] },
+  ],
+  annotations: {
+    readOnlyHint: READ_ONLY_TOOLS.has(tool.name),
+    openWorldHint: OPEN_WORLD_TOOLS.has(tool.name),
+    destructiveHint: DESTRUCTIVE_TOOLS.has(tool.name),
+  },
+}));
+
 const DISCOVERY_FLAGGED_TOOLS = new Set([
   "set_agent_capabilities",
   "resolve_discovery_location",
@@ -1252,8 +1366,13 @@ export function mcpToolResult(data: unknown) {
   };
 }
 
-export function mcpToolError(err: unknown) {
+export function mcpToolError(err: unknown, issuer?: string) {
   if (err instanceof AgentApiError) {
+    const insufficientScope = err.details?.code === "insufficient_scope";
+    const challenge =
+      insufficientScope && issuer
+        ? `Bearer resource_metadata="${mcpProtectedResourceMetadataUrl(issuer)}", error="insufficient_scope", error_description="${err.message}"`
+        : null;
     return {
       isError: true,
       content: [
@@ -1266,6 +1385,9 @@ export function mcpToolError(err: unknown) {
           ),
         },
       ],
+      ...(challenge
+        ? { _meta: { "mcp/www_authenticate": [challenge] } }
+        : {}),
     };
   }
   const message = err instanceof Error ? err.message : "Unknown error";

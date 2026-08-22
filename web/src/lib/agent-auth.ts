@@ -8,6 +8,26 @@ export type AgentAuth = {
   apiKey: ApiKey;
 };
 
+function requestAudience(request: Request): string {
+  const url = new URL(request.url);
+  const proto =
+    request.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "");
+  const host =
+    request.headers.get("x-forwarded-host") ??
+    request.headers.get("host") ??
+    url.host;
+  const path = url.pathname.replace(/\/$/, "") || "/";
+  return `${proto}://${host}${path}`;
+}
+
+/** Existing manual/device credentials have no audience and remain API-wide. */
+export function isApiKeyAudienceAllowed(
+  audience: string | null,
+  request: Request,
+): boolean {
+  return !audience || audience === requestAudience(request);
+}
+
 export async function authenticateAgent(
   request: Request,
 ): Promise<AgentAuth | null> {
@@ -35,6 +55,9 @@ export async function authenticateAgent(
 
   const row = rows[0];
   if (!row) return null;
+  if (!isApiKeyAudienceAllowed(row.apiKey.audience, request)) {
+    return null;
+  }
 
   const now = new Date();
   if (

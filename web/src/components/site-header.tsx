@@ -12,7 +12,9 @@ import { BrandLink } from "@/components/brand-link";
 
 /** The marketing pages are one scroll now, so the header carries the one link
  *  that leaves them rather than an anchor into a section that no longer exists. */
-const SECONDARY_LINKS = [{ href: "/agents", label: "For agents" }] as const;
+const SECONDARY_LINKS = [
+  { href: "/agents", label: "Connect an assistant" },
+] as const;
 
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);

@@ -41,7 +41,7 @@ export function getDiscoveryDocument(baseUrl?: string) {
       transport: "streamable-http",
       protocol_version: "2025-03-26",
       transport_notes:
-        "Prefer Streamable HTTP JSON-RPC at /api/mcp with MCP OAuth (Grok Bot Plugins) or a scoped hm_ Bearer from device-code pairing. Stdio wraps the same API.",
+        "Prefer Streamable HTTP JSON-RPC at /api/mcp with MCP OAuth (supported assistant connectors) or a scoped hm_ Bearer from device-code pairing. Stdio wraps the same API.",
     },
     auth: {
       type: "mcp_oauth_or_scoped_bearer",

@@ -44,7 +44,7 @@ const OPERATORS: Array<{
     id: "own",
     tab: "Bring my own",
     tagline:
-      "Already have one? Grok, Claude, Cursor, anything speaking MCP. Connect it and it runs every capability here from day one.",
+      "Already have one? ChatGPT, Claude, Gemini, Grok, Cursor—anything speaking MCP. Connect it and it runs every capability here from day one.",
   },
 ];
 

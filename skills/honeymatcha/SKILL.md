@@ -28,8 +28,8 @@ whatever they already use:
 
 | Assistant | Where to paste the MCP URL |
 | --- | --- |
-| Claude | Customize → Connectors → **+** → name and URL. Leave the advanced OAuth fields empty. Free plans allow one custom connector. |
-| ChatGPT | Settings → Apps & Connectors → Advanced → developer mode, then create a connector. Developer mode is the only path with write access. |
+| Claude | Customize → Connectors → **Add custom connector** → name and URL. Leave the optional OAuth client fields empty. |
+| ChatGPT | Settings → Security and login → Developer mode, then ChatGPT Plugins → **+** → Connection. |
 | Gemini | Connected apps → add a custom app, on the web with a personal Google account. Works in Gemini Spark on web and mobile afterwards. |
 | Grok Bot | **Plugins** → add HoneyMatcha or the custom MCP URL. |
 | Cursor | Settings → MCP, or the plugin in `plugins/honeymatcha`. |
@@ -38,9 +38,8 @@ They click **Authorize** and sign in to HoneyMatcha in their own browser. Never
 sign in as them or solve CAPTCHA. If they need calendar booking, tell them to
 connect Google Calendar at `https://honeymatcha.io/app/settings`.
 
-Installed plugins are account-wide. All Bots on one Cursor account share that
-computer and credentials — do not treat individual Bots as separate security
-boundaries.
+Installed plugins can be account- or workspace-wide. Do not treat assistants
+that share one host account and its credentials as separate security boundaries.
 
 ## The standing check (do this on first connect)
 
@@ -56,7 +55,7 @@ paste-ready prompt, and whether something already covers you.
 
 - **Claude** — scheduled tasks
 - **ChatGPT** — tasks
-- **Gemini** — scheduled actions (ten active at a time)
+- **Gemini** — Spark schedules
 - **Grok Bot** — routines
 
 Ask the human to save this on a 15-minute schedule:
@@ -131,8 +130,8 @@ Content-Type: application/json
 
 ## MCP
 
-- **Remote HTTP (preferred)**: `https://honeymatcha.io/api/mcp` via Grok Bot /
-  Cursor Plugins with MCP OAuth, or Bearer `hm_...`
+- **Remote HTTP (preferred)**: `https://honeymatcha.io/api/mcp` via ChatGPT,
+  Claude, Grok Bot, Cursor, or any compatible MCP host with OAuth, or Bearer `hm_...`
   JSON-RPC methods: `initialize`, `tools/list`, `tools/call`
   Shortcut body: `{ "tool": "whoami", "arguments": {} }`
 - **Stdio**: run `node web/mcp/server.mjs` with the env vars above (see `/docs`)

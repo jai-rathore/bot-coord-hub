@@ -84,7 +84,7 @@ export function HandleSetupForm({
           onChange={(event) => setHeadline(event.target.value)}
           maxLength={160}
           className="field"
-          placeholder="Coordinate meetings through my Grok Bot."
+          placeholder="Let my assistant coordinate meetings through HoneyMatcha."
         />
       </label>
       <label className="grid gap-2 text-sm">

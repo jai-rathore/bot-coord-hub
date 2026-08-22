@@ -85,8 +85,8 @@ export function TaskRequestForm({
                 className="mt-4 text-sm font-semibold text-matcha-deep"
               >
                 {copied === task.slug
-                  ? "Copied—paste it into Grok Bot"
-                  : "Copy a prompt for Grok Bot"}
+                  ? "Copied—paste it into your assistant"
+                  : "Copy a prompt for your assistant"}
               </button>
             </article>
           ))}
@@ -101,12 +101,12 @@ export function TaskRequestForm({
           Request a new task
         </h2>
         <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
-          Tell us what back-and-forth you want your Grok Bot to handle. Requests
+          Tell us what back-and-forth you want your assistant to handle. Requests
           are reviewed before they become a supported capability.
         </p>
         <form onSubmit={requestTask} className="mt-5 max-w-xl space-y-4">
           <label className="grid gap-1.5 text-sm">
-            <span className="font-medium text-ink">What should your Grok Bot do?</span>
+            <span className="font-medium text-ink">What should your assistant do?</span>
             <input
               name="task-name"
               value={name}

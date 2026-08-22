@@ -185,6 +185,8 @@ export const apiKeys = pgTable(
     keyPrefix: text("key_prefix").notNull(),
     keyHash: text("key_hash").notNull(),
     scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+    /** RFC 8707 protected resource for OAuth-minted credentials. */
+    audience: text("audience"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
