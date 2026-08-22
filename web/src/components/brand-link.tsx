@@ -20,7 +20,7 @@ export function BrandLink({
   return (
     <Link
       href={href}
-      className={`group inline-flex min-w-0 items-center gap-2.5 text-matcha-deep no-underline ${className}`}
+      className={`group inline-flex min-h-11 min-w-0 items-center gap-2.5 text-matcha-deep no-underline ${className}`}
     >
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-matcha-soft/25 bg-white/75 shadow-[0_5px_16px_rgba(23,63,46,0.09)] transition duration-200 group-hover:-rotate-2 group-hover:scale-[1.04] group-hover:border-matcha-soft/60">
         <Image

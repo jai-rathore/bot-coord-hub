@@ -18,15 +18,15 @@ export function CopyBlock({
   }
 
   return (
-    <div className="group relative">
-      <pre className="overflow-x-auto rounded-xl border border-line bg-white/72 p-4 pr-24 text-[0.78rem] leading-relaxed text-ink whitespace-pre-wrap shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+    <div className="group relative min-w-0">
+      <pre className="max-w-full min-w-0 overflow-x-auto rounded-xl border border-line bg-white/72 p-4 text-[0.78rem] leading-relaxed text-ink whitespace-pre-wrap shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] sm:pr-24">
         {text}
       </pre>
       <button
         type="button"
         onClick={() => void copy()}
         aria-live="polite"
-        className="absolute top-2 right-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-white/95 px-2.5 py-1.5 text-[0.7rem] font-semibold text-matcha-deep shadow-sm transition hover:border-matcha-soft"
+        className="mt-2 inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line bg-white/95 px-2.5 py-1.5 text-[0.7rem] font-semibold text-matcha-deep shadow-sm transition hover:border-matcha-soft sm:absolute sm:top-2 sm:right-2 sm:mt-0 sm:w-auto"
       >
         <svg
           viewBox="0 0 24 24"

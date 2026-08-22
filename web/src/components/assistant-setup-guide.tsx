@@ -34,7 +34,7 @@ export function AssistantSetupGuide({
     <section
       id={id}
       aria-labelledby={`${tabId}-title`}
-      className={`scroll-mt-28 overflow-hidden rounded-[1.75rem] border border-matcha-soft/35 bg-[linear-gradient(145deg,rgba(255,255,252,0.96),rgba(235,243,237,0.94)_58%,rgba(249,241,218,0.88))] p-5 shadow-[0_22px_70px_rgba(23,63,46,0.1)] sm:p-7 ${className}`}
+      className={`min-w-0 scroll-mt-28 overflow-hidden rounded-[1.75rem] border border-matcha-soft/35 bg-[linear-gradient(145deg,rgba(255,255,252,0.96),rgba(235,243,237,0.94)_58%,rgba(249,241,218,0.88))] p-5 shadow-[0_22px_70px_rgba(23,63,46,0.1)] sm:p-7 ${className}`}
     >
       <div className="max-w-3xl">
         <p className="section-kicker">Assistant setup</p>
@@ -86,9 +86,9 @@ export function AssistantSetupGuide({
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.08fr_0.92fr]">
-        <div className="rounded-2xl border border-white bg-white/76 p-4 sm:p-5">
+        <div className="min-w-0 rounded-2xl border border-white bg-white/76 p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-bold tracking-[0.12em] text-honey uppercase">
                 Connect {selected.name}
               </p>
@@ -98,7 +98,7 @@ export function AssistantSetupGuide({
             </div>
             <a
               href={selected.homeUrl}
-              className="button-secondary min-h-10 shrink-0 px-3 py-1.5 text-xs"
+              className="button-secondary min-h-11 shrink-0 px-3 py-1.5 text-xs"
             >
               Open {selected.name} <span aria-hidden="true">↗</span>
             </a>
@@ -106,11 +106,16 @@ export function AssistantSetupGuide({
 
           <ol className="mt-5 grid list-none gap-3 p-0">
             {selected.connectSteps.map((step, index) => (
-              <li key={step} className="grid grid-cols-[auto_1fr] gap-3">
+              <li
+                key={step}
+                className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3"
+              >
                 <span className="mt-0.5 grid h-6 w-6 place-items-center rounded-full bg-honey-soft/55 text-[0.68rem] font-bold text-matcha-deep">
                   {index + 1}
                 </span>
-                <span className="text-sm leading-6 text-ink">{step}</span>
+                <span className="min-w-0 text-sm leading-6 text-ink">
+                  {step}
+                </span>
               </li>
             ))}
           </ol>
@@ -139,7 +144,7 @@ export function AssistantSetupGuide({
           ) : null}
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-matcha-deep bg-matcha-deep p-4 text-white shadow-[0_16px_40px_rgba(23,63,46,0.18)] sm:p-5">
+        <div className="relative min-w-0 overflow-hidden rounded-2xl border border-matcha-deep bg-matcha-deep p-4 text-white shadow-[0_16px_40px_rgba(23,63,46,0.18)] sm:p-5">
           <div
             className="absolute -top-16 -right-12 h-44 w-44 rounded-full bg-[radial-gradient(circle,rgba(240,220,168,0.2),transparent_68%)]"
             aria-hidden="true"
