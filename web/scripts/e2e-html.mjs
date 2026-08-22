@@ -51,7 +51,7 @@ function text(html) {
 const PAGES = [
   { path: "/", heading: "handle the back-and-forth" },
   { path: "/docs", heading: "Connect the assistant you already have" },
-  { path: "/agents", heading: "Authorize once" },
+  { path: "/agents", heading: "Choose yours." },
   { path: "/agents/tasks", heading: "What agents can coordinate" },
   { path: "/privacy", heading: "Privacy" },
   { path: "/terms", heading: "Terms" },
