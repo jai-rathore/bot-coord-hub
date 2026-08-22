@@ -22,12 +22,13 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "HoneyMatcha",
-    "shortDescription": "Coordinate people and plans through your agent.",
+    "shortDescription": "Coordinate people and plans.",
     "longDescription": "Use your personal AI agent to coordinate meetings, shared events, introductions, and private guest requests across HoneyMatcha. OAuth keeps your password private, every tool advertises its safety behavior, and consequential approvals remain with the human.",
     "developerName": "HoneyMatcha",
     "category": "Productivity",
     "capabilities": ["Interactive", "Read", "Write"],
     "websiteURL": "https://honeymatcha.io",
+    "supportURL": "https://honeymatcha.io/support",
     "privacyPolicyURL": "https://honeymatcha.io/privacy",
     "termsOfServiceURL": "https://honeymatcha.io/terms",
     "defaultPrompt": [
@@ -36,6 +37,7 @@
       "Show my active HoneyMatcha events and pending replies."
     ],
     "brandColor": "#1F4A36",
-    "logo": "./assets/logo.svg"
+    "logo": "./assets/logo.svg",
+    "composerIcon": "./assets/logo.svg"
   }
 }
