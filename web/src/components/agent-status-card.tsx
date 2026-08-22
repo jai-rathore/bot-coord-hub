@@ -28,11 +28,11 @@ function relativeTime(value: string | null) {
 export function AgentStatusCard({ status }: { status: HomeStatus }) {
   const rows = [
     {
-      label: "Your Grok Bot",
+      label: "Your assistant",
       value: status.agent.connected
-        ? `${status.agent.name ?? "Grok Bot"} connected · last active ${relativeTime(status.agent.lastUsedAt)}`
+        ? `${status.agent.name ?? "Assistant"} connected · last active ${relativeTime(status.agent.lastUsedAt)}`
         : status.agent.configured
-          ? "Connection created · waiting for your Bot"
+          ? "Connection created · waiting for your assistant"
           : "Not connected yet",
       ok: status.agent.connected,
       href: "/agents",

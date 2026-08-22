@@ -40,6 +40,7 @@ import {
   inboxInstructions,
   listInboxForUser,
   registerAgentCallback,
+  standingCheckStatus,
 } from "@/lib/agent-inbox";
 import {
   createSessionForUser,
@@ -199,6 +200,9 @@ export async function whoami(auth: AgentAuth) {
       next: inbox[0] ?? null,
     },
     instructions: inboxInstructions(pendingInbox),
+    standingCheck: standingCheckStatus({
+      callbackRegistered: Boolean(auth.apiKey.callbackUrl),
+    }),
   };
 }
 
@@ -517,11 +521,15 @@ export async function listSessions(auth: AgentAuth) {
 export async function listInbox(auth: AgentAuth) {
   assertAgentScope(auth, "tasks:read");
   const items = await listInboxForUser(auth.user.id, { pendingOnly: true });
+  const standingCheck = standingCheckStatus({
+    callbackRegistered: Boolean(auth.apiKey.callbackUrl),
+  });
   return {
     ok: true,
     inbox: items,
     pending: items.length,
     instructions: inboxInstructions(items.length),
+    standingCheck,
     next_steps:
       items.length > 0
         ? [
@@ -530,7 +538,12 @@ export async function listInbox(auth: AgentAuth) {
             "Ack the item when you have taken the next step.",
             "Do not book Google yourself.",
           ]
-        : ["No inbound work right now. Call get_inbox at the start of every turn."],
+        : [
+            "No inbound work right now.",
+            standingCheck.satisfied
+              ? "Call get_inbox at the start of every turn."
+              : `Schedule a recurring get_inbox every ${standingCheck.intervalMinutes} minutes so the next one does not wait for your human.`,
+          ],
   };
 }
 

@@ -36,7 +36,10 @@ export default async function OAuthAuthorizePage({
     authorize = parseAuthorizeRequest(url);
     const client = await loadOAuthClient(authorize.clientId);
     if (!client) {
-      throw new AgentApiError(400, "Unknown OAuth client. Reconnect from Grok Bot Plugins.");
+      throw new AgentApiError(
+        400,
+        "Unknown OAuth client. Remove HoneyMatcha from your assistant and connect it again.",
+      );
     }
     if (!client.redirectUris.includes(authorize.redirectUri)) {
       throw new AgentApiError(400, "redirect_uri was not registered for this client");
@@ -65,7 +68,7 @@ export default async function OAuthAuthorizePage({
           ) : (
             <>
               <p className="text-sm font-semibold uppercase tracking-[0.14em] text-matcha">
-                Grok Bot connector
+                Assistant connector
               </p>
               <h1 className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold text-matcha-deep">
                 Connect {clientName}?
@@ -107,7 +110,8 @@ export default async function OAuthAuthorizePage({
                   state={authorize.state}
                   codeChallenge={authorize.codeChallenge}
                   scope={authorize.scope}
-                  agentName={authorize.agentName || clientName}
+                  resource={authorize.resource}
+                  agentName={clientName || authorize.agentName}
                 />
               </Show>
             </>

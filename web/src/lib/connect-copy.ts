@@ -1,4 +1,26 @@
+import {
+  AGENT_CLIENTS,
+  STANDING_CHECK_INTERVAL_MINUTES,
+  standingCheckInstruction,
+  standingCheckPrompt,
+} from "@/lib/agent-clients";
+
 export const PRODUCTION_ORIGIN = "https://honeymatcha.io";
+
+/**
+ * Where this deployment lives.
+ *
+ * The single resolver for agent-facing copy: `events/notify` delegates here so
+ * an email link and an inbox link can never disagree about the origin.
+ */
+export function appOrigin(): string {
+  return (
+    process.env.NEXT_PUBLIC_APP_ORIGIN?.trim() ||
+    process.env.APP_ORIGIN?.trim() ||
+    PRODUCTION_ORIGIN
+  );
+}
+
 export const GROK_BOT_URL = "https://x.ai/bot";
 export const MCP_URL = `${PRODUCTION_ORIGIN}/api/mcp`;
 
@@ -24,14 +46,31 @@ If Plugins / MCP OAuth is unavailable, use the terminal on your persistent cloud
 4. Store that credential securely on your Grok Bot computer and GET https://honeymatcha.io/api/v1/me with Authorization: Bearer <hm_...>
 5. After that, use POST https://honeymatcha.io/api/mcp with the same Bearer token, or the REST API under /api/v1
 6. Call get_inbox at the start of every turn. That is how HoneyMatcha reaches you when another agent starts a task.
+7. Call whoami, read standingCheck, and create the requested recurring get_inbox schedule if your host supports schedules. Keep it silent when nothing is pending.
 
 If a step fails, stop and show me the exact error. Do not fall back to signing in as me.`;
 
 export const FRIEND_INVITE_MESSAGE = `Hey — can you sign up at https://honeymatcha.io?
 
-Connect Google Calendar when the site asks. If you have a personal agent, add HoneyMatcha in Grok Bot Plugins (or tell it: connect to honeymatcha.io as my agent) and approve in your browser.
+Connect Google Calendar when the site asks. Then point whatever assistant you already use — Claude, ChatGPT, Gemini, Grok — at https://honeymatcha.io/api/mcp and approve it in your browser (or just tell it: connect to honeymatcha.io as my agent). Setup steps for each one, plus how to make it check on a schedule, are at https://honeymatcha.io/docs.
 
 Then accept my invite: PASTE_INVITE_URL_HERE`;
+
+/**
+ * What an MCP client is told the moment it connects.
+ *
+ * This fires exactly once per connection, which makes it the only place we can
+ * reliably ask an agent to set up its standing check before it has any work to
+ * do. Repeating it on every tool call would be noise.
+ */
+export function mcpConnectInstructions(): string {
+  return [
+    "HoneyMatcha MCP. Call get_inbox at the start of every turn. That is how this platform reaches you when someone else's agent starts a task with your human.",
+    "If inbox.pending > 0, handle that work before anything else.",
+    standingCheckInstruction(),
+    "Never book Google Calendar yourself.",
+  ].join(" ");
+}
 
 export function agentLlmsText(origin = PRODUCTION_ORIGIN): string {
   const base = origin.replace(/\/$/, "");
@@ -40,18 +79,29 @@ export function agentLlmsText(origin = PRODUCTION_ORIGIN): string {
 HoneyMatcha is a coordination platform for a human and their personal agent.
 It is not a chat app or a message board.
 
-The human signs in at ${base}. The preferred connect path is Grok Bot Plugins
-→ add MCP URL ${base}/api/mcp → Authorize in the browser (MCP OAuth). Device-code
-pairing remains available. The agent then does the coordination work
-(schedule a meeting, hiring compatibility, guest asks). The human approves
-important actions in the browser.
+The human signs in at ${base}. The connect path is remote MCP with OAuth: add
+${base}/api/mcp in whichever assistant the human already uses. HoneyMatcha
+supports dynamic client registration, so no vendor-specific setup and no
+pre-shared client secret is needed. Device-code pairing remains available for
+agents with a terminal. The agent then does the coordination work (schedule a
+meeting, hiring compatibility, guest asks). The human approves important
+actions in the browser.
 
-## Preferred: Grok Bot Plugins / MCP OAuth
+## Connect: remote MCP + OAuth
 
-1. Human opens Plugins and adds ${base}/api/mcp (or HoneyMatcha when listed).
-2. Human Authorize / signs in at ${base}/oauth/authorize — never as the agent.
+1. Human adds ${base}/api/mcp in their assistant's connector settings.
+2. Human authorizes at ${base}/oauth/authorize — never as the agent.
 3. Agent uses MCP tools. Call get_inbox at the start of every turn.
 4. Calendar booking needs Connect Calendar at ${base}/app/settings.
+
+Where that setting lives, per assistant:
+
+${AGENT_CLIENTS.map(
+  (client) =>
+    `- ${client.name}: ${client.connectSteps.join(" ")}${
+      client.caveat ? ` (${client.caveat})` : ""
+    }`,
+).join("\n")}
 
 OAuth metadata:
 - ${base}/.well-known/oauth-protected-resource
@@ -85,9 +135,33 @@ person's agent starts a task with your human, HoneyMatcha writes it here.
 whoami also returns inbox.pending — if that is greater than 0, handle inbox
 before anything else.
 
-If you have a public HTTPS URL, register_agent_callback so HoneyMatcha can
-POST when work arrives. Grok Bots generally cannot receive inbound HTTP; polling
-get_inbox is the required path.
+That covers turns your human starts. It does not cover the rest of the day,
+and coordination is mostly the rest of the day: someone else's agent proposes
+a time, an event deadline closes, an introduction lands. HoneyMatcha cannot
+interrupt a hosted assistant to tell you — there is no open stream to push
+down, and Claude, ChatGPT, Gemini and Grok cannot receive an inbound webhook.
+
+So schedule the check yourself, the first time you connect. Every assistant
+listed above can run a saved prompt on a schedule:
+
+${AGENT_CLIENTS.filter((client) => client.standingCheck)
+  .map((client) => `- ${client.name}: ${client.standingCheck?.featureName}`)
+  .join("\n")}
+
+Save this on a ${STANDING_CHECK_INTERVAL_MINUTES}-minute schedule. Staying silent
+on an empty inbox is the part that makes it survivable — never report "nothing
+to do" on a timer.
+
+\`\`\`
+${standingCheckPrompt(base)}
+\`\`\`
+
+whoami and get_inbox both return a standingCheck object with that interval, the
+prompt text, and whether something else already covers you.
+
+If you do have a public HTTPS URL — a self-hosted agent, a worker, a
+Cloudflare tunnel — call register_agent_callback instead and HoneyMatcha will
+POST to it the moment work arrives. That sets standingCheck.satisfied.
 
 ## Scheduling
 

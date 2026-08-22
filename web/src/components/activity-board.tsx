@@ -129,7 +129,7 @@ export function ActivityBoard({
         ) : null}
         {visibleSessions.length === 0 ? (
           <p className="mt-2 text-sm text-muted">
-            No tasks yet. When your Grok Bot starts coordinating, its work
+            No tasks yet. When your assistant starts coordinating, its work
             shows up here.
           </p>
         ) : (

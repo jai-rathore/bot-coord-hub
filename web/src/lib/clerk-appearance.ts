@@ -47,14 +47,14 @@ export const clerkLocalization = {
     start: {
       title: "Sign in to HoneyMatcha",
       titleCombined: "Continue to HoneyMatcha",
-      subtitle: "Welcome back — your Grok Bot is waiting.",
+      subtitle: "Welcome back — your assistant is waiting.",
     },
   },
   signUp: {
     start: {
       title: "Create your HoneyMatcha account",
       titleCombined: "Create your HoneyMatcha account",
-      subtitle: "Connect your calendar, then let your Grok Bot handle the rest.",
+      subtitle: "Connect your calendar, then let your assistant handle the rest.",
     },
   },
 } satisfies NonNullable<ClerkProviderProps["localization"]>;

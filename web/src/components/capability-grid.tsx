@@ -65,7 +65,9 @@ export function CapabilityGrid({
                     ready ? "text-matcha-deep" : "text-[#7a5610]"
                   }`}
                 >
-                  {ready ? `${sageName} runs this` : "Connect an agent to use it"}
+                  {ready
+                    ? `${sageName} runs this`
+                    : "Connect an assistant to use it"}
                 </span>
               )}
             </Link>

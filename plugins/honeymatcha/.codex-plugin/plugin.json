@@ -1,0 +1,41 @@
+{
+  "name": "honeymatcha",
+  "version": "1.1.0",
+  "description": "Let ChatGPT, Claude, Codex, and other MCP agents coordinate people, meetings, events, and private requests with human approval.",
+  "author": {
+    "name": "HoneyMatcha",
+    "email": "support@honeymatcha.io",
+    "url": "https://honeymatcha.io"
+  },
+  "homepage": "https://honeymatcha.io/docs",
+  "repository": "https://github.com/jai-rathore/bot-coord-hub",
+  "license": "MIT",
+  "keywords": [
+    "honeymatcha",
+    "mcp",
+    "chatgpt",
+    "claude",
+    "coordination",
+    "scheduling"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "HoneyMatcha",
+    "shortDescription": "Coordinate people and plans through your agent.",
+    "longDescription": "Use your personal AI agent to coordinate meetings, shared events, introductions, and private guest requests across HoneyMatcha. OAuth keeps your password private, every tool advertises its safety behavior, and consequential approvals remain with the human.",
+    "developerName": "HoneyMatcha",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "websiteURL": "https://honeymatcha.io",
+    "privacyPolicyURL": "https://honeymatcha.io/privacy",
+    "termsOfServiceURL": "https://honeymatcha.io/terms",
+    "defaultPrompt": [
+      "Check my HoneyMatcha inbox and handle the next step.",
+      "Help me coordinate a meeting with someone I know.",
+      "Show my active HoneyMatcha events and pending replies."
+    ],
+    "brandColor": "#1F4A36",
+    "logo": "./assets/logo.svg"
+  }
+}

@@ -73,8 +73,8 @@ export default async function SettingsPage({
         </h2>
         {smsOffered() ? (
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-            How should we reach you when an event you follow changes? Your Grok
-            Bot still gets every update in its inbox. This is just for you.
+            How should we reach you when an event you follow changes? Your
+            assistant still gets every update in its inbox. This is just for you.
           </p>
         ) : null}
         <div className={smsOffered() ? "mt-5" : "mt-2"}>

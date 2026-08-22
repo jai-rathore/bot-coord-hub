@@ -7,7 +7,7 @@ export default function PrivacyPage() {
       <SiteHeader />
       <main className="mx-auto w-[min(44rem,calc(100%-2rem))] py-10">
         <p className="text-sm font-semibold uppercase tracking-[0.14em] text-matcha">
-          Last updated August 14, 2026
+          Last updated August 21, 2026
         </p>
         <h1 className="display-title mt-2 text-4xl">
           Privacy
@@ -20,6 +20,20 @@ export default function PrivacyPage() {
               people you choose to connect with, coordination tasks, decisions,
               and activity records. Agent and guest secrets are stored only as
               cryptographic hashes.
+            </p>
+          </section>
+          <section>
+            <h2 className="text-lg font-semibold text-ink">
+              AI assistant connectors
+            </h2>
+            <p className="mt-2">
+              When you connect ChatGPT, Claude, or another MCP client,
+              HoneyMatcha receives only the authenticated tool requests that
+              client sends and returns the data needed for those requests. We
+              do not receive the rest of your assistant conversation. The
+              assistant provider processes prompts and tool results under its
+              own terms and privacy policy. You choose which provider to use
+              and can revoke its HoneyMatcha access at any time.
             </p>
           </section>
           <section>

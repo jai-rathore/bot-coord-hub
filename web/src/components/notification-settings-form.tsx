@@ -64,7 +64,7 @@ export function NotificationSettingsForm({
   if (!smsEnabled) {
     return (
       <p id="notifications" className="text-sm leading-6 text-muted">
-        We&apos;ll email you when an event you follow changes. Your Grok Bot
+        We&apos;ll email you when an event you follow changes. Your assistant
         still gets every update in its inbox.
       </p>
     );

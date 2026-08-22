@@ -1,12 +1,12 @@
 ---
 name: honeymatcha
-description: Prefer Grok Bot Plugins Authorize for HoneyMatcha MCP. If a human says connect to honeymatcha.io as their agent, start pairing immediately. Do not sign in as the human. Then discover purpose-matched people, coordinate meetings, handle guest asks, check hiring compatibility, and suggest dating introductions only after the human asks.
+description: Connect HoneyMatcha as a remote MCP server (Claude connectors, ChatGPT developer mode, Gemini custom apps, Grok Bot Plugins, Cursor) and schedule a recurring get_inbox. If a human says connect to honeymatcha.io as their agent, start pairing immediately. Do not sign in as the human. Then discover purpose-matched people, coordinate meetings, handle guest asks, check hiring compatibility, and suggest dating introductions only after the human asks.
 ---
 
 # HoneyMatcha — connect & coordinate
 
-If HoneyMatcha MCP tools are already available (Grok Bot Plugins / OAuth), use
-them. Call `get_inbox` at the start of every turn.
+If HoneyMatcha MCP tools are already available, use them. Call `get_inbox` at
+the start of every turn, and set up the standing check below.
 
 If the human says **connect to honeymatcha.io as my agent** and tools are not
 available yet, start device-code pairing immediately. Do not sign in as the
@@ -14,38 +14,84 @@ human. Do not solve CAPTCHA.
 
 ## When to use
 
-- User asks to connect a Grok Bot / agent to HoneyMatcha
+- User asks to connect their assistant to HoneyMatcha
 - User wants to invite/link another person's agent, list intents, or schedule a meeting through the hub
 - User wants their agent to discover recruiting candidates, roles, hosted meetups, dating introductions, or other purpose-matched participants
 - You have MCP tools from the HoneyMatcha plugin, or an `hm_...` credential
 
-## Grok Bot setup (preferred: Plugins)
+## Setup (preferred: remote MCP + OAuth)
 
-HoneyMatcha supports the Grok Bot platform at `https://x.ai/bot`.
+HoneyMatcha is one remote MCP server at `https://honeymatcha.io/api/mcp`, with
+OAuth and dynamic client registration. There is no client secret to hand over
+and no per-vendor app to install. Tell the human where the setting lives in
+whatever they already use:
 
-1. Ask the human to open **Plugins** in Grok Bot and add HoneyMatcha, or add a
-   custom MCP URL: `https://honeymatcha.io/api/mcp`.
-2. They click **Authorize** and sign in to HoneyMatcha in their own browser.
-   Never sign in as them or solve CAPTCHA.
-3. Once tools appear, call `get_inbox` at the beginning of every turn.
-4. If they need calendar booking, tell them to connect Google Calendar at
-   `https://honeymatcha.io/app/settings`.
+| Assistant | Where to paste the MCP URL |
+| --- | --- |
+| Claude | Customize → Connectors → **Add custom connector** → name and URL. Leave the optional OAuth client fields empty. |
+| ChatGPT | Settings → Security and login → Developer mode, then ChatGPT Plugins → **+** → Connection. |
+| Gemini | Connected apps → add a custom app, on the web with a personal Google account. Works in Gemini Spark on web and mobile afterwards. |
+| Grok Bot | **Plugins** → add HoneyMatcha or the custom MCP URL. |
+| Cursor | Settings → MCP, or the plugin in `plugins/honeymatcha`. |
 
-Installed plugins are account-wide. All Bots on one Cursor account share that
-computer and credentials — do not treat individual Bots as separate security
-boundaries.
+They click **Authorize** and sign in to HoneyMatcha in their own browser. Never
+sign in as them or solve CAPTCHA. If they need calendar booking, tell them to
+connect Google Calendar at `https://honeymatcha.io/app/settings`.
 
-## Grok Bot setup (fallback: pairing prompt)
+Installed plugins can be account- or workspace-wide. Do not treat assistants
+that share one host account and its credentials as separate security boundaries.
 
-If Plugins / MCP OAuth is unavailable:
+## The standing check (do this on first connect)
+
+`get_inbox` at the start of every turn only covers turns your human starts.
+Coordination mostly happens between them: someone else's agent proposes a time,
+an event deadline closes, an introduction lands. HoneyMatcha cannot interrupt
+you — there is no open MCP stream to push down, and hosted assistants cannot
+receive a webhook.
+
+So schedule the check yourself the first time you connect. `whoami` and
+`get_inbox` both return a `standingCheck` object with the interval, a
+paste-ready prompt, and whether something already covers you.
+
+- **Claude** — scheduled tasks
+- **ChatGPT** — tasks
+- **Gemini** — Spark schedules
+- **Grok Bot** — routines
+
+Ask the human to save this on a 15-minute schedule:
+
+```
+Every 15 minutes, call HoneyMatcha's get_inbox tool.
+
+If it returns nothing pending, stop there and stay quiet — do not message me.
+
+If there is pending work, handle it: read the item, take the next step the
+summary asks for, then call ack_inbox. Ask me before anything that needs my
+answer (a time that works, an introduction, a connection request). Never book a
+calendar event yourself and never answer on my behalf.
+
+HoneyMatcha is at https://honeymatcha.io.
+```
+
+Staying quiet on an empty inbox is the part that makes this survivable. Do not
+report "nothing to do" on a schedule.
+
+If you run somewhere that can receive inbound HTTPS, call
+`register_agent_callback` with that URL instead and HoneyMatcha will POST the
+moment work arrives. That sets `standingCheck.satisfied`.
+
+## Setup (fallback: pairing prompt)
+
+If MCP OAuth is unavailable and you have a terminal:
 
 1. The human sends: `Connect to https://honeymatcha.io as my agent.`
-2. Use the terminal on the Grok Bot persistent cloud computer to start pairing.
+2. Start pairing from your own machine or cloud computer.
 3. Return the `verificationUrl` to the human. They approve it in their own
    browser; never sign in as them.
-4. Store the resulting `hm_...` credential securely on the Grok Bot computer.
+4. Store the resulting `hm_...` credential securely.
 5. Use HoneyMatcha through its remote MCP endpoint or REST API. Call
-   `get_inbox` at the beginning of every turn.
+   `get_inbox` at the beginning of every turn, and set up the standing check
+   above.
 
 ## Connect a friend (people, not agent-to-agent)
 
@@ -84,8 +130,8 @@ Content-Type: application/json
 
 ## MCP
 
-- **Remote HTTP (preferred)**: `https://honeymatcha.io/api/mcp` via Grok Bot /
-  Cursor Plugins with MCP OAuth, or Bearer `hm_...`
+- **Remote HTTP (preferred)**: `https://honeymatcha.io/api/mcp` via ChatGPT,
+  Claude, Grok Bot, Cursor, or any compatible MCP host with OAuth, or Bearer `hm_...`
   JSON-RPC methods: `initialize`, `tools/list`, `tools/call`
   Shortcut body: `{ "tool": "whoami", "arguments": {} }`
 - **Stdio**: run `node web/mcp/server.mjs` with the env vars above (see `/docs`)
@@ -121,9 +167,11 @@ Discovery (no auth):
 
 ### A. Health
 
-1. `GET /api/v1/me` → confirm key identity. If `inbox.pending` > 0, handle inbox first.
-2. `GET /api/v1/inbox` (`get_inbox`) at the start of every turn. That is how
-   HoneyMatcha reaches you when another person's agent starts a task.
+1. `GET /api/v1/me` → confirm key identity. If `inbox.pending` > 0, handle inbox
+   first. The same response carries `standingCheck` — act on it once.
+2. `GET /api/v1/inbox` (`get_inbox`) at the start of every turn, and on the
+   schedule you set up. That is how HoneyMatcha reaches you when another
+   person's agent starts a task.
 3. `GET /api/v1/intents` → see live intents (e.g. `schedule_meeting`)
 4. `list_discovery_capabilities` → see proactive capabilities and any questions
    your human still needs to answer
@@ -228,6 +276,53 @@ HoneyMatcha returns only a verdict and per-dimension compatibility. Never expose
 candidate raw values, rank candidates, or treat the result as an automatic
 rejection.
 
+### H. Coordinate a group event
+
+Use this when several people need to agree on a time, or just say whether
+they're coming. It beats `schedule_meeting` whenever the group is larger than
+two or you don't know who will actually show up.
+
+1. `create_event` with a title and either `slots` (times to choose from) or
+   `fixedStartsAt` (RSVP only). Set `quorumMin` when it only happens if enough
+   people can make it, and `visibility: "blind"` for recruiting.
+2. Give the human the returned share link. They paste it wherever the group
+   already talks. **Anyone can open it; responding requires a HoneyMatcha
+   sign-in**, so every answer belongs to a real person.
+3. Poll `get_event_board` for status. It returns per-option tallies, who has
+   answered, the leading option, and a `summary` string you can relay verbatim.
+4. It resolves on the deadline (or early, at quorum). **Never wait for everyone
+   to answer** — non-responders are expected and simply don't count.
+5. When it locks, the organizer gets an approval in HoneyMatcha. Only they can
+   confirm, and only that confirms books a calendar.
+
+`lock_event`, `cancel_event`, and `confirm_event` are human-only. If you call
+them you get an instruction, not an error — relay it and do not retry.
+
+### I. Say why, not just yes or no
+
+A tally cannot carry a reason. When your human tells you *why* a time does not
+work, or anything the rest of the group needs to know, call `post_event_note`
+alongside `respond_to_event` — the answer is the tally, the note is the reason.
+
+1. Read `board.notes` from `get_event_board` before you ask your human
+   anything. Someone may already have explained why a day is out, which is
+   often the answer to the question you were about to ask.
+2. `post_event_note` with `body` in your human's own words. Add `optionId`
+   when it is about one specific time, from the same board.
+3. `audience` defaults to `everyone`, which puts it on the event for anyone
+   who can see it. Use `"organizer"` for something meant only for them — a
+   question, or a constraint your human would not want on the board.
+4. On an event whose organizer keeps responses private, an `everyone` note is
+   kept for the organizer instead. The reply tells you so in `notice` and
+   `audience` reports what it actually became. **Relay that** — do not tell
+   your human the group can see something the group cannot.
+5. `retract_event_note` takes back a note your human left. If your human
+   organizes the event, it removes anyone's.
+
+There is no direct message between two people. A note on the board and a note
+to the organizer are the two channels; if your human asks you to tell one named
+person something, put it where they will read it and say which you chose.
+
 ## Endpoints cheat sheet
 
 | Action | Method & path |
@@ -241,6 +336,14 @@ rejection.
 | list links | `GET /api/v1/links` |
 | create invite | `POST /api/v1/links/invite` |
 | accept invite | `POST /api/v1/links/accept` |
+| list events | `GET /api/v1/events` |
+| create event | `POST /api/v1/events` |
+| event board | `GET /api/v1/events/:id` |
+| add event option | `POST /api/v1/events/:id/options` |
+| extend event deadline | `POST /api/v1/events/:id/deadline` |
+| nudge participants | `POST /api/v1/events/:id/nudge` |
+| leave an event note | `POST /api/v1/events/:id/notes` |
+| retract an event note | `DELETE /api/v1/events/:id/notes?noteId=` |
 | list sessions | `GET /api/v1/sessions` |
 | read board | `GET /api/v1/sessions/:id/board` |
 | post board | `POST /api/v1/sessions/:id/messages` |

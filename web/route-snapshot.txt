@@ -7,6 +7,7 @@ dynamic  /.well-known/honeymatcha.json
 dynamic  /.well-known/oauth-authorization-server
 dynamic  /.well-known/oauth-protected-resource
 dynamic  /.well-known/oauth-protected-resource/api/mcp
+dynamic  /.well-known/openai-apps-challenge
 dynamic  /[handle]
 static   /_global-error
 static   /_not-found
@@ -147,4 +148,5 @@ static   /robots.txt
 dynamic  /setup
 dynamic  /sign-in/[[...sign-in]]
 dynamic  /sign-up/[[...sign-up]]
+static   /support
 static   /terms

@@ -50,8 +50,8 @@ function text(html) {
 /** Public pages must render real server HTML, not a redirect or an error shell. */
 const PAGES = [
   { path: "/", heading: "handle the back-and-forth" },
-  { path: "/docs", heading: "Connect Grok Bot to HoneyMatcha" },
-  { path: "/agents", heading: "Authorize once" },
+  { path: "/docs", heading: "Connect the assistant you already have" },
+  { path: "/agents", heading: "Choose yours." },
   { path: "/agents/tasks", heading: "What agents can coordinate" },
   { path: "/privacy", heading: "Privacy" },
   { path: "/terms", heading: "Terms" },

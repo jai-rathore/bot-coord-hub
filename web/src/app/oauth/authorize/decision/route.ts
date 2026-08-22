@@ -1,11 +1,13 @@
 import {
   buildAuthorizeRedirect,
+  assertMcpResource,
   createAuthorizationCode,
   loadOAuthClient,
   scopesFromAuthorizeRequest,
 } from "@/lib/mcp-oauth";
 import { AgentApiError } from "@/lib/agent-errors";
 import { ensureCurrentUser } from "@/lib/users";
+import { requestBaseUrl } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,7 @@ export async function POST(request: Request) {
       state?: string | null;
       code_challenge?: string;
       scope?: string | null;
+      resource?: string | null;
       agent_name?: string;
     };
 
@@ -40,6 +43,9 @@ export async function POST(request: Request) {
       return Response.json({ error: "redirect_uri mismatch" }, { status: 400 });
     }
 
+    const issuer = requestBaseUrl(request).replace(/\/$/, "");
+    assertMcpResource(body.resource, issuer);
+
     if (body.decision === "denied") {
       return Response.json({
         ok: true,
@@ -47,6 +53,7 @@ export async function POST(request: Request) {
           error: "access_denied",
           error_description: "The human declined this connection",
           state: body.state,
+          iss: issuer,
         }),
       });
     }
@@ -75,6 +82,7 @@ export async function POST(request: Request) {
       redirectTo: buildAuthorizeRedirect(body.redirect_uri, {
         code,
         state: body.state,
+        iss: issuer,
       }),
     });
   } catch (error) {

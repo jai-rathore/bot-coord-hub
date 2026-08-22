@@ -82,7 +82,7 @@ export function MobileTabBar({
   }
   overflow.push({
     href: "/app/agent",
-    label: agentConnected ? "Agent" : "Connect an agent",
+    label: agentConnected ? "Assistant" : "Connect assistant",
     glyph: "agent",
   });
   overflow.push({ href: "/app/settings", label: "Settings", glyph: "settings" });

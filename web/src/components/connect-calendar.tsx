@@ -87,7 +87,7 @@ export function ConnectCalendar({
       ) : (
         <>
           <p className="text-sm text-muted">
-            Connect Google Calendar so your Grok Bot can compare free/busy and
+            Connect Google Calendar so your assistant can compare free/busy and
             create an event with Meet after everyone approves.
           </p>
           {/* OAuth start is an API route that 302s to Google, not a Next.js page. */}

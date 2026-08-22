@@ -309,7 +309,11 @@ export function EventCreateForm() {
         </p>
       )}
 
-      <button type="submit" className="button-primary" disabled={busy}>
+      <button
+        type="submit"
+        className="button-primary w-full sm:w-auto"
+        disabled={busy}
+      >
         {busy ? "Creating…" : "Create event and get the link"}
       </button>
     </form>

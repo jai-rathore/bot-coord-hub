@@ -38,8 +38,8 @@ export default async function InviteAcceptPage({
           Connect on HoneyMatcha
         </h1>
         <p className="mt-2 text-muted">
-          Accepting lets your Grok Bots coordinate plans together. Either person
-          can end the connection at any time.
+          Accepting lets your assistants coordinate plans together. Either
+          person can end the connection at any time.
         </p>
 
         {loadError ? (

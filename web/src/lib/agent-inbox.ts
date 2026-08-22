@@ -3,6 +3,12 @@ import { getDb } from "@/db";
 import { agentInbox, apiKeys, type User } from "@/db/schema";
 import { AgentApiError } from "@/lib/agent-errors";
 import {
+  STANDING_CHECK_INTERVAL_MINUTES,
+  standingCheckInstruction,
+  standingCheckPrompt,
+} from "@/lib/agent-clients";
+import { appOrigin } from "@/lib/connect-copy";
+import {
   fetchResolvedCallback,
   isSafeCallbackUrl,
   resolveSafeCallbackUrl,
@@ -449,5 +455,37 @@ export function inboxInstructions(pending: number): string {
   if (pending > 0) {
     return `You have ${pending} unread HoneyMatcha inbox item(s) from another person's agent. Call get_inbox immediately and handle that work. Do not book Google yourself.`;
   }
-  return "Call get_inbox at the start of every turn. That is how HoneyMatcha reaches you when someone else's agent starts a task with your human.";
+  return `Call get_inbox at the start of every turn. That is how HoneyMatcha reaches you when someone else's agent starts a task with your human. ${standingCheckInstruction()}`;
+}
+
+/**
+ * What this agent should do so inbound work does not wait for its human.
+ *
+ * HoneyMatcha has no way to interrupt a hosted assistant: there is no open MCP
+ * stream to push down, and Claude, ChatGPT, Gemini and Grok cannot receive an
+ * inbound webhook. So the answer is a standing check the agent schedules for
+ * itself. This ships in whoami and get_inbox rather than only in the connect
+ * docs, because the agent — not the human — is the one that can create it.
+ */
+export function standingCheckStatus(opts: {
+  callbackRegistered: boolean;
+}): {
+  /** True once something else already delivers — no schedule needed. */
+  satisfied: boolean;
+  intervalMinutes: number;
+  instructions: string;
+  /** Paste-ready text for a scheduler that only stores a prompt string. */
+  prompt: string;
+  setupUrl: string;
+} {
+  const origin = appOrigin();
+  return {
+    satisfied: opts.callbackRegistered,
+    intervalMinutes: STANDING_CHECK_INTERVAL_MINUTES,
+    instructions: opts.callbackRegistered
+      ? "A callback URL is registered, so HoneyMatcha pushes new work to you. A scheduled get_inbox is still a cheap safety net if your callback host can go down."
+      : standingCheckInstruction(),
+    prompt: standingCheckPrompt(origin),
+    setupUrl: `${origin}/docs#standing-check`,
+  };
 }

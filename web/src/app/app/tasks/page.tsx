@@ -34,7 +34,7 @@ export default async function TasksPage() {
       <PageHeading
         eyebrow="Coordination"
         title="Tasks"
-        description="What you and your Grok Bot are working on—and what you want HoneyMatcha to support next."
+        description="What you and your assistant are working on—and what you want HoneyMatcha to support next."
       />
 
       <section className="mt-10">
@@ -67,7 +67,7 @@ export default async function TasksPage() {
           </ul>
         ) : (
           <p className="mt-4 rounded-2xl border border-dashed border-matcha-soft/40 bg-white/40 p-6 text-sm text-muted">
-            No tasks yet. Once your Grok Bot starts coordinating, its work
+            No tasks yet. Once your assistant starts coordinating, its work
             appears here.
           </p>
         )}

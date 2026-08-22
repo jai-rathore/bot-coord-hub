@@ -183,6 +183,13 @@
       "when": 1787400000000,
       "tag": "0025_petite_madame_hydra",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787375678867,
+      "tag": "0026_square_thaddeus_ross",
+      "breakpoints": true
     }
   ]
 }

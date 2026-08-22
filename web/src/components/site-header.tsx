@@ -12,7 +12,9 @@ import { BrandLink } from "@/components/brand-link";
 
 /** The marketing pages are one scroll now, so the header carries the one link
  *  that leaves them rather than an anchor into a section that no longer exists. */
-const SECONDARY_LINKS = [{ href: "/agents", label: "For agents" }] as const;
+const SECONDARY_LINKS = [
+  { href: "/agents", label: "Connect an assistant" },
+] as const;
 
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -77,7 +79,7 @@ export function SiteHeader() {
             aria-controls={menuId}
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             onClick={() => setMenuOpen((open) => !open)}
-            className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-line bg-white/70 text-matcha-deep transition hover:border-matcha-soft hover:bg-white"
+            className="inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-line bg-white/70 text-matcha-deep transition hover:border-matcha-soft hover:bg-white"
           >
             <svg
               width="16"
@@ -126,7 +128,7 @@ export function SiteHeader() {
           <SignInButton mode="redirect">
             <button
               type="button"
-              className="button-secondary min-h-10 cursor-pointer whitespace-nowrap px-2.5 py-1.5 sm:px-3.5"
+              className="button-secondary min-h-11 cursor-pointer whitespace-nowrap px-2.5 py-1.5 sm:px-3.5"
             >
               Sign in
             </button>
@@ -134,16 +136,17 @@ export function SiteHeader() {
           <SignUpButton mode="redirect">
             <button
               type="button"
-              className="button-primary min-h-10 cursor-pointer whitespace-nowrap px-2.5 py-1.5 sm:px-3.5"
+              className="button-primary min-h-11 cursor-pointer whitespace-nowrap px-2.5 py-1.5 sm:px-3.5"
             >
-              Get started
+              <span className="sm:hidden">Start</span>
+              <span className="hidden sm:inline">Get started</span>
             </button>
           </SignUpButton>
         </Show>
         <Show when="signed-in">
           <Link
             href="/"
-            className="button-primary min-h-10 whitespace-nowrap px-2.5 py-1.5 sm:px-3.5"
+            className="button-primary min-h-11 whitespace-nowrap px-2.5 py-1.5 sm:px-3.5"
           >
             Home
           </Link>

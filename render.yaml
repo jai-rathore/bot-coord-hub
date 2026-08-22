@@ -52,6 +52,9 @@ services:
         value: "false"
       - key: INTENT_ADMIN_EMAILS
         sync: false
+      # Set to the exact token shown by OpenAI during plugin submission.
+      - key: OPENAI_APPS_CHALLENGE
+        sync: false
       - key: TRIAGE_SECRET
         generateValue: true
       - key: REDIS_URL

@@ -8,7 +8,7 @@ const SCENES = [
     tone: "live" as const,
     kicker: "Scheduling task",
     title: "Coffee with Sam and Anu",
-    detail: "Your Grok Bot is comparing free/busy time.",
+    detail: "Your assistant is comparing free/busy time.",
     note: "Calendars checked. Event titles stay private.",
     approval: "Finding a slot that works for everyone.",
   },
@@ -18,7 +18,7 @@ const SCENES = [
     kicker: "Scheduling task",
     title: "Thursday 3:30–4:00",
     detail: "Three calendars overlap. One clean window.",
-    note: "Sam’s Bot and Anu’s Bot already agreed.",
+    note: "Sam’s assistant and Anu’s assistant already agreed.",
     approval: "Preparing a booking for your review.",
   },
   {

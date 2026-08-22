@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { HomeLivePreview } from "@/components/home-live-preview";
 
+const SUPPORTED_ASSISTANTS = [
+  "ChatGPT",
+  "Claude",
+  "Gemini Spark",
+  "Grok Bot",
+  "Cursor",
+] as const;
+
 /**
  * The first screen for someone who has never been here.
  *
@@ -45,6 +53,27 @@ export function HomeHero() {
         <p className="animate-rise-delay-3 mt-3 text-sm text-muted">
           Free in beta. Sage comes with your account — nothing to install.
         </p>
+        <div className="animate-rise-delay-3 mt-6 max-w-xl border-t border-matcha-soft/25 pt-4">
+          <p className="text-[0.68rem] font-bold tracking-[0.12em] text-matcha uppercase">
+            Or bring the assistant you already use
+          </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            {SUPPORTED_ASSISTANTS.map((assistant) => (
+              <span
+                key={assistant}
+                className="rounded-full border border-white/90 bg-white/68 px-2.5 py-1 text-xs font-semibold text-muted shadow-[0_4px_14px_rgba(23,63,46,0.05)] backdrop-blur-sm"
+              >
+                {assistant}
+              </span>
+            ))}
+            <Link
+              href="/agents"
+              className="ml-1 text-xs font-semibold text-matcha-deep"
+            >
+              See your steps <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+        </div>
       </div>
       <div className="animate-rise-delay-2 lg:pt-2">
         <HomeLivePreview />

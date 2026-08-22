@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "honeymatcha": {
+      "type": "http",
+      "url": "https://honeymatcha.io/api/mcp"
+    }
+  }
+}

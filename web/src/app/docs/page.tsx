@@ -2,10 +2,18 @@ import Link from "next/link";
 import { CopyBlock } from "@/components/copy-block";
 import { SiteHeader } from "@/components/site-header";
 import {
+  AGENT_CLIENTS,
+  STANDING_CHECK_INTERVAL_MINUTES,
+  clientsWithStandingCheck,
+  standingCheckPrompt,
+} from "@/lib/agent-clients";
+import {
   ASK_AGENT_PROMPT,
   FRIEND_INVITE_MESSAGE,
   GROK_BOT_CONNECT_PROMPT,
   GROK_BOT_URL,
+  MCP_URL,
+  PRODUCTION_ORIGIN,
 } from "@/lib/connect-copy";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 
@@ -33,12 +41,12 @@ export default function DocsPage() {
             Docs
           </p>
           <h1 className="display-title mt-2 text-[clamp(1.9rem,5vw,2.7rem)]">
-            Connect Grok Bot to HoneyMatcha
+            Connect the assistant you already have
           </h1>
           <p className="mt-2 max-w-[42ch] text-[1.02rem] text-muted">
-            You connect one of your Grok Bots to your HoneyMatcha account. A
-            friend connects their Bot to theirs. Then you invite each other as
-            people — Bots never sign in as you.
+            Claude, ChatGPT, Gemini, Grok — one MCP URL, approved in your own
+            browser. A friend connects theirs. Then you invite each other as
+            people. No assistant ever signs in as you.
           </p>
         </div>
       </div>
@@ -49,10 +57,10 @@ export default function DocsPage() {
             id="steps-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
           >
-            Two steps
+            Three steps
           </h2>
           <p className="mt-2 mb-4 text-[0.95rem] text-muted">
-            After that, you talk to your Grok Bot.
+            After that, you talk to your assistant.
           </p>
           <ol className="mt-4 grid list-none gap-4 p-0">
             <li className="grid grid-cols-[auto_1fr] gap-3">
@@ -75,24 +83,155 @@ export default function DocsPage() {
               </span>
               <div>
                 <strong className="font-semibold text-ink">
-                  Connect HoneyMatcha in Grok Bot Plugins
+                  Add HoneyMatcha to your assistant
                 </strong>
                 <p className="mt-1 text-[0.95rem] text-muted">
-                  In Grok Bot open <strong>Plugins</strong>, add HoneyMatcha or
-                  the custom MCP URL{" "}
+                  Paste the MCP URL{" "}
                   <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
-                    https://honeymatcha.io/api/mcp
-                  </code>
-                  , then Authorize in your browser. Paste the pairing prompt
-                  only if Plugins OAuth is unavailable. Bots never receive your
-                  HoneyMatcha password.
+                    {MCP_URL}
+                  </code>{" "}
+                  into your assistant&rsquo;s connector settings and approve it
+                  in your browser. Per-assistant steps are{" "}
+                  <a href="#assistants">just below</a>. Your assistant never
+                  receives your HoneyMatcha password.
+                </p>
+                <p className="mt-2 text-[0.95rem] text-muted">
+                  If your assistant has its own terminal, you can skip the menus
+                  and just say this instead:
                 </p>
                 <div className="mt-3">
                   <CopyBlock text={ASK_AGENT_PROMPT} />
                 </div>
               </div>
             </li>
+            <li className="grid grid-cols-[auto_1fr] gap-3">
+              <span className="mt-0.5 grid h-[1.55rem] w-[1.55rem] place-items-center rounded-full bg-honey-soft text-[0.78rem] font-semibold text-matcha-deep">
+                3
+              </span>
+              <div>
+                <strong className="font-semibold text-ink">
+                  Give it a standing check
+                </strong>
+                <p className="mt-1 text-[0.95rem] text-muted">
+                  Ask your assistant to check HoneyMatcha every{" "}
+                  {STANDING_CHECK_INTERVAL_MINUTES} minutes on a schedule.
+                  Without it, a request from someone else&rsquo;s agent waits
+                  until you next open a chat.{" "}
+                  <a href="#standing-check">The prompt to paste is below.</a>
+                </p>
+              </div>
+            </li>
           </ol>
+        </section>
+
+        <section
+          aria-labelledby="assistants-title"
+          className="mb-12"
+          id="assistants"
+        >
+          <h2
+            id="assistants-title"
+            className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
+          >
+            Where the setting lives
+          </h2>
+          <p className="mt-2 text-[0.95rem] leading-7 text-muted">
+            HoneyMatcha is a remote MCP server with OAuth and dynamic client
+            registration, so there is no HoneyMatcha app to install and no
+            client secret to copy anywhere. Every assistant below takes the same
+            URL:{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+              {MCP_URL}
+            </code>
+          </p>
+          <div className="mt-6 grid gap-5">
+            {AGENT_CLIENTS.map((client) => (
+              <div
+                key={client.id}
+                className="rounded-md border border-line bg-[rgba(255,252,246,0.6)] p-5"
+              >
+                <h3 className="font-semibold text-matcha-deep">
+                  <a href={client.homeUrl}>{client.name}</a>
+                </h3>
+                <p className="mt-1 text-[0.9rem] leading-6 text-muted">
+                  {client.summary}
+                </p>
+                <ol className="mt-3 grid list-decimal gap-1.5 pl-5 text-[0.9rem] leading-6 text-muted">
+                  {client.connectSteps.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+                {client.connectDocsUrl ? (
+                  <p className="mt-3 text-[0.85rem] leading-6 text-muted">
+                    <a href={client.connectDocsUrl}>
+                      Read {client.name}&rsquo;s official connection guide
+                    </a>
+                    .
+                  </p>
+                ) : null}
+                {client.caveat ? (
+                  <p className="mt-3 text-[0.85rem] leading-6 text-muted">
+                    <strong className="text-ink">Worth knowing.</strong>{" "}
+                    {client.caveat}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section
+          aria-labelledby="standing-check-title"
+          className="mb-12"
+          id="standing-check"
+        >
+          <h2
+            id="standing-check-title"
+            className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
+          >
+            The standing check
+          </h2>
+          <p className="mt-2 text-[0.95rem] leading-7 text-muted">
+            Connecting your assistant lets it reach HoneyMatcha. It does not let
+            HoneyMatcha reach your assistant. A hosted assistant has no inbox of
+            its own and cannot receive a webhook, so it only sees an incoming
+            request the next time you happen to open a chat with it. That is the
+            difference between coordination that happens and coordination you
+            find out about on Thursday.
+          </p>
+          <p className="mt-3 text-[0.95rem] leading-7 text-muted">
+            The fix is a saved prompt on a timer. Paste this once and ask your
+            assistant to run it on a schedule:
+          </p>
+          <div className="mt-4">
+            <CopyBlock text={standingCheckPrompt(PRODUCTION_ORIGIN)} />
+          </div>
+          <p className="mt-5 text-[0.95rem] leading-7 text-muted">
+            It stays quiet when nothing is pending, so a check every{" "}
+            {STANDING_CHECK_INTERVAL_MINUTES} minutes costs you no
+            notifications. What each assistant calls the feature:
+          </p>
+          <ul className="mt-3 grid list-none gap-2 p-0 text-[0.95rem] text-muted">
+            {clientsWithStandingCheck().map((client) => (
+              <li key={client.id}>
+                <strong className="text-ink">{client.name}</strong> —{" "}
+                <a href={client.standingCheck?.docsUrl}>
+                  {client.standingCheck?.featureName}
+                </a>
+                . {client.standingCheck?.steps.join(" ")}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-5 text-[0.95rem] leading-7 text-muted">
+            If your agent runs somewhere that can receive inbound HTTPS, skip
+            the timer: call{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+              register_agent_callback
+            </code>{" "}
+            and HoneyMatcha posts to it the moment work arrives. Either way,
+            HoneyMatcha still emails you — the standing check is what saves you
+            from being the one who has to relay it.
+          </p>
         </section>
 
         <section
@@ -104,10 +243,12 @@ export default function DocsPage() {
             id="grok-bot-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
           >
-            Connect with Grok Bot
+            Grok Bot fallback pairing
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
-            Grok Bot is the supported setup path.{" "}
+            Most people should use the connector steps above. Grok Bot can also
+            finish device-style pairing from its own computer, so this fallback
+            remains available for existing users.{" "}
             <a href={GROK_BOT_URL}>Get Grok Bot at x.ai/bot</a>, then connect
             HoneyMatcha under Plugins and Google Calendar in HoneyMatcha
             settings.
@@ -179,8 +320,8 @@ export default function DocsPage() {
             Connecting with a friend
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
-            You do not connect their Bot to yours. Each person connects their
-            own Grok Bot to their own HoneyMatcha account. From{" "}
+            You do not connect their assistant to yours. Each person connects their
+            own assistant to their own HoneyMatcha account. From{" "}
             <Link href="/app/people">People</Link>, send a private
             email-targeted invite or create a reusable public link and QR code.
             Your handle page carries a code of its own — someone you just met
@@ -191,7 +332,7 @@ export default function DocsPage() {
           </p>
           <p className="mt-3 text-[0.95rem] leading-7 text-muted">
             Once they have a HoneyMatcha account, HoneyMatcha reaches{" "}
-            <em>their Grok Bot</em> through the agent inbox — not email, and not
+            <em>their assistant</em> through the agent inbox — not email, and not
             a Google invite. Their agent should call{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
               get_inbox
@@ -304,7 +445,7 @@ curl -s "$BASE/" -H "Accept: application/json"`}
             MCP
           </h2>
           <p className="mt-2 text-[0.95rem] text-muted">
-            Prefer Grok Bot / Cursor Plugins with MCP OAuth against{" "}
+            ChatGPT, Claude, Gemini Spark, Grok Bot, Cursor, and other remote MCP clients use OAuth against{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">https://honeymatcha.io/api/mcp</code>
             . Remote agents can also POST JSON-RPC with a scoped{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">hm_</code>{" "}
@@ -312,7 +453,7 @@ curl -s "$BASE/" -H "Accept: application/json"`}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">web/mcp</code>.
           </p>
           <h3 className="mt-5 text-[0.95rem] font-semibold text-ink">
-            Remote MCP URL (Grok Bot Plugins)
+            Remote MCP URL
           </h3>
           <pre className="mt-2 overflow-x-auto rounded-md border border-line bg-[rgba(255,252,246,0.75)] p-4 text-[0.82rem] leading-relaxed text-ink">
 {`{
@@ -381,20 +522,20 @@ curl -s "$BASE/api/mcp" \\
             id="skill-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
           >
-            Reuse the workflow in Grok Bot
+            Reuse the workflow in any supported agent
           </h2>
           <p className="mt-2 text-[0.95rem] text-muted">
-            Start with the Grok Bot pairing flow above. After it succeeds, ask
-            your Bot to save the process as a reusable skill. Builders can use{" "}
+            The packaged skill works alongside the same MCP server in ChatGPT,
+            Claude, Gemini Spark, Codex, Grok Bot, and Cursor. Builders can use{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
               skills/honeymatcha/SKILL.md
             </code>{" "}
             as the reference instructions. The skill preserves the same human
-            approval boundary and never automates human sign-in. See{" "}
-            <a href="#grok-bot">Connect with Grok Bot</a> and the official{" "}
-            <a href="https://docs.x.ai/grok-bot/skills-routines-and-automations">
-              Grok Bot skills guide
-            </a>
+            approval boundary and never automates human sign-in. The distributable
+            manifests and release runbook live under{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+              plugins/honeymatcha
+            </code>
             .
           </p>
         </section>
@@ -416,7 +557,7 @@ curl -s "$BASE/api/mcp" \\
             </li>
             <li className="relative pl-[1.15rem]">
               <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
-              Update your Grok Bot / MCP secrets (
+              Update your agent / MCP secrets (
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">HONEYMATCHA_API_KEY</code>
               ) to the new value and verify{" "}
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">GET /api/v1/me</code>.
