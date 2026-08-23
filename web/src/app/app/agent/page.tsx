@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { AgentOperatorControl } from "@/components/agent-operator-control";
 import { AgentStatusCard } from "@/components/agent-status-card";
 import { AssistantSetupGuide } from "@/components/assistant-setup-guide";
 import { PageHeading } from "@/components/page-heading";
 import { SagePortrait } from "@/components/sage-avatar";
+import { SageScheduleForm } from "@/components/sage-schedule-form";
 import { SetupGuide } from "@/components/setup-guide";
 import { getHomeStatus } from "@/lib/home-status";
 import { intentLabel, taskStatusLabel } from "@/lib/intent-labels";
@@ -12,6 +14,7 @@ import {
   googleOAuthConfigured,
 } from "@/lib/google-oauth";
 import { ensureCurrentUser } from "@/lib/users";
+import { getAgentOperatorMode } from "@/lib/sage/job-store";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +33,10 @@ export default async function AgentPage() {
     return <p className="text-danger">Unable to resolve your account.</p>;
   }
 
-  const [status, conn] = await Promise.all([
+  const [status, conn, operatorMode] = await Promise.all([
     getHomeStatus(user),
     getGoogleConnection(user.id),
+    getAgentOperatorMode(user.id),
   ]);
 
   const links = [
@@ -63,7 +67,7 @@ export default async function AgentPage() {
       <PageHeading
         eyebrow="Your personal agent"
         title="Your assistant"
-        description="You already have an agent — Sage came with the account and works only for you. Connect one of your own and it takes over the same job: comparing calendars, chasing replies, and bringing you only the decisions that need a person."
+        description="You already have an agent — Sage came with the account and works only for you. Connect one of your own if you prefer; both use the same HoneyMatcha capabilities and the same human approval boundaries."
       />
 
       <div className="flex items-center gap-4 rounded-2xl border border-matcha-soft/35 bg-matcha/5 p-4 sm:p-5">
@@ -74,6 +78,10 @@ export default async function AgentPage() {
           sees the titles on your calendar.
         </p>
       </div>
+
+      <SageScheduleForm />
+
+      <AgentOperatorControl initialMode={operatorMode} />
 
       <SetupGuide
         calendar={{

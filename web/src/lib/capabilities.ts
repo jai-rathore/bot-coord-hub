@@ -3,14 +3,12 @@
  *
  * The product is not "an events app with an optional agent". Every capability
  * here is run by an agent — the only question is whose. Sage is the one we
- * provide and it is already switched on; your own agent (ChatGPT, Claude,
- * Gemini, Grok, Cursor, or anything speaking MCP or A2A) can run all of them
- * today.
+ * provide and it is already switched on; a connected agent (ChatGPT, Claude,
+ * Gemini, Grok, Cursor, or anything speaking MCP or A2A) can use the same
+ * underlying capability boundary.
  *
- * That distinction is the entire pitch, so it lives in one list that both the
- * signed-out page and the signed-in home read from. A capability that Sage has
- * not learned yet is never a dead end: it is one connection away from working,
- * and the UI has to say so in the same breath as "coming soon".
+ * Readiness lives in one list that both the signed-out page and signed-in home
+ * use, so product copy cannot accidentally promise a path Sage cannot run.
  */
 
 export type Operator = "sage" | "own";
@@ -53,15 +51,15 @@ export const CAPABILITIES: Capability[] = [
     id: "meet",
     title: "Meet one-on-one",
     line: "Calendars compared for you. Free/busy only — never event titles.",
-    sage: "soon",
-    href: "/app/people",
+    sage: "ready",
+    href: "/app/agent",
     glyph: "handshake",
   },
   {
     id: "intro",
     title: "Introductions",
     line: "Put in touch with someone new, only once you both say yes.",
-    sage: "soon",
+    sage: "ready",
     href: "/app/discovery",
     flag: "discovery",
     glyph: "search",
@@ -70,7 +68,7 @@ export const CAPABILITIES: Capability[] = [
     id: "hiring",
     title: "Hiring matches",
     line: "Compare what a role and a candidate need before either is named.",
-    sage: "soon",
+    sage: "ready",
     href: "/app/discovery",
     flag: "discovery",
     glyph: "briefcase",
@@ -79,7 +77,7 @@ export const CAPABILITIES: Capability[] = [
     id: "meetup",
     title: "Local meetups",
     line: "Find people nearby who want the same thing on the same evening.",
-    sage: "soon",
+    sage: "ready",
     href: "/app/discovery",
     flag: "discovery",
     glyph: "pin",
@@ -87,7 +85,7 @@ export const CAPABILITIES: Capability[] = [
 ];
 
 /**
- * Your own agent can run everything; Sage runs what it has learned.
+ * Connected agents can run everything; Sage runs every ready capability.
  *
  * This is the one rule the whole model rests on, so it is a function rather
  * than a field: nothing else is allowed to invent a third answer.

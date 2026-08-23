@@ -7,6 +7,7 @@ import {
   listDiscoveryInterests,
   listUserDiscoveryAudit,
   reportDiscoveryParticipant,
+  requestDiscoveryIntroduction,
   submitDiscoveryEnrollment,
   type CoarseLocationInput,
 } from "@/lib/discovery-service";
@@ -73,10 +74,13 @@ export async function POST(request: Request) {
       reasonCode?: unknown;
       details?: unknown;
       block?: boolean;
+      candidateHandle?: unknown;
+      idempotencyKey?: unknown;
     };
     if (
       body.action === "submit_enrollment" ||
-      body.action === "resolve_location"
+      body.action === "resolve_location" ||
+      body.action === "request_introduction"
     ) {
       if (!discoveryFeatureEnabled()) {
         return Response.json(
@@ -92,8 +96,14 @@ export async function POST(request: Request) {
         rate = await distributedRateLimit(
           body.action === "resolve_location"
             ? `human-location:${user.id}`
-            : `human:${user.id}`,
-          body.action === "resolve_location" ? 60 : 30,
+            : body.action === "request_introduction"
+              ? `human-interest:${user.id}`
+              : `human:${user.id}`,
+          body.action === "resolve_location"
+            ? 60
+            : body.action === "request_introduction"
+              ? 10
+              : 30,
         );
       } catch {
         return Response.json(
@@ -205,6 +215,23 @@ export async function POST(request: Request) {
               | "confirm_request"
               | "accept"
               | "decline",
+          }),
+        });
+      case "request_introduction":
+        if (typeof body.candidateHandle !== "string") {
+          return Response.json(
+            { error: "candidateHandle is required" },
+            { status: 400 },
+          );
+        }
+        return Response.json({
+          interest: await requestDiscoveryIntroduction({
+            actor: { user, kind: "user" },
+            candidateHandle: body.candidateHandle,
+            idempotencyKey:
+              typeof body.idempotencyKey === "string"
+                ? body.idempotencyKey
+                : undefined,
           }),
         });
       case "block":

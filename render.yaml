@@ -16,6 +16,8 @@ services:
         value: "true"
       - key: ENABLE_DISCOVERY
         value: "true"
+      - key: ENABLE_SAGE_JOBS
+        value: "true"
       - key: ENABLE_CANONICAL_LOCATIONS
         value: "false"
       - key: HOSTED_AGENT_PROVIDER
@@ -72,6 +74,55 @@ services:
       # Leave unset until A2P 10DLC is approved.
       - key: TWILIO_FROM_NUMBER
         sync: false
+  - type: worker
+    name: honeymatcha-sage-worker
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: web
+    buildCommand: npm install
+    preDeployCommand: npm run db:migrate
+    startCommand: npm run sage:worker
+    maxShutdownDelaySeconds: 90
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          type: web
+          name: honeymatcha-web
+          envVarKey: DATABASE_URL
+      - key: NEXT_PUBLIC_APP_ORIGIN
+        value: https://honeymatcha.io
+      - key: ENABLE_SAGE_JOBS
+        value: "true"
+      - key: ENABLE_DISCOVERY
+        value: "true"
+      - key: GOOGLE_CALENDAR_ENABLED
+        value: "true"
+      - key: GOOGLE_CLIENT_ID
+        fromService:
+          type: web
+          name: honeymatcha-web
+          envVarKey: GOOGLE_CLIENT_ID
+      - key: GOOGLE_CLIENT_SECRET
+        fromService:
+          type: web
+          name: honeymatcha-web
+          envVarKey: GOOGLE_CLIENT_SECRET
+      - key: TOKEN_ENCRYPTION_KEY
+        fromService:
+          type: web
+          name: honeymatcha-web
+          envVarKey: TOKEN_ENCRYPTION_KEY
+      - key: ALLOW_MOCK_CALENDAR
+        value: "false"
+      - key: SAGE_WORKER_POLL_MS
+        value: "1500"
+      - key: SAGE_WORKER_LEASE_MS
+        value: "120000"
+      - key: DB_POOL_MAX
+        value: "3"
   - type: keyvalue
     name: honeymatcha-rate-limit
     plan: starter

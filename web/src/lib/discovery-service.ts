@@ -71,7 +71,7 @@ const DISCOVERY_AUDIT_ACTIONS = [
 
 export type DiscoveryActor = {
   user: User;
-  kind: "user" | "agent";
+  kind: "user" | "agent" | "hosted_agent";
   apiKeyId?: string | null;
 };
 

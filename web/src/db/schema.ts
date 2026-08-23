@@ -95,6 +95,34 @@ export const safetyReportStatusEnum = pgEnum("safety_report_status", [
   "dismissed",
 ]);
 
+export const agentOperatorModeEnum = pgEnum("agent_operator_mode", [
+  "sage_primary",
+  "external_primary",
+  "sage_only",
+]);
+
+export const sageJobStateEnum = pgEnum("sage_job_state", [
+  "pending",
+  "running",
+  "waiting_human",
+  "completed",
+  "failed",
+  "dead_letter",
+  "cancelled",
+]);
+
+export const sageRunStateEnum = pgEnum("sage_run_state", [
+  "running",
+  "completed",
+  "failed",
+]);
+
+export const sageStepStateEnum = pgEnum("sage_step_state", [
+  "running",
+  "completed",
+  "failed",
+]);
+
 /** Optional working-hours policy on a link. */
 export type AllowedHours = {
   start: string;
@@ -1594,6 +1622,117 @@ export const notificationOutbox = pgTable(
   ],
 );
 
+/**
+ * Which agent should pick up non-explicit work for a person. An explicit
+ * "ask Sage" request always goes to Sage; this preference arbitrates inbox,
+ * deadline, and scheduled triggers so two agents do not race each other.
+ */
+export const agentOperatorPreferences = pgTable(
+  "agent_operator_preferences",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    mode: agentOperatorModeEnum("mode").notNull().default("sage_primary"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+);
+
+/** Durable queue entry for work performed by the hosted Sage operator. */
+export const sageJobs = pgTable(
+  "sage_jobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    capability: text("capability").notNull(),
+    trigger: text("trigger").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    idempotencyKey: text("idempotency_key"),
+    state: sageJobStateEnum("state").notNull().default("pending"),
+    runAt: timestamp("run_at", { withTimezone: true }).defaultNow().notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(5),
+    workerId: text("worker_id"),
+    leasedAt: timestamp("leased_at", { withTimezone: true }),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+    result: jsonb("result").$type<Record<string, unknown>>(),
+    lastError: text("last_error"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("sage_jobs_claim_idx").on(t.state, t.runAt, t.leaseExpiresAt),
+    index("sage_jobs_user_created_idx").on(t.userId, t.createdAt),
+    uniqueIndex("sage_jobs_idempotency_uidx")
+      .on(t.userId, t.capability, t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} is not null`),
+    check("sage_jobs_attempts_check", sql`${t.attempts} >= 0`),
+    check("sage_jobs_max_attempts_check", sql`${t.maxAttempts} > 0`),
+  ],
+);
+
+/** One processing attempt for a Sage job. */
+export const sageRuns = pgTable(
+  "sage_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => sageJobs.id, { onDelete: "cascade" }),
+    attempt: integer("attempt").notNull(),
+    state: sageRunStateEnum("state").notNull().default("running"),
+    provider: text("provider"),
+    model: text("model"),
+    latencyMs: integer("latency_ms"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    error: text("error"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("sage_runs_job_attempt_uidx").on(t.jobId, t.attempt),
+    index("sage_runs_started_idx").on(t.startedAt),
+  ],
+);
+
+/** Redacted, ordered capability calls made during a Sage run. */
+export const sageSteps = pgTable(
+  "sage_steps",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => sageRuns.id, { onDelete: "cascade" }),
+    sequence: integer("sequence").notNull(),
+    capability: text("capability").notNull(),
+    state: sageStepStateEnum("state").notNull().default("running"),
+    input: jsonb("input").$type<Record<string, unknown>>().notNull().default({}),
+    output: jsonb("output").$type<Record<string, unknown>>(),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("sage_steps_run_sequence_uidx").on(t.runId, t.sequence),
+    index("sage_steps_capability_idx").on(t.capability, t.startedAt),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type AgentProfile = typeof agentProfiles.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
@@ -1633,3 +1772,7 @@ export type EventActivity = typeof eventActivity.$inferSelect;
 export type EventMessage = typeof eventMessages.$inferSelect;
 export type EventNote = typeof eventNotes.$inferSelect;
 export type NotificationOutbox = typeof notificationOutbox.$inferSelect;
+export type AgentOperatorPreference = typeof agentOperatorPreferences.$inferSelect;
+export type SageJob = typeof sageJobs.$inferSelect;
+export type SageRun = typeof sageRuns.$inferSelect;
+export type SageStep = typeof sageSteps.$inferSelect;

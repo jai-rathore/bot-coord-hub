@@ -19,6 +19,7 @@ import {
 } from "@/db/schema";
 import { writeAudit } from "@/lib/audit";
 import { AgentApiError } from "@/lib/agent-errors";
+import { completeWaitingSageScheduleJobs } from "@/lib/sage/job-store";
 import {
   calendarConnectionStatus,
   collectFreeBusyForUsers,
@@ -60,7 +61,7 @@ type ResolvedPeer = {
 
 type ScheduleActor = {
   apiKeyId?: string | null;
-  kind?: "user" | "agent";
+  kind?: "user" | "agent" | "hosted_agent";
 };
 
 function findDirectionalLink(
@@ -1250,6 +1251,14 @@ export async function tryBookAfterConfirmApprovals(
       and(eq(confirms.sessionId, sessionId), eq(confirms.status, "denied")),
     );
   if (denied.length > 0) {
+    await completeWaitingSageScheduleJobs(sessionId, {
+      ok: true,
+      sessionId,
+      sessionStatus: "declined",
+      calendarStatus: "not_booked",
+      waitingForHuman: false,
+      message: "A participant declined the proposed meeting.",
+    });
     return null;
   }
 
@@ -1272,12 +1281,22 @@ export async function tryBookAfterConfirmApprovals(
     };
   }
 
-  return bookMeeting(
+  const booking = await bookMeeting(
     actor,
     sessionId,
     { acceptedBy: "user" },
     actorMeta,
   );
+  const calendar = booking.calendar as Record<string, unknown>;
+  await completeWaitingSageScheduleJobs(sessionId, {
+    ok: true,
+    sessionId,
+    sessionStatus: "confirmed",
+    calendarStatus: calendar.status ?? "booked",
+    waitingForHuman: false,
+    message: "The meeting was booked after every required approval.",
+  });
+  return booking;
 }
 
 async function bookMeeting(

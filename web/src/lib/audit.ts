@@ -8,7 +8,7 @@ import { auditLogs } from "@/db/schema";
 export async function writeAudit(entry: {
   actorUserId?: string | null;
   actorApiKeyId?: string | null;
-  actorKind?: "user" | "agent" | "guest" | "system";
+  actorKind?: "user" | "agent" | "hosted_agent" | "guest" | "system";
   action: string;
   entityType: string;
   entityId?: string | null;
