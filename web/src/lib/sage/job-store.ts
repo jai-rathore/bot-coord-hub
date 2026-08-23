@@ -350,6 +350,26 @@ export async function completeSageStep(
     .where(eq(sageSteps.id, stepId));
 }
 
+export async function recordSageRunTelemetry(
+  runId: string,
+  telemetry: {
+    provider: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+  },
+) {
+  await getDb()
+    .update(sageRuns)
+    .set({
+      provider: telemetry.provider.slice(0, 120),
+      model: telemetry.model.slice(0, 160),
+      inputTokens: Math.max(0, Math.floor(telemetry.inputTokens)),
+      outputTokens: Math.max(0, Math.floor(telemetry.outputTokens)),
+    })
+    .where(eq(sageRuns.id, runId));
+}
+
 export async function failSageStep(stepId: string, error: unknown) {
   await getDb()
     .update(sageSteps)

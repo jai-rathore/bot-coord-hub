@@ -14,6 +14,7 @@ import {
   failSageJob,
   failSageStep,
   finishSageJob,
+  recordSageRunTelemetry,
   safeSageError,
   startSageStep,
 } from "@/lib/sage/job-store";
@@ -88,6 +89,9 @@ export async function processNextSageJob(input: {
       { actor: hostedAgentActor(user, run.id), jobId: job.id },
       parsedInput,
     );
+    if (outcome.telemetry) {
+      await recordSageRunTelemetry(run.id, outcome.telemetry);
+    }
     await completeSageStep(step.id, outcome.result);
     await finishSageJob({
       job,

@@ -75,6 +75,20 @@ export class GeminiProvider implements LlmProvider {
           })),
         },
       ];
+      if (request.requiredToolName) {
+        const advertised = request.tools.some(
+          (tool) => tool.name === request.requiredToolName,
+        );
+        if (!advertised) {
+          throw new Error("Required tool must be present in the advertised tool set");
+        }
+        body.toolConfig = {
+          functionCallingConfig: {
+            mode: "ANY",
+            allowedFunctionNames: [request.requiredToolName],
+          },
+        };
+      }
     }
 
     const res = await fetchWithTimeout(

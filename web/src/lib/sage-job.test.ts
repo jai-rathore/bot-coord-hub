@@ -108,6 +108,22 @@ test("Sage and external agents share capability definitions", () => {
   assert.equal(discovery.humanApproval, "never");
 });
 
+test("Sage publishes conversational discovery and human-gated handoffs", () => {
+  const capabilities = new Map(
+    listSageCapabilities().map((capability) => [capability.name, capability]),
+  );
+  assert.equal(capabilities.size, 5);
+  assert.equal(capabilities.get("discovery_intake")?.humanApproval, "never");
+  assert.equal(
+    capabilities.get("discovery_prepare_enrollment")?.humanApproval,
+    "always",
+  );
+  assert.equal(
+    capabilities.get("discovery_stage_introduction")?.humanApproval,
+    "always",
+  );
+});
+
 test("the shared registry enforces external-agent scopes", async () => {
   await assert.rejects(
     executeCoordinationCapability(

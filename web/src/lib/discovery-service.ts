@@ -75,6 +75,23 @@ export type DiscoveryActor = {
   apiKeyId?: string | null;
 };
 
+export function discoverySubmissionRequiresHumanApproval(
+  kind: DiscoveryActor["kind"],
+) {
+  return kind !== "user";
+}
+
+export function canSubmitHumanOnlyDiscoveryField(
+  kind: DiscoveryActor["kind"],
+  source: string | null,
+) {
+  if (kind === "user") return true;
+  return (
+    kind === "hosted_agent" &&
+    source === "authenticated_human_sage_conversation"
+  );
+}
+
 export type CoarseLocationInput = {
   resolutionToken?: unknown;
   label?: unknown;
@@ -383,6 +400,17 @@ async function getDiscoveryIntent(
   }
   registeredIntentHandler(definition);
   return { row, definition };
+}
+
+/** Read-only contract access for the hosted Sage intake boundary. */
+export async function getDiscoveryIntentContract(slug: string) {
+  const { row, definition } = await getDiscoveryIntent(slug);
+  return {
+    slug: row.slug,
+    name: row.name,
+    description: row.description,
+    definition,
+  };
 }
 
 function stableJson(value: unknown): string {
@@ -843,16 +871,12 @@ function mergeClaimsForSubmission(opts: {
     ...((opts.existing?.claimProvenance as Record<string, unknown>) ?? {}),
   };
   const now = new Date().toISOString();
+  const automatedActor = discoverySubmissionRequiresHumanApproval(
+    opts.actorKind,
+  );
 
   for (const [key, rawValue] of Object.entries(opts.claims)) {
     const field = fields.get(key)!;
-    if (opts.actorKind === "agent" && field.sourcePolicy === "human_only") {
-      throw new AgentApiError(
-        403,
-        `${key} must be supplied directly by the human`,
-        { code: "human_only_field", field: key },
-      );
-    }
     const value = validateClaimValue(field, rawValue);
     assertSafeSharedContent(field, value);
     const target =
@@ -866,7 +890,7 @@ function mergeClaimsForSubmission(opts: {
 
     const provided = opts.provenance[key];
     if (
-      opts.actorKind === "agent" &&
+      automatedActor &&
       (!provided || typeof provided !== "object" || Array.isArray(provided))
     ) {
       throw new AgentApiError(
@@ -874,14 +898,27 @@ function mergeClaimsForSubmission(opts: {
         `provenance.${key} is required for agent-submitted information`,
       );
     }
+    const providedSource =
+      provided &&
+      typeof provided === "object" &&
+      !Array.isArray(provided) &&
+      typeof (provided as Record<string, unknown>).source === "string"
+        ? String((provided as Record<string, unknown>).source).slice(0, 120)
+        : null;
+    if (
+      field.sourcePolicy === "human_only" &&
+      !canSubmitHumanOnlyDiscoveryField(opts.actorKind, providedSource)
+    ) {
+      throw new AgentApiError(
+        403,
+        `${key} must be supplied directly by the human`,
+        { code: "human_only_field", field: key },
+      );
+    }
     claimProvenance[key] = {
-      source:
-        provided &&
-        typeof provided === "object" &&
-        !Array.isArray(provided) &&
-        typeof (provided as Record<string, unknown>).source === "string"
-          ? String((provided as Record<string, unknown>).source).slice(0, 120)
-          : opts.actorKind === "user"
+      source: providedSource
+        ? providedSource
+        : opts.actorKind === "user"
             ? "human"
             : "agent",
       submittedBy: opts.actorKind,
@@ -1044,14 +1081,15 @@ export async function submitDiscoveryEnrollment(
   const unapprovedProvenance = hasUnapprovedProvenance(
     merged.claimProvenance,
   );
-  const agentChangedEnrollment =
-    actor.kind === "agent" &&
+  const automatedActor = discoverySubmissionRequiresHumanApproval(actor.kind);
+  const automatedActorChangedEnrollment =
+    automatedActor &&
     (Object.keys(claims).length > 0 || submission.location !== undefined);
   const status =
-    actor.kind === "agent"
+    automatedActor
       ? existing?.status === "paused"
         ? ("paused" as const)
-        : agentChangedEnrollment
+        : automatedActorChangedEnrollment
           ? ("pending_approval" as const)
           : (existing?.status ?? ("draft" as const))
       : activationRequested

@@ -6,6 +6,7 @@ import {
   LocationAutocomplete,
   type CanonicalLocationSuggestion,
 } from "@/components/location-autocomplete";
+import { SageDiscoveryConversation } from "@/components/sage-discovery-conversation";
 
 type Question = {
   key: string;
@@ -264,6 +265,17 @@ export function DiscoveryManager({
     startTransition(() => router.refresh());
   }
 
+  async function reloadDiscoveryState() {
+    const response = await fetch("/api/discovery", { cache: "no-store" });
+    if (!response.ok) return;
+    const data = (await response.json()) as {
+      intents?: IntentItem[];
+      interests?: InterestItem[];
+    };
+    if (data.intents) setIntents(data.intents);
+    if (data.interests) setInterests(data.interests);
+  }
+
   async function pollSageDiscovery(jobId: string) {
     for (let attempt = 0; attempt < 30; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 2_000));
@@ -334,18 +346,50 @@ export function DiscoveryManager({
     setBusy(true);
     setError(null);
     try {
-      await discoveryAction({
-        action: "request_introduction",
-        candidateHandle,
-        idempotencyKey: crypto.randomUUID(),
+      const idempotencyKey = crypto.randomUUID();
+      const response = await fetch("/api/sage/jobs", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": idempotencyKey,
+        },
+        body: JSON.stringify({
+          capability: "discovery_stage_introduction",
+          payload: { candidateHandle },
+          idempotencyKey,
+        }),
       });
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        job?: SageDiscoveryJob;
+      };
+      if (!response.ok || !data.job) {
+        throw new Error(data.error ?? "Sage could not prepare this introduction");
+      }
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1_500));
+        const jobsResponse = await fetch("/api/sage/jobs", {
+          cache: "no-store",
+        });
+        if (!jobsResponse.ok) continue;
+        const jobsData = (await jobsResponse.json()) as {
+          jobs?: SageDiscoveryJob[];
+        };
+        const next = jobsData.jobs?.find((job) => job.id === data.job?.id);
+        if (!next || ["pending", "running"].includes(next.state)) continue;
+        if (["failed", "dead_letter"].includes(next.state)) {
+          throw new Error(next.lastError ?? "Sage could not prepare this introduction");
+        }
+        break;
+      }
       setSageCandidates((current) =>
         current.filter(
           (candidate) => candidate.candidateHandle !== candidateHandle,
         ),
       );
+      await reloadDiscoveryState();
       setMessage(
-        "Interest recorded. The other participant remains anonymous until they approve.",
+        "Sage prepared the anonymous introduction. Approve it below before the other person is notified.",
       );
     } catch (requestError) {
       setError(
@@ -597,6 +641,13 @@ export function DiscoveryManager({
               </div>
 
               <div className="mt-6 space-y-5">
+                <SageDiscoveryConversation
+                  key={selected.slug}
+                  intentSlug={selected.slug}
+                  intentName={selected.name}
+                  onEnrollmentPrepared={reloadDiscoveryState}
+                />
+
                 {selected.enrollment.questions.map((question) => (
                   <label key={question.key} className="block">
                     <span className="text-sm font-semibold text-ink">
@@ -898,7 +949,7 @@ export function DiscoveryManager({
                             }
                             className="mt-4 rounded-lg border border-matcha px-3 py-2 text-xs font-semibold text-matcha disabled:opacity-50"
                           >
-                            Request introduction
+                            Ask Sage to prepare introduction
                           </button>
                         </article>
                       ))}

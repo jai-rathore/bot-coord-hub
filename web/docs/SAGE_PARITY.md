@@ -22,11 +22,11 @@ A milestone is complete only when all three columns below say **Complete**:
 | --- | --- | --- | --- | --- |
 | Shared capability boundary | Complete | Complete | Partial | Scheduling and discovery search share domain services; other streams do not yet use Sage capabilities. |
 | Durable Sage queue | Complete | Complete | Partial | Postgres jobs, runs, steps, leases, retries, and idempotency are live; concurrency recovery still needs database integration coverage. |
-| Sage worker | Complete | Complete | **Blocked on current fix** | The worker is live and reaches production Postgres, but verification found a lease-query timestamp binding crash. The fix and a database regression check are in progress. |
-| Scheduling | Complete | Blocked by worker fix | Not verified | Structured Sage requests exist; real-calendar duplicate and approval behavior still needs production dogfooding. |
-| Dating discovery | Search only | Blocked by worker fix | Not verified | Sage cannot yet conduct enrollment intake, clarification, or interest follow-up. |
-| Recruiting discovery | Search only | Blocked by worker fix | Not verified | Guest compatibility requests and response monitoring are outside the Sage harness. |
-| Local meetup discovery | Search only | Blocked by worker fix | Not verified | No recurring search or persistent recommendations. |
+| Sage worker | Complete | Complete | Complete | The worker is live, reaches production Postgres, polls without errors, and the pre-worker queue was confirmed empty. |
+| Scheduling | Complete | Complete | Not verified | Structured Sage requests exist; real-calendar duplicate and approval behavior still needs production dogfooding. |
+| Dating discovery | Search only | Complete | Not verified | Sage cannot yet conduct enrollment intake, clarification, or interest follow-up. |
+| Recruiting discovery | Search only | Complete | Not verified | Guest compatibility requests and response monitoring are outside the Sage harness. |
+| Local meetup discovery | Search only | Complete | Not verified | No recurring search or persistent recommendations. |
 | Events | Partial | Complete | Partial | Event chat has Gemini and role-scoped tools, but event creation and lifecycle work are not in the durable Sage harness. |
 | People and invitations | Missing | Not applicable | Not verified | Connected-agent and human UI flows exist; Sage has no outcome capability. |
 | Inbox and follow-up | Missing | Not applicable | Not verified | Trigger names exist, but inbox, deadline, approval, and scheduled producers are not wired to Sage. |
@@ -44,11 +44,18 @@ A milestone is complete only when all three columns below say **Complete**:
 
 ## Work queue
 
+### Active change
+
+`cursor/sage-conversational-discovery` is implementing encrypted discovery
+threads, contract-scoped intake, canonical location choices, snapshot
+preparation, and Sage-staged introductions. These remain unchecked below until
+the change is merged, deployed, and verified.
+
 ### P0: make the existing Sage path operational
 
 - [x] Provision `honeymatcha-sage-worker` in the live Render workspace.
 - [x] Confirm the worker uses the production database and `ENABLE_SAGE_JOBS=true`.
-- [ ] Inspect and safely process any jobs queued before the worker existed.
+- [x] Inspect jobs queued before the worker existed; the production queue was empty.
 - [ ] Run an authenticated scheduling job and discovery job end to end.
 - [ ] Verify lease heartbeats, graceful shutdown, retry, and idempotent replay in production.
 

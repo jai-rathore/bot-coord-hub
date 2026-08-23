@@ -44,6 +44,24 @@ required("REDIS_URL", production && discoveryEnabled);
 required("GEOAPIFY_API_KEY", production && discoveryEnabled);
 required("INTENT_ADMIN_EMAILS", production && discoveryEnabled);
 
+const sageEnabled =
+  process.env.ENABLE_SAGE_JOBS === "true" ||
+  process.env.ENABLE_SAGE_JOBS === "1";
+const hostedProvider = (
+  process.env.HOSTED_AGENT_PROVIDER?.trim() || "gemini"
+).toLowerCase();
+checks.push({
+  name: "Hosted Sage provider",
+  ok: !production || !sageEnabled || hostedProvider === "gemini",
+  detail:
+    hostedProvider === "gemini"
+      ? "gemini"
+      : sageEnabled && production
+        ? "must be gemini"
+        : hostedProvider,
+});
+required("GEMINI_API_KEY", production && sageEnabled);
+
 const googleEnabled =
   process.env.GOOGLE_CALENDAR_ENABLED === "true" ||
   process.env.GOOGLE_CALENDAR_ENABLED === "1";
