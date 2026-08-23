@@ -21,6 +21,11 @@ import {
 import { createSessionForUser, listMessagesForSession, postSessionMessage } from "../src/lib/sessions";
 import { decideConfirm, listConfirmsForUser, requestConfirm } from "../src/lib/confirms";
 import { DEFAULT_AGENT_SCOPES } from "../src/lib/scopes";
+import {
+  claimNextSageJob,
+  enqueueSageJob,
+  finishSageJob,
+} from "../src/lib/sage/job-store";
 import { syncUserIdentity } from "../src/lib/users";
 
 function hashApiKey(rawKey: string) {
@@ -80,6 +85,28 @@ async function main() {
     keyPrefix: aliceRaw.slice(0, 11),
     keyHash: hashApiKey(aliceRaw),
     scopes: DEFAULT_AGENT_SCOPES,
+  });
+
+  const queuedSageJob = await enqueueSageJob({
+    user: alice,
+    capability: "discovery_search",
+    trigger: "user_request",
+    payload: { intentSlug: "dating_introduction" },
+    runAt: new Date(0),
+  });
+  const claimedSageJob = await claimNextSageJob({
+    workerId: `e2e-${suffix}`,
+    leaseMs: 30_000,
+  });
+  if (claimedSageJob?.job.id !== queuedSageJob.job.id) {
+    throw new Error("Sage worker must claim an eligible queued job");
+  }
+  await finishSageJob({
+    job: claimedSageJob.job,
+    run: claimedSageJob.run,
+    state: "completed",
+    result: { e2e: true },
+    startedAtMs: Date.now(),
   });
 
   const origin = "http://localhost:3000";
