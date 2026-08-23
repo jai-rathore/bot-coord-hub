@@ -12,25 +12,23 @@ async function main() {
     throw new Error("DATABASE_URL is required");
   }
   const { url, ssl } = postgresConnectionOptions(process.env.DATABASE_URL);
-  const pool = postgres(url, {
+  const client = postgres(url, {
     prepare: false,
     max: 1,
     ...(ssl ? { ssl } : {}),
   });
-  const connection = await pool.reserve();
   let locked = false;
   try {
-    await connection`select pg_advisory_lock(hashtext(${"honeymatcha:database-migrations"}))`;
+    await client`select pg_advisory_lock(hashtext(${"honeymatcha:database-migrations"}))`;
     locked = true;
-    await migrate(drizzle(connection), {
+    await migrate(drizzle(client), {
       migrationsFolder: "./drizzle",
     });
   } finally {
     if (locked) {
-      await connection`select pg_advisory_unlock(hashtext(${"honeymatcha:database-migrations"}))`;
+      await client`select pg_advisory_unlock(hashtext(${"honeymatcha:database-migrations"}))`;
     }
-    connection.release();
-    await pool.end({ timeout: 5 });
+    await client.end({ timeout: 5 });
   }
   console.log("HoneyMatcha database migrations applied successfully.");
   process.exit(0);
