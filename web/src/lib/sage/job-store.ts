@@ -192,6 +192,7 @@ export async function claimNextSageJob(input: {
 }): Promise<ClaimedSageJob | null> {
   const db = getDb();
   const now = new Date();
+  const nowSql = now.toISOString();
   const leaseExpiresAt = new Date(now.getTime() + input.leaseMs);
 
   return db.transaction(async (tx) => {
@@ -208,7 +209,7 @@ export async function claimNextSageJob(input: {
               and active_sage_job.capability = ${sageJobs.capability}
               and active_sage_job.id <> ${sageJobs.id}
               and active_sage_job.state = 'running'
-              and active_sage_job.lease_expires_at > ${now}
+              and active_sage_job.lease_expires_at > ${nowSql}
           )`,
           or(
             and(eq(sageJobs.state, "pending"), lte(sageJobs.runAt, now)),

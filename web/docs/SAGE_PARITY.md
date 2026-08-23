@@ -1,11 +1,36 @@
-# Sage parity plan
+# Sage parity tracker
 
-## Product rule
+Last reviewed: 2026-08-23
+
+## Definition of complete parity
 
 Every core HoneyMatcha workflow must work with Sage and no external agent.
-Connected agents are an optional operator choice, not a feature-unlock gate.
-Both operators use the same server-side capability definitions, policies,
-domain services, idempotency rules, and human approval boundaries.
+Connected agents are an optional operator choice, not a feature unlock gate.
+Parity means the same useful outcome, not the same authority: introductions,
+calendar bookings, disclosures, approvals, and other consequential actions stay
+human-gated.
+
+A milestone is complete only when all three columns below say **Complete**:
+
+1. **Code**: the implementation and automated tests are merged.
+2. **Production**: every required service, migration, secret, and feature flag is live.
+3. **Verified**: the real signed-in workflow has passed end to end in production.
+
+## Current production status
+
+| Milestone | Code | Production | Verified | Current gap |
+| --- | --- | --- | --- | --- |
+| Shared capability boundary | Complete | Complete | Partial | Scheduling and discovery search share domain services; other streams do not yet use Sage capabilities. |
+| Durable Sage queue | Complete | Complete | Partial | Postgres jobs, runs, steps, leases, retries, and idempotency are live; concurrency recovery still needs database integration coverage. |
+| Sage worker | Complete | Complete | **Blocked on current fix** | The worker is live and reaches production Postgres, but verification found a lease-query timestamp binding crash. The fix and a database regression check are in progress. |
+| Scheduling | Complete | Blocked by worker fix | Not verified | Structured Sage requests exist; real-calendar duplicate and approval behavior still needs production dogfooding. |
+| Dating discovery | Search only | Blocked by worker fix | Not verified | Sage cannot yet conduct enrollment intake, clarification, or interest follow-up. |
+| Recruiting discovery | Search only | Blocked by worker fix | Not verified | Guest compatibility requests and response monitoring are outside the Sage harness. |
+| Local meetup discovery | Search only | Blocked by worker fix | Not verified | No recurring search or persistent recommendations. |
+| Events | Partial | Complete | Partial | Event chat has Gemini and role-scoped tools, but event creation and lifecycle work are not in the durable Sage harness. |
+| People and invitations | Missing | Not applicable | Not verified | Connected-agent and human UI flows exist; Sage has no outcome capability. |
+| Inbox and follow-up | Missing | Not applicable | Not verified | Trigger names exist, but inbox, deadline, approval, and scheduled producers are not wired to Sage. |
+| Operations and scale | Partial | Partial | Not verified | No dead-letter console, requeue action, alerts, retention job, persistent recommendations, or indexed discovery scan. |
 
 ## Architecture invariants
 
@@ -15,53 +40,67 @@ domain services, idempotency rules, and human approval boundaries.
 - Dating, hiring, and local-meetup searches never reveal identity or raw private claims.
 - Introductions, calendar bookings, and other consequential actions remain human-gated.
 - A per-user operator preference prevents Sage and a connected agent from racing.
+- A checked task means merged, deployed, and verified unless its text explicitly says code-only.
 
-## Delivery phases
+## Work queue
 
-### Phase 1 — shared control plane and functional parity
+### P0: make the existing Sage path operational
 
-- [x] Add durable `sage_jobs`, `sage_runs`, and `sage_steps` records.
-- [x] Add Postgres leasing with `FOR UPDATE SKIP LOCKED`, retries, backoff, dead-letter state, heartbeats, and per-user/capability concurrency.
-- [x] Distinguish hosted Sage from external agents in audit records.
-- [x] Add Sage-primary, connected-agent-primary-with-fallback, and Sage-only preferences.
-- [x] Route Sage and external scheduling/discovery through shared capability definitions.
-- [x] Let a signed-in user ask Sage to schedule a meeting.
-- [x] Let Sage search approved dating, hiring, and local-meetup enrollments.
-- [x] Preserve human confirmation before booking or requesting an introduction.
-- [x] Add a graceful long-running Render worker and controlled production feature flag.
+- [x] Provision `honeymatcha-sage-worker` in the live Render workspace.
+- [x] Confirm the worker uses the production database and `ENABLE_SAGE_JOBS=true`.
+- [ ] Inspect and safely process any jobs queued before the worker existed.
+- [ ] Run an authenticated scheduling job and discovery job end to end.
+- [ ] Verify lease heartbeats, graceful shutdown, retry, and idempotent replay in production.
 
-### Phase 2 — reliability and operations
-
-- [ ] Add database-backed integration tests for concurrent claiming, expired leases, retries, and idempotency races.
-- [ ] Add an internal dead-letter/requeue view and alerting.
-- [ ] Add retention cleanup for completed jobs, runs, and expired discovery handles.
-- [ ] Lease notification outbox rows before sending so multiple drainers cannot double-send.
-- [ ] Emit run latency, queue age, attempt count, outcome, and provider-cost metrics.
-
-### Phase 3 — conversational Sage
+### P1: complete conversational discovery
 
 - [ ] Add a narrow request interpreter that produces one typed capability request.
-- [ ] Give each run only the selected capability schema, never the entire MCP catalog.
-- [ ] Add clarification and correction states without allowing the model to bypass validation.
-- [ ] Add provider retry, circuit breaker, concurrency, and fallback budgets.
+- [ ] Give the model only the selected capability schema, never the entire MCP catalog.
+- [ ] Persist conversation and clarification state for missing or ambiguous enrollment fields.
+- [ ] Let Sage explain discovery purposes and prepare enrollment drafts.
+- [ ] Let Sage resolve locations and present ambiguous choices to the human.
+- [ ] Require snapshot approval before activating agent-prepared enrollment data.
+- [ ] Let Sage run a search and explain anonymous results without exposing private dimensions.
+- [ ] Let Sage stage an introduction request for human approval.
+- [ ] Resume the workflow after requester and recipient decisions.
+- [ ] Add provider retry, circuit breaker, concurrency, and token/cost budgets.
 
-### Phase 4 — proactive discovery
+### P2: cover the remaining product streams
 
+- [ ] Add an outcome-level `coordinate_event` capability for creation, options, invitations, responses, notes, reminders, and deadlines.
+- [ ] Wrap hosted event turns in Sage jobs, runs, and redacted steps.
+- [ ] Preserve event role-specific tool allowlists and deterministic deadline resolution.
+- [ ] Add a `run_guest_request` capability for recruiting and other no-account structured requests.
+- [ ] Let Sage monitor guest responses and return human-review summaries.
+- [ ] Add a `manage_connections` capability for people, invitation, and relationship-policy workflows.
+- [ ] Add a `review_activity` capability for inbox, sessions, boards, and safe follow-up.
+
+### P3: proactive operation
+
+- [ ] Wire inbox events to the selected operator.
+- [ ] Wire approval results and scheduling state changes to continuation jobs.
+- [ ] Wire event deadlines and pending responses to continuation jobs.
+- [ ] Add user-controlled discovery cadence and notification preferences.
 - [ ] Persist recommendations independently from short-lived discovery handles.
-- [ ] Add user-controlled search cadence and notification preferences.
-- [ ] Replace randomized candidate sampling with indexed buckets/cursors before fleet-wide scans.
-- [ ] Enqueue periodic searches only after applying the operator preference and per-user budget.
+- [ ] Enqueue periodic discovery only after applying operator preference, safety status, and per-user budget.
+- [ ] Prevent Sage and a connected agent from acting on the same trigger.
 
-### Phase 5 — consolidate events
+### P4: reliability, operations, and scale
 
-- [ ] Wrap hosted event chat turns in the shared run/step envelope.
-- [ ] Keep event role-specific tool allowlists and deterministic deadline resolution unchanged.
+- [ ] Add database integration tests for concurrent claiming, expired leases, retries, and idempotency races.
+- [ ] Add an internal dead-letter and requeue console with append-only audit records.
+- [ ] Add retention cleanup for completed jobs, runs, steps, recommendations, and expired discovery handles.
+- [ ] Lease notification outbox rows before sending so multiple drainers cannot double-send.
+- [ ] Emit queue age, run latency, attempts, outcomes, provider tokens, and provider cost metrics.
+- [ ] Alert on queue age, repeated retries, dead letters, and unavailable providers.
+- [ ] Replace randomized candidate sampling with indexed buckets or cursors before fleet-wide scans.
 - [ ] Move notification draining to a leased worker path while retaining cron as a trigger only.
 
 ## Rollout gates
 
-1. Apply the migration and deploy the worker with `ENABLE_SAGE_JOBS=true`.
-2. Dogfood scheduling with real connected calendars and confirm duplicate submissions remain idempotent.
-3. Dogfood one discovery intent at a time; verify anonymous cards and dual approval.
-4. Monitor queue age, lease recovery, retry counts, and failed jobs before increasing traffic.
-5. Add conversational input only after structured workflows are stable.
+1. Worker is live and both structured capabilities pass production end-to-end tests.
+2. Conversational input cannot bypass schema validation, privacy, or approval boundaries.
+3. Dating, recruiting, and meetup flows each pass anonymous-card and dual-approval dogfooding.
+4. Event and guest workflows produce the same outcomes with Sage as with a connected agent.
+5. Proactive triggers respect operator selection, idempotency, budgets, and notification preferences.
+6. Dead letters, queue age, provider failures, and retention are visible and operable before traffic is increased.
