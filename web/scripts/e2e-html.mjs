@@ -74,12 +74,45 @@ async function main() {
         text(body).includes(page.heading),
         `missing expected copy: ${page.heading}`,
       );
+      assert.match(
+        body,
+        /og-agent-choice-v2\.png/,
+        "page does not inherit the current shared URL card",
+      );
+      assert.doesNotMatch(
+        body,
+        /content="[^"]*\/og\.png"/,
+        "page still advertises the retired URL card",
+      );
       assert.ok(
         !text(body).includes("\u2014"),
         "rendered copy contains an em dash",
       );
     });
   }
+
+  await check("shared URL card uses the current Sage and agent-choice image", async () => {
+    const image = await fetch(`${BASE_URL}/og-agent-choice-v2.png`);
+    assert.equal(image.status, 200);
+    assert.match(image.headers.get("content-type") ?? "", /image\/png/);
+    const bytes = new Uint8Array(await image.arrayBuffer());
+    assert.ok(bytes.length > 50_000, "shared URL card is unexpectedly small");
+    assert.equal(bytes[16], 0, "unexpected PNG width prefix");
+    assert.equal(bytes[17], 0, "unexpected PNG width prefix");
+    assert.equal(bytes[18], 4, "expected a 1200px-wide PNG");
+    assert.equal(bytes[19], 176, "expected a 1200px-wide PNG");
+    assert.equal(bytes[22], 2, "expected a 630px-tall PNG");
+    assert.equal(bytes[23], 118, "expected a 630px-tall PNG");
+  });
+
+  await check("event URLs keep their dedicated dynamic image card", async () => {
+    const res = await fetch(
+      `${BASE_URL}/api/events/definitely-not-a-real-event/og`,
+    );
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") ?? "", /image\/png/);
+    assert.ok((await res.arrayBuffer()).byteLength > 10_000);
+  });
 
   await check("GET / with Accept: application/json returns the discovery document", async () => {
     const res = await fetch(`${BASE_URL}/`, {

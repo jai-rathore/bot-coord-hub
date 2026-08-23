@@ -34,6 +34,7 @@
     "perf:baseline": "node scripts/perf-baseline.mjs",
     "perf:bench": "tsx scripts/perf-bench.ts",
     "test:e2e-html": "node scripts/e2e-html.mjs",
+    "og:generate": "node scripts/generate-og-card.mjs",
     "test:routes": "node scripts/route-snapshot.mjs --check",
     "routes:snapshot": "node scripts/route-snapshot.mjs --write"
   },
