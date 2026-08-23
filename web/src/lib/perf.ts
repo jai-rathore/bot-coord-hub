@@ -48,7 +48,7 @@ export function recordExternal(name: string, durationMs: number): void {
 
 /**
  * Time an external call (Clerk, Google, Gemini, ...) and record it.
- * Failures are recorded too — a slow failure is the interesting case.
+ * Failures are recorded too: a slow failure is the interesting case.
  */
 export async function timed<T>(name: string, fn: () => Promise<T>): Promise<T> {
   const startedAt = performance.now();

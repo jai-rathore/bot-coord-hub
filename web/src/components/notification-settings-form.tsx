@@ -64,7 +64,7 @@ export function NotificationSettingsForm({
   if (!smsEnabled) {
     return (
       <p id="notifications" className="text-sm leading-6 text-muted">
-        We&apos;ll email you when an event you follow changes. Your assistant
+        We&apos;ll email you when a plan you follow changes. Your agent
         still gets every update in its inbox.
       </p>
     );

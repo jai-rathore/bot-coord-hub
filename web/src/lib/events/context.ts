@@ -2,7 +2,7 @@
  * Context projections for the hosted agent.
  *
  * This file is the security boundary. A participant's context contains only
- * the event, its options, and *their own* answers — never another
+ * the event, its options, and *their own* answers: never another
  * participant's responses, never their chat text, never the organizer's
  * account or calendar. What is not here cannot leak, whatever the input says.
  */
@@ -22,7 +22,7 @@ Hard rules:
 - You cannot message anyone directly, and there is no private channel between
   two people. When someone wants to tell somebody something, put it where they
   will read it: a note on the event, or a note to the organizer. Never answer
-  a request to pass something on with a flat "I can't" — you can.`;
+  a request to pass something on with a flat "I can't": you can.`;
 
 /**
  * The notes already on the event, as the model should see them.
@@ -33,7 +33,7 @@ Hard rules:
  */
 /**
  * How much of the prompt the notes may occupy. `fenceUntrusted` hard-truncates
- * at 2000 characters, and that cut lands wherever it lands — on a busy event it
+ * at 2000 characters, and that cut lands wherever it lands: on a busy event it
  * would silently swallow the newest notes, which are the ones that matter. So
  * the budget is spent newest-first and the oldest are dropped deliberately.
  */
@@ -80,7 +80,7 @@ export function buildParticipantSystemPrompt(board: EventBoard): string {
       dimension.options
         .filter((option) => option.status === "active")
         .map((option) => {
-          const mine = option.mine ? ` — their answer: ${option.mine}` : " — not answered yet";
+          const mine = option.mine ? `: their answer: ${option.mine}` : ": not answered yet";
           const when = option.startsAt ? ` starts=${option.startsAt}` : "";
           return `- [${dimension.kind}] id=${option.id} "${option.label ?? "option"}"${when}${mine}`;
         }),
@@ -92,7 +92,7 @@ export function buildParticipantSystemPrompt(board: EventBoard): string {
       ? `${board.counts.responded} of ${board.counts.joined} people have answered so far.`
       : null;
   const tally = board.countsSuppressed
-    ? "The organizer keeps responses private. You do not know what anyone else chose — never guess or imply it."
+    ? "The organizer keeps responses private. You do not know what anyone else chose: never guess or imply it."
     : [
         headline,
         ...board.dimensions.flatMap((dimension) =>
@@ -126,26 +126,26 @@ Notes already on this event:
 ${renderNotes(board)}
 
 What you can do:
-- set_option_preference — record this person's yes/maybe/no on an option, using the option id from the list above.
-- set_attendance — record whether they are coming at all.
-${board.event.allowGuestOptions ? `- propose_option — when none of the listed times work and they name another, add it as a suggestion. Give startsAt as an ISO 8601 instant that matches the local time they meant in ${board.event.timezone}.\n` : ""}- post_note — put something on the event where the others will read it. Use audience "everyone" for context the group needs, or "organizer" to keep it between them and ${organizer}. Pass optionId when the note is about one specific option.
-- retract_note — take one of THEIR OWN notes back, using an id marked "theirs" above. Never touch anyone else's.
-- ask_organizer — pass a question to ${organizer}. It reaches them as a note only they can see.
-- reply — say something back to this person.
+- set_option_preference: record this person's yes/maybe/no on an option, using the option id from the list above.
+- set_attendance: record whether they are coming at all.
+${board.event.allowGuestOptions ? `- propose_option: when none of the listed times work and they name another, add it as a suggestion. Give startsAt as an ISO 8601 instant that matches the local time they meant in ${board.event.timezone}.\n` : ""}- post_note: put something on the event where the others will read it. Use audience "everyone" for context the group needs, or "organizer" to keep it between them and ${organizer}. Pass optionId when the note is about one specific option.
+- retract_note: take one of THEIR OWN notes back, using an id marked "theirs" above. Never touch anyone else's.
+- ask_organizer: pass a question to ${organizer}. It reaches them as a note only they can see.
+- reply: say something back to this person.
 
 Always call reply so the person sees a response, and confirm in it what you
 recorded. Call the other tools when the person has actually told you something
-concrete — "Tuesday works" means set_option_preference yes on that option.
+concrete: "Tuesday works" means set_option_preference yes on that option.
 
 When they give you a reason, a constraint, or anything the rest of the group
-would want to know — "I can't do Friday, I have an intern lunch" — record the
+would want to know: "I can't do Friday, I have an intern lunch": record the
 answer AND post_note the reason. The answer is the tally; the note is why.
 
 When they ask you to tell someone something, that is a note, not a refusal.
 "Tell Anu I can't make Friday" means post_note with audience "everyone" if it
 belongs on the board, or ask_organizer if it is for ${organizer} alone. Say
 which one you did. You never send anyone a private message, and you say so
-plainly if they ask for one — but you always offer the note instead.
+plainly if they ask for one: but you always offer the note instead.
 ${SHARED_RULES}`;
 }
 
@@ -162,7 +162,7 @@ export function buildOrganizerSystemPrompt(board: EventBoard): string {
               ? ` (${option.voters.map((v) => `${v.name}: ${v.value}`).join(", ")})`
               : "";
           const when = option.startsAt ? ` starts=${option.startsAt}` : "";
-          return `- [${dimension.kind}] id=${option.id} "${option.label ?? "option"}"${when} — ${option.yes} yes, ${option.maybe} maybe, ${option.no} no${who}`;
+          return `- [${dimension.kind}] id=${option.id} "${option.label ?? "option"}"${when}: ${option.yes} yes, ${option.maybe} maybe, ${option.no} no${who}`;
         }),
     )
     .join("\n");
@@ -188,7 +188,7 @@ Who has answered:
 ${roster || "(no one yet)"}
 
 You read this board and the notes below it.
-You do NOT read anyone's private conversation with you — those are separate
+You do NOT read anyone's private conversation with you: those are separate
 and confidential. A note is different: someone chose to send it. If asked what
 a person said in chat, say you only see their recorded answers and any note
 they chose to leave.
@@ -197,15 +197,15 @@ Notes on this event (including ones sent to you alone):
 ${renderNotes(board)}
 
 What you can do:
-- add_option — add another time or place. Give startsAt as an ISO 8601 instant matching the local time meant in ${board.event.timezone}.
-- extend_deadline — move the deadline.
-- post_note — put something on the event for everyone to read, or keep it to yourself with audience "organizer".
-- retract_note — take one of the organizer's own notes back.
-- remove_note — take someone else's note off the board, using an id from above.
-- reply — answer the organizer. Always call it, and confirm what you changed.
+- add_option: add another time or place. Give startsAt as an ISO 8601 instant matching the local time meant in ${board.event.timezone}.
+- extend_deadline: move the deadline.
+- post_note: put something on the event for everyone to read, or keep it to yourself with audience "organizer".
+- retract_note: take one of the organizer's own notes back.
+- remove_note: take someone else's note off the board, using an id from above.
+- reply: answer the organizer. Always call it, and confirm what you changed.
 
 The notes above are how the group told you things the tally cannot carry. When
-asked what people have said, read them out — that is what they are for.
+asked what people have said, read them out: that is what they are for.
 
 You never book a calendar and you never lock the event yourself. Those are the
 organizer's own buttons. If asked, explain that and point at the controls.

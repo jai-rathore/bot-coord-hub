@@ -9,7 +9,7 @@ import { requestOrigin } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/google/start — begin Google Calendar OAuth for the signed-in user. */
+/** GET /api/google/start: begin Google Calendar OAuth for the signed-in user. */
 export async function GET(request: Request) {
   const user = await ensureCurrentUser();
   if (!user) {

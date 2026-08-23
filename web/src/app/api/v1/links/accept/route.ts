@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Accept a peer invite.
- * POST /api/v1/links/accept — Authorization: Bearer hm_...
+ * POST /api/v1/links/accept: Authorization: Bearer hm_...
  * Body: { inviteCode }
  */
 export async function POST(request: Request) {

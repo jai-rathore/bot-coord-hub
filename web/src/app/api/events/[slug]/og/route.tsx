@@ -15,7 +15,7 @@ const LINE = "#d9e2da";
  * The card someone sees when an event link is pasted into a chat.
  *
  * Without it every event fell back to the site-wide marketing image, so a lunch
- * invite previewed as a product ad — the one moment where the preview should be
+ * invite previewed as a product ad: the one moment where the preview should be
  * doing the inviting.
  *
  * A plain route handler rather than a colocated `opengraph-image` file: that
@@ -23,7 +23,7 @@ const LINE = "#d9e2da";
  * params without the slug, which fails before the image is ever drawn. Here the
  * slug is just a route param and nothing else runs.
  *
- * The summary comes from the *anonymous* projection — the same one a signed-out
+ * The summary comes from the *anonymous* projection: the same one a signed-out
  * visitor sees. Link previews are unfurled by servers nobody here controls, so
  * this must never disclose more than the public page; under blind or
  * counts_only that means no tallies.

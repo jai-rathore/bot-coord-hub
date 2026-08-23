@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  * This page used to split the same set of events across two headed sections,
  * so a single plan could be read as two different things depending on which
  * list it happened to land in. Whether you started it or were invited to it is
- * a property of the event, not a place to file it — so it is a label on the
+ * a property of the event, not a place to file it, so it is a label on the
  * card and the list is one list, ordered by what needs you first.
  */
 export default async function EventsPage({
@@ -61,16 +61,16 @@ export default async function EventsPage({
   return (
     <div className="space-y-8">
       <PageHeading
-        eyebrow="Events"
-        title={archived ? "Archived events" : "Events"}
+        eyebrow="Plans"
+        title={archived ? "Archived plans" : "Group plans"}
         description={
           archived
             ? "Plans you have taken off your list. Everyone else still has theirs."
-            : "Everything you're planning or have been invited to, newest news first."
+            : "Bring a group together with one link. Everyone shares what works, and you make the final call."
         }
         action={
           <Link href="/app/events/new" className="button-primary w-full sm:w-auto">
-            Create an event
+            Plan something
           </Link>
         }
       />
@@ -83,7 +83,7 @@ export default async function EventsPage({
           <p className="text-sm leading-6 text-muted">
             {archived
               ? "Nothing archived yet."
-              : "Nothing yet. Create one and share the link in a group chat — people can see it straight away and sign in only when they answer."}
+              : "No group plans yet. Start one, then share the link wherever your group already talks. People sign in only when they answer."}
           </p>
         </div>
       ) : (

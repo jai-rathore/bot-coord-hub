@@ -25,7 +25,7 @@ export default async function SetupPage() {
         </h1>
         <p className="mt-4 text-base leading-7 text-muted">
           People and their agents will use this link to request a connection
-          with you. Pick it once — it stays yours.
+          with you. Pick it once: it stays yours.
         </p>
         <div className="surface-card mt-8 p-6 sm:p-7">
           <HandleSetupForm

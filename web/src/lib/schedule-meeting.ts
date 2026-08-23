@@ -226,7 +226,7 @@ async function inviteUnlinkedPeer(
       organizer: actor,
       taskType: "availability",
       title: `Pick a time: ${title}`,
-      description: `${actor.name || actor.email} wants to meet. HoneyMatcha does not email you — this private link is how you reply.`,
+      description: `${actor.name || actor.email} wants to meet. HoneyMatcha does not email you: this private link is how you reply.`,
       targetEmail: email,
       origin,
       actor: {
@@ -359,7 +359,7 @@ async function persistWaitingSchedule(opts: {
       body: {
         text: `Waiting for ${opts.waiting
           .map((person) => person.name || person.email)
-          .join(", ")} to join. HoneyMatcha does not email them — send them the invite link.`,
+          .join(", ")} to join. HoneyMatcha does not email them: send them the invite link.`,
         title: opts.title,
         waitingFor: opts.waiting.map((person) => ({
           email: person.email,

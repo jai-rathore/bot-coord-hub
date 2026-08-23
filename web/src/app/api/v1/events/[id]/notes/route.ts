@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Leave a note on the event. Notes are read back through get_event_board,
- * which already carries them projected for this agent's human — there is no
+ * which already carries them projected for this agent's human: there is no
  * separate read endpoint, so an agent cannot accidentally read around the
  * board's visibility rules.
  */
@@ -27,7 +27,7 @@ export async function POST(
   }
 }
 
-/** Retract the human's own note, or — for the organizer — remove anyone's. */
+/** Retract the human's own note, or: for the organizer: remove anyone's. */
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },

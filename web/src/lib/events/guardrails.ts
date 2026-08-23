@@ -4,7 +4,7 @@
  * IMPORTANT: this is defence in depth, not the security boundary. Blocklists
  * are bypassable by construction. What actually holds the line is the minimal
  * context projection (context.ts) and the role check in the turn executor
- * (turn.ts) — those are as strict as if this file did not exist.
+ * (turn.ts): those are as strict as if this file did not exist.
  */
 
 export const MAX_INPUT_LENGTH = 1_000;
@@ -36,7 +36,7 @@ const BLOCKED_PATTERNS: RegExp[] = [
 ];
 
 export const REFUSAL_MESSAGE =
-  "I can only help with this event — the times, the place, and who's coming. Tell me what would work for you and I'll pass it on.";
+  "I can only help with this event: the times, the place, and who's coming. Tell me what would work for you and I'll pass it on.";
 
 export class GuardrailError extends Error {
   constructor(message: string) {
@@ -78,12 +78,12 @@ export function validateParticipantInput(raw: unknown): string {
  * backticks was not enough: a value containing the literal `</event_notes>`
  * closed the fence early and everything after it landed in the prompt looking
  * like our own instructions. That went from theoretical to reachable when
- * notes shipped — a note is text one participant writes that lands in every
+ * notes shipped: a note is text one participant writes that lands in every
  * other participant's prompt, and their tools can set *their* answers, so a
  * successful steer changes somebody else's RSVP.
  *
  * Angle brackets are therefore neutralised outright. Nothing inside a fence
- * can form a tag of any name — not this label, and not one borrowed from
+ * can form a tag of any name: not this label, and not one borrowed from
  * another fence. The substitutes are the single guillemets, which read the
  * same to a model and cannot open or close anything.
  */

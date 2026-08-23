@@ -7,7 +7,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 /**
  * Read a session board.
- * GET /api/v1/sessions/:id/board — Authorization: Bearer hm_...
+ * GET /api/v1/sessions/:id/board: Authorization: Bearer hm_...
  */
 export async function GET(request: Request, context: Ctx) {
   const auth = await requireAgent(request);

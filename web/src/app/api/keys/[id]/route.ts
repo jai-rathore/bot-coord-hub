@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 
 /**
  * Revoke an API key. authenticateAgent filters revoked_at IS NULL on every
- * request — revoke takes effect immediately (no key cache).
+ * request: revoke takes effect immediately (no key cache).
  */
 export async function DELETE(_request: Request, { params }: Params) {
   const user = await ensureCurrentUser();

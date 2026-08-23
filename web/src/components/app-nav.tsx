@@ -52,8 +52,8 @@ function NavLink({
  * Two navs for two hands.
  *
  * A desktop has room to show every destination at once, so it still gets the
- * rail. A phone does not, and the rail's answer — scroll sideways at the top of
- * the screen — put destinations both out of reach and out of sight. There it
+ * rail. A phone does not, and the rail's answer put destinations both out of
+ * reach and out of sight. There it
  * becomes a fixed tab bar at the bottom instead; see mobile-tab-bar.tsx for how
  * the slots are chosen. The header keeps only what is about *you* rather than
  * about where you are going: the brand, the agent's pulse, and your account.
@@ -78,25 +78,25 @@ export function AppNav({
   const items: Array<{ item: NavItem; icon: NavGlyph; badge?: number }> = [
     { item: { href: "/", label: "Home", hint: "Your home", exact: true }, icon: "home" },
     {
-      item: { href: "/app/events", label: "Events", hint: "Plan with a group" },
+      item: { href: "/app/events", label: "Plans", hint: "Plans with a group" },
       icon: "events",
       badge: eventsUnreadCount,
     },
     {
-      item: { href: "/app/people", label: "People", hint: "Your connections" },
+      item: { href: "/app/people", label: "Connections", hint: "People and agents you know" },
       icon: "people",
     },
   ];
 
   if (discoveryEnabled) {
     items.push({
-      item: { href: "/app/discovery", label: "Discovery", hint: "Meet someone new" },
+      item: { href: "/app/discovery", label: "Discover", hint: "Find the right people" },
       icon: "discovery",
     });
   }
   if (handle) {
     items.push({
-      item: { href: "/app/code", label: "My code", hint: "Your QR code and public page" },
+      item: { href: "/app/code", label: "Share", hint: "Your meeting code and public page" },
       icon: "code",
     });
   }
@@ -110,10 +110,10 @@ export function AppNav({
   items.push({
     item: {
       href: "/app/agent",
-      label: agentConnected ? "Assistant" : "Connect assistant",
+      label: "Agents",
       hint: agentConnected
-        ? "Assistant setup and activity"
-        : "Connect ChatGPT, Claude, Gemini, Grok, or Cursor",
+        ? "Choose an operator and review agent activity"
+        : "Use Sage or connect another agent",
     },
     icon: "agent",
   });

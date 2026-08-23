@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ id: string }> };
 
 /**
- * PATCH /api/v1/links/:id — update per-link policies
+ * PATCH /api/v1/links/:id: update per-link policies
  * (confirmRequired, timezone, allowedHours).
  */
 export async function PATCH(request: Request, { params }: Params) {

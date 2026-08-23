@@ -8,7 +8,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/** POST /api/v1/me/callback — register an optional inbox webhook. */
+/** POST /api/v1/me/callback: register an optional inbox webhook. */
 export async function POST(request: Request) {
   const auth = await requireAgent(request);
   if (auth instanceof Response) return auth;

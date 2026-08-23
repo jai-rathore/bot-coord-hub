@@ -56,7 +56,7 @@ export type EnqueueInput = {
   scheduledFor?: Date;
   /** Send to participants who opted into updates (notify_updates). */
   toSubscribedParticipants?: boolean;
-  /** Skip this user — the person who caused the update already knows. */
+  /** Skip this user: the person who caused the update already knows. */
   excludeUserId?: string;
   /** Set false for mail that would be noise in an agent's inbox. */
   notifyAgents?: boolean;
@@ -95,7 +95,7 @@ export function payloadForRecipient(
  * One-line summary for the agent copy of a notification.
  *
  * Deliberately terser than the email: an agent relays or acts on this, it does
- * not read it as prose. Never includes another participant's name — the board
+ * not read it as prose. Never includes another participant's name: the board
  * projection decides what a viewer may see, and this bypasses it.
  */
 function agentSummary(
@@ -111,7 +111,7 @@ function agentSummary(
     case "participant_joined":
       return `Someone new opened your event "${title}" and has not answered yet. Call get_event_board for the tallies.`;
     case "event_locked":
-      return `Responses closed on "${title}"${payload.winner ? ` — ${payload.winner} led` : ""}. The organizer confirms next.`;
+      return `Responses closed on "${title}"${payload.winner ? `: ${payload.winner} led` : ""}. The organizer confirms next.`;
     case "event_confirmed":
       return `"${title}" is confirmed${payload.winner ? ` for ${payload.winner}` : ""}. Put it on your human's radar.`;
     case "event_cancelled":
@@ -291,49 +291,49 @@ function renderTemplate(
   switch (template) {
     case "event_locked":
       return {
-        subject: `Responses closed — ${title}`,
+        subject: `Responses closed: ${title}`,
         body: payload.winner
           ? `${payload.winner} came out on top for “${title}”. The organizer is confirming it now.\n\n${eventUrl}`
           : `Responses for “${title}” are closed.\n\n${eventUrl}`,
       };
     case "event_confirmed":
       return {
-        subject: `Confirmed — ${title}`,
+        subject: `Confirmed: ${title}`,
         body: `“${title}” is confirmed${payload.winner ? ` for ${payload.winner}` : ""}.\n\n${eventUrl}`,
       };
     case "event_cancelled":
       return {
-        subject: `Cancelled — ${title}`,
+        subject: `Cancelled: ${title}`,
         body: `“${title}” was cancelled by the organizer.\n\n${eventUrl}`,
       };
     case "event_invited":
       return {
-        subject: `You're invited — ${title}`,
+        subject: `You're invited: ${title}`,
         body: `${payload.invitedBy ? `${payload.invitedBy} wants` : "Someone wants"} to find a time with you for “${title}”. Pick what works and HoneyMatcha handles the rest.\n\n${eventUrl}`,
       };
     case "quorum_missed":
       return {
-        subject: `Not enough people — ${title}`,
+        subject: `Not enough people: ${title}`,
         body: `“${title}” closed without reaching ${payload.quorumMin ?? "enough"} people. You can reopen it with a new deadline.\n\n${eventUrl}`,
       };
     case "deadline_soon":
       return {
-        subject: `${payload.hours ?? 24}h left — ${title}`,
+        subject: `${payload.hours ?? 24}h left: ${title}`,
         body: `You haven't answered “${title}” yet. It closes in about ${payload.hours ?? 24} hours.\n\n${eventUrl}`,
       };
     case "event_update":
       return {
-        subject: `Update — ${title}`,
+        subject: `Update: ${title}`,
         body: `${payload.summary ?? "There's new activity on this event."}\n\nYou asked to be notified when something changes here. Turn it off on the event page.\n\n${eventUrl}`,
       };
     case "organizer_digest":
       return {
-        subject: `Update — ${title}`,
+        subject: `Update: ${title}`,
         body: `${payload.summary ?? "There's new activity on your event."}\n\n${eventUrl}`,
       };
     default:
       return {
-        subject: `Update — ${title}`,
+        subject: `Update: ${title}`,
         body: `There's an update on “${title}”.\n\n${eventUrl}`,
       };
   }
@@ -365,7 +365,7 @@ function renderSms(
     case "deadline_soon":
       return `HoneyMatcha: “${title}” still needs your answer. ${eventUrl}`;
     case "event_update":
-      return `HoneyMatcha: ${payload.summary ?? "there's a new update"} — “${title}”. ${eventUrl}`;
+      return `HoneyMatcha: ${payload.summary ?? "there's a new update"}: “${title}”. ${eventUrl}`;
     case "organizer_digest":
       return `HoneyMatcha: ${payload.summary ?? "there's a new update"} on “${title}”. ${eventUrl}`;
     default:

@@ -29,7 +29,7 @@ const VAGUE = new Set([
 ]);
 
 /**
- * Deterministic heuristic. Never publishes — only recommends.
+ * Deterministic heuristic. Never publishes: only recommends.
  */
 export function heuristicTriage(proposal: {
   name: string;
@@ -77,7 +77,7 @@ export function heuristicTriage(proposal: {
   if (desc.length < 12) {
     return {
       recommendation: "needs_review",
-      reason: "Description is thin — publisher should verify the intent is actionable.",
+      reason: "Description is thin: publisher should verify the intent is actionable.",
       source: "heuristic",
     };
   }
@@ -113,7 +113,7 @@ async function llmTriage(proposal: {
 
   const prompt = `You triage coordination intent proposals for HoneyMatcha.
 Return ONLY compact JSON: {"recommendation":"publish"|"reject"|"needs_review","reason":"..."}.
-Do NOT auto-publish — recommendation only.
+Do NOT auto-publish: recommendation only.
 Name: ${proposal.name}
 Slug: ${proposal.slug}
 Description: ${proposal.description ?? "(none)"}`;
@@ -249,7 +249,7 @@ export async function triageProposal(
 
 /**
  * Claim and triage up to `limit` queued pending proposals.
- * Writes recommendation + reason only — never changes status to live/rejected.
+ * Writes recommendation + reason only: never changes status to live/rejected.
  */
 export async function runTriageWorker(opts?: {
   limit?: number;

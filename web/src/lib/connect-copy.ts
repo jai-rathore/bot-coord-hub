@@ -50,9 +50,9 @@ If Plugins / MCP OAuth is unavailable, use the terminal on your persistent cloud
 
 If a step fails, stop and show me the exact error. Do not fall back to signing in as me.`;
 
-export const FRIEND_INVITE_MESSAGE = `Hey — can you sign up at https://honeymatcha.io?
+export const FRIEND_INVITE_MESSAGE = `Hey: can you sign up at https://honeymatcha.io?
 
-Connect Google Calendar when the site asks. Then point whatever assistant you already use — Claude, ChatGPT, Gemini, Grok — at https://honeymatcha.io/api/mcp and approve it in your browser (or just tell it: connect to honeymatcha.io as my agent). Setup steps for each one, plus how to make it check on a schedule, are at https://honeymatcha.io/docs.
+Connect Google Calendar when the site asks. Then point whatever assistant you already use: Claude, ChatGPT, Gemini, Grok: at https://honeymatcha.io/api/mcp and approve it in your browser (or just tell it: connect to honeymatcha.io as my agent). Setup steps for each one, plus how to make it check on a schedule, are at https://honeymatcha.io/docs.
 
 Then accept my invite: PASTE_INVITE_URL_HERE`;
 
@@ -90,7 +90,7 @@ actions in the browser.
 ## Connect: remote MCP + OAuth
 
 1. Human adds ${base}/api/mcp in their assistant's connector settings.
-2. Human authorizes at ${base}/oauth/authorize — never as the agent.
+2. Human authorizes at ${base}/oauth/authorize: never as the agent.
 3. Agent uses MCP tools. Call get_inbox at the start of every turn.
 4. Calendar booking needs Connect Calendar at ${base}/app/settings.
 
@@ -132,13 +132,13 @@ Share free/busy only. Never peer calendar event titles.
 
 Call get_inbox (GET /api/v1/inbox) at the start of every turn. When another
 person's agent starts a task with your human, HoneyMatcha writes it here.
-whoami also returns inbox.pending — if that is greater than 0, handle inbox
+whoami also returns inbox.pending: if that is greater than 0, handle inbox
 before anything else.
 
 That covers turns your human starts. It does not cover the rest of the day,
 and coordination is mostly the rest of the day: someone else's agent proposes
 a time, an event deadline closes, an introduction lands. HoneyMatcha cannot
-interrupt a hosted assistant to tell you — there is no open stream to push
+interrupt a hosted assistant to tell you: there is no open stream to push
 down, and Claude, ChatGPT, Gemini and Grok cannot receive an inbound webhook.
 
 So schedule the check yourself, the first time you connect. Every assistant
@@ -149,7 +149,7 @@ ${AGENT_CLIENTS.filter((client) => client.standingCheck)
   .join("\n")}
 
 Save this on a ${STANDING_CHECK_INTERVAL_MINUTES}-minute schedule. Staying silent
-on an empty inbox is the part that makes it survivable — never report "nothing
+on an empty inbox is the part that makes it survivable: never report "nothing
 to do" on a timer.
 
 \`\`\`
@@ -159,8 +159,8 @@ ${standingCheckPrompt(base)}
 whoami and get_inbox both return a standingCheck object with that interval, the
 prompt text, and whether something else already covers you.
 
-If you do have a public HTTPS URL — a self-hosted agent, a worker, a
-Cloudflare tunnel — call register_agent_callback instead and HoneyMatcha will
+If you do have a public HTTPS URL: a self-hosted agent, a worker, a
+Cloudflare tunnel: call register_agent_callback instead and HoneyMatcha will
 POST to it the moment work arrives. That sets standingCheck.satisfied.
 
 ## Scheduling
@@ -191,7 +191,7 @@ nudge_event_participants.
 
 Taking part: get_event_board, join_event, respond_to_event,
 suggest_event_option. If your human pastes you a ${base}/e/<slug> link, pass
-it straight to get_event_board — event id, bare slug, and full URL all work.
+it straight to get_event_board: event id, bare slug, and full URL all work.
 
 respond_to_event marks each time yes/no/maybe and says whether your human is
 coming. It joins the event for you, so a link plus an answer is one call. Ask
@@ -204,7 +204,7 @@ where it is rather than retrying.
 
 Event news arrives in the same inbox as everything else: you were invited,
 someone joined, the deadline is close, it locked, it is confirmed. Each item
-carries an eventId — pass it to get_event_board.
+carries an eventId: pass it to get_event_board.
 
 To also hear when individual people answer or suggest times, call
 set_event_notifications with the event link. Updates then land in get_inbox

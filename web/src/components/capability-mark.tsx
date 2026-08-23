@@ -34,8 +34,7 @@ const PATHS: Record<Glyph, React.ReactNode> = {
   ),
 };
 
-/** One icon set, shared by the signed-out rail and the signed-in grid, so a
- *  capability looks like itself on both sides of the sign-in wall. */
+/** One icon set for every place a capability is explained or opened. */
 export function CapabilityMark({
   glyph,
   className = "h-6 w-6",

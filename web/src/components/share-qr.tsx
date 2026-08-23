@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
  * already in the page, so a round trip would only add latency to something a
  * person is holding up in front of someone else.
  *
- * Error correction is "M" at 240px and "Q" once large — a phone screen held at
+ * Error correction is "M" at 240px and "Q" once large: a phone screen held at
  * arm's length in a dim bar is the design case, and the extra redundancy
  * survives glare and a fingerprint better than a denser, cleaner code does.
  */
@@ -41,7 +41,7 @@ export function ShareQr({
     let active = true;
     // Imported here rather than at module scope. The QR panel sits behind a
     // toggle, but a static import pulled the encoder into the initial bundle of
-    // every page that can reach it — People and the event page among them.
+    // every page that can reach it: People and the event page among them.
     void (async () => {
       try {
         const { default: QRCode } = await import("qrcode");

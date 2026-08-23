@@ -5,7 +5,6 @@ import { useEffect, useId, useRef, useState } from "react";
 import {
   Show,
   SignInButton,
-  SignUpButton,
   UserButton,
 } from "@clerk/nextjs";
 import { BrandLink } from "@/components/brand-link";
@@ -13,7 +12,7 @@ import { BrandLink } from "@/components/brand-link";
 /** The marketing pages are one scroll now, so the header carries the one link
  *  that leaves them rather than an anchor into a section that no longer exists. */
 const SECONDARY_LINKS = [
-  { href: "/agents", label: "Connect an assistant" },
+  { href: "/agents", label: "Bring your own agent" },
 ] as const;
 
 export function SiteHeader() {
@@ -43,7 +42,7 @@ export function SiteHeader() {
   }, [menuOpen]);
 
   useEffect(() => {
-    // Close the mobile menu when crossing to desktop so items never “leak”
+    // Close the mobile menu when crossing to desktop so items never "leak"
     // into the hero after a viewport change.
     const mq = window.matchMedia("(min-width: 640px)");
     const onChange = () => {
@@ -133,15 +132,6 @@ export function SiteHeader() {
               Sign in
             </button>
           </SignInButton>
-          <SignUpButton mode="redirect">
-            <button
-              type="button"
-              className="button-primary min-h-11 cursor-pointer whitespace-nowrap px-2.5 py-1.5 sm:px-3.5"
-            >
-              <span className="sm:hidden">Start</span>
-              <span className="hidden sm:inline">Get started</span>
-            </button>
-          </SignUpButton>
         </Show>
         <Show when="signed-in">
           <Link

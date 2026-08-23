@@ -1,7 +1,7 @@
 /**
  * Wall-clock arithmetic for scanned meetings.
  *
- * Pure and database-free so the slot math can be tested directly — the DST
+ * Pure and database-free so the slot math can be tested directly: the DST
  * boundaries are exactly where a "9am coffee" quietly becomes 8am, and that is
  * not something to find out in production.
  */

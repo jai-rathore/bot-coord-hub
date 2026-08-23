@@ -203,7 +203,7 @@ export function sharePrompt(session: PublicSession): {
     if (reach === "delivered_to_agent") {
       return {
         headline: `Waiting for ${possessiveName(peerName)} agent`,
-        body: "HoneyMatcha put this on their agent inbox. If their agent is connected, it will see this the next time it calls HoneyMatcha. HoneyMatcha does not ping the human — their agent does that.",
+        body: "HoneyMatcha put this on their agent inbox. If their agent is connected, it will see this the next time it calls HoneyMatcha. HoneyMatcha does not ping the human: their agent does that.",
         inviteUrl,
         guestUrl,
       };

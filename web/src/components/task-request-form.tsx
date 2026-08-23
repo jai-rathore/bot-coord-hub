@@ -44,7 +44,7 @@ export function TaskRequestForm({
       return;
     }
     setMessage(
-      `Thanks—we recorded “${data.proposal.name}” for product review.`,
+      `Thanks. We recorded “${data.proposal.name}” for product review.`,
     );
     setName("");
     setDescription("");
@@ -85,7 +85,7 @@ export function TaskRequestForm({
                 className="mt-4 text-sm font-semibold text-matcha-deep"
               >
                 {copied === task.slug
-                  ? "Copied—paste it into your assistant"
+                  ? "Copied:paste it into your assistant"
                   : "Copy a prompt for your assistant"}
               </button>
             </article>

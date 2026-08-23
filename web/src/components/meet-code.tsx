@@ -9,12 +9,12 @@ import { ShareQr } from "@/components/share-qr";
  *
  * One tap from their page to a full-screen, forced-light panel: a QR on a dark
  * background is unreadable to most camera apps, and the page itself may be
- * tinted. The overlay is deliberately almost empty — at the moment it is used,
+ * tinted. The overlay is deliberately almost empty: at the moment it is used,
  * two people are looking at a phone between them, and anything else on screen
  * is something to read instead of scan.
  *
  * It renders through a portal on purpose. `.surface-card` sets a
- * `backdrop-filter`, which makes the card — not the viewport — the containing
+ * `backdrop-filter`, which makes the card: not the viewport: the containing
  * block for `position: fixed` descendants, so an overlay rendered in place was
  * pinned inside the card and left the rest of the page showing around it.
  */

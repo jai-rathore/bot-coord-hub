@@ -231,7 +231,7 @@ export function EventCreateForm() {
             />
             <p className="mt-1 text-xs text-muted">
               Leave it blank for 48 hours. People who never reply simply
-              don&apos;t count — nothing waits on them.
+              don&apos;t count: nothing waits on them.
             </p>
           </div>
 
@@ -314,7 +314,7 @@ export function EventCreateForm() {
         className="button-primary w-full sm:w-auto"
         disabled={busy}
       >
-        {busy ? "Creating…" : "Create event and get the link"}
+        {busy ? "Creating…" : "Create plan and get the link"}
       </button>
     </form>
   );

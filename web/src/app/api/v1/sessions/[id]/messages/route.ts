@@ -13,7 +13,7 @@ type Ctx = { params: Promise<{ id: string }> };
 /**
  * Session board messages.
  * GET  /api/v1/sessions/:id/messages
- * POST /api/v1/sessions/:id/messages — { kind, body?, text? }
+ * POST /api/v1/sessions/:id/messages: { kind, body?, text? }
  */
 export async function GET(request: Request, context: Ctx) {
   const auth = await requireAgent(request);

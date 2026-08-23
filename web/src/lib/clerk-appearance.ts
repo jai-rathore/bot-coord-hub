@@ -47,7 +47,7 @@ export const clerkLocalization = {
     start: {
       title: "Sign in to HoneyMatcha",
       titleCombined: "Continue to HoneyMatcha",
-      subtitle: "Welcome back — your assistant is waiting.",
+      subtitle: "Welcome back: your assistant is waiting.",
     },
   },
   signUp: {

@@ -109,7 +109,7 @@ export function MeetCard({
             </h2>
             <p className="mt-3 text-muted">
               Mark the ones that work for you. {result.metName ?? displayName}{" "}
-              does the same, and HoneyMatcha settles it — neither of you has to
+              does the same, and HoneyMatcha settles it: neither of you has to
               chase the other.
             </p>
             <Link
@@ -130,7 +130,7 @@ export function MeetCard({
         {result.event && result.connection?.status !== "already_connected" ? (
           <p className="mt-4 text-xs text-muted">
             You also asked to connect your agents. {displayName} approves that
-            separately — the plan above works either way.
+            separately: the plan above works either way.
           </p>
         ) : null}
       </div>
@@ -200,7 +200,7 @@ export function MeetCard({
 
       {!signedIn ? (
         <p className="mt-4 text-xs text-muted">
-          Pick one first — you&apos;ll sign in straight after and land right back
+          Pick one first: you&apos;ll sign in straight after and land right back
           here.
         </p>
       ) : null}

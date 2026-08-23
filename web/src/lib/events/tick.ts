@@ -118,7 +118,7 @@ async function attendingCount(eventId: string): Promise<number> {
 }
 
 /**
- * Close an event and record its outcome. Locking never books — it creates the
+ * Close an event and record its outcome. Locking never books: it creates the
  * organizer's confirm, and only their approval reaches a calendar.
  */
 export async function closeEvent(event: Event): Promise<"locked" | "expired"> {
@@ -134,7 +134,7 @@ export async function closeEvent(event: Event): Promise<"locked" | "expired"> {
     winner = resolved.winningOption;
     yesCount = resolved.outcome.winner?.yes ?? 0;
   } else {
-    // Nothing to choose between — this is an RSVP event, where the only open
+    // Nothing to choose between: this is an RSVP event, where the only open
     // question is who is coming. Resolve on attendance and keep the event's
     // own fixed time as the outcome, so it still reaches the organizer's
     // approval instead of silently expiring.
@@ -186,7 +186,7 @@ export async function closeEvent(event: Event): Promise<"locked" | "expired"> {
     kind: nextStatus === "locked" ? "locked" : "expired",
     summary:
       nextStatus === "locked"
-        ? `Responses closed. ${label} won — waiting on the organizer to confirm.`
+        ? `Responses closed. ${label} won: waiting on the organizer to confirm.`
         : `Responses closed without enough people.`,
     body: { reason: resolved?.outcome.reason, winningOptionId: winner?.id },
   });

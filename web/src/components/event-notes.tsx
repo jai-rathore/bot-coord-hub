@@ -75,7 +75,7 @@ function NoteRow({
  * The shared layer of the event.
  *
  * Everything Sage records through `post_note` shows up here, next to notes
- * people typed themselves — same rows, same rules. The board is re-fetched by
+ * people typed themselves: same rows, same rules. The board is re-fetched by
  * the parent on a timer, so this list is whatever the event currently says
  * without anyone reloading the page.
  */
@@ -162,8 +162,8 @@ export function EventNotes({
         </p>
       ) : (
         <p className="mt-2 text-sm text-muted">
-          Nothing yet. A note is for the things a yes or no can&apos;t carry —
-          why a day doesn&apos;t work, what you need, what everyone should know.
+          Nothing yet. A note is for the things a yes or no can&apos;t carry, such
+          as context, questions, or a reason a particular option does not work.
         </p>
       )}
 
@@ -203,7 +203,7 @@ export function EventNotes({
                   onChange={(event) => setDraft(event.target.value)}
                   maxLength={MAX_NOTE_LENGTH}
                   rows={3}
-                  placeholder="Can't do Friday — intern last-day lunch. Any other day works."
+                  placeholder="Can't do Friday: intern last-day lunch. Any other day works."
                   className="field resize-y"
                   disabled={busy}
                 />
@@ -275,7 +275,7 @@ export function EventNotes({
                 </div>
               </div>
 
-              {/* Said before they write, not after — the downgrade is the
+              {/* Said before they write, not after: the downgrade is the
                   organizer's setting, not a surprise about their own words. */}
               {boardIsPrivate && visibility === "everyone" && !isOrganizer && (
                 <p className="text-xs text-muted">

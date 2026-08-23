@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 /**
  * "I just met this person." Called from the handle page after a scan.
  *
- * Sign-in is required — an event needs two real accounts — but the choice of
+ * Sign-in is required: an event needs two real accounts: but the choice of
  * what to set up is made before signing in and replayed here, so the tap that
  * happens in front of the other person is never the one that hits a wall.
  */

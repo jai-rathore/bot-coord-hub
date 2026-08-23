@@ -254,7 +254,7 @@ export async function approveConnection(
   assertAgentScope(auth, "people:write");
   const linkId = body.linkId?.trim();
   if (!linkId) {
-    throw new AgentApiError(400, "linkId is required — take it from list_links.");
+    throw new AgentApiError(400, "linkId is required: take it from list_links.");
   }
   try {
     const result = await approveConnectionRequest({
@@ -1027,7 +1027,7 @@ export async function proposeIntent(
 }
 
 /**
- * request_schedule_meeting — invite if needed, then free/busy, then confirm, then book.
+ * request_schedule_meeting: invite if needed, then free/busy, then confirm, then book.
  * Never claims a meeting is booked until HoneyMatcha actually creates the event.
  */
 export async function requestScheduleMeeting(
@@ -1108,7 +1108,7 @@ export async function requestConfirm(
 }
 
 /**
- * respond_confirm — records human decision on a confirm gate.
+ * respond_confirm: records human decision on a confirm gate.
  * Reserved for explicitly privileged legacy integrations. Default pairings do
  * not receive approvals:write; humans decide at /app/attention.
  * When all schedule_meeting participants approve, books via CalendarPort.
@@ -1173,7 +1173,7 @@ export async function respondConfirm(
     const note =
       body.note?.trim() ||
       confirmRow.note ||
-      "Deferred — still awaiting human decision";
+      "Deferred: still awaiting human decision";
     const [updated] = await db
       .update(confirms)
       .set({ note })
@@ -1190,7 +1190,7 @@ export async function respondConfirm(
         action: updated.action,
         note: updated.note,
         text: `Deferred: ${updated.action}${
-          updated.note ? ` — ${updated.note}` : ""
+          updated.note ? `: ${updated.note}` : ""
         }`,
       },
     });

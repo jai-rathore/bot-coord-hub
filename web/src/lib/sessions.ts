@@ -26,7 +26,7 @@ import {
 } from "@/lib/scopes";
 import { assertPayloadSize, boundedText } from "@/lib/validation";
 
-/** Intents that are always between people — creating one needs a counterparty. */
+/** Intents that are always between people: creating one needs a counterparty. */
 export const PAIRWISE_SESSION_INTENTS = new Set(["schedule_meeting"]);
 
 export const SCHEDULE_COUNTERPARTY_REQUIRED =
@@ -162,27 +162,27 @@ export function messageToPlainEnglish(
       return (
         text ??
         `Confirmation requested: ${String(body.action ?? "action")}${
-          body.note ? ` — ${String(body.note)}` : ""
+          body.note ? `: ${String(body.note)}` : ""
         }`
       );
     case "confirm.approved":
       return (
         text ??
         `Approved: ${String(body.action ?? "action")}${
-          body.note ? ` — ${String(body.note)}` : ""
+          body.note ? `: ${String(body.note)}` : ""
         }`
       );
     case "confirm.denied":
       return (
         text ??
         `Denied: ${String(body.action ?? "action")}${
-          body.note ? ` — ${String(body.note)}` : ""
+          body.note ? `: ${String(body.note)}` : ""
         }`
       );
     case "link.accepted":
       return text ?? "Peer link accepted. You can coordinate on this session.";
     case "avail.offer":
-      return text ?? "Shared available times (busy times only — no event titles).";
+      return text ?? "Shared available times (busy times only: no event titles).";
     case "avail.request":
       return text ?? "Looked up calendars (busy times only).";
     case "slot.propose":
@@ -254,9 +254,9 @@ async function isSessionParticipant(
  * Which of these sessions the user may still see, for discovery-mediated ones.
  *
  * Applies exactly the rules assertDiscoverySessionAccess applies to a single
- * session — the interest must still be accepted and bound to this session, the
+ * session: the interest must still be accepted and bound to this session, the
  * user must be one of its two sides, neither side may be non-active in
- * user_safety, and neither may have blocked the other — but resolves them for
+ * user_safety, and neither may have blocked the other: but resolves them for
  * the whole list in three queries instead of three per session.
  *
  * Non-discovery sessions are not included here; the caller keeps those as-is.

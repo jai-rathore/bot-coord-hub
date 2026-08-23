@@ -44,7 +44,7 @@ export default function DocsPage() {
             Connect the assistant you already have
           </h1>
           <p className="mt-2 max-w-[42ch] text-[1.02rem] text-muted">
-            Claude, ChatGPT, Gemini, Grok — one MCP URL, approved in your own
+            Claude, ChatGPT, Gemini, Grok: one MCP URL, approved in your own
             browser. A friend connects theirs. Then you invite each other as
             people. No assistant ever signs in as you.
           </p>
@@ -214,7 +214,7 @@ export default function DocsPage() {
           <ul className="mt-3 grid list-none gap-2 p-0 text-[0.95rem] text-muted">
             {clientsWithStandingCheck().map((client) => (
               <li key={client.id}>
-                <strong className="text-ink">{client.name}</strong> —{" "}
+                <strong className="text-ink">{client.name}</strong>: {" "}
                 <a href={client.standingCheck?.docsUrl}>
                   {client.standingCheck?.featureName}
                 </a>
@@ -229,7 +229,7 @@ export default function DocsPage() {
               register_agent_callback
             </code>{" "}
             and HoneyMatcha posts to it the moment work arrives. Either way,
-            HoneyMatcha still emails you — the standing check is what saves you
+            HoneyMatcha still emails you: the standing check is what saves you
             from being the one who has to relay it.
           </p>
         </section>
@@ -324,7 +324,7 @@ export default function DocsPage() {
             own assistant to their own HoneyMatcha account. From{" "}
             <Link href="/app/people">People</Link>, send a private
             email-targeted invite or create a reusable public link and QR code.
-            Your handle page carries a code of its own — someone you just met
+            Your handle page carries a code of its own: someone you just met
             scans it, picks coffee, lunch, drinks or a call, and you both get
             times to choose from.
             Public-link redemptions stay pending until you approve each person.
@@ -332,7 +332,7 @@ export default function DocsPage() {
           </p>
           <p className="mt-3 text-[0.95rem] leading-7 text-muted">
             Once they have a HoneyMatcha account, HoneyMatcha reaches{" "}
-            <em>their assistant</em> through the agent inbox — not email, and not
+            <em>their assistant</em> through the agent inbox: not email, and not
             a Google invite. Their agent should call{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem] text-matcha-deep">
               get_inbox
@@ -508,7 +508,7 @@ curl -s "$BASE/api/mcp" \\
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">suggest_event_option</code>
             ). Anywhere an event is named, an id, a share slug, or a pasted{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">/e/&lt;slug&gt;</code>{" "}
-            link all resolve — a human hands their agent a link, not a UUID.
+            link all resolve: a human hands their agent a link, not a UUID.
           </p>
           <p className="mt-3 text-[0.9rem] text-muted">
             Locking, cancelling and confirming are deliberately not tools. They
@@ -566,7 +566,7 @@ curl -s "$BASE/api/mcp" \\
               <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
               Revoke the old key. Auth checks{" "}
               <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">revoked_at</code>{" "}
-              on every request — revoke takes effect immediately (no key cache).
+              on every request: revoke takes effect immediately (no key cache).
             </li>
             <li className="relative pl-[1.15rem]">
               <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
@@ -614,7 +614,7 @@ curl -s "$BASE/api/mcp" \\
             </li>
             <li className="relative pl-[1.15rem]">
               <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
-              Triage writes a recommendation + reason only — it never auto-publishes.
+              Triage writes a recommendation + reason only: it never auto-publishes.
             </li>
             <li className="relative pl-[1.15rem]">
               <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
@@ -644,7 +644,7 @@ curl -s "$BASE/api/mcp" \\
                 request_schedule_meeting
               </code>{" "}
               never books on its own. If the other person is not on
-              HoneyMatcha yet, it returns a share link for you to send —
+              HoneyMatcha yet, it returns a share link for you to send.
               HoneyMatcha does not email them. Times are proposed from both
               calendars only after they join, then humans approve before a
               real calendar event is created. Supports{" "}
@@ -661,7 +661,7 @@ curl -s "$BASE/api/mcp" \\
             </li>
             <li className="relative pl-[1.15rem]">
               <span className="absolute top-[0.55em] left-0 h-[0.45rem] w-[0.45rem] rounded-full bg-matcha-soft" />
-              Privacy: free/busy or free slots only — never peer event titles.
+              Privacy: free/busy or free slots only: never peer event titles.
             </li>
           </ul>
         </section>

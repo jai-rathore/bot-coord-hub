@@ -1,7 +1,7 @@
 /**
  * The light behind the page.
  *
- * This used to also draw two hairline rings — a 12rem one at `left-[42%]` and
+ * This used to also draw two hairline rings: a 12rem one at `left-[42%]` and
  * a floating 4rem one at `right-[18%]`. They outlined nothing, referred to
  * nothing, and because both were positioned in percentages they landed
  * somewhere different at every width; on a phone the large one sat squarely

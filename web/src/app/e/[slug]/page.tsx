@@ -37,7 +37,7 @@ export async function generateMetadata({
     title,
     description,
     // A share link is unlisted, not secret. Previewing it in a chat is the
-    // point; turning up in a search result is not — so the card is rich but
+    // point; turning up in a search result is not: so the card is rich but
     // the page stays out of the index.
     robots: { index: false, follow: false },
     // Without these the invite inherits the site-wide marketing card, so a

@@ -4,7 +4,7 @@ import { ensureCurrentUser } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
-/** POST /api/google/disconnect — remove Google Calendar connection. */
+/** POST /api/google/disconnect: remove Google Calendar connection. */
 export async function POST() {
   const user = await ensureCurrentUser();
   if (!user) {

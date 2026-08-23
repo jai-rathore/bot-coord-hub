@@ -126,7 +126,7 @@ export async function requestConfirm(opts: {
       action: created.action,
       note: created.note,
       text: `Confirmation requested: ${created.action}${
-        created.note ? ` — ${created.note}` : ""
+        created.note ? `: ${created.note}` : ""
       }`,
     },
   });
@@ -194,7 +194,7 @@ export async function decideConfirm(opts: {
       note: updated.note,
       status: updated.status,
       text: `${label}: ${updated.action}${
-        updated.note ? ` — ${updated.note}` : ""
+        updated.note ? `: ${updated.note}` : ""
       }`,
     },
     actorApiKeyId: opts.actorApiKeyId ?? null,
@@ -241,7 +241,7 @@ export async function decideConfirm(opts: {
     };
   }
 
-  // approved — events book straight away; the organizer is the only approver.
+  // approved: events book straight away; the organizer is the only approver.
   if (updated.action === "event.confirm") {
     const { bookEventForConfirm } = await import("@/lib/events/book");
     const booking = await bookEventForConfirm(
@@ -259,7 +259,7 @@ export async function decideConfirm(opts: {
     };
   }
 
-  // approved — for schedule_meeting wait for all; otherwise confirm immediately
+  // approved: for schedule_meeting wait for all; otherwise confirm immediately
   if (session.intentType === "schedule_meeting") {
     const booking = await tryBookAfterConfirmApprovals(
       opts.user,

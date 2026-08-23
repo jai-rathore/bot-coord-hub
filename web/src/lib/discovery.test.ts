@@ -422,7 +422,7 @@ test("unexpected agent errors never expose SQL parameters", async () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* claim validation — a closed enum is not free text                   */
+/* claim validation: a closed enum is not free text                   */
 /* ------------------------------------------------------------------ */
 
 test("every relationshipIntent option the UI offers is actually accepted", () => {

@@ -34,7 +34,7 @@ export default async function TasksPage() {
       <PageHeading
         eyebrow="Coordination"
         title="Tasks"
-        description="What you and your assistant are working on—and what you want HoneyMatcha to support next."
+        description="See what Sage or your connected agent is working on, then request a capability you want HoneyMatcha to support next."
       />
 
       <section className="mt-10">

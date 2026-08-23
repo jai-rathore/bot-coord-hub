@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Hide or restore an event on this human's list.
- * POST /api/v1/events/:id/archive — { archived?: boolean }
+ * POST /api/v1/events/:id/archive: { archived?: boolean }
  */
 export async function POST(
   request: Request,

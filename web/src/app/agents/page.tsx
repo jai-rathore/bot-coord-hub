@@ -18,23 +18,25 @@ export default function AgentsPage() {
       <SiteHeader />
       <main className="relative mx-auto w-full max-w-[72rem] flex-1 px-5 py-12 sm:px-6 sm:py-20">
         <p className="section-kicker">
-          Assistant connections
+          Optional agent connection
         </p>
         <h1 className="display-title mt-3 max-w-4xl text-[clamp(2.8rem,7vw,5.2rem)]">
-          Choose yours.
-          <span className="display-accent mt-1 block">Connect once.</span>
+          Sage is ready.
+          <span className="display-accent mt-1 block">Bring yours if you prefer.</span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-8 text-muted">
-          Pick ChatGPT, Claude, Gemini Spark, Grok Bot, or Cursor below and
-          follow the exact steps for that app. They all use the same secure
-          HoneyMatcha connection at <code>{MCP_URL}</code>, approved in your own
-          browser. Then give your assistant a{" "}
+          Every HoneyMatcha account includes Sage, with access to all the same
+          coordination capabilities. If you prefer ChatGPT, Claude, Gemini,
+          Grok, Cursor, or another compatible agent, follow the steps below. It
+          will use the secure HoneyMatcha connection at <code>{MCP_URL}</code>,
+          approved in your own browser. Then give your agent a{" "}
           <Link href="/docs#standing-check">standing check</Link> so inbound work
           does not wait for you to open a chat.
         </p>
         <p className="mt-6 max-w-2xl text-sm leading-6 text-muted">
-          If your assistant can configure tools for you, start by pasting this.
-          Otherwise, choose it in the guided setup below.
+          If your agent can configure tools for you, start by pasting this.
+          Otherwise, choose it in the guided setup below. If you want to use
+          Sage, you can simply sign up and skip this page.
         </p>
         <div className="mt-3 max-w-3xl">
           <CopyBlock text={ASK_AGENT_PROMPT} label="Copy direct prompt" />
@@ -43,7 +45,7 @@ export default function AgentsPage() {
         <AssistantSetupGuide className="mt-12 sm:mt-16" />
 
         <div className="mt-10 grid gap-5 lg:grid-cols-2">
-          <section className="surface-card surface-card-interactive p-5 sm:p-7">
+          <section className="surface-card p-5 sm:p-7">
             <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
               Connecting with a friend
             </h2>
@@ -57,7 +59,7 @@ export default function AgentsPage() {
             </div>
           </section>
 
-          <section className="surface-card surface-card-interactive p-5 sm:p-7">
+          <section className="surface-card p-5 sm:p-7">
             <h2 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
               What approval means
             </h2>

@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 /**
  * The composer on the event page. Same writes Sage makes through `post_note`,
  * so a note typed by hand and a note the assistant recorded are the same row
- * with the same rules — including the visibility downgrade on a private board,
+ * with the same rules: including the visibility downgrade on a private board,
  * which comes back as `notice` for the UI to show.
  */
 export async function POST(

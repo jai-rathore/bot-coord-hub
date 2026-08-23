@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Respond to a confirm gate after human OK.
- * POST /api/v1/confirms/respond — Authorization: Bearer hm_...
+ * POST /api/v1/confirms/respond: Authorization: Bearer hm_...
  * Body: { action: approve|decline|defer, confirmId?|sessionId?, note? }
  *
  * When all participants approve, CalendarPort books the event.

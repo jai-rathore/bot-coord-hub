@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Agent whoami / key health.
- * GET /api/v1/me — Authorization: Bearer hm_...
+ * GET /api/v1/me: Authorization: Bearer hm_...
  */
 export async function GET(request: Request) {
   const auth = await requireAgent(request);

@@ -104,7 +104,7 @@ export function IntentsRegistry({
           return;
         }
         setSuccess(
-          `Thanks—we recorded “${data.proposal.name}” for product review.`,
+          `Thanks. We recorded “${data.proposal.name}” for product review.`,
         );
         setName("");
         setDescription("");

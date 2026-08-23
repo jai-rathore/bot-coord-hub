@@ -94,7 +94,7 @@ export function EventChat({
 
   if (!open) {
     // A first-time recipient has no idea what "Sage" is. The collapsed state
-    // introduces it as a thing — name, what it is, what it can do — instead of
+    // introduces it as a thing: name, what it is, what it can do: instead of
     // a bare link that assumes they already know.
     return (
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[0.9rem] border border-matcha-soft/40 bg-matcha/6 p-4">
@@ -110,7 +110,7 @@ export function EventChat({
             <p className="mt-1 text-sm text-muted">
               {isOrganizer
                 ? `Ask who hasn't answered, what's leading, or tell it a time to add.`
-                : `None of these times work, or it's complicated? Tell ${agentName} — it can record your answer, suggest another time, or pass a question to ${organizerName}.`}
+                : `None of these times work, or it's complicated? Tell ${agentName}: it can record your answer, suggest another time, or pass a question to ${organizerName}.`}
             </p>
           </div>
         </div>
@@ -142,7 +142,7 @@ export function EventChat({
             )}
           </p>
           <p className="text-xs text-muted">
-            Automated assistant — not a person. It can record your answers,
+            Automated assistant: not a person. It can record your answers,
             suggest times, and pass questions along. Only for this event.
           </p>
         </div>
@@ -158,7 +158,7 @@ export function EventChat({
       {available === false && (
         <p className="mt-4 text-sm text-muted">
           The assistant isn&apos;t available right now. You can still tap your
-          answer above — that&apos;s what actually counts.
+          answer above: that&apos;s what actually counts.
         </p>
       )}
 
@@ -168,8 +168,8 @@ export function EventChat({
             {messages.length === 0 && (
               <li className="rounded-[0.8rem] bg-matcha/8 p-3 text-sm text-ink">
                 {isOrganizer
-                  ? `Hi — ask me who hasn't replied, what's leading, or to add another time.`
-                  : `Hi — I'm ${agentName}, the assistant organizing this for ${organizerName}. Tell me which times work, name a different one and I'll suggest it, or ask a question and I'll pass it on.`}
+                  ? `Hi: ask me who hasn't replied, what's leading, or to add another time.`
+                  : `Hi, I'm ${agentName}, the assistant organizing this for ${organizerName}. Tell me which times work, name a different one and I'll suggest it, or ask a question and I'll pass it on.`}
               </li>
             )}
             {messages.map((message) => (
@@ -218,7 +218,7 @@ export function EventChat({
           {turnsLeft != null && turnsLeft <= 3 && (
             <p className="mt-2 text-xs text-muted">
               {turnsLeft === 0
-                ? "That's the end of this conversation — your answers above are saved."
+                ? "That's the end of this conversation: your answers above are saved."
                 : `${turnsLeft} message${turnsLeft === 1 ? "" : "s"} left in this conversation.`}
             </p>
           )}

@@ -21,8 +21,8 @@ export const dynamic = "force-dynamic";
 /**
  * Assistant connection and controls, in one place.
  *
- * Everything an agent brings with it — pairing, credentials, capabilities, the
- * task log — used to be scattered through the dashboard and the nav, where it
+ * Everything an agent brings with it, including pairing, credentials,
+ * capabilities, and the task log, used to be scattered through the dashboard and the nav, where it
  * was the first thing a brand-new person saw and the last thing they needed.
  * It all lives behind this one door now, so the rest of HoneyMatcha can be used
  * by hand without ever meeting it.
@@ -65,9 +65,9 @@ export default async function AgentPage() {
   return (
     <div className="space-y-10">
       <PageHeading
-        eyebrow="Your personal agent"
-        title="Your assistant"
-        description="You already have an agent — Sage came with the account and works only for you. Connect one of your own if you prefer; both use the same HoneyMatcha capabilities and the same human approval boundaries."
+        eyebrow="Your agents"
+        title="Use Sage or bring your own"
+        description="Sage comes with your HoneyMatcha account and works only for you. If you prefer ChatGPT, Claude, Gemini, Grok, Cursor, or another compatible agent, connect it here. Both paths use the same capabilities and human approval boundaries."
       />
 
       <div className="flex items-center gap-4 rounded-2xl border border-matcha-soft/35 bg-matcha/5 p-4 sm:p-5">
@@ -168,9 +168,8 @@ export default async function AgentPage() {
           </ul>
         ) : (
           <p className="mt-3 text-sm leading-6 text-muted">
-            {status.agent.connected
-              ? "Nothing yet. Ask your agent to schedule a meeting or invite someone."
-              : "Once an agent is connected, what it does shows up here."}
+            When Sage or your connected agent takes on work, its progress shows
+            up here.
           </p>
         )}
       </section>

@@ -2,7 +2,7 @@
  * What HoneyMatcha can coordinate, and who is allowed to run it.
  *
  * The product is not "an events app with an optional agent". Every capability
- * here is run by an agent — the only question is whose. Sage is the one we
+ * here is run by an agent: the only question is whose. Sage is the one we
  * provide and it is already switched on; a connected agent (ChatGPT, Claude,
  * Gemini, Grok, Cursor, or anything speaking MCP or A2A) can use the same
  * underlying capability boundary.
@@ -50,7 +50,7 @@ export const CAPABILITIES: Capability[] = [
   {
     id: "meet",
     title: "Meet one-on-one",
-    line: "Calendars compared for you. Free/busy only — never event titles.",
+    line: "Calendars compared for you. Free/busy only: never event titles.",
     sage: "ready",
     href: "/app/agent",
     glyph: "handshake",

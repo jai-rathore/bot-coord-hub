@@ -13,7 +13,7 @@ import { requestOrigin } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/google/callback — OAuth redirect handler. */
+/** GET /api/google/callback: OAuth redirect handler. */
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");

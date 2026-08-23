@@ -103,7 +103,7 @@ export function IntentModeration({
           </h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
             Pending proposals stay private until published. Triage adds a
-            recommendation only — it never auto-publishes.
+            recommendation only: it never auto-publishes.
           </p>
         </div>
         {canRunTriage && (

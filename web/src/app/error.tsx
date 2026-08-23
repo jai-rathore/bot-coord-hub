@@ -6,7 +6,7 @@ import Link from "next/link";
  * Route-level error boundary.
  *
  * Without this, an unhandled throw in any server component fell through to
- * Next's raw error page — no branding, no way back, and no retry.
+ * Next's raw error page: no branding, no way back, and no retry.
  */
 export default function AppError({
   error,
@@ -22,7 +22,7 @@ export default function AppError({
         That page didn&apos;t load
       </h1>
       <p className="mt-3 text-sm leading-7 text-muted">
-        The problem has been logged. Trying again often clears it — nothing you
+        The problem has been logged. Trying again often clears it: nothing you
         submitted was lost.
       </p>
       {error.digest ? (

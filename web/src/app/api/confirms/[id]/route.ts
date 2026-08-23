@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Human decide confirm.
- * PATCH /api/confirms/:id — { decision: "approved" | "denied", note? }
+ * PATCH /api/confirms/:id: { decision: "approved" | "denied", note? }
  */
 export async function PATCH(
   request: Request,

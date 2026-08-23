@@ -1,5 +1,5 @@
 /**
- * "We just met" — turning a scan into a time on two calendars.
+ * "We just met": turning a scan into a time on two calendars.
  *
  * The failure this exists to fix: two people hit it off at a conference, swap
  * handles, and never speak again, because the next step was always "text me and
@@ -8,7 +8,7 @@
  *
  * So the scan does the scheduling work up front. One tap picks a shape (coffee,
  * lunch, drinks, a call) and that produces a real event with real candidate
- * times already on it — nobody has to compose anything while standing in a bar.
+ * times already on it: nobody has to compose anything while standing in a bar.
  *
  * Two things are deliberately separate:
  *   - The *connection* is approval-gated, exactly like every other way to reach
@@ -80,7 +80,7 @@ export type MeetResult = {
  *
  * `scanner` is the person who scanned; the handle belongs to the person whose
  * code it was. The event is organized by the scanner because they are the one
- * taking an action — nothing is written into the other person's account beyond
+ * taking an action: nothing is written into the other person's account beyond
  * a participant row and an approval-gated connection request.
  */
 export async function recordMeeting(opts: {
@@ -166,7 +166,7 @@ export async function recordMeeting(opts: {
 
   const shape = MEET_INTENTS[opts.intent];
   const slots = meetSlots(opts.intent, timezone, now);
-  const title = `${shape.noun} — ${firstName(found.owner)} & ${firstName(opts.scanner)}`;
+  const title = `${shape.noun}: ${firstName(found.owner)} & ${firstName(opts.scanner)}`;
 
   const event = await createEvent(opts.scanner, {
     title,
@@ -241,7 +241,7 @@ async function findOpenMeetEvents(
 /**
  * Put the scanned person on the event directly.
  *
- * joinEvent is self-service by design — it is how a share link works. This is
+ * joinEvent is self-service by design: it is how a share link works. This is
  * the one place someone is added by another person, and it is bounded: it only
  * happens for a code they published and someone physically scanned.
  */

@@ -408,7 +408,7 @@ export function LinksManager({
         </h2>
         <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
           These people run an agent of their own, so yours can settle a time
-          with theirs — comparing free/busy, never event titles, and never
+          with theirs: comparing free/busy, never event titles, and never
           booking until you both say yes.
         </p>
         {withAgents.length === 0 ? (
@@ -436,7 +436,7 @@ export function LinksManager({
           Connected, no agent yet
         </h2>
         <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
-          Nothing runs on these yet — they are a record that you know each
+          Nothing runs on these yet: they are a record that you know each
           other, kept so the connection is already in place if they bring an
           agent. To make a plan with them today, send them an event link.
         </p>
@@ -500,7 +500,7 @@ export function LinksManager({
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-muted">
             A reusable link for handing out at a conference or on a slide.
-            Anyone who uses it <em>requests</em> a connection — you approve
+            Anyone who uses it <em>requests</em> a connection: you approve
             every person, and nothing is granted until you do. This is for
             building the agent network; to get people into a single event,
             share that event&apos;s own link instead.
@@ -652,7 +652,7 @@ function ConnectionRow({
           {hasAgent ? <AgentBadge /> : null}
         </p>
         <p className="text-sm text-muted">
-          {link.peer?.email ?? link.toEmail ?? "—"}
+          {link.peer?.email ?? link.toEmail ?? "Not available"}
           {hasAgent ? " · can coordinate meetings" : null}
         </p>
       </div>

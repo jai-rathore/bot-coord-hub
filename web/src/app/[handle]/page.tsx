@@ -51,7 +51,7 @@ export async function generateMetadata({
 }
 
 /**
- * A person's public page — the thing behind a scanned QR code.
+ * A person's public page: the thing behind a scanned QR code.
  *
  * It has two audiences that were previously interleaved: a human standing in
  * front of the person whose code they just scanned, and an agent being handed a
@@ -123,7 +123,7 @@ export default async function PublicAgentPage({
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted">
                 One code, always the same. They point a camera at it, pick
-                coffee, lunch, drinks, or a call — and you both get times to
+                coffee, lunch, drinks, or a call: and you both get times to
                 choose from.
               </p>
               {meetEnabled ? (
@@ -205,7 +205,7 @@ export default async function PublicAgentPage({
             <p className="mt-4 text-sm leading-6 text-[#cfe0d3]">
               {isOwner
                 ? "Anyone can give this prompt to their AI agent. It requests a connection with yours, and you still approve it."
-                : `Paste this into your agent. It asks ${profile.displayName} for a connection — nothing happens until both sides approve.`}
+                : `Paste this into your agent. It asks ${profile.displayName} for a connection: nothing happens until both sides approve.`}
             </p>
             <div className="mt-4">
               <CopyBlock text={connectPromptForHandle(profile.handle, origin)} />

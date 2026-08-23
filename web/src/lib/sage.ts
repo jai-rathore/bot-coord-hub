@@ -12,7 +12,7 @@ export const DEFAULT_SAGE_NAME = "Sage";
  * `users.hosted_agent_name` has been in the schema since events shipped,
  * described as the "platform-provided agent" and never surfaced. Letting
  * someone set it is what turns "Sage is your agent" from a claim in the
- * marketing copy into something the product actually behaves like — an event
+ * marketing copy into something the product actually behaves like: an event
  * they create is run by an agent with the name they chose.
  */
 export function sageNameFor(user: Pick<User, "hostedAgentName">): string {
