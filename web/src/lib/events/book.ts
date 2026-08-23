@@ -84,7 +84,7 @@ async function placeLabel(eventId: string): Promise<string | null> {
 
 /**
  * Book the confirmed event. Attendees are the participants who said yes or
- * maybe — never the whole invite list.
+ * maybe: never the whole invite list.
  */
 export async function bookConfirmedEvent(
   event: Event,
@@ -183,7 +183,7 @@ export async function bookConfirmedEvent(
       meetLink: booked.meetLink,
     };
   } catch (error) {
-    // A calendar failure must not strand the event in `locked` forever — the
+    // A calendar failure must not strand the event in `locked` forever: the
     // decision stands, only the calendar write failed.
     await db
       .update(events)
@@ -198,7 +198,7 @@ export async function bookConfirmedEvent(
     return {
       status: "unavailable",
       message:
-        "Confirmed. The calendar could not be updated — connect Google Calendar at /app/settings and add it manually.",
+        "Confirmed. The calendar could not be updated: connect Google Calendar at /app/settings and add it manually.",
     };
   }
 }

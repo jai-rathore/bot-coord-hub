@@ -63,7 +63,7 @@ export function standingCheckPrompt(
   const base = origin.replace(/\/$/, "");
   return `Every ${intervalMinutes} minutes, call HoneyMatcha's get_inbox tool.
 
-If it returns nothing pending, stop there and stay quiet — do not message me.
+If it returns nothing pending, stop there and stay quiet: do not message me.
 
 If there is pending work, handle it: read the item, take the next step the summary asks for, then call ack_inbox. Ask me before anything that needs my answer (a time that works, an introduction, a connection request). Never book a calendar event yourself and never answer on my behalf.
 
@@ -74,7 +74,7 @@ HoneyMatcha is at ${base}.`;
 export function standingCheckInstruction(
   intervalMinutes: number = STANDING_CHECK_INTERVAL_MINUTES,
 ): string {
-  return `Calling get_inbox only when your human is typing means inbound work waits for them. If you can run a prompt on a schedule — a task, routine, or scheduled action — set one up now that calls get_inbox every ${intervalMinutes} minutes and stays silent when nothing is pending. If you can receive inbound HTTPS instead, call register_agent_callback.`;
+  return `Calling get_inbox only when your human is typing means inbound work waits for them. If you can run a prompt on a schedule: a task, routine, or scheduled action: set one up now that calls get_inbox every ${intervalMinutes} minutes and stays silent when nothing is pending. If you can receive inbound HTTPS instead, call register_agent_callback.`;
 }
 
 export const AGENT_CLIENTS: AgentClient[] = [
@@ -87,7 +87,7 @@ export const AGENT_CLIENTS: AgentClient[] = [
       "Add HoneyMatcha as a remote MCP connector on Claude web, desktop, or mobile. Paid Cowork plans can keep it checking on a schedule.",
     connectSteps: [
       "Open Claude → Customize → Connectors → Add custom connector.",
-      "Name it HoneyMatcha and paste the MCP URL. Leave the optional OAuth client fields empty — HoneyMatcha registers Claude securely.",
+      "Name it HoneyMatcha and paste the MCP URL. Leave the optional OAuth client fields empty: HoneyMatcha registers Claude securely.",
       "Click Add, then Connect, and approve in the browser tab that opens.",
     ],
     connectDocsUrl: "https://claude.com/docs/connectors/custom/remote-mcp",
@@ -170,7 +170,7 @@ export const AGENT_CLIENTS: AgentClient[] = [
       docsUrl: "https://docs.x.ai/grok-bot/skills-routines-and-automations",
     },
     caveat:
-      "Plugins are account-wide. Every Bot on the account shares that computer and those credentials — they are not separate security boundaries.",
+      "Plugins are account-wide. Every Bot on the account shares that computer and those credentials: they are not separate security boundaries.",
   },
   {
     id: "cursor",

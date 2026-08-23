@@ -51,8 +51,8 @@ export function ConfirmQueue({
 
       {initialConfirms.length === 0 ? (
         <p className="text-sm text-muted">
-          You&apos;re all caught up. When your assistant needs your OK—like
-          confirming a meeting—it appears here.
+          You&apos;re all caught up. When Sage or your connected agent needs your
+          approval, such as confirming a meeting, it appears here.
         </p>
       ) : (
         <ul className="divide-y divide-line border-t border-b border-line">

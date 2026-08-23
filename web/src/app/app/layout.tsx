@@ -79,7 +79,7 @@ export default async function AppLayout({
     if (isNextControlFlowError(error)) throw error;
     // DB may be unavailable in local UI-only runs; pages that need DB surface errors.
     // The shell still renders with zeroed badges, but the cause is logged
-    // rather than swallowed — this ran on every /app navigation.
+    // rather than swallowed: this ran on every /app navigation.
     console.error("[app-shell] layout data load failed", error);
   }
 

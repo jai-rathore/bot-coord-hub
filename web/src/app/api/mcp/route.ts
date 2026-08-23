@@ -113,7 +113,7 @@ export async function OPTIONS(request: Request) {
  * Also accepts { tool, arguments } shortcut for tools/call.
  *
  * Unauthenticated POSTs return 401 + WWW-Authenticate so MCP clients start OAuth.
- * GET with Accept: text/event-stream returns 405 — this server does not offer SSE.
+ * GET with Accept: text/event-stream returns 405: this server does not offer SSE.
  */
 export async function POST(request: Request) {
   const rejected = rejectInvalidOrigin(request);
@@ -210,7 +210,7 @@ export async function POST(request: Request) {
 
 /**
  * Streamable HTTP clients probe GET for an SSE notification stream.
- * We do not offer one — 405 is the spec signal to continue with POST-only JSON.
+ * We do not offer one: 405 is the spec signal to continue with POST-only JSON.
  * Other GET Accept types return the tool catalog (auth required).
  */
 export async function GET(request: Request) {

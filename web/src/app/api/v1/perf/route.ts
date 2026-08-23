@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 /**
  * Process-wide performance counters, for scripts/perf-baseline.mjs.
  *
- * Exposes counts only — no user data. Off in production unless explicitly
+ * Exposes counts only: no user data. Off in production unless explicitly
  * enabled, so it cannot become an accidental public surface.
  */
 export async function GET() {

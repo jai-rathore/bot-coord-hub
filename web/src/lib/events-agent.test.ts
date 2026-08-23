@@ -35,7 +35,7 @@ import {
 import { getMcpTools } from "./mcp-tools";
 
 /* ------------------------------------------------------------------ */
-/* guardrails — defence in depth                                       */
+/* guardrails: defence in depth                                       */
 /* ------------------------------------------------------------------ */
 
 const INJECTIONS = [
@@ -109,11 +109,11 @@ test("replies to participants are length-capped", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* tool authorization — the actual boundary                            */
+/* tool authorization: the actual boundary                            */
 /* ------------------------------------------------------------------ */
 
 test("a participant turn cannot reach organizer-only tools", () => {
-  // Some tools are deliberately shared — both roles reply, and both leave
+  // Some tools are deliberately shared: both roles reply, and both leave
   // notes. What matters is that everything NOT shared stays out of reach.
   const shared = new Set<string>(PARTICIPANT_TOOLS);
   const organizerOnly = ORGANIZER_TOOLS.filter((tool) => !shared.has(tool));
@@ -134,7 +134,7 @@ test("a participant turn cannot reach organizer-only tools", () => {
 });
 
 test("a participant can only take back their own note", () => {
-  // retract_note is shared; remove_note — someone else's words — is not.
+  // retract_note is shared; remove_note: someone else's words: is not.
   assert.equal(isToolAllowed("participant", "retract_note"), true);
   assert.equal(isToolAllowed("participant", "remove_note"), false);
   assert.equal(isToolAllowed("organizer", "remove_note"), true);
@@ -209,7 +209,7 @@ test("participant tools carry prose only where it is meant to go", () => {
     "reply",
   ]);
 
-  // set_option_preference takes an id and a closed enum — no prose at all.
+  // set_option_preference takes an id and a closed enum: no prose at all.
   const pref = participantToolDefs(true).find(
     (d) => d.name === "set_option_preference",
   )!;
@@ -230,7 +230,7 @@ test("participant tools carry prose only where it is meant to go", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* context projection — what cannot leak                               */
+/* context projection: what cannot leak                               */
 /* ------------------------------------------------------------------ */
 
 const ORGANIZER = "11111111-1111-1111-1111-111111111111";
@@ -702,7 +702,7 @@ test("applied changes are confirmed in plain words", () => {
     "participant",
     "2 of 3 responded.",
   );
-  assert.match(saved, /^Done — /);
+  assert.match(saved, /^Done: /);
   assert.match(saved, /saved your answers/);
   assert.match(saved, /2 of 3 responded/);
 

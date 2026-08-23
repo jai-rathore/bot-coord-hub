@@ -5,7 +5,7 @@ import { PRODUCT_VERSION, PROTOCOL_VERSION } from "@/lib/discovery";
 // there is nothing to render.
 export const dynamic = "force-static";
 
-/** Public health — no auth required. */
+/** Public health: no auth required. */
 export async function GET() {
   return Response.json({
     ok: true,

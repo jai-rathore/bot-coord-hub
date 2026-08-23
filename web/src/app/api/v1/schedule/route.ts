@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Request a schedule_meeting session: free/busy propose → confirm gate → book.
- * POST /api/v1/schedule — Authorization: Bearer hm_...
+ * POST /api/v1/schedule: Authorization: Bearer hm_...
  *
  * Body supports peerEmail (pairwise) or peerEmails (3+ group).
  */

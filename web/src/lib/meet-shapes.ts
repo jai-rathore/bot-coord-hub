@@ -32,7 +32,7 @@ export const MEET_INTENTS = {
   },
   call: {
     label: "Quick call",
-    // The noun titles the event ("Call — Dana & Sam"); the label sits on a chip.
+    // The noun titles the event ("Call: Dana & Sam"); the label sits on a chip.
     noun: "Call",
     hour: 16,
     minute: 0,
@@ -43,7 +43,7 @@ export const MEET_INTENTS = {
 
 export type MeetIntent = keyof typeof MEET_INTENTS;
 
-/** "connect" asks for the link only — no event, no times. */
+/** "connect" asks for the link only: no event, no times. */
 export type MeetChoice = MeetIntent | "connect";
 
 export function isMeetChoice(value: unknown): value is MeetChoice {

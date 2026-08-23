@@ -10,7 +10,7 @@ import { NavIcon, type NavGlyph } from "@/components/nav-icon";
  * The phone's navigation.
  *
  * A human using HoneyMatcha is on a phone, and the top rail this replaces put
- * every destination in the one place a thumb cannot reach — then scrolled half
+ * every destination in the one place a thumb cannot reach, then scrolled half
  * of them off the right edge, where nobody knew to look. This is five fixed
  * slots at the bottom of the screen.
  *
@@ -56,19 +56,19 @@ export function MobileTabBar({
     { href: "/", label: "Home", glyph: "home", exact: true },
     {
       href: "/app/events",
-      label: "Events",
+      label: "Plans",
       glyph: "events",
       badge: eventsUnreadCount,
     },
     { href: "/app/people", label: "People", glyph: "people" },
-    { href: handle ? "/app/code" : "/setup", label: "My code", glyph: "code" },
+    { href: handle ? "/app/code" : "/setup", label: "Share", glyph: "code" },
   ];
 
   const overflow: Destination[] = [];
   if (discoveryEnabled) {
     overflow.push({
       href: "/app/discovery",
-      label: "Discovery",
+      label: "Discover",
       glyph: "discovery",
     });
   }
@@ -82,13 +82,13 @@ export function MobileTabBar({
   }
   overflow.push({
     href: "/app/agent",
-    label: agentConnected ? "Assistant" : "Connect assistant",
+    label: "Agents",
     glyph: "agent",
   });
   overflow.push({ href: "/app/settings", label: "Settings", glyph: "settings" });
 
   // A page behind More is still the page you are on, so the tab has to look
-  // selected — otherwise the bar claims you are nowhere.
+  // selected. Otherwise the bar claims you are nowhere.
   const moreActive =
     overflow.some((item) => isActive(pathname, item)) &&
     !tabs.some((item) => isActive(pathname, item));

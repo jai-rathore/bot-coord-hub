@@ -44,7 +44,7 @@ export function SetupGuide({
       <p className="relative mt-2 max-w-2xl text-sm leading-6 text-muted">
         HoneyMatcha is where your assistant coordinates with other people. You
         connect a calendar and approve the assistant once. After that, you talk
-        to your assistant—not this website—unless something needs your say.
+        to your assistant, not this website, unless something needs your say.
       </p>
 
       <ol className="relative mt-6 grid list-none gap-4 p-0 lg:grid-cols-2">

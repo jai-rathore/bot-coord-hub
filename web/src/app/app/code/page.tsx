@@ -21,7 +21,7 @@ async function originFromHeaders() {
 /**
  * Your code, without leaving the app.
  *
- * "My code" in the nav used to go straight to `/{handle}` — the public page,
+ * "My code" in the nav used to go straight to `/{handle}`, the public page,
  * which runs the marketing shell. Tapping a tab therefore threw you out of the
  * app: the tab bar vanished, and the only way back was a "Home" button that
  * appeared beside your own avatar. A tab that exits the tab bar is a dead end,
@@ -43,9 +43,9 @@ export default async function MyCodePage() {
   return (
     <div className="space-y-8">
       <PageHeading
-        eyebrow="Your code"
-        title="Let them scan you"
-        description="One code, always the same. Someone points a camera at it, picks coffee, lunch, drinks, or a call — and you both get times to choose from."
+        eyebrow="Share"
+        title="Your meeting link and code"
+        description="Use this when you meet someone new. They can scan or open your link, choose what they want to plan, and compare times with you."
       />
 
       <section className="surface-card p-5 sm:p-7">

@@ -3,7 +3,7 @@ import { agentJoinEvent } from "@/lib/events/agent-api";
 
 export const dynamic = "force-dynamic";
 
-/** `id` accepts an event id or a share slug — an agent is handed the link. */
+/** `id` accepts an event id or a share slug: an agent is handed the link. */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },

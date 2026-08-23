@@ -1,5 +1,5 @@
 /**
- * Event notes — the shared layer chat never had.
+ * Event notes: the shared layer chat never had.
  *
  * Until now every word a person gave Sage died in their own private thread.
  * A note is free text that leaves that thread: it lands on the event, it is
@@ -12,7 +12,7 @@
  *  1. A note belongs to exactly one event. Every query filters on `eventId`,
  *     and no caller ever passes an event id that came from the model.
  *  2. `visibility` is the entire disclosure contract. There is no third state
- *     and no person-to-person channel — a note is either on the board for
+ *     and no person-to-person channel: a note is either on the board for
  *     everyone who can see the event, or it is for the organizer alone.
  */
 
@@ -57,7 +57,7 @@ export function isNoteVisibility(value: unknown): value is NoteVisibility {
  * What a requested visibility actually becomes on this board.
  *
  * On a counts_only or blind event the organizer has said that who-answered-what
- * is private. A note signed with a name would walk straight around that — "I
+ * is private. A note signed with a name would walk straight around that: "I
  * can't do Friday" is a vote in prose. So on any board that is not `open`, a
  * note meant for everyone is kept for the organizer instead. The caller is
  * told, in `noteVisibilityNotice`, before it is saved.
@@ -84,11 +84,11 @@ export function noteVisibilityNotice(
  *
  * Anonymous visitors never see notes. A share link is unlisted rather than
  * secret, and other people's words are not something to hand to anyone who
- * forwards the URL — tallies are public on an open board, prose is not.
+ * forwards the URL: tallies are public on an open board, prose is not.
  *
  * Being signed in is the bar, not having joined. Someone who opened the invite
- * and has not answered yet is exactly who the notes are for — the reason
- * Friday is out is what they need in order to answer at all — and reading one
+ * and has not answered yet is exactly who the notes are for: the reason
+ * Friday is out is what they need in order to answer at all: and reading one
  * tap earlier changes nothing, since answering or chatting joins them anyway.
  */
 export function canSeeNote(
@@ -163,7 +163,7 @@ export function projectNotes(
 }
 
 /**
- * The rollup shown above the feed when Sage's digest is missing — no model
+ * The rollup shown above the feed when Sage's digest is missing: no model
  * key, a failed call, or notes that changed a moment ago. Deterministic, so
  * the board always has something true to say.
  */
@@ -182,7 +182,7 @@ export function summarizeNotesDeterministic(notes: NoteView[]): string | null {
   return `${people} added context${tail}.`;
 }
 
-/** Ids of the everyone-visible notes, in order — the digest's cache key input. */
+/** Ids of the everyone-visible notes, in order: the digest's cache key input. */
 export function sharedNoteIds(rows: Pick<EventNote, "id" | "visibility" | "status">[]): string[] {
   return rows
     .filter((row) => row.status === "active" && row.visibility === "everyone")
@@ -226,7 +226,7 @@ export type PostNoteResult = {
 
 /**
  * Write one note. Callable by a participant or the organizer, from chat or
- * from the composer — the caller's real role is resolved by the route, never
+ * from the composer: the caller's real role is resolved by the route, never
  * by the model.
  */
 export async function postNote(opts: {
@@ -302,7 +302,7 @@ export async function postNote(opts: {
   return { note, notice: noteVisibilityNotice(requested, visibility) };
 }
 
-/** The author takes their own note back. Soft delete — the row stays for audit. */
+/** The author takes their own note back. Soft delete: the row stays for audit. */
 export async function retractNote(opts: {
   event: Event;
   user: User;

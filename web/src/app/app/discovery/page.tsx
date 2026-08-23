@@ -34,9 +34,9 @@ export default async function DiscoveryPage() {
   return (
     <div>
       <PageHeading
-        eyebrow="Private matching"
-        title="Discovery"
-        description="Choose what your agent may look for. Dating introductions are 18+ and stay anonymous until both people accept. HoneyMatcha compares private constraints and releases only approved fields after mutual interest."
+        eyebrow="Private discovery"
+        title="Find the right people"
+        description="Tell Sage or your connected agent what you are looking for in dating, hiring, or local meetups. HoneyMatcha compares private criteria, keeps dating introductions 18+, and reveals identities only after both people accept."
       />
       <div className="mt-8">
         <DiscoveryManager

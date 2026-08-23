@@ -49,9 +49,9 @@ function text(html) {
 
 /** Public pages must render real server HTML, not a redirect or an error shell. */
 const PAGES = [
-  { path: "/", heading: "handle the back-and-forth" },
+  { path: "/", heading: "meets their agent" },
   { path: "/docs", heading: "Connect the assistant you already have" },
-  { path: "/agents", heading: "Choose yours." },
+  { path: "/agents", heading: "Sage is ready." },
   { path: "/agents/tasks", heading: "What agents can coordinate" },
   { path: "/privacy", heading: "Privacy" },
   { path: "/terms", heading: "Terms" },
@@ -73,6 +73,10 @@ async function main() {
       assert.ok(
         text(body).includes(page.heading),
         `missing expected copy: ${page.heading}`,
+      );
+      assert.ok(
+        !text(body).includes("\u2014"),
+        "rendered copy contains an em dash",
       );
     });
   }

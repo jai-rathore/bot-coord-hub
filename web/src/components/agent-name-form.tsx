@@ -8,7 +8,7 @@ import { SageAvatar } from "@/components/sage-avatar";
  * Name the agent that came with the account.
  *
  * Renaming is the smallest thing that makes "your agent" true rather than
- * asserted — the name is stamped on each event at creation, so it is what the
+ * asserted: the name is stamped on each event at creation, so it is what the
  * other people on that event see it called.
  */
 export function AgentNameForm({
@@ -73,7 +73,7 @@ export function AgentNameForm({
         </div>
       </div>
       <p className="text-xs leading-5 text-muted">
-        Events you create from now on will use this name, and it is what the
+        Plans you create from now on will use this name, and it is what the
         people on them see. Leave it empty to go back to {defaultName}.
       </p>
       {error ? <p className="text-sm text-danger">{error}</p> : null}

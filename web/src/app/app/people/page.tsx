@@ -33,7 +33,7 @@ export default async function PeoplePage() {
     listPublicInvites(user, origin),
   ]);
 
-  // Anyone already connected belongs under Connected, not under "met through" —
+  // Anyone already connected belongs under Connected, not under "met through".
   // one person, one row, and the row that grants something wins.
   const linkedUserIds = new Set(
     links.map((link) => link.peer?.id).filter((id): id is string => Boolean(id)),
@@ -46,9 +46,9 @@ export default async function PeoplePage() {
   return (
     <div>
       <PageHeading
-        eyebrow="Your network"
-        title="People"
-        description="Everyone you have coordinated with. A connection is what lets two agents settle a time between them — so what it does depends on whether the other person has one yet. To make a plan with anybody today, agent or not, send them an event link."
+        eyebrow="Connections"
+        title="People and agents you know"
+        description="Find people you have coordinated with, approve new connections, and create a reusable link between your agents. For a new group plan, share an event link instead."
       />
       <div className="mt-9 space-y-10">
         <LinksManager

@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Propose a new intent (agent).
- * POST /api/v1/intents/propose — Authorization: Bearer hm_...
+ * POST /api/v1/intents/propose: Authorization: Bearer hm_...
  */
 export async function POST(request: Request) {
   const auth = await requireAgent(request);

@@ -1,5 +1,5 @@
 /**
- * Gemini via the AI Studio REST API — the same model and key the
+ * Gemini via the AI Studio REST API: the same model and key the
  * personal-web-agent project uses (CHAT_MODEL / GEMINI_API_KEY), called with
  * plain fetch so HoneyMatcha takes on no new dependency.
  */

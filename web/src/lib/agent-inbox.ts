@@ -251,7 +251,7 @@ export async function deliverDiscoveryInbox(opts: {
  *
  * Events reach people by email through notification_outbox; this is the same
  * fan-out for the agent side, so an agent learns about an invitation, a closing
- * deadline, or a confirmed time by calling get_inbox — the contract the MCP
+ * deadline, or a confirmed time by calling get_inbox: the contract the MCP
  * initialize instructions promise.
  *
  * `dedupeKey` is the outbox's key, so a retried tick can never deliver twice.
@@ -465,12 +465,12 @@ export function inboxInstructions(pending: number): string {
  * stream to push down, and Claude, ChatGPT, Gemini and Grok cannot receive an
  * inbound webhook. So the answer is a standing check the agent schedules for
  * itself. This ships in whoami and get_inbox rather than only in the connect
- * docs, because the agent — not the human — is the one that can create it.
+ * docs, because the agent: not the human: is the one that can create it.
  */
 export function standingCheckStatus(opts: {
   callbackRegistered: boolean;
 }): {
-  /** True once something else already delivers — no schedule needed. */
+  /** True once something else already delivers: no schedule needed. */
   satisfied: boolean;
   intervalMinutes: number;
   instructions: string;

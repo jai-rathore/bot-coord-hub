@@ -25,8 +25,8 @@ export type AgentScope = (typeof AGENT_SCOPES)[number];
  * Safe defaults deliberately exclude approvals:write.
  *
  * events:write is included: every event action reachable with it is reversible
- * and re-checks organizer ownership in the service. The irreversible ones —
- * lock, cancel, confirm/book — are not exposed to agents at all (see
+ * and re-checks organizer ownership in the service. The irreversible ones :
+ * lock, cancel, confirm/book: are not exposed to agents at all (see
  * events/agent-api.ts), so there is no scope that grants them.
  */
 export const DEFAULT_AGENT_SCOPES: AgentScope[] = [

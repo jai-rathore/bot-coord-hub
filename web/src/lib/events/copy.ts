@@ -87,12 +87,12 @@ export function statusSummary(opts: {
   }
   if (opts.status === "locked") {
     return opts.leadingLabel
-      ? `Locked in: ${opts.leadingLabel} — waiting on the organizer to confirm.`
-      : "Locked — waiting on the organizer to confirm.";
+      ? `Locked in: ${opts.leadingLabel}: waiting on the organizer to confirm.`
+      : "Locked: waiting on the organizer to confirm.";
   }
   if (opts.status === "expired") {
     return opts.quorumRequired && !opts.quorumMet
-      ? `Closed without enough people — ${opts.quorumRequired} were needed.`
+      ? `Closed without enough people: ${opts.quorumRequired} were needed.`
       : "Closed without an answer.";
   }
 

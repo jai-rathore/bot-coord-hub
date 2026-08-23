@@ -102,7 +102,7 @@ export async function createEvent(
   );
   const place = boundedText(input.place, "place", EVENT_LIMITS.optionLabelLength);
 
-  // A blank deadline means "48 hours from now" — the form leaves it empty.
+  // A blank deadline means "48 hours from now": the form leaves it empty.
   const deadlineAt = input.deadlineAt
     ? parseDate(input.deadlineAt, "deadlineAt")
     : new Date(Date.now() + 48 * 3600_000);
@@ -376,7 +376,7 @@ export async function joinEvent(
   });
 
   // The organizer's agent should know the shape of the room is changing. Agent
-  // only — one email per person who opens a link would be noise. Imported
+  // only: one email per person who opens a link would be noise. Imported
   // lazily because notify.ts reads this module.
   if (event.organizerUserId !== user.id) {
     const { enqueueEventNotification } = await import("@/lib/events/notify");
@@ -504,7 +504,7 @@ export async function setResponses(
  * Deliberately nameless and tally-free: an email is outside the board's
  * visibility projection, so it must never say more than the most restricted
  * viewer could see. Under anything but open visibility, response updates go
- * only to the organizer (who sees everything) — and only if they opted in.
+ * only to the organizer (who sees everything): and only if they opted in.
  * Imported lazily because notify.ts reads this module.
  */
 async function notifySubscribersOfUpdate(
@@ -552,7 +552,7 @@ async function notifySubscribersOfUpdate(
 }
 
 /**
- * Flip update notifications for this person, joining them first if needed —
+ * Flip update notifications for this person, joining them first if needed :
  * subscribing to an event is engaging with it, exactly like responding is.
  */
 export async function setNotifyUpdates(
@@ -773,7 +773,7 @@ export async function cancelEvent(event: Event, user: User): Promise<void> {
  * Take an event off *your* list.
  *
  * The organizer is a participant like everyone else, so archiving is one write
- * to your own row and nobody else's view changes. Any status can be archived —
+ * to your own row and nobody else's view changes. Any status can be archived :
  * a confirmed dinner you have already been to is as done as a cancelled one.
  */
 export async function archiveEvent(
@@ -806,7 +806,7 @@ export async function archiveEvent(
 /**
  * Destroy an event for everyone.
  *
- * Only the organizer, and only once it is cancelled — cancelling is what tells
+ * Only the organizer, and only once it is cancelled: cancelling is what tells
  * the other people it is off, and deleting an event nobody was told about
  * would just make it vanish from their lists.
  *
@@ -878,7 +878,7 @@ export async function rotateShareSlug(
 export const EVENT_PAGE_SIZE = 20;
 
 /**
- * The ceiling for callers that are not paging — the nav's unread badge counts
+ * The ceiling for callers that are not paging: the nav's unread badge counts
  * across whatever this returns, so it stays where the old two-query cap was
  * rather than dropping to a page.
  */
@@ -894,14 +894,14 @@ export type EventListPage = {
 /**
  * The events one person can see, one page at a time.
  *
- * This was two queries — organized and joined — each capped at 50 with no way
+ * This was two queries: organized and joined: each capped at 50 with no way
  * to reach anything past that, so a busy account silently lost its older
  * plans. It is one query now, which is what makes a page boundary mean
  * anything: paging two independently-sorted lists and merging them afterwards
  * cannot produce a stable second page.
  *
  * The join is left, not inner, on purpose. Creating an event also writes the
- * organizer a participant row, so the inner join would be enough today — but
+ * organizer a participant row, so the inner join would be enough today: but
  * an organizer who somehow lacks one would lose their own event from their own
  * list, and that is not a failure worth risking to save a condition.
  */
@@ -950,7 +950,7 @@ function notePreview(body: string, max = 140): string {
 /**
  * Write a note and tell everyone who should know.
  *
- * The single entry point for both surfaces — Sage's `post_note` tool and the
+ * The single entry point for both surfaces: Sage's `post_note` tool and the
  * composer on the event page land here, so a note written by the assistant and
  * a note typed by hand are indistinguishable afterwards, as they should be.
  */

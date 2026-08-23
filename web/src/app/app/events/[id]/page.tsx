@@ -69,7 +69,7 @@ export default async function OrganizerEventPage({
           <h2 className="mt-2 text-lg font-semibold text-ink">
             Paste this wherever your group talks
           </h2>
-          {/* The whole URL, not just the path — someone reading this off the
+          {/* The whole URL, not just the path: someone reading this off the
               screen or copying it by hand needs something that resolves. */}
           <div className="mt-3">
             <CopyBlock text={shareUrl} label="Copy link" />

@@ -39,7 +39,7 @@ export function SageAvatar({
 }
 
 /**
- * The whole seated figure, for the few places with room for it — an empty
+ * The whole seated figure, for the few places with room for it: an empty
  * list, or the page that explains what an agent is for.
  */
 export function SagePortrait({

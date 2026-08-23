@@ -3,8 +3,8 @@
  * enforces its scope before touching anything.
  *
  * An agent can do both halves of an event: organize one, and take part in
- * someone else's. The participant half is what a human is handed in practice —
- * a share link — so every entry point here resolves an event by id, share slug,
+ * someone else's. The participant half is what a human is handed in practice :
+ * a share link: so every entry point here resolves an event by id, share slug,
  * or a pasted share URL.
  *
  * Irreversible actions (lock, cancel, confirm/book) are deliberately absent:
@@ -155,13 +155,13 @@ export async function agentGetEventBoard(
  * The board an agent sees, with no scope assertion of its own.
  *
  * Writes return it too, so an agent sees the result of what it just did in the
- * same call — and a key holding events:write but not events:read still works.
+ * same call: and a key holding events:write but not events:read still works.
  */
 async function boardPayload(auth: AgentAuth, event: Event, baseUrl?: string) {
   const source = await loadBoardSource(event.id);
   if (!source) throw new AgentApiError(404, "That event does not exist.");
 
-  // Projected for this agent's human — a non-participant gets the same public
+  // Projected for this agent's human: a non-participant gets the same public
   // view a signed-out browser would, never the roster.
   const board = projectBoard(source, auth.user.id);
 
@@ -180,8 +180,8 @@ async function boardPayload(auth: AgentAuth, event: Event, baseUrl?: string) {
     board,
     agent_instructions: stillOpen
       ? board.viewer.participantId
-        ? "Ask your human which of these work, then call respond_to_event with the optionIds above. Do not guess for them. When they give a reason the others should know — why a day is out, what they need — also call post_event_note; board.notes is where those live."
-        : "Your human is not on this event yet. Ask them which times work, then call respond_to_event — it joins them at the same time. Read board.notes first: someone may already have said why a time does not work."
+        ? "Ask your human which of these work, then call respond_to_event with the optionIds above. Do not guess for them. When they give a reason the others should know: why a day is out, what they need: also call post_event_note; board.notes is where those live."
+        : "Your human is not on this event yet. Ask them which times work, then call respond_to_event: it joins them at the same time. Read board.notes first: someone may already have said why a time does not work."
       : "This event is closed to new responses. Relay the summary and board.notes; do not try to answer.",
   };
 }
@@ -209,7 +209,7 @@ export async function agentCreateEvent(
 }
 
 /**
- * Join on the human's behalf. Idempotent — an agent that re-runs its turn, or
+ * Join on the human's behalf. Idempotent: an agent that re-runs its turn, or
  * two agents for the same human, land on the same participant row.
  */
 export async function agentJoinEvent(
@@ -315,7 +315,7 @@ export async function agentSuggestEventOption(
   if (typeof body.dimensionId !== "string" || !body.dimensionId) {
     throw new AgentApiError(
       400,
-      "dimensionId is required — take it from get_event_board.",
+      "dimensionId is required: take it from get_event_board.",
     );
   }
 
@@ -355,7 +355,7 @@ export async function agentSuggestEventOption(
  * Leave a note on the event, on the human's behalf.
  *
  * The same write Sage makes through its `post_note` tool and the same one the
- * composer on the event page makes — one code path, so an agent cannot reach
+ * composer on the event page makes: one code path, so an agent cannot reach
  * past a rule the other two obey. In particular `publishNote` still downgrades
  * an `everyone` note to the organizer on a private board, and still returns
  * the notice saying so; that notice is handed back here rather than swallowed,
@@ -377,7 +377,7 @@ export async function agentPostEventNote(
   const event = await resolveEventRef(eventRefFrom(body));
 
   if (typeof body.body !== "string" || !body.body.trim()) {
-    throw new AgentApiError(400, "body is required — the note, in their words.");
+    throw new AgentApiError(400, "body is required: the note, in their words.");
   }
 
   const audience = typeof body.audience === "string" ? body.audience : "everyone";
@@ -436,7 +436,7 @@ export async function agentPostEventNote(
 /**
  * Take a note down. The author retracts their own; the organizer removes
  * anyone's. Which applies is decided from the caller's real role here, never
- * from the request — an agent naming someone else's note gets the author
+ * from the request: an agent naming someone else's note gets the author
  * check, and fails it.
  */
 export async function agentRetractEventNote(
@@ -454,7 +454,7 @@ export async function agentRetractEventNote(
   if (typeof body.noteId !== "string" || !body.noteId) {
     throw new AgentApiError(
       400,
-      "noteId is required — take it from get_event_board.",
+      "noteId is required: take it from get_event_board.",
     );
   }
 
@@ -521,8 +521,8 @@ export async function agentExtendEventDeadline(
 }
 
 /**
- * Hide or restore an event on this human's list. Per-person and reversible —
- * the same button the Events page offers — so an agent can clean up without
+ * Hide or restore an event on this human's list. Per-person and reversible :
+ * the same button the Events page offers: so an agent can clean up without
  * cancelling for everyone else.
  */
 export async function agentArchiveEvent(
@@ -590,7 +590,7 @@ export async function agentSetEventNotifications(
     eventId: event.id,
     notify: participant.notifyUpdates,
     human_note: notify
-      ? "Updates about this event will arrive in your inbox (get_inbox) and by the channel your human chose in Settings — email, text, or both."
+      ? "Updates about this event will arrive in your inbox (get_inbox) and by the channel your human chose in Settings: email, text, or both."
       : "Updates for this event are off.",
   };
 }
@@ -600,7 +600,7 @@ export async function agentSetEventNotifications(
  *
  * The same thing the QR does, for the case where an agent is told about the
  * encounter instead of a camera being pointed at a screen. The connection stays
- * approval-gated either way — an agent cannot link two people by asserting they
+ * approval-gated either way: an agent cannot link two people by asserting they
  * met.
  */
 export async function agentRecordMeeting(

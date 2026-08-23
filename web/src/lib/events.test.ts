@@ -117,7 +117,7 @@ test("earliest start breaks a tie before position", () => {
   assert.equal(outcome.winner?.optionId, "b");
 });
 
-test("resolution is stable — identical data always gives the same winner", () => {
+test("resolution is stable: identical data always gives the same winner", () => {
   const options = [opt("a", 0), opt("b", 1), opt("c", 2)];
   const cast = votes(["a", "yes"], ["b", "yes"], ["c", "yes"]);
   const first = resolveDimension(options, cast, null).winner?.optionId;
@@ -500,7 +500,7 @@ test("responding is closed once the event is locked", () => {
 
 test("a signed-in non-participant sees the public view but may respond", () => {
   // The exact state every share-link recipient is in the moment after they
-  // sign in. Responding joins them, so the buttons must be live — gating on
+  // sign in. Responding joins them, so the buttons must be live: gating on
   // participant role left real recipients staring at a dead board.
   const src = source("open");
   src.participants = src.participants.filter(

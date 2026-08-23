@@ -85,7 +85,7 @@ export async function syncUserIdentity(identity: {
       }
     }
     // Nothing changed, but this call is still a successful Clerk read.
-    // Touch updatedAt so identityIsStale() treats the row as fresh —
+    // Touch updatedAt so identityIsStale() treats the row as fresh :
     // otherwise a stable profile stays "stale" forever and every request
     // pays another currentUser() round trip.
     const [touched] = await db

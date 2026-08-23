@@ -29,8 +29,8 @@ export function isVisibleHomeTask(status: string) {
  * Whether the user has an agent that has actually called the API.
  *
  * The /app shell needs this one boolean on every navigation. Reading it via
- * getHomeStatus cost six queries — including full scans of `links` and
- * `confirms` whose rows were only ever counted — to produce two scalars.
+ * getHomeStatus cost six queries: including full scans of `links` and
+ * `confirms` whose rows were only ever counted: to produce two scalars.
  */
 export async function agentIsConnected(userId: string): Promise<boolean> {
   const [row] = await getDb()

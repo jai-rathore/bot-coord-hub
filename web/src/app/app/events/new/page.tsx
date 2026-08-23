@@ -10,9 +10,9 @@ export default function NewEventPage() {
   return (
     <div className="space-y-8">
       <PageHeading
-        eyebrow="Events"
-        title="Start something"
-        description="One link, shared wherever your group already talks. People tap what works; you decide."
+        eyebrow="Plans"
+        title="Plan with a group"
+        description="Name the plan and the choices you need from people. HoneyMatcha creates one link for the group, gathers their answers, and leaves the final decision with you."
       />
       <EventCreateForm />
     </div>

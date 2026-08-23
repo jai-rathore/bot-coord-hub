@@ -1,5 +1,5 @@
 /**
- * Unread event updates for the people in the plan — not the organizer's own
+ * Unread event updates for the people in the plan: not the organizer's own
  * moves. Uses existing event_activity + event_participants.last_seen_at so
  * there is no extra table. Copy is nameless on purpose: list views sit
  * outside the board's visibility projection.
@@ -43,7 +43,7 @@ export function isRecipientUpdateKind(kind: string): kind is RecipientUpdateKind
   return (RECIPIENT_UPDATE_KINDS as readonly string[]).includes(kind);
 }
 
-/** Never include a name — joined summaries in the activity log do. */
+/** Never include a name: joined summaries in the activity log do. */
 export function namelessUpdateCopy(kind: string): string {
   switch (kind) {
     case "responded":

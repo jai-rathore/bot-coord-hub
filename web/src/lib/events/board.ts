@@ -1,8 +1,8 @@
 /**
  * The single source of truth for event status.
  *
- * Every surface — organizer UI, participant page, Sage's context, and the
- * agent API — reads this projection. If a second status query appears
+ * Every surface: organizer UI, participant page, Sage's context, and the
+ * agent API: reads this projection. If a second status query appears
  * anywhere else, that is the bug.
  */
 
@@ -337,7 +337,7 @@ export function projectBoard(
 
   // Notes carry names and prose, so they go through the same projection as
   // everything else rather than being attached raw to the response. Signing in
-  // is the bar to read any of it — the summary included.
+  // is the bar to read any of it: the summary included.
   const canReadNotes = viewerUserId != null;
   const viewerNotes = projectNotes(
     source.notes,
@@ -408,7 +408,7 @@ export function projectBoard(
     quorum: {
       // `required` is a rule of the event, so everyone may see it. Progress
       // toward it is an aggregate and follows the same disclosure rules as
-      // counts and voters — otherwise a blind event leaks its own tally.
+      // counts and voters: otherwise a blind event leaks its own tally.
       required: event.quorumMin,
       met: showCounts ? quorumMet : null,
       leadingYes: showCounts ? leadingYes : null,
@@ -429,7 +429,7 @@ export function projectBoard(
     // The digest is a summary OF the notes, so it is note content and follows
     // their disclosure rule exactly. Reading it off the event row and handing
     // it to everyone would have published people's words to any signed-out
-    // visitor holding the share link — invisible in any environment without a
+    // visitor holding the share link: invisible in any environment without a
     // model key, because there the digest is always null.
     notesSummary: canReadNotes
       ? (event.notesDigest ?? summarizeNotesDeterministic(viewerNotes))

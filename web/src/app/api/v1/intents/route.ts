@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * List intent registry (agent).
- * GET /api/v1/intents?q= — Authorization: Bearer hm_...
+ * GET /api/v1/intents?q=: Authorization: Bearer hm_...
  */
 export async function GET(request: Request) {
   const auth = await requireAgent(request);

@@ -134,7 +134,7 @@ export function EventClient({
     board.event.status === "cancelled" || board.event.status === "expired";
   /**
    * Nobody but the organizer is on it yet. `counts.joined` includes them, and
-   * is null when the viewer may not see the roster — which an organizer always
+   * is null when the viewer may not see the roster: which an organizer always
    * may, so a null here means "do not guess" rather than "nobody".
    */
   const nobodyYet =
@@ -191,7 +191,7 @@ export function EventClient({
    * Keep the page honest without a reload.
    *
    * Notes and answers arrive from other people while this page is open, so the
-   * board is re-fetched on a timer — paused while the tab is hidden, because a
+   * board is re-fetched on a timer: paused while the tab is hidden, because a
    * backgrounded invite does not need to poll, and skipped while a write is in
    * flight so a slow GET cannot overwrite what was just saved.
    */
@@ -344,7 +344,7 @@ export function EventClient({
     const text =
       kind === "link"
         ? shareUrl
-        : `${board.event.title} — ${board.summary} ${shareUrl}`;
+        : `${board.event.title}: ${board.summary} ${shareUrl}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(kind);
@@ -393,7 +393,7 @@ export function EventClient({
                     {dimension.label}
                   </dt>
                   <dd className="text-sm font-semibold text-ink">
-                    {dimension.options[0]?.label ?? "—"}
+                    {dimension.options[0]?.label ?? "No option"}
                   </dd>
                 </div>
               ))}
@@ -401,7 +401,7 @@ export function EventClient({
           )}
 
           {/* A brand-new event looks finished the moment it is created, and
-              nothing on the page says how anybody else finds out about it —
+              nothing on the page says how anybody else finds out about it.
               there is no invite step to complete, because the link is the
               invite. So until someone has actually joined, the link stops
               being one button among several and says what it is for. */}
@@ -411,7 +411,7 @@ export function EventClient({
                 Nobody has seen this yet
               </p>
               <p className="mt-1 text-sm leading-6 text-muted">
-                There is no invite to send — the link is the invite. Paste it
+                There is no invite to send: the link is the invite. Paste it
                 into the group chat and people answer straight away, without
                 signing up first.
               </p>
@@ -421,7 +421,7 @@ export function EventClient({
                   onClick={() => void copyToClipboard("link")}
                   className="button-primary"
                 >
-                  {copied === "link" ? "Copied — now paste it" : "Copy the link"}
+                  {copied === "link" ? "Copied. Now paste it" : "Copy the link"}
                 </button>
                 <button
                   type="button"
@@ -495,7 +495,7 @@ export function EventClient({
       {!signedIn && board.event.status === "open" && (
         <div className="surface-card flex flex-wrap items-center justify-between gap-4 border-matcha-soft/40 p-5">
           <p className="text-sm text-muted">
-            Sign in to respond — it takes a few seconds with Google.
+            Sign in to respond: it takes a few seconds with Google.
           </p>
           <Link href={signInUrl} className="button-primary">
             Sign in to respond
@@ -877,7 +877,7 @@ export function EventClient({
               <p className="mt-3 text-xs leading-5 text-muted">
                 {confirmingDelete
                   ? "This erases the event, everyone's answers, and every note on it. It cannot be undone."
-                  : "Archiving only takes it off your list — everyone else keeps theirs."}
+                  : "Archiving only takes it off your list: everyone else keeps theirs."}
               </p>
             </>
           ) : (

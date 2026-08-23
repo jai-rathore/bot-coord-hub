@@ -8,7 +8,7 @@ import type { MetPerson } from "@/lib/people";
  * People you have coordinated with but never connected to.
  *
  * The row is deliberately quiet about what it grants, because it grants
- * nothing. Connect starts the same email invite the form above sends — the
+ * nothing. Connect starts the same email invite the form above sends: the
  * other person still has to accept, and nothing about sharing an event has
  * given you a shortcut past that.
  */
@@ -58,7 +58,7 @@ export function PeopleMet({ people }: { people: MetPerson[] }) {
       </h2>
       <p className="text-sm leading-6 text-muted">
         People you have been on an event with. They are here so you can find
-        them again — being listed grants nothing on its own.
+        them again: being listed grants nothing on its own.
       </p>
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}

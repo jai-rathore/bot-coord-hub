@@ -8,7 +8,7 @@
  *
  * When there is no model key, or the call fails, the board falls back to
  * `summarizeNotesDeterministic`. A missing digest is a normal state, not an
- * error — the feed underneath it is the real record.
+ * error: the feed underneath it is the real record.
  */
 
 import { createHash } from "node:crypto";
@@ -31,7 +31,7 @@ export const DIGEST_MAX_LENGTH = 320;
  * different every time. At twelve note writes a minute per person that is
  * twelve model calls a minute per person, from an action that costs the caller
  * nothing. Inside the cooldown the digest is cleared rather than rewritten, so
- * the section falls back to the deterministic rollup — which is accurate, just
+ * the section falls back to the deterministic rollup: which is accurate, just
  * plainer. Busy minutes are exactly when paying per keystroke is least worth it.
  */
 export const DIGEST_MIN_INTERVAL_MS = 30_000;
@@ -46,7 +46,7 @@ export function notesDigestKey(noteIds: string[]): string {
 }
 
 /**
- * The prompt. Every note body is fenced as untrusted — a note is arbitrary
+ * The prompt. Every note body is fenced as untrusted: a note is arbitrary
  * text written by whoever holds the share link, and it reaches this prompt
  * verbatim. It is data to be summarized, never instruction to be followed.
  */
@@ -57,7 +57,7 @@ export function buildDigestPrompt(opts: {
 }): { system: string; user: string } {
   const system = `You are ${opts.agentName}, summarizing the notes people left on one event.
 
-Write ONE sentence — two at the very most — saying what the group has said.
+Write ONE sentence: two at the very most: saying what the group has said.
 Lead with what affects the plan: who cannot make something, what they need,
 what is still open. Name people only as they are named in the notes.
 
@@ -96,7 +96,7 @@ export function boundDigest(text: string | null): string | null {
 
 /**
  * Regenerate the digest if the shared notes changed. Safe to call after every
- * note write — it is a no-op when the key still matches, and it never throws:
+ * note write: it is a no-op when the key still matches, and it never throws:
  * a failed digest must not fail the note that triggered it.
  */
 export async function refreshNotesDigest(
@@ -167,7 +167,7 @@ export async function refreshNotesDigest(
     // Clear the stale sentence but leave the key alone, so the next write
     // retries instead of caching a failure forever. Returning here without
     // clearing would leave the previous digest on the row describing a note
-    // set that no longer exists — the feed would show a note the summary
+    // set that no longer exists: the feed would show a note the summary
     // above it had never heard of. A wrong summary is worse than none, and
     // the deterministic rollup takes over the moment this is null.
     await db

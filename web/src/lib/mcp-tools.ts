@@ -101,7 +101,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "whoami",
     description:
-      "Health check. Also returns inbox.pending. If pending > 0, call get_inbox immediately — another person's agent has work for you.",
+      "Health check. Also returns inbox.pending. If pending > 0, call get_inbox immediately: another person's agent has work for you.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -111,7 +111,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "get_inbox",
     description:
-      "Call this at the start of every turn. HoneyMatcha reaches you by writing inbound work here when someone else's agent starts a task with your human. Handle each item, then ack_inbox. The response also returns standingCheck — schedule that recurring call so inbound work does not wait for your human to start a chat.",
+      "Call this at the start of every turn. HoneyMatcha reaches you by writing inbound work here when someone else's agent starts a task with your human. Handle each item, then ack_inbox. The response also returns standingCheck: schedule that recurring call so inbound work does not wait for your human to start a chat.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -132,7 +132,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "register_agent_callback",
     description:
-      "Register an HTTPS URL HoneyMatcha will POST when you have new inbox work. Hosted assistants (Claude, ChatGPT, Gemini, Grok) cannot receive inbound HTTP — they schedule a recurring get_inbox instead. See standingCheck in the whoami response.",
+      "Register an HTTPS URL HoneyMatcha will POST when you have new inbox work. Hosted assistants (Claude, ChatGPT, Gemini, Grok) cannot receive inbound HTTP: they schedule a recurring get_inbox instead. See standingCheck in the whoami response.",
     inputSchema: {
       type: "object",
       properties: {
@@ -166,7 +166,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "approve_connection",
     description:
-      "Approve an incoming public-page or public-invite connection request. Ask your human first — this is the same button they have on People. Take linkId from list_links (pending, incoming).",
+      "Approve an incoming public-page or public-invite connection request. Ask your human first: this is the same button they have on People. Take linkId from list_links (pending, incoming).",
     inputSchema: {
       type: "object",
       properties: {
@@ -355,14 +355,14 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "set_event_notifications",
     description:
-      "Get told when this event moves — someone answers or a new time is suggested. Updates arrive in get_inbox and by the channel your human chose in Settings (email, text, or both). Joins the event for your human if they haven't yet. Pass notify=false to stop.",
+      "Get told when this event moves: someone answers or a new time is suggested. Updates arrive in get_inbox and by the channel your human chose in Settings (email, text, or both). Joins the event for your human if they haven't yet. Pass notify=false to stop.",
     inputSchema: {
       type: "object",
       properties: {
         eventId: {
           type: "string",
           description:
-            "Event id, share slug, or full /e/<slug> link — any of the three.",
+            "Event id, share slug, or full /e/<slug> link: any of the three.",
         },
         notify: {
           type: "boolean",
@@ -393,7 +393,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
         timezone: {
           type: "string",
           description:
-            "IANA timezone the times should land in. Defaults to UTC — pass your human's.",
+            "IANA timezone the times should land in. Defaults to UTC: pass your human's.",
         },
       },
       required: ["handle", "intent"],
@@ -605,7 +605,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
         peerEmails: {
           type: "array",
           items: { type: "string" },
-          description: "Group coordination — 2+ peer emails (organizer implied)",
+          description: "Group coordination: 2+ peer emails (organizer implied)",
         },
         linkId: { type: "string" },
         durationMinutes: { type: "number" },
@@ -634,7 +634,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "respond_confirm",
     description:
-      "Record a decision on a confirm gate after your human said yes. Default pairings lack approvals:write and will be refused — those humans decide at /app/attention. Call only after explicit human OK.",
+      "Record a decision on a confirm gate after your human said yes. Default pairings lack approvals:write and will be refused: those humans decide at /app/attention. Call only after explicit human OK.",
     inputSchema: {
       type: "object",
       properties: {
@@ -708,7 +708,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "create_event",
     description:
-      "Create a group event and get one shareable link. Anyone can open the link; responding requires a HoneyMatcha sign-in. Resolves on a deadline and optional quorum — it never waits for everyone. The organizer confirms before anything is booked.",
+      "Create a group event and get one shareable link. Anyone can open the link; responding requires a HoneyMatcha sign-in. Resolves on a deadline and optional quorum: it never waits for everyone. The organizer confirms before anything is booked.",
     inputSchema: {
       type: "object",
       properties: {
@@ -770,14 +770,14 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "archive_event",
     description:
-      "Hide an event from your human's list, or put it back. Per-person and reversible — it does not cancel the event for anyone else. Use list_events with archived=true to find hidden ones.",
+      "Hide an event from your human's list, or put it back. Per-person and reversible: it does not cancel the event for anyone else. Use list_events with archived=true to find hidden ones.",
     inputSchema: {
       type: "object",
       properties: {
         eventId: {
           type: "string",
           description:
-            "Event id, share slug, or full /e/<slug> link — any of the three.",
+            "Event id, share slug, or full /e/<slug> link: any of the three.",
         },
         archived: {
           type: "boolean",
@@ -798,7 +798,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
         eventId: {
           type: "string",
           description:
-            "Event id, share slug, or full /e/<slug> link — any of the three.",
+            "Event id, share slug, or full /e/<slug> link: any of the three.",
         },
       },
       required: ["eventId"],
@@ -808,14 +808,14 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "join_event",
     description:
-      "Join an event your human was given a link to, without answering yet. Returns the board. Use respond_to_event instead when you already know what works — it joins for you.",
+      "Join an event your human was given a link to, without answering yet. Returns the board. Use respond_to_event instead when you already know what works: it joins for you.",
     inputSchema: {
       type: "object",
       properties: {
         eventId: {
           type: "string",
           description:
-            "Event id, share slug, or full /e/<slug> link — any of the three.",
+            "Event id, share slug, or full /e/<slug> link: any of the three.",
         },
       },
       required: ["eventId"],
@@ -825,14 +825,14 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "respond_to_event",
     description:
-      "Answer an event for your human: mark each time yes/no/maybe and say whether they're coming. Joins the event if they haven't yet. Ask your human first — never guess their availability. Call get_event_board for the optionIds.",
+      "Answer an event for your human: mark each time yes/no/maybe and say whether they're coming. Joins the event if they haven't yet. Ask your human first: never guess their availability. Call get_event_board for the optionIds.",
     inputSchema: {
       type: "object",
       properties: {
         eventId: {
           type: "string",
           description:
-            "Event id, share slug, or full /e/<slug> link — any of the three.",
+            "Event id, share slug, or full /e/<slug> link: any of the three.",
         },
         entries: {
           type: "array",
@@ -870,7 +870,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
         eventId: {
           type: "string",
           description:
-            "Event id, share slug, or full /e/<slug> link — any of the three.",
+            "Event id, share slug, or full /e/<slug> link: any of the three.",
         },
         dimensionId: { type: "string", description: "From get_event_board." },
         startsAt: { type: "string", description: "ISO 8601." },
@@ -904,14 +904,14 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "post_event_note",
     description:
-      "Leave a note on an event — the reason a day does not work, a constraint, anything the others should know that a yes/no cannot carry. Notes appear on the event for everyone, or set audience to 'organizer' to send it to them alone. Read existing notes from board.notes on get_event_board.",
+      "Leave a note on an event: the reason a day does not work, a constraint, anything the others should know that a yes/no cannot carry. Notes appear on the event for everyone, or set audience to 'organizer' to send it to them alone. Read existing notes from board.notes on get_event_board.",
     inputSchema: {
       type: "object",
       properties: {
         eventId: {
           type: "string",
           description:
-            "Event id, share slug, or full /e/<slug> link — any of the three.",
+            "Event id, share slug, or full /e/<slug> link: any of the three.",
         },
         body: {
           type: "string",

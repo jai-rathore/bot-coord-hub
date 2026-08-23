@@ -15,7 +15,7 @@ import {
  *
  * People used to list only the connections you had deliberately made, which
  * left it empty for someone whose whole use of HoneyMatcha was answering an
- * event link — the six people they just picked a restaurant with were nowhere.
+ * event link: the six people they just picked a restaurant with were nowhere.
  * They belong on the page.
  *
  * What they must not do is arrive holding permissions. A shared event is not
@@ -40,7 +40,7 @@ export type MetPerson = {
 /**
  * Which of these people run an agent of their own.
  *
- * "Connected" means a key that has actually been used — a key someone created
+ * "Connected" means a key that has actually been used: a key someone created
  * and never pointed anything at is not an agent, and showing it as one would
  * promise a peer capability that is not there.
  */
@@ -65,7 +65,7 @@ export async function agentConnectedUserIds(
 /**
  * People you share an event with, minus anyone already connected.
  *
- * One row per person — the most recent event you were both on — because this
+ * One row per person: the most recent event you were both on: because this
  * is a list of people, not of meetings.
  */
 export async function listPeopleMetThroughEvents(
@@ -101,7 +101,7 @@ export async function listPeopleMetThroughEvents(
     .limit(limit * 4);
 
   // Rows arrive newest first, so the first sighting of a person is the most
-  // recent event you shared — every later one is older by construction.
+  // recent event you shared: every later one is older by construction.
   const seen = new Map<string, MetPerson>();
   for (const row of rows) {
     if (row.userId === user.id) continue;

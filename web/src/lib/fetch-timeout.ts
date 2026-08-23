@@ -2,7 +2,7 @@
  * fetch with a deadline.
  *
  * Node's fetch has no default timeout, so a hung connection holds the request
- * open indefinitely — and because every handler holds one of the ten Postgres
+ * open indefinitely: and because every handler holds one of the ten Postgres
  * pool connections around it, a handful of stuck outbound calls could starve
  * the whole instance. Only two of the eleven server-side fetch sites set a
  * timeout of their own; this is for the rest.

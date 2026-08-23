@@ -1,6 +1,6 @@
 /**
  * Lightweight in-memory token-bucket style limiter for /api/v1/*.
- * Resets on process restart — fine for single-instance / free-tier deploys.
+ * Resets on process restart: fine for single-instance / free-tier deploys.
  */
 
 type Bucket = {

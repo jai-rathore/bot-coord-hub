@@ -30,7 +30,7 @@ export function wantsSms(channel: NotifyChannel): boolean {
 
 /**
  * Channels a person should actually be queued for right now.
- * SMS is omitted until we have a number — they still get email when
+ * SMS is omitted until we have a number: they still get email when
  * the preference includes it.
  */
 export function humanChannelsFor(input: {

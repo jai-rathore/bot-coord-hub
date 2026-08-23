@@ -2,7 +2,7 @@ import { getDb } from "@/db";
 import { auditLogs } from "@/db/schema";
 
 /**
- * Append-only audit log. Failures are logged but do not throw — callers must
+ * Append-only audit log. Failures are logged but do not throw: callers must
  * not block user-facing flows on audit write errors.
  */
 export async function writeAudit(entry: {

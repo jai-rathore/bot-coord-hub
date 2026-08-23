@@ -106,7 +106,7 @@ export function KeysManager({ initialKeys }: { initialKeys: KeyRow[] }) {
       {createdRaw && (
         <div className="rounded-md border border-honey bg-[rgba(232,210,154,0.35)] p-4">
           <p className="font-semibold text-matcha-deep">
-            Copy this credential now—it won&apos;t be shown again.
+            Copy this credential now. It won&apos;t be shown again.
           </p>
           <code className="mt-2 block break-all rounded bg-white/70 px-3 py-2 text-sm text-ink">
             {createdRaw}

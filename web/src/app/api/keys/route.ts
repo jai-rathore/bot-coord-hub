@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    // empty body ok — use default name
+    // empty body ok: use default name
   }
 
   const name = (body.name ?? "default").trim().slice(0, 80) || "default";

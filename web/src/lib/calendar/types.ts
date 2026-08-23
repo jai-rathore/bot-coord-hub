@@ -1,7 +1,7 @@
 export type BusyBlock = { start: string; end: string };
 
 export type FreeBusyQuery = {
-  /** Opaque calendar ids / emails — never event contents */
+  /** Opaque calendar ids / emails: never event contents */
   calendarIds: string[];
   timeMin: string;
   timeMax: string;

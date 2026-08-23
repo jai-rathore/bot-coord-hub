@@ -890,7 +890,7 @@ export const intentProposals = pgTable(
       onDelete: "set null",
     }),
     proposedByEmail: text("proposed_by_email"),
-    /** Set on create — worker claims rows where triaged_at IS NULL. */
+    /** Set on create: worker claims rows where triaged_at IS NULL. */
     triageQueuedAt: timestamp("triage_queued_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -1235,7 +1235,7 @@ export const agentInbox = pgTable(
 );
 
 /* ==========================================================================
- * Events — shareable group coordination.
+ * Events: shareable group coordination.
  *
  * Viewing an event is public. Participating requires a signed-in HoneyMatcha
  * user, so every participant resolves to a real `users` row: identity is
@@ -1295,7 +1295,7 @@ export const events = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     publicId: uuid("public_id").defaultRandom().notNull(),
-    /** Short, human-shareable path segment. Not a secret — it only grants read. */
+    /** Short, human-shareable path segment. Not a secret: it only grants read. */
     shareSlug: text("share_slug").notNull(),
     organizerUserId: uuid("organizer_user_id")
       .notNull()
@@ -1323,7 +1323,7 @@ export const events = pgTable(
     outcome: jsonb("outcome").$type<Record<string, unknown>>().notNull().default({}),
     /**
      * Sage's rollup of the shared notes, written when a note changes rather
-     * than when the page is read — the board is polled every few seconds by
+     * than when the page is read: the board is polled every few seconds by
      * every viewer, and a model call per poll would be absurd. `notesDigestKey`
      * is a hash of the note set it was built from, so a write only pays for a
      * regeneration when the notes actually changed.
@@ -1418,7 +1418,7 @@ export const eventParticipants = pgTable(
     eventId: uuid("event_id")
       .notNull()
       .references(() => events.id, { onDelete: "cascade" }),
-    /** Never null — participation requires a signed-in account. */
+    /** Never null: participation requires a signed-in account. */
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -1532,7 +1532,7 @@ export const eventMessages = pgTable(
 );
 
 /**
- * Free text that people add to an event — the shared layer chat never had.
+ * Free text that people add to an event: the shared layer chat never had.
  *
  * A note is the only way one person's words reach another person on the
  * event. `visibility` is the whole contract: 'everyone' puts it on the board
@@ -1546,14 +1546,14 @@ export const eventNotes = pgTable(
     eventId: uuid("event_id")
       .notNull()
       .references(() => events.id, { onDelete: "cascade" }),
-    /** Null when the organizer wrote it — they are not always a participant row. */
+    /** Null when the organizer wrote it: they are not always a participant row. */
     participantId: uuid("participant_id").references(() => eventParticipants.id, {
       onDelete: "cascade",
     }),
     authorUserId: uuid("author_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
-    /** Set when the note is about one option — "can't do Friday, intern lunch". */
+    /** Set when the note is about one option: "can't do Friday, intern lunch". */
     optionId: uuid("option_id").references(() => eventOptions.id, {
       onDelete: "set null",
     }),

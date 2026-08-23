@@ -138,7 +138,7 @@ export type EventBoard = {
   } | null;
   quorum: {
     required: number | null;
-    /** Null when the viewer may not see aggregates — never a plain false. */
+    /** Null when the viewer may not see aggregates: never a plain false. */
     met: boolean | null;
     leadingYes: number | null;
   };

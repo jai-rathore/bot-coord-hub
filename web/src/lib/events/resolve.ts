@@ -82,7 +82,7 @@ export function scoreOptions(
  *   3. fewest hard calendar conflicts
  *   4. organizer's own preference
  *   5. earliest start
- *   6. lowest position  (stable — results never flap)
+ *   6. lowest position  (stable: results never flap)
  */
 function compareOptions(
   a: OptionScore,

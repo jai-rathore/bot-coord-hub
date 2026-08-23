@@ -25,7 +25,7 @@ export function mergeBusy(blocks: BusyBlock[]): BusyBlock[] {
 /**
  * Propose free slots of `durationMinutes` inside [windowStart, windowEnd]
  * that do not overlap any busy block. Starts on a 15-minute boundary.
- * Returns free/busy-derived windows only — never calendar event contents.
+ * Returns free/busy-derived windows only: never calendar event contents.
  */
 export function proposeFreeSlots(opts: {
   windowStart: string;

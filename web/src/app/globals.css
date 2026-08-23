@@ -6,6 +6,8 @@
   --matcha-soft: #75a184;
   --honey: #c8922d;
   --honey-soft: #f0dca8;
+  --sky: #dcecf0;
+  --coral: #d87964;
   --ink: #17211c;
   --muted: #5c6a62;
   --line: #d9e2da;
@@ -32,6 +34,8 @@
   --color-matcha-soft: var(--matcha-soft);
   --color-honey: var(--honey);
   --color-honey-soft: var(--honey-soft);
+  --color-sky: var(--sky);
+  --color-coral: var(--coral);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
@@ -144,6 +148,40 @@ body {
     transform: translateY(-3px);
     border-color: color-mix(in srgb, var(--matcha-soft) 70%, white);
     box-shadow: var(--shadow-md);
+  }
+
+  .action-tile {
+    border: 1px solid color-mix(in srgb, var(--matcha-soft) 42%, white);
+    border-radius: 1.2rem;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 252, 0.96), rgba(233, 243, 236, 0.86));
+    box-shadow: var(--shadow-sm);
+    color: inherit;
+    cursor: pointer;
+    min-width: 0;
+    position: relative;
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .action-tile:nth-child(2) {
+    background:
+      linear-gradient(145deg, rgba(255, 255, 252, 0.97), color-mix(in srgb, var(--sky) 64%, white));
+  }
+
+  .action-tile:nth-child(3) {
+    border-color: color-mix(in srgb, var(--coral) 32%, white);
+    background:
+      linear-gradient(145deg, rgba(255, 255, 252, 0.97), color-mix(in srgb, var(--honey-soft) 48%, white));
+  }
+
+  .action-tile:hover {
+    border-color: var(--matcha-soft);
+    box-shadow: var(--shadow-md);
+    color: inherit;
+    transform: translateY(-3px);
   }
 
   .display-title {
@@ -298,7 +336,7 @@ body {
 
 /*
  * The live dot used to animate box-shadow, which cannot be composited: it
- * repainted every frame, forever, in eight places — including inside the
+ * repainted every frame, forever, in eight places: including inside the
  * sticky backdrop-blur header. Same look, expressed as a ring that scales and
  * fades, so both halves stay on the compositor.
  */
@@ -552,68 +590,7 @@ a[href^="https://go.clerk.com"] {
   }
 }
 
-/* ── Capability cards ──────────────────────────────────────────────────────
-   Each of the three gets its own character: warm for a group you know, green
-   for one person, deep for someone you have not met. */
-
-.cap-card {
-  transition:
-    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 240ms ease,
-    border-color 240ms ease;
-}
-
-.cap-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-md);
-}
-
-.cap-mark {
-  transition: transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.cap-card:hover .cap-mark {
-  transform: translateY(-2px) scale(1.05);
-}
-
-
-/* ── Swipe rails ───────────────────────────────────────────────────────────
-   The marketing page is read on a phone with a thumb, so its content sits on
-   horizontal rails that snap card by card instead of stacking into a scroll
-   that never ends. On a desktop the same rail simply shows more cards at once. */
-
-.rail {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: min(20rem, 82%);
-  gap: 0.75rem;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
-  scroll-padding-inline: 1.25rem;
-  padding-bottom: 0.5rem;
-  scrollbar-width: none;
-}
-
-.rail::-webkit-scrollbar {
-  display: none;
-}
-
-.rail > * {
-  scroll-snap-align: center;
-}
-
-@media (min-width: 640px) {
-  .rail {
-    grid-auto-columns: 21rem;
-  }
-
-  .rail > * {
-    scroll-snap-align: start;
-  }
-}
-
-/* Who is doing the work — the one distinction the product turns on. Marked the
+/* Who is doing the work: the one distinction the product turns on. Marked the
    same way everywhere so "I do this" and "my agent does this" never blur. */
 .lane-you {
   border: 1px solid color-mix(in srgb, var(--matcha-soft) 45%, white);
@@ -648,32 +625,6 @@ a[href^="https://go.clerk.com"] {
   color: var(--honey-soft);
 }
 
-/* A capability Sage has not learned yet. Marked rather than hidden: the point
-   is that you can see exactly what you would get, and that it is one agent
-   connection away rather than one release away.
-
-   The state is carried by the dashed edge and the badge, never by opacity —
-   fading the card took its body text to 2.6:1 against the page, and a card
-   nobody can read is a worse answer than no card. */
-.cap-dimmed {
-  background: color-mix(in srgb, var(--honey-soft) 10%, white);
-  border-color: color-mix(in srgb, var(--honey) 40%, white);
-  border-style: dashed;
-}
-
-.cap-tag-soon,
-.lane-you .cap-tag-soon {
-  background: color-mix(in srgb, var(--honey-soft) 55%, white);
-  color: #7a5610;
-}
-
-/* A locked tile on the signed-in home. Same idea as .cap-dimmed, but it has to
-   stay legible next to live tiles rather than sitting in its own rail. */
-.cap-locked {
-  background: color-mix(in srgb, var(--honey-soft) 12%, white);
-  border: 1px dashed color-mix(in srgb, var(--honey) 45%, white);
-}
-
 /* ── Phone tab bar ─────────────────────────────────────────────────────────
    The bar sits over the home indicator on a modern iPhone, so it carries the
    safe-area inset itself rather than asking every page to know about it. The
@@ -683,7 +634,7 @@ a[href^="https://go.clerk.com"] {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Content has to clear the bar, including that inset — a plan sitting under
+/* Content has to clear the bar, including that inset: a plan sitting under
    the tab bar is a plan nobody can tap. */
 .has-tab-bar {
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));

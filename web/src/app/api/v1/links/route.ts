@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * List links for the authenticated agent user.
- * GET /api/v1/links — Authorization: Bearer hm_...
+ * GET /api/v1/links: Authorization: Bearer hm_...
  *
  * Also accepts POST as an alias of /api/v1/links/invite for convenience.
  */

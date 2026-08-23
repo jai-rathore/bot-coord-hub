@@ -137,8 +137,8 @@ async function logAnomaly(
 }
 
 /**
- * Where a suggested option lands. The model never sees dimension ids — a
- * hallucinated one used to make every proposal fail — so the server picks:
+ * Where a suggested option lands. The model never sees dimension ids: a
+ * hallucinated one used to make every proposal fail: so the server picks:
  * a time suggestion goes to the open time dimension, a bare label to an open
  * place/custom dimension, falling back to any open one.
  */
@@ -161,7 +161,7 @@ async function resolveOpenDimensionId(
 
 /**
  * What the person reads when the model made changes but wrote no reply, or
- * said nothing at all. The old fallback was the guardrail refusal — so a
+ * said nothing at all. The old fallback was the guardrail refusal: so a
  * benign "how about Saturday?" that ended in a silent tool call read as a
  * security lecture.
  */
@@ -195,7 +195,7 @@ export function composeFallbackReply(
     if (applied.includes("note_retracted")) parts.push("taken that note back");
     if (applied.includes("note_removed")) parts.push("removed that note");
     const done = parts.length > 0 ? parts.join(" and ") : "saved that";
-    return `Done — I've ${done}. ${summary}`;
+    return `Done: I've ${done}. ${summary}`;
   }
   return role === "organizer"
     ? "I didn't catch that. You can ask me what's leading, who hasn't answered, or tell me a time or place to add."
@@ -204,7 +204,7 @@ export function composeFallbackReply(
 
 /**
  * Fold anything the server has to say into the reply the person reads. The
- * model does not get to omit it — the notice describes what the board actually
+ * model does not get to omit it: the notice describes what the board actually
  * did, which may not be what the model said it did.
  */
 export function appendNotices(reply: string, notices: string[]): string {
@@ -280,7 +280,7 @@ async function applyToolCall(opts: {
         return {
           applied: null,
           reply:
-            "The organizer isn't taking extra suggestions on this one. I can pass it along as a question instead — want me to?",
+            "The organizer isn't taking extra suggestions on this one. I can pass it along as a question instead: want me to?",
         };
       }
       const startsAt = args.startsAt ? String(args.startsAt) : undefined;
@@ -299,7 +299,7 @@ async function applyToolCall(opts: {
         return {
           applied: null,
           reply:
-            "This event's times are fixed, so I can't add another — but I can pass your preference to the organizer.",
+            "This event's times are fixed, so I can't add another: but I can pass your preference to the organizer.",
         };
       }
       await addOption(event, user, { dimensionId, startsAt, label }, "participant");
@@ -323,7 +323,7 @@ async function applyToolCall(opts: {
         return {
           applied: null,
           reply:
-            "There's no open list to add to on this event — its options are fixed.",
+            "There's no open list to add to on this event: its options are fixed.",
         };
       }
       await addOption(event, user, { dimensionId, startsAt, label }, "organizer");
@@ -526,7 +526,7 @@ export async function runEventChatTurn(opts: {
       if (outcome.reply) reply = outcome.reply;
       if (outcome.notice) notices.push(outcome.notice);
     } catch (error) {
-      // A rejected write is normal (closed event, bad id) — tell the person
+      // A rejected write is normal (closed event, bad id): tell the person
       // rather than failing the turn.
       reply =
         reply ??

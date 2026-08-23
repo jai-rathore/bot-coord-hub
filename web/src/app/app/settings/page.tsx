@@ -91,8 +91,8 @@ export default async function SettingsPage({
           Your agent
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-          {DEFAULT_SAGE_NAME} came with your account and works only for you —
-          on your events, with your permissions. Call it something else if you
+          {DEFAULT_SAGE_NAME} came with your account and works only for you, on
+          your plans and with your permissions. Call it something else if you
           like.
         </p>
         <div className="mt-5 max-w-md">

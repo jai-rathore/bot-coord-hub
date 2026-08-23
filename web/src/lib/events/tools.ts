@@ -3,7 +3,7 @@
  *
  * Authorization is enforced here and in turn.ts against the caller's real
  * role, before any write. A model that emits an organizer-only tool inside a
- * participant turn gets a rejected call and a logged anomaly — the prompt is
+ * participant turn gets a rejected call and a logged anomaly: the prompt is
  * never what stops it.
  */
 
@@ -30,7 +30,7 @@ export const ORGANIZER_TOOLS = [
   "reply",
 ] as const;
 
-/** Tools no agent may ever call — they are the human's own buttons. */
+/** Tools no agent may ever call: they are the human's own buttons. */
 export const HUMAN_ONLY_ACTIONS = [
   "lock_event",
   "cancel_event",
@@ -64,14 +64,14 @@ const REPLY: LlmToolDef = {
  * The note tools, shared by both roles.
  *
  * `audience` is deliberately plain English rather than the stored
- * `visibility` value — the model picks who should read it, and the server
+ * `visibility` value: the model picks who should read it, and the server
  * decides what that means on this board (a non-open event keeps every note
  * for the organizer, whatever was asked for).
  */
 const POST_NOTE: LlmToolDef = {
   name: "post_note",
   description:
-    "Add a note to the event so it is not lost in this conversation. Use it when the person gives a reason, a constraint, or anything the others should know — \"can't do Friday, intern lunch\". Set audience to 'everyone' to put it on the event board, or 'organizer' to send it to the organizer alone.",
+    "Add a note to the event so it is not lost in this conversation. Use it when the person gives a reason, a constraint, or anything the others should know: \"can't do Friday, intern lunch\". Set audience to 'everyone' to put it on the event board, or 'organizer' to send it to the organizer alone.",
   parameters: {
     type: "object",
     properties: {

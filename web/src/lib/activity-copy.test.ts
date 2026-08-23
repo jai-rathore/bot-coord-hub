@@ -124,7 +124,7 @@ test("activity messages hide technical kinds and collapse duplicates", () => {
   );
   assert.equal(
     messageToPlainEnglish("avail.offer", {}),
-    "Shared available times (busy times only — no event titles).",
+    "Shared available times (busy times only: no event titles).",
   );
   assert.doesNotMatch(messageToPlainEnglish("mystery.kind", {}), /Event:/);
   const collapsed = collapseActivityMessages([
@@ -136,7 +136,7 @@ test("activity messages hide technical kinds and collapse duplicates", () => {
       kind: "avail.offer",
       body: {},
       createdAt: "2026-08-12T22:16:00.000Z",
-      plainEnglish: "Shared available times (busy times only — no event titles).",
+      plainEnglish: "Shared available times (busy times only: no event titles).",
     },
     {
       id: "2",
@@ -146,7 +146,7 @@ test("activity messages hide technical kinds and collapse duplicates", () => {
       kind: "avail.offer",
       body: {},
       createdAt: "2026-08-12T22:16:01.000Z",
-      plainEnglish: "Shared available times (busy times only — no event titles).",
+      plainEnglish: "Shared available times (busy times only: no event titles).",
     },
   ]);
   assert.equal(collapsed.length, 1);
