@@ -17,9 +17,14 @@ function createClient() {
     );
   }
   const { url: connectionUrl, ssl } = postgresConnectionOptions(url);
+  const configuredMax = Number(process.env.DB_POOL_MAX ?? 10);
+  const poolMax =
+    Number.isInteger(configuredMax) && configuredMax > 0
+      ? Math.min(configuredMax, 50)
+      : 10;
   return postgres(connectionUrl, {
     prepare: false,
-    max: 10,
+    max: poolMax,
     ...(ssl ? { ssl } : {}),
   });
 }
@@ -45,6 +50,14 @@ export function getDb() {
     globalForDb.drizzleDb = buildDb(globalForDb.pgClient);
   }
   return globalForDb.drizzleDb;
+}
+
+/** Close long-lived database connections during worker shutdown. */
+export async function closeDb() {
+  const client = globalForDb.pgClient;
+  globalForDb.drizzleDb = undefined;
+  globalForDb.pgClient = undefined;
+  if (client) await client.end({ timeout: 5 });
 }
 
 export type Db = ReturnType<typeof getDb>;

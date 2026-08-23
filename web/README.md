@@ -34,6 +34,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
 | `CLERK_SECRET_KEY` | Clerk secret key |
 | `DATABASE_URL` | Postgres connection string |
+| `ENABLE_SAGE_JOBS` | Production gate for durable hosted Sage tasks |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Optional, default `/sign-in` |
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Optional, default `/sign-up` |
 | `RESEND_API_KEY` | Event notification email. Without it, email outbox rows stay queued. |
@@ -60,6 +61,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run test:e2e-api` | Bearer API smoke against a running server |
 | `npm run test:e2e-platform` | Pairing + guest + A2A integration smoke |
 | `npm run events:tick` | Lock/expire events and drain the outbox (needs Resend and/or Twilio to send) |
+| `npm run sage:worker` | Run the durable hosted Sage queue consumer |
 | `npm run email:test -- you@example.com` | Send one Resend test email |
 | `npm run sms:test -- +15551234567` | Send one Twilio test text |
 
@@ -81,6 +83,8 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/join/[token]` | Public / signed-in request | Signed, reusable public connection invitation |
 | `/app/**` | Clerk protected | Dashboard shell |
 | `/app/tasks` | Auth | Task history + request a new task type |
+| `/app/agent` | Auth | Ask Sage to schedule and choose the primary operator |
+| `/app/discovery` | Auth | Approve discovery profiles and ask Sage to search anonymously |
 | `/app/people` | Auth | Private invites, public links/QRs, approvals, and revocation |
 | `/app/attention` | Auth | Human-only approvals |
 | `/app/activity` | Auth | Session list + plain-English messages (raw JSON toggle) |
@@ -131,6 +135,15 @@ Documented flow: [`docs/SCHEDULE_MEETING.md`](./docs/SCHEDULE_MEETING.md).
 `POST /api/v1/schedule` → free/busy propose → human approval → book on all approvals via per-user **Google** with Meet. MockCalendar is local-only; production fails closed. Supports `peerEmails` for groups. Each principal owns their own relationship policy.
 
 Humans connect Google at `/app/settings` (`GOOGLE_CALENDAR_ENABLED`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`).
+
+## Hosted Sage
+
+Architecture and rollout plan: [`docs/SAGE_PARITY.md`](./docs/SAGE_PARITY.md).
+
+The web process validates and enqueues Sage requests; `npm run sage:worker`
+claims them from Postgres with leases and retries. Sage and connected agents use
+the same capability definitions and domain services. Scheduling and discovery
+remain human-gated at booking and introduction boundaries.
 
 ## hiring_compatibility
 
@@ -183,6 +196,8 @@ Optional: keep the existing hub (`src/`) as a separate Render service until the 
 - `calendar_connections` — per-user encrypted Google OAuth tokens
 - `guest_tasks` / `guest_responses` — invitation-scoped no-account participation
 - `agent_pairings` — expiring, browser-approved agent connections
+- `agent_operator_preferences` — Sage/connected-agent arbitration per user
+- `sage_jobs` / `sage_runs` / `sage_steps` — durable hosted-agent work and redacted execution audit
 
 Agent and guest surfaces are rate-limited. Intent triage worker:
 `POST /api/v1/intents/triage` with `TRIAGE_SECRET`. Only configured admins can

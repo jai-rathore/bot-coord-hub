@@ -29,7 +29,8 @@ import {
   updateLinkPolicyForUser,
 } from "@/lib/links";
 import { listPeopleMetThroughEvents } from "@/lib/people";
-import { runScheduleMeeting } from "@/lib/schedule-meeting";
+import { agentActor } from "@/lib/actor";
+import { executeCoordinationCapability } from "@/lib/coordination-capabilities";
 import type { AllowedHours } from "@/db/schema";
 import { writeAudit } from "@/lib/audit";
 import { assertAgentScope, hasAgentScope } from "@/lib/scopes";
@@ -78,7 +79,6 @@ import {
   listDiscoveryCatalog,
   listDiscoveryInterests,
   requestDiscoveryIntroduction,
-  searchDiscovery,
   submitDiscoveryEnrollment,
   upsertAgentCapabilityManifest,
   type CoarseLocationInput,
@@ -852,15 +852,14 @@ export async function searchDiscoveryCandidates(
   if (!intentSlug) throw new AgentApiError(400, "intentSlug is required");
   return {
     ok: true,
-    ...(await searchDiscovery({
-      actor: {
-        user: auth.user,
-        kind: "agent",
-        apiKeyId: auth.apiKey.id,
+    ...(await executeCoordinationCapability(
+      "discovery_search",
+      { actor: agentActor(auth) },
+      {
+        intentSlug,
+        limit: typeof body.limit === "number" ? body.limit : undefined,
       },
-      intentSlug,
-      limit: typeof body.limit === "number" ? body.limit : undefined,
-    })),
+    )),
   };
 }
 
@@ -1049,10 +1048,11 @@ export async function requestScheduleMeeting(
 ) {
   assertAgentScope(auth, "tasks:write");
   try {
-    return await runScheduleMeeting(auth.user, body, {
-      apiKeyId: auth.apiKey.id,
-      kind: "agent",
-    });
+    return await executeCoordinationCapability(
+      "schedule_meeting",
+      { actor: agentActor(auth) },
+      body,
+    );
   } catch (err) {
     rethrowAsAgentError(err);
   }

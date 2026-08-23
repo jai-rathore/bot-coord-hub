@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   LocationAutocomplete,
   type CanonicalLocationSuggestion,
@@ -80,6 +80,20 @@ type AuditItem = {
   createdAt: string;
 };
 
+type SageCandidate = {
+  candidateHandle: string;
+  compatibility: Record<string, unknown>;
+  untrustedParticipantData: Record<string, unknown>;
+  expiresAt: string;
+};
+
+type SageDiscoveryJob = {
+  id: string;
+  state: string;
+  result?: Record<string, unknown> | null;
+  lastError?: string | null;
+};
+
 async function discoveryAction(body: Record<string, unknown>) {
   const response = await fetch("/api/discovery", {
     method: "POST",
@@ -98,6 +112,17 @@ function sensitivityLabel(value: Question["sensitivity"]) {
   if (value === "private") return "Private match only";
   if (value === "disclose_after_match") return "After mutual approval";
   return "Anonymous discovery card";
+}
+
+function candidatesFromJob(job: SageDiscoveryJob): SageCandidate[] {
+  const candidates = job.result?.candidates;
+  if (!Array.isArray(candidates)) return [];
+  return candidates.filter(
+    (candidate): candidate is SageCandidate =>
+      Boolean(candidate) &&
+      typeof candidate === "object" &&
+      typeof (candidate as SageCandidate).candidateHandle === "string",
+  );
 }
 
 function QuestionInput({
@@ -192,6 +217,8 @@ export function DiscoveryManager({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sageJob, setSageJob] = useState<SageDiscoveryJob | null>(null);
+  const [sageCandidates, setSageCandidates] = useState<SageCandidate[]>([]);
   const router = useRouter();
   const [, startTransition] = useTransition();
   const selected = useMemo(
@@ -199,11 +226,134 @@ export function DiscoveryManager({
     [intents, selectedSlug],
   );
 
+  useEffect(() => {
+    if (!selectedSlug) return;
+    let cancelled = false;
+    void fetch("/api/sage/jobs", { cache: "no-store" })
+      .then(async (response) =>
+        response.ok
+          ? ((await response.json()) as { jobs?: SageDiscoveryJob[] })
+          : {},
+      )
+      .then((data) => {
+        if (cancelled) return;
+        const latest = data.jobs?.find(
+          (job) =>
+            job.state === "completed" &&
+            job.result?.intentSlug === selectedSlug &&
+            Array.isArray(job.result?.candidates),
+        );
+        if (!latest) return;
+        setSageJob(latest);
+        setSageCandidates(
+          candidatesFromJob(latest).filter(
+            (candidate) => new Date(candidate.expiresAt).getTime() > Date.now(),
+          ),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSlug]);
+
   function refresh() {
     // Was window.location.reload(). That re-downloaded the document and all of
     // the JS, re-initialised Clerk, re-ran the app shell's queries, and wiped
     // the success message set just above before anyone could read it.
     startTransition(() => router.refresh());
+  }
+
+  async function pollSageDiscovery(jobId: string) {
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+      const response = await fetch("/api/sage/jobs", { cache: "no-store" });
+      if (!response.ok) return;
+      const data = (await response.json()) as { jobs?: SageDiscoveryJob[] };
+      const next = data.jobs?.find((job) => job.id === jobId);
+      if (!next) return;
+      setSageJob(next);
+      if (next.state === "completed") {
+        const candidates = candidatesFromJob(next);
+        setSageCandidates(candidates);
+        setMessage(
+          candidates.length
+            ? `Sage found ${candidates.length} anonymous ${candidates.length === 1 ? "possibility" : "possibilities"}. You decide whether to request an introduction.`
+            : "Sage did not find a new compatible possibility in this scan.",
+        );
+        return;
+      }
+      if (["failed", "dead_letter"].includes(next.state)) {
+        setError(next.lastError ?? "Sage could not finish this search.");
+        return;
+      }
+    }
+  }
+
+  async function askSageToSearch() {
+    if (!selected) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    setSageCandidates([]);
+    try {
+      const response = await fetch("/api/sage/jobs", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          capability: "discovery_search",
+          payload: {
+            intentSlug: selected.slug,
+            limit: selected.discovery.pageLimit,
+          },
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        job?: SageDiscoveryJob;
+      };
+      if (!response.ok || !data.job) {
+        throw new Error(data.error ?? "Sage could not start this search");
+      }
+      setSageJob(data.job);
+      setMessage("Sage is checking anonymous, privacy-safe possibilities.");
+      void pollSageDiscovery(data.job.id);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "Search failed",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function requestSageIntroduction(candidateHandle: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await discoveryAction({
+        action: "request_introduction",
+        candidateHandle,
+        idempotencyKey: crypto.randomUUID(),
+      });
+      setSageCandidates((current) =>
+        current.filter(
+          (candidate) => candidate.candidateHandle !== candidateHandle,
+        ),
+      );
+      setMessage(
+        "Interest recorded. The other participant remains anonymous until they approve.",
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "Request failed",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submitEnrollment() {
@@ -407,6 +557,8 @@ export function DiscoveryManager({
                   setLocationValues({});
                   setCoarseLocation([]);
                   setClearFields(new Set());
+                  setSageJob(null);
+                  setSageCandidates([]);
                   setMessage(null);
                   setError(null);
                 }}
@@ -680,6 +832,80 @@ export function DiscoveryManager({
                   </button>
                 ) : null}
               </div>
+
+              {selected.currentEnrollment.status === "active" ? (
+                <section className="mt-8 border-t border-line pt-6" aria-labelledby="sage-discovery-title">
+                  <h3
+                    id="sage-discovery-title"
+                    className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep"
+                  >
+                    Let Sage search
+                  </h3>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+                    Sage uses the enrollment you approved. Results stay anonymous,
+                    private answers remain hidden, and Sage cannot request an
+                    introduction without you.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={busy || ["pending", "running"].includes(sageJob?.state ?? "")}
+                    onClick={askSageToSearch}
+                    className="mt-4 rounded-xl bg-matcha-deep px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {["pending", "running"].includes(sageJob?.state ?? "")
+                      ? "Sage is searching…"
+                      : "Ask Sage to find possibilities"}
+                  </button>
+
+                  {sageCandidates.length ? (
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      {sageCandidates.map((candidate) => (
+                        <article
+                          key={candidate.candidateHandle}
+                          className="rounded-2xl border border-line bg-white/70 p-4"
+                        >
+                          <p className="text-sm font-semibold text-ink">
+                            Anonymous possibility
+                          </p>
+                          {Object.keys(candidate.untrustedParticipantData).length ? (
+                            <dl className="mt-3 space-y-2 text-sm">
+                              {Object.entries(candidate.untrustedParticipantData).map(
+                                ([key, value]) => (
+                                  <div key={key}>
+                                    <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+                                      {key.replaceAll("_", " ")}
+                                    </dt>
+                                    <dd className="mt-0.5 text-ink">
+                                      {Array.isArray(value)
+                                        ? value.join(", ")
+                                        : String(value)}
+                                    </dd>
+                                  </div>
+                                ),
+                              )}
+                            </dl>
+                          ) : (
+                            <p className="mt-2 text-sm text-muted">
+                              Private constraints show potential compatibility;
+                              no identifying details are available.
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              requestSageIntroduction(candidate.candidateHandle)
+                            }
+                            className="mt-4 rounded-lg border border-matcha px-3 py-2 text-xs font-semibold text-matcha disabled:opacity-50"
+                          >
+                            Request introduction
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
             </div>
           ) : (
             <p className="mt-5 text-sm text-muted">

@@ -47,7 +47,7 @@ export type GuestTaskType =
 
 export type GuestTaskActor = {
   apiKeyId?: string | null;
-  kind?: "user" | "agent";
+  kind?: "user" | "agent" | "hosted_agent";
 };
 
 const TASK_TYPES = new Set<GuestTaskType>([
