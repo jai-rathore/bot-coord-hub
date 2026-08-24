@@ -1,6 +1,7 @@
 import { ActivityBoard } from "@/components/activity-board";
 import { MultiPartyActivity } from "@/components/multi-party-activity";
 import { PageHeading } from "@/components/page-heading";
+import { SageStreamReview } from "@/components/sage-stream-review";
 import { listSessionsForUser } from "@/lib/sessions";
 import { ensureCurrentUser } from "@/lib/users";
 
@@ -40,6 +41,10 @@ export default async function ActivityPage({
         </p>
       ) : (
         <div className="mt-9 space-y-12">
+          <div className="space-y-3">
+            <SageStreamReview stream="activity" />
+            <SageStreamReview stream="guests" />
+          </div>
           <ActivityBoard
             initialSessions={sessions}
             initialSelectedId={session ?? null}

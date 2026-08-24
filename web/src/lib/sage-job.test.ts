@@ -112,7 +112,7 @@ test("Sage publishes conversational discovery and human-gated handoffs", () => {
   const capabilities = new Map(
     listSageCapabilities().map((capability) => [capability.name, capability]),
   );
-  assert.equal(capabilities.size, 5);
+  assert.equal(capabilities.size, 10);
   assert.equal(capabilities.get("discovery_intake")?.humanApproval, "never");
   assert.equal(
     capabilities.get("discovery_prepare_enrollment")?.humanApproval,
@@ -121,6 +121,179 @@ test("Sage publishes conversational discovery and human-gated handoffs", () => {
   assert.equal(
     capabilities.get("discovery_stage_introduction")?.humanApproval,
     "always",
+  );
+});
+
+test("Sage publishes bounded outcome capabilities for every remaining stream", () => {
+  const capabilities = new Map(
+    listSageCapabilities().map((capability) => [capability.name, capability]),
+  );
+  assert.equal(capabilities.get("coordinate_event")?.humanApproval, "policy");
+  assert.equal(capabilities.get("run_guest_request")?.humanApproval, "policy");
+  assert.equal(capabilities.get("manage_connections")?.humanApproval, "policy");
+  assert.equal(capabilities.get("review_activity")?.humanApproval, "never");
+  assert.equal(capabilities.get("event_chat")?.humanApproval, "policy");
+});
+
+test("event chat allowlists private input and redacts the model prompt", () => {
+  const capability = getSageCapability("event_chat");
+  const parsed = capability.parseInput({
+    eventId: "event-1",
+    message: "Private scheduling constraints",
+    role: "organizer",
+    ignored: "drop this",
+  });
+  assert.deepEqual(parsed, {
+    eventId: "event-1",
+    message: "Private scheduling constraints",
+  });
+  assert.deepEqual(capability.redactInput(parsed), {
+    eventId: "event-1",
+    messageLength: 30,
+  });
+  assert.equal(
+    JSON.stringify(capability.redactInput(parsed)).includes("constraints"),
+    false,
+  );
+});
+
+test("event creation is strictly parsed and operationally redacted", () => {
+  const capability = getSageCapability("coordinate_event");
+  const parsed = capability.parseInput({
+    action: "create",
+    title: "Sunday picnic",
+    description: "Private organizer context",
+    fixedStartsAt: "2026-09-06T19:00:00.000Z",
+    place: "Lake Merritt",
+    ignored: "must not cross the boundary",
+  });
+  assert.equal("ignored" in parsed, false);
+  assert.deepEqual(capability.redactInput(parsed), {
+    action: "create",
+    archived: null,
+    limit: null,
+    hasEventRef: false,
+    hasTitle: true,
+    hasDescription: true,
+    slotCount: 0,
+    hasFixedTime: true,
+    hasPlace: true,
+    hasDimensionId: false,
+    responseCount: 0,
+    hasAttendance: false,
+    hasNote: false,
+    noteAudience: null,
+    hasDeadline: false,
+  });
+  assert.equal(
+    JSON.stringify(capability.redactInput(parsed)).includes("Private"),
+    false,
+  );
+});
+
+test("event lifecycle actions accept only explicit typed human values", () => {
+  const capability = getSageCapability("coordinate_event");
+  assert.deepEqual(
+    capability.parseInput({
+      action: "respond",
+      eventRef: "event-link",
+      entries: [{ optionId: "option-1", value: "yes" }],
+      privateProse: "drop this",
+    }),
+    {
+      action: "respond",
+      eventRef: "event-link",
+      origin: undefined,
+      entries: [{ optionId: "option-1", value: "yes" }],
+      attendance: undefined,
+    },
+  );
+  assert.deepEqual(
+    capability.parseInput({
+      action: "post_note",
+      eventRef: "event-link",
+      body: "I can arrive after six.",
+      audience: "organizer",
+    }),
+    {
+      action: "post_note",
+      eventRef: "event-link",
+      origin: undefined,
+      body: "I can arrive after six.",
+      audience: "organizer",
+      optionId: undefined,
+    },
+  );
+  assert.throws(() =>
+    capability.parseInput({
+      action: "respond",
+      eventRef: "event-link",
+      entries: [{ optionId: "option-1", value: "probably" }],
+    }),
+  );
+});
+
+test("human-only event actions are absent from the Sage capability", () => {
+  const capability = getSageCapability("coordinate_event");
+  for (const action of ["lock", "cancel", "confirm", "book"]) {
+    assert.throws(
+      () => capability.parseInput({ action }),
+      (error: unknown) => error instanceof SageCapabilityError,
+    );
+  }
+});
+
+test("guest, people, and activity capabilities expose only their bounded actions", () => {
+  const guest = getSageCapability("run_guest_request");
+  assert.deepEqual(guest.parseInput({ action: "review", publicId: "task-1" }), {
+    action: "review",
+    publicId: "task-1",
+  });
+  const guestCreate = guest.parseInput({
+    action: "create",
+    taskType: "hiring_compatibility",
+    title: "Product engineer",
+    targetEmail: "candidate@example.com",
+    privateConfig: { compensationMaximum: 200_000 },
+    rawCandidateAnswer: "must be dropped",
+  });
+  assert.equal("rawCandidateAnswer" in guestCreate, false);
+  assert.equal(
+    JSON.stringify(guest.redactInput(guestCreate)).includes("candidate@example.com"),
+    false,
+  );
+
+  const people = getSageCapability("manage_connections");
+  assert.deepEqual(people.parseInput({ action: "review", secret: "drop" }), {
+    action: "review",
+    origin: undefined,
+  });
+  assert.deepEqual(
+    people.parseInput({
+      action: "create_invite",
+      toEmail: "friend@example.com",
+      toName: "Friend",
+    }),
+    {
+      action: "create_invite",
+      toEmail: "friend@example.com",
+      toName: "Friend",
+      confirmRequired: true,
+      expiresInHours: 168,
+      origin: undefined,
+    },
+  );
+  assert.throws(() => people.parseInput({ action: "approve" }));
+
+  const activity = getSageCapability("review_activity");
+  assert.deepEqual(activity.parseInput({ pendingOnly: true, limit: 8, x: 1 }), {
+    action: "overview",
+    pendingOnly: true,
+    limit: 8,
+  });
+  assert.deepEqual(
+    activity.parseInput({ action: "session", sessionId: "session-1" }),
+    { action: "session", sessionId: "session-1" },
   );
 });
 

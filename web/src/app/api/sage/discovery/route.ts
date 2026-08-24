@@ -162,6 +162,7 @@ export async function POST(request: Request) {
         capability: capability.name,
         trigger: "user_request",
         payload,
+        redactedPayload: capability.redactInput(payload),
         idempotencyKey,
       });
       return Response.json(

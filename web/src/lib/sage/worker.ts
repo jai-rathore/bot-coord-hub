@@ -10,6 +10,7 @@ import {
 import {
   claimNextSageJob,
   completeSageStep,
+  executionPayloadForSageJob,
   extendSageJobLease,
   failSageJob,
   failSageStep,
@@ -57,7 +58,7 @@ export async function processNextSageJob(input: {
     if (!user) throw new SageCapabilityError("Sage job owner no longer exists");
 
     const capability = getSageCapability(job.capability);
-    const parsedInput = capability.parseInput(job.payload);
+    const parsedInput = capability.parseInput(executionPayloadForSageJob(job));
     const step = await startSageStep({
       runId: run.id,
       capability: capability.name,
@@ -92,12 +93,14 @@ export async function processNextSageJob(input: {
     if (outcome.telemetry) {
       await recordSageRunTelemetry(run.id, outcome.telemetry);
     }
-    await completeSageStep(step.id, outcome.result);
+    const redactedResult = capability.redactOutput(outcome.result);
+    await completeSageStep(step.id, redactedResult);
     await finishSageJob({
       job,
       run,
       state: outcome.state,
       result: outcome.result,
+      redactedResult,
       startedAtMs,
     });
     await writeAudit({

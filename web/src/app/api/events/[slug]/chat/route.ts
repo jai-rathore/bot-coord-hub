@@ -1,10 +1,19 @@
 import { ensureCurrentUser } from "@/lib/users";
 import { jsonError } from "@/lib/http";
 import { eventBySlug, participantFor } from "@/lib/events/access";
-import { joinEvent } from "@/lib/events/service";
-import { loadThread, runEventChatTurn } from "@/lib/events/turn";
+import { loadThread } from "@/lib/events/turn";
 import { hostedAgentAvailable } from "@/lib/llm";
 import { rateLimit, rateLimitedJson } from "@/lib/rate-limit";
+import {
+  getSageCapability,
+  SageCapabilityError,
+} from "@/lib/sage/capabilities";
+import {
+  enqueueSageJob,
+  ownerResultForSageJob,
+} from "@/lib/sage/job-store";
+import { sageJobsFeatureEnabled } from "@/lib/sage-feature";
+import { boundedText } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +38,8 @@ export async function GET(
         : [];
 
     return Response.json({
-      available: hostedAgentAvailable() && event.allowChat,
+      available:
+        sageJobsFeatureEnabled() && hostedAgentAvailable() && event.allowChat,
       agentName: event.agentName,
       messages,
     });
@@ -51,6 +61,12 @@ export async function POST(
         { status: 401 },
       );
     }
+    if (!sageJobsFeatureEnabled() || !hostedAgentAvailable()) {
+      return Response.json(
+        { error: "The assistant is unavailable right now." },
+        { status: 503 },
+      );
+    }
 
     // 1 turn / 3s, and 30/hour, per user.
     const burst = rateLimit(`event:chat:burst:${user.id}`, 1, 3_000);
@@ -59,36 +75,49 @@ export async function POST(
     if (!hourly.ok) return rateLimitedJson(hourly);
 
     const event = await eventBySlug(slug);
-    const isOrganizer = event.organizerUserId === user.id;
 
-    let body: { message?: string } = {};
+    let body: { message?: string; idempotencyKey?: string } = {};
     try {
       body = await request.json();
     } catch {
       // Guardrails report the empty message.
     }
 
-    const participant = isOrganizer
-      ? await participantFor(event, user)
-      : ((await participantFor(event, user)) ?? (await joinEvent(event, user)));
-
-    const result = await runEventChatTurn({
-      event,
-      user,
-      participant,
-      role: isOrganizer ? "organizer" : "participant",
+    const idempotencyKey = boundedText(
+      body.idempotencyKey ?? request.headers.get("idempotency-key"),
+      "idempotencyKey",
+      160,
+      { required: true },
+    );
+    const capability = getSageCapability("event_chat");
+    const payload = capability.parseInput({
+      eventId: event.id,
       message: body.message ?? "",
     });
-
-    return Response.json({
-      reply: result.reply,
-      board: result.board,
-      applied: result.applied,
-      turnsRemaining: Number.isFinite(result.turnsRemaining)
-        ? result.turnsRemaining
-        : null,
+    const queued = await enqueueSageJob({
+      user,
+      capability: capability.name,
+      trigger: "user_request",
+      payload,
+      redactedPayload: capability.redactInput(payload),
+      idempotencyKey,
     });
+
+    return Response.json(
+      {
+        job: {
+          id: queued.job.id,
+          state: queued.job.state,
+          result: ownerResultForSageJob(queued.job),
+        },
+        created: queued.created,
+      },
+      { status: queued.created ? 201 : 200 },
+    );
   } catch (err) {
+    if (err instanceof SageCapabilityError) {
+      return Response.json({ error: err.message }, { status: 400 });
+    }
     return jsonError(err, "The assistant could not respond");
   }
 }

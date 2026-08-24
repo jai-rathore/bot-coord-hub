@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { createHash, randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
 import { getDb } from "../src/db";
-import { apiKeys, users } from "../src/db/schema";
+import { apiKeys, guestTasks, sageJobs, users } from "../src/db/schema";
+import { createGuestTask } from "../src/lib/guest-tasks";
 import {
   acceptInviteLink,
   approveConnectionRequest,
@@ -24,7 +25,9 @@ import { DEFAULT_AGENT_SCOPES } from "../src/lib/scopes";
 import {
   claimNextSageJob,
   enqueueSageJob,
+  executionPayloadForSageJob,
   finishSageJob,
+  ownerResultForSageJob,
 } from "../src/lib/sage/job-store";
 import {
   enqueueSageDiscoveryMessage,
@@ -91,11 +94,19 @@ async function main() {
     scopes: DEFAULT_AGENT_SCOPES,
   });
 
+  const privateQueueValue = `private-sage-input-${suffix}`;
   const queuedSageJob = await enqueueSageJob({
     user: alice,
     capability: "discovery_search",
     trigger: "user_request",
-    payload: { intentSlug: "dating_introduction" },
+    payload: {
+      intentSlug: "dating_introduction",
+      privateContext: privateQueueValue,
+    },
+    redactedPayload: {
+      intentSlug: "dating_introduction",
+      hasPrivateContext: true,
+    },
     runAt: new Date(0),
   });
   const claimedSageJob = await claimNextSageJob({
@@ -105,13 +116,38 @@ async function main() {
   if (claimedSageJob?.job.id !== queuedSageJob.job.id) {
     throw new Error("Sage worker must claim an eligible queued job");
   }
+  assert.equal(
+    JSON.stringify(claimedSageJob.job.payload).includes(privateQueueValue),
+    false,
+    "operational queue payload must be redacted",
+  );
+  assert.match(claimedSageJob.job.payloadEncrypted ?? "", /^enc:v1:/);
+  assert.equal(
+    executionPayloadForSageJob(claimedSageJob.job).privateContext,
+    privateQueueValue,
+  );
+  const privateResultValue = `private-sage-result-${suffix}`;
   await finishSageJob({
     job: claimedSageJob.job,
     run: claimedSageJob.run,
     state: "completed",
-    result: { e2e: true },
+    result: { e2e: true, privateSummary: privateResultValue },
+    redactedResult: { e2e: true },
     startedAtMs: Date.now(),
   });
+  const [finishedSageJob] = await db
+    .select()
+    .from(sageJobs)
+    .where(eq(sageJobs.id, queuedSageJob.job.id));
+  assert.equal(
+    JSON.stringify(finishedSageJob.result).includes(privateResultValue),
+    false,
+    "operational queue result must be redacted",
+  );
+  assert.equal(
+    ownerResultForSageJob(finishedSageJob)?.privateSummary,
+    privateResultValue,
+  );
 
   const privateDiscoveryMessage = `I am looking for a private match ${suffix}`;
   const queuedDiscoveryTurn = await enqueueSageDiscoveryMessage({
@@ -138,6 +174,32 @@ async function main() {
   }
 
   const origin = "http://localhost:3000";
+  const guestReplayKey = `sage-guest-${suffix}`;
+  const guestRequest = {
+    organizer: alice,
+    taskType: "hiring_compatibility",
+    title: `Engineer ${suffix}`,
+    targetEmail: eve.email,
+    privateConfig: { compensationMaximum: 200_000 },
+    origin,
+    actor: { kind: "hosted_agent" as const },
+    idempotencyKey: guestReplayKey,
+  };
+  const firstGuest = await createGuestTask(guestRequest);
+  const replayedGuest = await createGuestTask(guestRequest);
+  assert.equal(replayedGuest.task.publicId, firstGuest.task.publicId);
+  assert.equal(replayedGuest.guestUrl, firstGuest.guestUrl);
+  const [storedGuest] = await db
+    .select()
+    .from(guestTasks)
+    .where(eq(guestTasks.publicId, firstGuest.task.publicId));
+  assert.match(storedGuest.tokenEncrypted ?? "", /^enc:v1:/);
+  assert.equal(
+    JSON.stringify(storedGuest).includes(firstGuest.rawToken),
+    false,
+    "guest token must never be persisted in plaintext",
+  );
+
   const capResults = await Promise.allSettled(
     Array.from({ length: 6 }, (_, index) =>
       createPublicInvite({

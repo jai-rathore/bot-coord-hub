@@ -22,6 +22,7 @@ import {
   type SageRun,
   type User,
 } from "@/db/schema";
+import { decryptJson, encryptJson } from "@/lib/secret-crypto";
 
 export type SageTrigger =
   | "user_request"
@@ -121,6 +122,7 @@ export async function enqueueSageJob(input: {
   capability: string;
   trigger: SageTrigger;
   payload: Record<string, unknown>;
+  redactedPayload?: Record<string, unknown>;
   idempotencyKey?: string | null;
   runAt?: Date;
   maxAttempts?: number;
@@ -134,7 +136,10 @@ export async function enqueueSageJob(input: {
     userId: input.user.id,
     capability: input.capability,
     trigger: input.trigger,
-    payload: input.payload,
+    payload: input.redactedPayload ?? input.payload,
+    payloadEncrypted: input.redactedPayload
+      ? encryptJson(input.payload)
+      : null,
     idempotencyKey: input.idempotencyKey ?? null,
     runAt: input.runAt ?? new Date(),
     maxAttempts: input.maxAttempts ?? 5,
@@ -174,6 +179,16 @@ export async function enqueueSageJob(input: {
     throw new Error("The Sage job could not be enqueued idempotently");
   }
   return { job: existing, created: false };
+}
+
+/** Decrypt the private execution input, while supporting jobs queued before encryption. */
+export function executionPayloadForSageJob(job: SageJob): Record<string, unknown> {
+  return job.payloadEncrypted ? decryptJson(job.payloadEncrypted) : job.payload;
+}
+
+/** Decrypt an owner-visible result, while supporting jobs completed before encryption. */
+export function ownerResultForSageJob(job: SageJob): Record<string, unknown> | null {
+  return job.resultEncrypted ? decryptJson(job.resultEncrypted) : job.result;
 }
 
 export async function listSageJobsForUser(userId: string, limit = 20) {
@@ -386,6 +401,7 @@ export async function finishSageJob(input: {
   run: SageRun;
   state: "waiting_human" | "completed";
   result: Record<string, unknown>;
+  redactedResult: Record<string, unknown>;
   startedAtMs: number;
 }) {
   const db = getDb();
@@ -403,7 +419,8 @@ export async function finishSageJob(input: {
       .update(sageJobs)
       .set({
         state: input.state,
-        result: input.result,
+        result: input.redactedResult,
+        resultEncrypted: encryptJson(input.result),
         workerId: null,
         leasedAt: null,
         leaseExpiresAt: null,

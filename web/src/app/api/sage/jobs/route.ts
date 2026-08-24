@@ -8,6 +8,7 @@ import {
 import {
   enqueueSageJob,
   listSageJobsForUser,
+  ownerResultForSageJob,
 } from "@/lib/sage/job-store";
 import { boundedText } from "@/lib/validation";
 import { sageJobsFeatureEnabled } from "@/lib/sage-feature";
@@ -21,7 +22,7 @@ function publicJob(job: Awaited<ReturnType<typeof listSageJobsForUser>>[number])
     trigger: job.trigger,
     state: job.state,
     attempts: job.attempts,
-    result: job.result,
+    result: ownerResultForSageJob(job),
     lastError:
       job.state === "failed" || job.state === "dead_letter"
         ? "Sage could not complete this task. Try again or contact support if it keeps happening."
@@ -89,7 +90,15 @@ export async function POST(request: Request) {
 
     const capability = getSageCapability(body.capability);
     const payload = capability.parseInput(body.payload as Record<string, unknown>);
-    if (capability.name === "schedule_meeting" && !payload.origin) {
+    if (
+      [
+        "schedule_meeting",
+        "coordinate_event",
+        "run_guest_request",
+        "manage_connections",
+      ].includes(capability.name) &&
+      !payload.origin
+    ) {
       payload.origin = process.env.NEXT_PUBLIC_APP_ORIGIN ?? new URL(request.url).origin;
     }
     const headerKey = request.headers.get("idempotency-key");
@@ -105,6 +114,7 @@ export async function POST(request: Request) {
       capability: capability.name,
       trigger: "user_request",
       payload,
+      redactedPayload: capability.redactInput(payload),
       idempotencyKey,
     });
 

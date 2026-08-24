@@ -13,6 +13,7 @@ import { getDb } from "@/db";
 import {
   guestResponses,
   guestTasks,
+  auditLogs,
   sessionMessages,
   type GuestTask,
   type User,
@@ -37,7 +38,7 @@ import {
   type CandidateConstraints,
   type RoleConstraints,
 } from "@/lib/hiring-match";
-import { encryptSecret } from "@/lib/secret-crypto";
+import { decryptSecret, encryptSecret } from "@/lib/secret-crypto";
 
 export type GuestTaskType =
   | "binary_choice"
@@ -229,7 +230,43 @@ export async function createGuestTask(opts: {
   sessionId?: unknown;
   origin: string;
   actor?: GuestTaskActor;
+  /** Stable replay key for a durable hosted-agent creation job. */
+  idempotencyKey?: unknown;
 }) {
+  const idempotencyKey = boundedText(
+    opts.idempotencyKey,
+    "idempotencyKey",
+    160,
+  ) ?? null;
+  const origin = opts.origin.replace(/\/$/, "");
+  if (idempotencyKey) {
+    const [existing] = await getDb()
+      .select()
+      .from(guestTasks)
+      .where(
+        and(
+          eq(guestTasks.organizerUserId, opts.organizer.id),
+          eq(guestTasks.idempotencyKey, idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      if (!existing.tokenEncrypted) {
+        throw new AgentApiError(
+          409,
+          "This guest request predates replay-safe links. Create a new request.",
+        );
+      }
+      const rawToken = decryptSecret(existing.tokenEncrypted);
+      return {
+        task: serializeTask(existing),
+        rawToken,
+        guestUrl: `${origin}/guest/${existing.publicId}#${rawToken}`,
+        warning:
+          "This private response link is shown only to you. Share it only with the recipient.",
+      };
+    }
+  }
   const taskType = normalizeTaskType(opts.taskType);
   const title = boundedText(
     opts.title,
@@ -307,44 +344,77 @@ export async function createGuestTask(opts: {
   }
 
   const { rawToken, tokenHash, tokenPrefix } = generateGuestToken();
-  const [created] = await db
-    .insert(guestTasks)
-    .values({
-      organizerUserId: opts.organizer.id,
-      taskType,
-      title,
-      description,
-      config,
-      privateConfig,
-      sessionId,
-      targetEmailHash: hashGuestEmail(targetEmail),
-      tokenHash,
-      tokenPrefix,
-      expiresAt: new Date(Date.now() + expiresInMinutes * 60_000),
-      maxResponses,
-    })
-    .returning();
-
-  await writeAudit({
-    actorUserId: opts.organizer.id,
-    actorApiKeyId: opts.actor?.apiKeyId ?? null,
-    actorKind: opts.actor?.kind ?? "user",
-    action: "guest_task.created",
-    entityType: "guest_task",
-    entityId: created.id,
-    metadata: {
-      publicId: created.publicId,
-      taskType,
-      expiresAt: created.expiresAt.toISOString(),
-    },
+  const created = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(guestTasks)
+      .values({
+        organizerUserId: opts.organizer.id,
+        taskType,
+        title,
+        description,
+        config,
+        privateConfig,
+        sessionId,
+        targetEmailHash: hashGuestEmail(targetEmail),
+        tokenHash,
+        tokenPrefix,
+        tokenEncrypted: idempotencyKey ? encryptSecret(rawToken) : null,
+        idempotencyKey,
+        expiresAt: new Date(Date.now() + expiresInMinutes * 60_000),
+        maxResponses,
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (!inserted && idempotencyKey) {
+      const [replayed] = await tx
+        .select()
+        .from(guestTasks)
+        .where(
+          and(
+            eq(guestTasks.organizerUserId, opts.organizer.id),
+            eq(guestTasks.idempotencyKey, idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (replayed) return replayed;
+    }
+    if (!inserted) {
+      throw new AgentApiError(500, "Could not create the guest request. Try again.");
+    }
+    await tx.insert(auditLogs).values({
+      actorUserId: opts.organizer.id,
+      actorApiKeyId: opts.actor?.apiKeyId ?? null,
+      actorKind: opts.actor?.kind ?? "user",
+      action: "guest_task.created",
+      entityType: "guest_task",
+      entityId: inserted.id,
+      metadata: {
+        publicId: inserted.publicId,
+        taskType,
+        expiresAt: inserted.expiresAt.toISOString(),
+      },
+    });
+    return inserted;
   });
-
-  const origin = opts.origin.replace(/\/$/, "");
+  const effectiveRawToken =
+    created.tokenHash === tokenHash
+      ? rawToken
+      : created.tokenEncrypted
+        ? decryptSecret(created.tokenEncrypted)
+        : null;
+  if (!effectiveRawToken) {
+    throw new AgentApiError(
+      409,
+      "This guest request could not be replayed safely. Create a new request.",
+    );
+  }
   return {
     task: serializeTask(created),
-    rawToken,
-    guestUrl: `${origin}/guest/${created.publicId}#${rawToken}`,
-    warning: "This private response link is shown once. Share it only with the recipient.",
+    rawToken: effectiveRawToken,
+    guestUrl: `${origin}/guest/${created.publicId}#${effectiveRawToken}`,
+    warning: idempotencyKey
+      ? "This private response link is shown only to you. Share it only with the recipient."
+      : "This private response link is shown once. Share it only with the recipient.",
   };
 }
 

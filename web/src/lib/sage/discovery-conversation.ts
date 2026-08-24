@@ -293,6 +293,11 @@ export async function enqueueSageDiscoveryMessage(input: {
       messageId: message.id,
       intentSlug: input.intentSlug,
     },
+    redactedPayload: {
+      threadId: thread.id,
+      messageId: message.id,
+      intentSlug: input.intentSlug,
+    },
     idempotencyKey: `discovery-intake:${message.id}`,
   });
   await db

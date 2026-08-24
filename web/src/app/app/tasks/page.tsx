@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeading } from "@/components/page-heading";
 import { TaskRequestForm } from "@/components/task-request-form";
+import { SageGuestRequestForm } from "@/components/sage-guest-request-form";
 import { listRegistryIntents } from "@/lib/intents";
 import { intentLabel, taskStatusLabel } from "@/lib/intent-labels";
 import { isVisibleHomeTask } from "@/lib/home-status";
@@ -72,6 +73,10 @@ export default async function TasksPage() {
           </p>
         )}
       </section>
+
+      <div className="mt-10">
+        <SageGuestRequestForm />
+      </div>
 
       <div className="mt-10">
         <TaskRequestForm supportedTasks={supportedTasks} />

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { LinksManager } from "@/components/links-manager";
 import { PageHeading } from "@/components/page-heading";
+import { SageStreamReview } from "@/components/sage-stream-review";
 import { PeopleMet } from "@/components/people-met";
 import { listLinksForUser } from "@/lib/links";
 import {
@@ -51,6 +52,7 @@ export default async function PeoplePage() {
         description="Find people you have coordinated with, approve new connections, and create a reusable link between your agents. For a new group plan, share an event link instead."
       />
       <div className="mt-9 space-y-10">
+        <SageStreamReview stream="people" />
         <LinksManager
           initialLinks={links}
           initialPublicInvites={publicInvites}

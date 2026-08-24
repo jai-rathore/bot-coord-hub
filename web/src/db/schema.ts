@@ -944,7 +944,8 @@ export const auditLogs = pgTable(
 
 /**
  * A no-account guest receives one scoped capability for one task.
- * Raw gt_ tokens are never persisted.
+ * Raw gt_ tokens are never persisted in plaintext. Durable Sage-created
+ * requests keep an encrypted copy so a worker replay can return the same link.
  */
 export const guestTasks = pgTable(
   "guest_tasks",
@@ -969,6 +970,8 @@ export const guestTasks = pgTable(
     status: guestTaskStatusEnum("status").notNull().default("open"),
     tokenHash: text("token_hash").notNull(),
     tokenPrefix: text("token_prefix").notNull(),
+    tokenEncrypted: text("token_encrypted"),
+    idempotencyKey: text("idempotency_key"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     maxResponses: integer("max_responses").notNull().default(1),
@@ -984,6 +987,9 @@ export const guestTasks = pgTable(
     uniqueIndex("guest_tasks_public_id_uidx").on(t.publicId),
     uniqueIndex("guest_tasks_token_hash_uidx").on(t.tokenHash),
     index("guest_tasks_organizer_idx").on(t.organizerUserId),
+    uniqueIndex("guest_tasks_organizer_idempotency_uidx")
+      .on(t.organizerUserId, t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} is not null`),
     index("guest_tasks_status_expires_idx").on(t.status, t.expiresAt),
   ],
 );
@@ -1321,6 +1327,8 @@ export const events = pgTable(
     allowChat: boolean("allow_chat").notNull().default(true),
     allowGuestOptions: boolean("allow_guest_options").notNull().default(true),
     outcome: jsonb("outcome").$type<Record<string, unknown>>().notNull().default({}),
+    /** Internal replay key used by durable operators; never exposed publicly. */
+    idempotencyKey: text("idempotency_key"),
     /**
      * Sage's rollup of the shared notes, written when a note changes rather
      * than when the page is read: the board is polled every few seconds by
@@ -1342,6 +1350,9 @@ export const events = pgTable(
     uniqueIndex("events_public_id_uidx").on(t.publicId),
     uniqueIndex("events_share_slug_uidx").on(t.shareSlug),
     index("events_organizer_idx").on(t.organizerUserId),
+    uniqueIndex("events_organizer_idempotency_uidx")
+      .on(t.organizerUserId, t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} is not null`),
     index("events_status_deadline_idx").on(t.status, t.deadlineAt),
     // listEvents sorts every page by created_at; there was no index on it.
     index("events_created_at_idx").on(t.createdAt),
@@ -1401,6 +1412,7 @@ export const eventOptions = pgTable(
     }),
     status: text("status").notNull().default("active"),
     position: integer("position").notNull().default(0),
+    idempotencyKey: text("idempotency_key"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -1408,6 +1420,9 @@ export const eventOptions = pgTable(
   (t) => [
     index("event_options_event_dim_idx").on(t.eventId, t.dimensionId, t.position),
     index("event_options_dimension_idx").on(t.dimensionId),
+    uniqueIndex("event_options_event_idempotency_uidx")
+      .on(t.eventId, t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} is not null`),
   ],
 );
 
@@ -1495,11 +1510,17 @@ export const eventActivity = pgTable(
     kind: text("kind").notNull(),
     summary: text("summary").notNull(),
     body: jsonb("body").$type<Record<string, unknown>>().notNull().default({}),
+    idempotencyKey: text("idempotency_key"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
-  (t) => [index("event_activity_event_created_idx").on(t.eventId, t.createdAt)],
+  (t) => [
+    index("event_activity_event_created_idx").on(t.eventId, t.createdAt),
+    uniqueIndex("event_activity_event_idempotency_uidx")
+      .on(t.eventId, t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} is not null`),
+  ],
 );
 
 export const eventMessages = pgTable(
@@ -1518,6 +1539,10 @@ export const eventMessages = pgTable(
     toolCalls: jsonb("tool_calls").$type<unknown[]>().notNull().default([]),
     tokensIn: integer("tokens_in").notNull().default(0),
     tokensOut: integer("tokens_out").notNull().default(0),
+    provider: text("provider"),
+    model: text("model"),
+    idempotencyKey: text("idempotency_key"),
+    turnCounted: boolean("turn_counted").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -1528,6 +1553,9 @@ export const eventMessages = pgTable(
       t.participantId,
       t.createdAt,
     ),
+    uniqueIndex("event_messages_event_idempotency_uidx")
+      .on(t.eventId, t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} is not null`),
   ],
 );
 
@@ -1561,6 +1589,7 @@ export const eventNotes = pgTable(
     visibility: text("visibility").notNull().default("everyone"),
     source: text("source").notNull().default("chat"),
     status: text("status").notNull().default("active"),
+    idempotencyKey: text("idempotency_key"),
     removedByUserId: uuid("removed_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -1575,6 +1604,9 @@ export const eventNotes = pgTable(
     index("event_notes_event_created_idx").on(t.eventId, t.createdAt),
     index("event_notes_event_status_idx").on(t.eventId, t.status),
     index("event_notes_author_idx").on(t.eventId, t.authorUserId),
+    uniqueIndex("event_notes_event_idempotency_uidx")
+      .on(t.eventId, t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} is not null`),
     check(
       "event_notes_visibility_check",
       sql`${t.visibility} in ('everyone', 'organizer')`,
@@ -1651,6 +1683,8 @@ export const sageJobs = pgTable(
     capability: text("capability").notNull(),
     trigger: text("trigger").notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    /** Encrypted execution input. `payload` contains operationally safe metadata only. */
+    payloadEncrypted: text("payload_encrypted"),
     idempotencyKey: text("idempotency_key"),
     state: sageJobStateEnum("state").notNull().default("pending"),
     runAt: timestamp("run_at", { withTimezone: true }).defaultNow().notNull(),
@@ -1660,6 +1694,8 @@ export const sageJobs = pgTable(
     leasedAt: timestamp("leased_at", { withTimezone: true }),
     leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
     result: jsonb("result").$type<Record<string, unknown>>(),
+    /** Encrypted owner-visible result. `result` contains operationally safe metadata only. */
+    resultEncrypted: text("result_encrypted"),
     lastError: text("last_error"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })

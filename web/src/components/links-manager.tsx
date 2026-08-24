@@ -7,6 +7,13 @@ import type { PublicInviteView } from "@/lib/public-invites";
 import { PublicInviteQr } from "@/components/public-invite-qr";
 import { AgentBadge } from "@/components/people-met";
 
+type SageInviteJob = {
+  id: string;
+  state: string;
+  result?: Record<string, unknown> | null;
+  lastError?: string | null;
+};
+
 export function LinksManager({
   initialLinks,
   initialPublicInvites,
@@ -32,6 +39,30 @@ export function LinksManager({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [acceptCode, setAcceptCode] = useState("");
 
+  function inviteFromJob(job: SageInviteJob): PublicLink | null {
+    const link = job.result?.link;
+    return link && typeof link === "object" && !Array.isArray(link)
+      ? (link as PublicLink)
+      : null;
+  }
+
+  async function waitForSageInvite(jobId: string) {
+    for (let attempt = 0; attempt < 45; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      const response = await fetch("/api/sage/jobs", { cache: "no-store" });
+      if (!response.ok) continue;
+      const data = (await response.json()) as { jobs?: SageInviteJob[] };
+      const job = data.jobs?.find((candidate) => candidate.id === jobId);
+      if (!job || ["pending", "running"].includes(job.state)) continue;
+      const link = inviteFromJob(job);
+      if (job.state === "completed" && link) return link;
+      throw new Error(job.lastError ?? "Sage could not create the invitation.");
+    }
+    throw new Error(
+      "The invitation is still being prepared. Check Activity before creating another one.",
+    );
+  }
+
   function createInvite(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -42,25 +73,40 @@ export function LinksManager({
     // request, not just what follows it.
     startTransition(async () => {
       try {
-        const res = await fetch("/api/links", {
+        const idempotencyKey = crypto.randomUUID();
+        const res = await fetch("/api/sage/jobs", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey,
+          },
           body: JSON.stringify({
-            toEmail: toEmail.trim() || undefined,
-            toName: toName.trim() || undefined,
+            capability: "manage_connections",
+            payload: {
+              action: "create_invite",
+              toEmail: toEmail.trim() || undefined,
+              toName: toName.trim() || undefined,
+            },
+            idempotencyKey,
           }),
         });
-        const data = await res.json();
-        if (!res.ok) {
-          setError(data.error ?? "Failed to create invite");
-          return;
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          job?: SageInviteJob;
+        };
+        if (!res.ok || !data.job) {
+          throw new Error(data.error ?? "Sage could not start the invitation.");
         }
-        setCreated(data.link);
+        const link =
+          inviteFromJob(data.job) ?? (await waitForSageInvite(data.job.id));
+        setCreated(link);
         setToEmail("");
         setToName("");
         router.refresh();
-      } catch {
-        setError("Failed to create invite");
+      } catch (caught) {
+        setError(
+          caught instanceof Error ? caught.message : "Failed to create invite",
+        );
       }
     });
   }
@@ -255,7 +301,7 @@ export function LinksManager({
             disabled={pending}
             className="button-primary cursor-pointer disabled:opacity-60"
           >
-            Create invite
+            Ask Sage to create invite
           </button>
         </form>
 
