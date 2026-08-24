@@ -697,7 +697,11 @@ export async function postSessionMessage(opts: {
     .set({ updatedAt: new Date() })
     .where(eq(sessions.id, opts.session.id));
 
-  await notifySessionPeers({ session: opts.session, actor: opts.sender });
+  await notifySessionPeers({
+    session: opts.session,
+    actor: opts.sender,
+    activityKind: kind,
+  });
   return isDiscoveryMediatedSession(opts.session)
     ? toDiscoveryPublicMessage(created)
     : toPublicMessage(created);
@@ -706,6 +710,7 @@ export async function postSessionMessage(opts: {
 async function notifySessionPeers(opts: {
   session: Session;
   actor: User;
+  activityKind?: string;
 }): Promise<void> {
   try {
     const db = getDb();
@@ -760,6 +765,9 @@ async function notifySessionPeers(opts: {
         title,
       },
       skipIfUnacked: true,
+      trigger: opts.activityKind?.startsWith("confirm.")
+        ? "approval_result"
+        : "inbox",
     });
   } catch {
     // Inbox notify must not fail session create or board writes.

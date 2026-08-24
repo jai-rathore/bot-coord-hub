@@ -10,6 +10,7 @@ import {
 import { writeAudit } from "@/lib/audit";
 import { getSessionForUser, postSessionMessage } from "@/lib/sessions";
 import { tryBookAfterConfirmApprovals } from "@/lib/schedule-meeting";
+import { enqueueSageActivityTrigger } from "@/lib/sage/triggers";
 
 export type PublicConfirm = {
   id: string;
@@ -235,6 +236,12 @@ export async function decideConfirm(opts: {
       .update(sessions)
       .set({ status: "declined", updatedAt: now })
       .where(eq(sessions.id, session.id));
+    await enqueueSageActivityTrigger({
+      userId: opts.user.id,
+      sourceId: `${updated.id}:${updated.status}:actor`,
+      trigger: "approval_result",
+      sessionId: session.id,
+    });
     return {
       ...toPublicConfirm(updated, { ...session, status: "declined" }),
       calendar: { status: "cancelled", message: "Meeting declined." },
@@ -251,6 +258,16 @@ export async function decideConfirm(opts: {
       .update(sessions)
       .set({ status: "confirmed", updatedAt: now })
       .where(eq(sessions.id, session.id));
+    await enqueueSageActivityTrigger({
+      userId: opts.user.id,
+      sourceId: `${updated.id}:${updated.status}:actor`,
+      trigger: "approval_result",
+      eventId:
+        typeof updated.metadata?.eventId === "string"
+          ? updated.metadata.eventId
+          : null,
+      sessionId: session.id,
+    });
     return {
       ...toPublicConfirm(updated, { ...session, status: "confirmed" }),
       calendar: (booking as unknown as Record<string, unknown>) ?? {
@@ -277,6 +294,12 @@ export async function decideConfirm(opts: {
       .from(sessions)
       .where(eq(sessions.id, session.id))
       .limit(1);
+    await enqueueSageActivityTrigger({
+      userId: opts.user.id,
+      sourceId: `${updated.id}:${updated.status}:actor`,
+      trigger: "approval_result",
+      sessionId: session.id,
+    });
     return {
       ...toPublicConfirm(updated, fresh ?? session),
       calendar,
@@ -287,6 +310,13 @@ export async function decideConfirm(opts: {
     .update(sessions)
     .set({ status: "confirmed", updatedAt: now })
     .where(eq(sessions.id, session.id));
+
+  await enqueueSageActivityTrigger({
+    userId: opts.user.id,
+    sourceId: `${updated.id}:${updated.status}:actor`,
+    trigger: "approval_result",
+    sessionId: session.id,
+  });
 
   return toPublicConfirm(updated, {
     ...session,

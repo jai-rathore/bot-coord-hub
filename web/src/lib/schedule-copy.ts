@@ -30,13 +30,17 @@ export function buildScheduleWaitingResult(opts: {
 
   const who = primary?.email ?? "them";
   const notify = opts.agentNotify?.[0];
+  const reachedSage = notify?.reach === "delivered_to_sage";
   const reachedAgent = notify?.reach === "delivered_to_agent";
+  const reachedOperator = reachedSage || reachedAgent;
   const agent_instructions = [
     "Do not book a Google Calendar event.",
     "Do not send a calendar invite yourself.",
     "Do not tell the human this meeting is confirmed or that the other person accepted.",
-    reachedAgent
-      ? `HoneyMatcha put this on ${who}'s agent inbox. Wait for their agent to reply here.`
+    reachedOperator
+      ? reachedSage
+        ? `HoneyMatcha put this on ${who}'s Sage inbox. Wait for Sage and their human to reply here.`
+        : `HoneyMatcha put this on ${who}'s agent inbox. Wait for their agent to reply here.`
       : shareUrl
         ? `HoneyMatcha could not reach ${who}'s agent yet. Show the human this link and ask them to send it: ${shareUrl}`
         : `HoneyMatcha could not reach ${who}'s agent yet. Ask the human to invite them from People.`,
@@ -54,13 +58,17 @@ export function buildScheduleWaitingResult(opts: {
     people: opts.waiting,
     emails,
     agent_notified: opts.agentNotify ?? [],
-    message: reachedAgent
-      ? `Not booked. Reached ${who}'s agent inbox. Waiting for their agent.${calendarNote}`
+    message: reachedOperator
+      ? reachedSage
+        ? `Not booked. Reached ${who}'s Sage inbox. Waiting for Sage and their human.${calendarNote}`
+        : `Not booked. Reached ${who}'s agent inbox. Waiting for their agent.${calendarNote}`
       : `Not booked. ${who} has not confirmed on HoneyMatcha.${calendarNote}`,
     agent_instructions,
-    next_steps: reachedAgent
+    next_steps: reachedOperator
       ? [
-          "Wait for their agent to pick up the HoneyMatcha inbox item.",
+          reachedSage
+            ? "Wait for Sage to review the HoneyMatcha inbox item with their human."
+            : "Wait for their agent to pick up the HoneyMatcha inbox item.",
           "Do not book Google yourself.",
         ]
       : [

@@ -6,6 +6,7 @@ import { BrandAtmosphere } from "@/components/brand-atmosphere";
 import { CapabilityOverview } from "@/components/capability-overview";
 import { HomeHero } from "@/components/home-hero";
 import { SignedInHome } from "@/components/signed-in-home";
+import type { SageProactiveUpdate } from "@/components/sage-proactive-updates";
 import { SiteHeader } from "@/components/site-header";
 import { getProfileForUser } from "@/lib/agent-profiles";
 import { getHomeStatus } from "@/lib/home-status";
@@ -19,6 +20,10 @@ import {
   listEventsWithUpdates,
   type EventWithUpdates,
 } from "@/lib/events/updates";
+import {
+  listSageJobsForUser,
+  ownerResultForSageJob,
+} from "@/lib/sage/job-store";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +62,7 @@ type SignedInData = {
   calendarConnected: boolean;
   attentionCount: number;
   sageName: string;
+  sageUpdates: SageProactiveUpdate[];
 };
 
 /**
@@ -72,7 +78,7 @@ async function loadSignedInHome(): Promise<SignedInData | null> {
 
     const profile = await getProfileForUser(user.id);
     const eventsEnabled = eventsFeatureEnabled();
-    const [status, eventUpdates, headerList] = await Promise.all([
+    const [status, eventUpdates, headerList, sageJobs] = await Promise.all([
       getHomeStatus(user),
       eventsEnabled
         ? listEventsWithUpdates(user)
@@ -82,7 +88,22 @@ async function loadSignedInHome(): Promise<SignedInData | null> {
             unreadEventCount: 0,
           }),
       headers(),
+      listSageJobsForUser(user.id, 20),
     ]);
+
+    const sageUpdates = sageJobs
+      .filter((job) => job.trigger !== "user_request")
+      .slice(0, 3)
+      .map((job) => {
+        const result = ownerResultForSageJob(job);
+        return {
+          id: job.id,
+          trigger: job.trigger,
+          state: job.state,
+          action: typeof result?.action === "string" ? result.action : null,
+          createdAt: job.createdAt.toISOString(),
+        };
+      });
 
     return {
       handle: profile?.handle ?? null,
@@ -97,6 +118,7 @@ async function loadSignedInHome(): Promise<SignedInData | null> {
       calendarConnected: status.calendarConnected,
       attentionCount: status.attentionCount,
       sageName: sageNameFor(user),
+      sageUpdates,
     };
   } catch (error) {
     // headers() throws the static-generation bailout, and redirect()/notFound()
@@ -132,6 +154,7 @@ export default async function HomePage() {
         calendarConnected={home.calendarConnected}
         attentionCount={home.attentionCount}
         sageName={home.sageName}
+        sageUpdates={home.sageUpdates}
       />
     );
   }

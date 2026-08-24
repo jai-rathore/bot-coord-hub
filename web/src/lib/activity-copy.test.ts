@@ -53,6 +53,24 @@ test("board copy waits for the person and/or their agent", () => {
           agentNotify: [
             {
               email: "rishav@example.com",
+              reach: "delivered_to_sage",
+              hasPairedAgent: true,
+            },
+          ],
+        },
+        peer: { id: "u2", email: "rishav@example.com", name: "Rishav Sharma" },
+      }),
+    ),
+    "Waiting for Rishav Sharma's Sage",
+  );
+  assert.equal(
+    sessionStatusForHuman(
+      session({
+        payload: {
+          phase: "waiting_for_peer",
+          agentNotify: [
+            {
+              email: "rishav@example.com",
               reach: "delivered_to_agent",
               hasPairedAgent: true,
             },
