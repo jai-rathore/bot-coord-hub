@@ -29,6 +29,17 @@ type GeminiResponse = {
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
 };
 
+/** Gemini accepts an OpenAPI schema subset and rejects additionalProperties. */
+function geminiToolSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(geminiToolSchema);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => key !== "additionalProperties")
+      .map(([key, nested]) => [key, geminiToolSchema(nested)]),
+  );
+}
+
 export function geminiApiKey(): string | null {
   return (
     process.env.GEMINI_API_KEY?.trim() ||
@@ -71,7 +82,7 @@ export class GeminiProvider implements LlmProvider {
           functionDeclarations: request.tools.map((tool) => ({
             name: tool.name,
             description: tool.description,
-            parameters: tool.parameters,
+            parameters: geminiToolSchema(tool.parameters),
           })),
         },
       ];
