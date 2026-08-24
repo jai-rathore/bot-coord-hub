@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, timingSafeEqual } from "crypto";
 
 const GUEST_PREFIX = "gt_";
 
@@ -34,10 +34,39 @@ function guestPepper(): string {
   return "honeymatcha-development-guest-pepper";
 }
 
-export function hashGuestEmail(email: string): string {
+function sharedGuestIdentitySecret(): string {
+  const encryptionKey = process.env.TOKEN_ENCRYPTION_KEY;
+  if (encryptionKey) return encryptionKey;
+  return guestPepper();
+}
+
+function hashGuestEmailWithSecret(email: string, secret: string): string {
   return createHash("sha256")
-    .update(`${email.trim().toLowerCase()}.${guestPepper()}`)
+    .update(`${email.trim().toLowerCase()}.${secret}`)
     .digest("hex");
+}
+
+/**
+ * Email binding is created by both the web service and the Sage worker, so it
+ * uses their shared encryption key. Local and pre-migration environments fall
+ * back to the original guest pepper.
+ */
+export function hashGuestEmail(email: string): string {
+  return hashGuestEmailWithSecret(email, sharedGuestIdentitySecret());
+}
+
+/** Accept bindings written before Sage guest creation moved to the worker. */
+export function matchesGuestEmailHash(storedHash: string, email: string): boolean {
+  const candidates = [hashGuestEmail(email)];
+  const legacyPepper = process.env.GUEST_TOKEN_PEPPER;
+  if (legacyPepper && legacyPepper !== process.env.TOKEN_ENCRYPTION_KEY) {
+    candidates.push(hashGuestEmailWithSecret(email, legacyPepper));
+  }
+  const stored = Buffer.from(storedHash, "hex");
+  return candidates.some((candidate) => {
+    const value = Buffer.from(candidate, "hex");
+    return stored.length === value.length && timingSafeEqual(stored, value);
+  });
 }
 
 export function hashGuestIp(ip: string): string {
