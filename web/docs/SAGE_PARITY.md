@@ -26,7 +26,7 @@ A milestone is complete only when all three columns below say **Complete**:
 | Scheduling | Complete | Complete | Not verified | Structured Sage requests exist; real-calendar duplicate and approval behavior still needs production dogfooding. |
 | Dating discovery | Partial | Complete | Partial | Encrypted conversational intake, clarification, location choice, snapshot preparation, anonymous search, and staged introductions are live. Signed-in activation and dual-approval dogfooding remain. |
 | Recruiting discovery | Partial | Complete | Partial | Conversational hiring intake plus replay-safe private guest creation and response monitoring are live. The worker path passed a production synthetic; a real candidate response and signed-in review remain. |
-| Local meetup discovery | Partial | Complete | Not verified | Conversational meetup intake is live. Opt-in recurring search and durable anonymous recommendations are complete locally; deployment and signed-in dogfooding remain. |
+| Local meetup discovery | Complete | Complete | Partial | Conversational meetup intake, opt-in recurring search, and durable anonymous recommendations are live. A scheduled search passed through the production worker; signed-in cadence review remains. |
 | Events | Complete | Complete | Partial | Durable, replay-safe coordination and hosted event chat passed through the production worker and Gemini. Signed-in organizer and participant dogfooding remains. |
 | People and invitations | Complete | Complete | Partial | Sage can review people and create a private, unsent invitation link, and the production worker path passed. Signed-in review remains; approval, revocation, and relationship-policy changes stay human-controlled. |
 | Inbox and follow-up | Partial | Complete | Partial | Sage reviews activity, inbox, sessions, and event boards. Operator-safe automatic routing is live and passed both Sage-primary delivery and external-primary suppression; signed-in continuation dogfooding remains. |
@@ -67,6 +67,12 @@ A milestone is complete only when all three columns below say **Complete**:
   job for a Sage-primary account, while an external-primary account retained
   its inbox item and created no duplicate Sage job. The same run repeated all
   five cross-stream proofs and removed every synthetic row.
+- PR 80 is merged and deployed to both services. Production job
+  `job-da5qn7jm8hqs73djgujg` proved an opted-in cadence produced a durable
+  anonymous recommendation through the live worker without exposing the
+  candidate id or email, then removed every synthetic row. Regression job
+  `job-da5qniqjobas73fk12fg` repeated all five cross-stream proofs plus Sage and
+  external-primary routing after the cadence release.
 - Deployment verification found and repaired a previously skipped API-key
   migration. Preflight now checks the complete credential shape and the Sage
   queue and conversation tables.
@@ -85,7 +91,7 @@ A milestone is complete only when all three columns below say **Complete**:
 | `review_activity` inbox/session overview | Complete | Passed | Deployed | Signed-in activity comparison |
 | Hosted event chat through encrypted Sage jobs and redacted run steps | Complete | Passed | Deployed | Signed-in organizer and participant chat dogfood |
 | Operator-safe inbox, approval, session, and event-deadline triggers plus visible Sage updates | Complete | Passed | Deployed | Signed-in approval and session continuation comparison |
-| Opt-in discovery cadence, per-user budget, notification choice, and durable anonymous recommendations | Complete locally | Pending | Not deployed | Migration 0031, live-worker cadence proof, and signed-in review |
+| Opt-in discovery cadence, per-user budget, notification choice, and durable anonymous recommendations | Complete | Passed | Deployed | Signed-in cadence setup, notification, dismissal, and introduction review |
 | Operations UI and recovery tooling | Not started | Not started | Not deployed | Add audited dead-letter recovery, notification leases, retention, metrics, and alerts |
 
 This workstation did not have a usable local PostgreSQL environment for the
@@ -140,7 +146,7 @@ the live schema. Synthetic rows were explicitly cleaned up after each run.
 - [x] **Code-only:** Enqueue periodic discovery only after applying operator preference, active enrollment, safety status, and a one-search-per-user daily budget.
 - [x] **Code-only:** Route automatic callbacks only to the selected operator so Sage and a connected agent do not receive the same automatic trigger.
 - [x] **Automated production proof:** Verify the proactive trigger slice against the live worker and an external-primary account.
-- [ ] Deploy migration 0031 and prove recurring discovery creates a durable anonymous recommendation through the live worker.
+- [x] **Automated production proof:** Deploy migration 0031 and prove recurring discovery creates a durable anonymous recommendation through the live worker.
 
 ### P4: reliability, operations, and scale
 
