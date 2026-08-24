@@ -20,16 +20,16 @@ A milestone is complete only when all three columns below say **Complete**:
 
 | Milestone | Code | Production | Verified | Current gap |
 | --- | --- | --- | --- | --- |
-| Shared capability boundary | Partial | Complete | Partial | Ten bounded Sage capabilities now exist in code. Event, guest, people, activity, and hosted event-chat additions still need deployment and production verification. |
-| Durable Sage queue | Complete | Complete | Partial | Postgres jobs, runs, steps, leases, retries, and idempotency are live; concurrency recovery still needs database integration coverage. |
+| Shared capability boundary | Complete | Complete | Partial | Ten bounded Sage capabilities are deployed. A live-worker synthetic passed event coordination, hosted event chat, guest requests, people, and activity; signed-in browser verification remains. |
+| Durable Sage queue | Complete | Complete | Partial | Postgres jobs, encrypted private payloads/results, redacted telemetry, leases, retries, and idempotency are live and passed cross-stream production execution; concurrent claim and recovery race coverage remains. |
 | Sage worker | Complete | Complete | Complete | The worker is live, reaches production Postgres, polls without errors, and the pre-worker queue was confirmed empty. |
 | Scheduling | Complete | Complete | Not verified | Structured Sage requests exist; real-calendar duplicate and approval behavior still needs production dogfooding. |
 | Dating discovery | Partial | Complete | Partial | Encrypted conversational intake, clarification, location choice, snapshot preparation, anonymous search, and staged introductions are live. Signed-in activation and dual-approval dogfooding remain. |
-| Recruiting discovery | Partial | Complete | Not verified | Conversational hiring intake is live. Replay-safe private guest creation and response monitoring are implemented locally; deployment and production verification remain. |
+| Recruiting discovery | Partial | Complete | Partial | Conversational hiring intake plus replay-safe private guest creation and response monitoring are live. The worker path passed a production synthetic; a real candidate response and signed-in review remain. |
 | Local meetup discovery | Partial | Complete | Not verified | Conversational meetup intake is live; recurring search and persistent recommendations remain. |
-| Events | Partial | Complete | Partial | Durable, replay-safe create/list/review, options, responses, notes, reminders, deadlines, notification preferences, and hosted chat jobs are implemented locally. Deployment and dogfooding remain. |
-| People and invitations | Partial | Not deployed | Not verified | Sage can review people and create a private, unsent invitation link in code. Approval, revocation, and relationship-policy changes remain human-controlled. |
-| Inbox and follow-up | Partial | Not deployed | Not verified | Sage can review inbox and sessions in code. Trigger producers, continuations, acknowledgements, and safe follow-up remain. |
+| Events | Complete | Complete | Partial | Durable, replay-safe coordination and hosted event chat passed through the production worker and Gemini. Signed-in organizer and participant dogfooding remains. |
+| People and invitations | Complete | Complete | Partial | Sage can review people and create a private, unsent invitation link, and the production worker path passed. Signed-in review remains; approval, revocation, and relationship-policy changes stay human-controlled. |
+| Inbox and follow-up | Partial | Complete | Partial | Sage can review activity, inbox, sessions, and event boards through the production worker. Operator-safe inbox, approval, session, and event-deadline triggers are complete locally; deployment and live-worker proof remain. |
 | Operations and scale | Partial | Partial | Not verified | No dead-letter console, requeue action, alerts, retention job, persistent recommendations, or indexed discovery scan. |
 
 ## Architecture invariants
@@ -53,8 +53,15 @@ A milestone is complete only when all three columns below say **Complete**:
   telemetry. Its temporary user and all cascaded data were deleted afterward.
 - PR 75 is merged and deployed to both the web and worker services. Migration
   0030, production preflight, the full event database suite, and the encrypted
-  queue/guest/invitation/session suite passed. A cross-stream live-worker
-  synthetic is the final automated proof in this slice.
+  queue/guest/invitation/session suite passed.
+- PRs 76 and 77 are merged and deployed. Production job
+  `job-da5q05m417fc738a3j60` passed event coordination, hosted event chat through
+  Gemini, guest requests, connection management, and activity review through
+  the live worker. All synthetic records were removed after the run.
+- That production proof exposed two real configuration gaps before succeeding:
+  the worker was missing `ENABLE_EVENTS`, and guest email binding depended on a
+  web-only pepper. The feature flag is now present and guest email binding uses
+  the shared encryption key with legacy-hash compatibility.
 - Deployment verification found and repaired a previously skipped API-key
   migration. Preflight now checks the complete credential shape and the Sage
   queue and conversation tables.
@@ -65,19 +72,19 @@ A milestone is complete only when all three columns below say **Complete**:
 
 | Work item | Code | Database test | Production | Next proof |
 | --- | --- | --- | --- | --- |
-| Encrypt private Sage inputs and owner-visible results; redact operational payloads and steps | Complete locally | Pending | Not deployed | Migration, replay integration, and signed-in API result check |
-| Replay-safe event creation | Complete locally | Pending | Not deployed | Create the same job twice and prove one event with one dimension set |
-| `coordinate_event` create/list/review and lifecycle mutations | Complete locally | Pending | Not deployed | Replay each effect, then dogfood the signed-in event UI |
-| `run_guest_request` create/list/review | Complete locally | Pending | Not deployed | Replay one private link, then review a privacy-preserving response |
-| `manage_connections` review and private invite creation | Complete locally | Pending | Not deployed | Replay one invite and compare the signed-in People result |
-| `review_activity` inbox/session overview | Complete locally | Pending | Not deployed | Signed-in activity result comparison |
-| Hosted event chat through encrypted Sage jobs and redacted run steps | Complete locally | Pending | Not deployed | Replay one turn and prove one model call, one transcript pair, and one counted turn |
-| Proactive triggers, relationship changes, and operations UI | Not started | Not started | Not deployed | Implement operator-safe producers, human gates, and dead-letter controls |
+| Encrypt private Sage inputs and owner-visible results; redact operational payloads and steps | Complete | Passed | Deployed | Signed-in owner API/UI result check |
+| Replay-safe event creation | Complete | Passed | Deployed | Signed-in event creation dogfood |
+| `coordinate_event` create/list/review and lifecycle mutations | Complete | Passed | Deployed | Signed-in organizer lifecycle dogfood |
+| `run_guest_request` create/list/review | Complete | Passed | Deployed | Real candidate response and signed-in review |
+| `manage_connections` review and private invite creation | Complete | Passed | Deployed | Signed-in People comparison |
+| `review_activity` inbox/session overview | Complete | Passed | Deployed | Signed-in activity comparison |
+| Hosted event chat through encrypted Sage jobs and redacted run steps | Complete | Passed | Deployed | Signed-in organizer and participant chat dogfood |
+| Operator-safe inbox, approval, session, and event-deadline triggers plus visible Sage updates | Complete locally | Pending | Not deployed | Prove one domain trigger through the live worker and one external-primary suppression case |
+| Discovery cadence, persistent recommendations, relationship changes, and operations UI | Not started | Not started | Not deployed | Add opt-in cadence, persistence, human gates, and dead-letter controls |
 
-Local PostgreSQL integration is marked pending because this workstation has no
-PostgreSQL server or project environment file. It will not be counted complete
-until the migration is deployed and the database suites pass against the live
-schema.
+This workstation did not have a usable local PostgreSQL environment for the
+slice, so database evidence came from isolated production one-off jobs against
+the live schema. Synthetic rows were explicitly cleaned up after each run.
 
 ### P0: make the existing Sage path operational
 
@@ -104,26 +111,29 @@ schema.
 ### P2: cover the remaining product streams
 
 - [x] **Code-only:** Add an outcome-level `coordinate_event` capability for creation, options, responses, notes, reminders, deadlines, and notification preferences.
-- [ ] Deploy and verify the completed code slice for replay-safe event create/list/review.
+- [x] **Automated production proof:** Deploy and verify replay-safe event create/list/review through the live worker.
 - [x] **Code-only:** Wrap hosted event turns in encrypted Sage jobs, runs, and redacted steps.
 - [x] **Code-only:** Preserve event role-specific tool allowlists, human-only action boundaries, and deterministic deadline resolution.
 - [x] **Code-only:** Add a `run_guest_request` capability for recruiting and other no-account structured requests.
-- [ ] Deploy and verify the completed code slice for privacy-preserving guest response monitoring.
+- [x] **Automated production proof:** Deploy and verify privacy-preserving guest creation and response monitoring through the live worker.
 - [x] **Code-only:** Let Sage monitor guest responses and return privacy-preserving human-review summaries.
 - [x] **Code-only:** Add a `manage_connections` capability for people review and private, unsent invitations; approvals, revocation, and relationship policy remain human-controlled.
-- [ ] Deploy and verify the completed code slice for connection and met-person review.
+- [x] **Automated production proof:** Deploy and verify connection and met-person review through the live worker.
 - [x] **Code-only:** Add a `review_activity` capability for inbox, sessions, event boards, acknowledgement, and safe review.
-- [ ] Deploy and verify the completed code slice for inbox and session review.
+- [x] **Automated production proof:** Deploy and verify inbox and session review through the live worker.
+- [ ] Dogfood all P2 flows in a real signed-in production browser session.
 
 ### P3: proactive operation
 
-- [ ] Wire inbox events to the selected operator.
-- [ ] Wire approval results and scheduling state changes to continuation jobs.
-- [ ] Wire event deadlines and pending responses to continuation jobs.
+- [x] **Code-only:** Wire inbox events to one selected operator through an idempotent trigger bridge.
+- [x] **Code-only:** Wire approval results and peer session activity to continuation jobs.
+- [x] **Code-only:** Wire event deadlines and pending-response notifications to event review jobs.
+- [x] **Code-only:** Show recent proactive Sage work on the signed-in home page.
 - [ ] Add user-controlled discovery cadence and notification preferences.
 - [ ] Persist recommendations independently from short-lived discovery handles.
 - [ ] Enqueue periodic discovery only after applying operator preference, safety status, and per-user budget.
-- [ ] Prevent Sage and a connected agent from acting on the same trigger.
+- [x] **Code-only:** Route automatic callbacks only to the selected operator so Sage and a connected agent do not receive the same automatic trigger.
+- [ ] Deploy and verify the proactive trigger slice against the live worker and an external-primary account.
 
 ### P4: reliability, operations, and scale
 

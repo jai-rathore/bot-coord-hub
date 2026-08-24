@@ -23,6 +23,9 @@ export function waitingForAgentLine(
   peerLabel: string,
   reach: AgentReach | null | undefined,
 ): string {
+  if (reach === "delivered_to_sage") {
+    return `Waiting for ${peerLabel}'s Sage`;
+  }
   if (reach === "delivered_to_agent") {
     return `Waiting for ${possessiveName(peerLabel)} agent`;
   }
@@ -39,6 +42,7 @@ function reachFromSession(session: PublicSession): AgentReach | null {
   if (Array.isArray(raw) && raw[0] && typeof raw[0] === "object") {
     const reach = (raw[0] as { reach?: unknown }).reach;
     if (
+      reach === "delivered_to_sage" ||
       reach === "delivered_to_agent" ||
       reach === "no_paired_agent" ||
       reach === "not_on_honeymatcha"
@@ -74,6 +78,7 @@ export function waitingForFromPayload(
       guestUrl: typeof row.guestUrl === "string" ? row.guestUrl : null,
       reason: typeof row.reason === "string" ? row.reason : null,
       reach:
+        row.reach === "delivered_to_sage" ||
         row.reach === "delivered_to_agent" ||
         row.reach === "no_paired_agent" ||
         row.reach === "not_on_honeymatcha"
@@ -196,6 +201,14 @@ export function sharePrompt(session: PublicSession): {
       return {
         headline: "This was not sent to anyone",
         body: "HoneyMatcha did not reach another person or their agent.",
+        inviteUrl,
+        guestUrl,
+      };
+    }
+    if (reach === "delivered_to_sage") {
+      return {
+        headline: `Waiting for ${peerName}'s Sage`,
+        body: "HoneyMatcha queued this for Sage. Sage can review and coordinate the next safe step, while their human keeps control of approvals and booking.",
         inviteUrl,
         guestUrl,
       };

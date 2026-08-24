@@ -3,6 +3,10 @@ import { AppNav } from "@/components/app-nav";
 import { CapabilityMark } from "@/components/capability-mark";
 import { EventUpdatePill } from "@/components/event-update-pill";
 import { MeetCode } from "@/components/meet-code";
+import {
+  SageProactiveUpdates,
+  type SageProactiveUpdate,
+} from "@/components/sage-proactive-updates";
 import { relativeDeadline } from "@/lib/events/copy";
 import type { EventWithUpdates } from "@/lib/events/updates";
 
@@ -18,6 +22,7 @@ export function SignedInHome({
   calendarConnected,
   attentionCount,
   sageName,
+  sageUpdates,
 }: {
   firstName: string | null;
   handle: string | null;
@@ -30,6 +35,7 @@ export function SignedInHome({
   calendarConnected: boolean;
   attentionCount: number;
   sageName: string;
+  sageUpdates: SageProactiveUpdate[];
 }) {
   const displayName = firstName ?? "there";
   const activeAgent = agentConnected ? "your connected agent" : sageName;
@@ -126,6 +132,8 @@ export function SignedInHome({
             ))}
           </div>
         </section>
+
+        <SageProactiveUpdates updates={sageUpdates} />
 
         <div className="mt-6 grid gap-3 lg:grid-cols-2">
           {!calendarConnected ? (

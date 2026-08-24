@@ -96,6 +96,9 @@ function notifyBoardText(notified: AgentNotifyResult[]): string {
   return notified
     .map((row) => {
       const who = row.name || row.email;
+      if (row.reach === "delivered_to_sage") {
+        return `Reached ${who}'s Sage inbox. Sage is handling the next step.`;
+      }
       if (row.reach === "delivered_to_agent") {
         return `Reached ${who}'s agent inbox. Waiting for their agent.`;
       }

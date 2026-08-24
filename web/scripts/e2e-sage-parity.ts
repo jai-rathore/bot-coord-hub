@@ -23,6 +23,7 @@ import {
   enqueueSageJob,
   ownerResultForSageJob,
 } from "../src/lib/sage/job-store";
+import { deliverEventInbox } from "../src/lib/agent-inbox";
 
 const db = getDb();
 
@@ -151,6 +152,31 @@ async function main() {
       "event creation must be atomic and replay-safe",
     );
     console.log("PASS coordinate_event through the live worker");
+
+    const triggered = await deliverEventInbox({
+      userId: owner.id,
+      eventId,
+      kind: "event.deadline_soon",
+      summary: "Synthetic deadline review",
+      body: { eventId, template: "deadline_soon" },
+      dedupeKey: `sage-parity-deadline-${suffix}`,
+    });
+    assert.ok(triggered.inboxId, "deadline delivery must create an inbox item");
+    const [triggeredJob] = await db
+      .select()
+      .from(sageJobs)
+      .where(
+        and(
+          eq(sageJobs.userId, owner.id),
+          eq(sageJobs.idempotencyKey, `deadline:${triggered.inboxId}`),
+        ),
+      )
+      .limit(1);
+    assert.ok(triggeredJob, "the selected Sage operator must receive the trigger");
+    const finishedTrigger = await waitForJob(triggeredJob.id);
+    assert.equal(finishedTrigger.trigger, "deadline");
+    assert.equal(ownerResultForSageJob(finishedTrigger)?.action, "event");
+    console.log("PASS event deadline routed once to the selected Sage operator");
 
     const privateChat = `Confirm event help ${suffix}`;
     const chat = await runCapability({

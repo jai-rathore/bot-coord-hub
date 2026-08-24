@@ -10,6 +10,7 @@ import {
   sageRetryDelayMs,
   shouldSageHandle,
 } from "./sage/job-store";
+import { activityPayloadForTrigger } from "./sage/triggers";
 import {
   executeCoordinationCapability,
   getCoordinationCapability,
@@ -44,6 +45,22 @@ test("external primary falls back to Sage only without a connected agent", () =>
     }),
     true,
   );
+});
+
+test("activity triggers carry the narrowest available domain context", () => {
+  assert.deepEqual(
+    activityPayloadForTrigger({ eventId: "event-1", sessionId: "session-1" }),
+    { action: "event", eventRef: "event-1" },
+  );
+  assert.deepEqual(activityPayloadForTrigger({ sessionId: "session-1" }), {
+    action: "session",
+    sessionId: "session-1",
+  });
+  assert.deepEqual(activityPayloadForTrigger({}), {
+    action: "overview",
+    pendingOnly: true,
+    limit: 20,
+  });
 });
 
 test("Sage retry delay is bounded exponential backoff", () => {

@@ -14,8 +14,11 @@ import {
   resolveSafeCallbackUrl,
 } from "@/lib/safe-url";
 import { boundedText } from "@/lib/validation";
+import { getAgentOperatorMode } from "@/lib/sage/job-store";
+import { enqueueSageActivityTrigger } from "@/lib/sage/triggers";
 
 export type AgentReach =
+  | "delivered_to_sage"
   | "delivered_to_agent"
   | "no_paired_agent"
   | "not_on_honeymatcha";
@@ -182,6 +185,7 @@ export async function notifyPeerAgents(opts: {
   body?: Record<string, unknown>;
   /** Reuse an existing unacked inbox row and skip the callback. */
   skipIfUnacked?: boolean;
+  trigger?: "inbox" | "approval_result";
 }): Promise<AgentNotifyResult[]> {
   // Concurrent rather than serial: each delivery is several queries plus an
   // outbound callback with its own timeout, and recipients are independent.
@@ -212,6 +216,7 @@ export async function notifyPeerAgents(opts: {
           sessionId: opts.sessionId,
         },
         skipIfUnacked: opts.skipIfUnacked,
+        trigger: opts.trigger,
       });
     }),
   );
@@ -236,6 +241,12 @@ export async function deliverDiscoveryInbox(opts: {
       body: opts.body,
     })
     .returning();
+  await enqueueSageActivityTrigger({
+    userId: opts.userId,
+    sourceId: created.id,
+    trigger: "inbox",
+    sessionId: opts.sessionId,
+  });
   const callback = await postAgentCallbacks({
     userId: opts.userId,
     inboxId: created.id,
@@ -279,6 +290,13 @@ export async function deliverEventInbox(opts: {
     .returning();
   if (!created) return { inboxId: null, callback: "none" };
 
+  await enqueueSageActivityTrigger({
+    userId: opts.userId,
+    sourceId: created.id,
+    trigger: opts.kind === "event.deadline_soon" ? "deadline" : "inbox",
+    eventId: opts.eventId,
+  });
+
   const callback = await postAgentCallbacks({
     userId: opts.userId,
     inboxId: created.id,
@@ -299,6 +317,13 @@ export async function postDiscoveryInboxCallback(
     .where(and(eq(agentInbox.id, inboxId), isNull(agentInbox.ackedAt)))
     .limit(1);
   if (!item) return "none";
+  await enqueueSageActivityTrigger({
+    userId: item.userId,
+    sourceId: item.id,
+    trigger: "inbox",
+    sessionId: item.sessionId,
+    eventId: item.eventId,
+  });
   return postAgentCallbacks({
     userId: item.userId,
     inboxId: item.id,
@@ -317,6 +342,7 @@ async function deliverToUserAgent(opts: {
   summary: string;
   body: Record<string, unknown>;
   skipIfUnacked?: boolean;
+  trigger?: "inbox" | "approval_result";
 }): Promise<AgentNotifyResult> {
   const db = getDb();
   const paired = await userHasPairedAgent(opts.userId);
@@ -335,6 +361,12 @@ async function deliverToUserAgent(opts: {
     .limit(1);
 
   if (existing && opts.skipIfUnacked) {
+    const route = await enqueueSageActivityTrigger({
+      userId: opts.userId,
+      sourceId: existing.id,
+      trigger: opts.trigger ?? "inbox",
+      sessionId: opts.sessionId,
+    });
     return {
       userId: opts.userId,
       email: opts.email,
@@ -342,7 +374,12 @@ async function deliverToUserAgent(opts: {
       hasPairedAgent: paired.hasPairedAgent,
       inboxId: existing.id,
       callback: "none",
-      reach: paired.hasPairedAgent ? "delivered_to_agent" : "no_paired_agent",
+      reach:
+        route === "sage"
+          ? "delivered_to_sage"
+          : paired.hasPairedAgent
+            ? "delivered_to_agent"
+            : "no_paired_agent",
     };
   }
 
@@ -361,6 +398,13 @@ async function deliverToUserAgent(opts: {
     inboxId = created.id;
   }
 
+  const route = await enqueueSageActivityTrigger({
+    userId: opts.userId,
+    sourceId: inboxId,
+    trigger: opts.trigger ?? "inbox",
+    sessionId: opts.sessionId,
+  });
+
   const callback = await postAgentCallbacks({
     userId: opts.userId,
     inboxId,
@@ -376,7 +420,12 @@ async function deliverToUserAgent(opts: {
     hasPairedAgent: paired.hasPairedAgent,
     inboxId,
     callback,
-    reach: paired.hasPairedAgent ? "delivered_to_agent" : "no_paired_agent",
+    reach:
+      route === "sage"
+        ? "delivered_to_sage"
+        : paired.hasPairedAgent
+          ? "delivered_to_agent"
+          : "no_paired_agent",
   };
 }
 
@@ -389,6 +438,8 @@ async function postAgentCallbacks(opts: {
   summary: string;
 }): Promise<"delivered" | "failed" | "none"> {
   const db = getDb();
+  const operatorMode = await getAgentOperatorMode(opts.userId);
+  if (operatorMode !== "external_primary") return "none";
   const keys = await db
     .select({
       callbackUrl: apiKeys.callbackUrl,
