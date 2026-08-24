@@ -13,6 +13,7 @@ import {
   sessions,
   userLocations,
   users,
+  type SageJob,
 } from "../src/db/schema";
 import {
   DATING_INTRODUCTION_DEFINITION,
@@ -44,6 +45,7 @@ import {
 } from "../src/lib/sessions";
 import { issueLocationResolutionToken } from "../src/lib/location-resolver";
 import { ownerResultForSageJob } from "../src/lib/sage/job-store";
+import { enqueueSageDiscoveryMessage } from "../src/lib/sage/discovery-conversation";
 
 process.env.TOKEN_ENCRYPTION_KEY =
   process.env.TOKEN_ENCRYPTION_KEY ??
@@ -62,6 +64,27 @@ const clerkIds = [
   `e2e-dating-b-${suffix}`,
   `e2e-dating-austin-${suffix}`,
 ];
+
+function pause(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForSageJob(jobId: string): Promise<SageJob> {
+  for (let attempt = 0; attempt < 180; attempt += 1) {
+    const [job] = await db
+      .select()
+      .from(sageJobs)
+      .where(eq(sageJobs.id, jobId))
+      .limit(1);
+    if (!job) throw new Error(`Sage discovery job ${jobId} disappeared`);
+    if (job.state === "completed") return job;
+    if (["failed", "dead_letter"].includes(job.state)) {
+      throw new Error(job.lastError ?? `Sage discovery job ended ${job.state}`);
+    }
+    await pause(500);
+  }
+  throw new Error(`Sage discovery job ${jobId} did not finish within 90 seconds`);
+}
 
 function resolvedCity(userId: string, city: string, region = "NY") {
   const providerPlaceId = city.toLowerCase().replaceAll(" ", "-");
@@ -213,6 +236,25 @@ async function main() {
         },
       ])
       .returning();
+
+  if (process.env.E2E_SAGE_HOSTED_MODEL === "true") {
+    const queuedIntake = await enqueueSageDiscoveryMessage({
+      user: seeker,
+      intentSlug: "local_meetup",
+      message:
+        "I would like a small local chess meetup near Park Slope on Saturday afternoons.",
+      clientMessageId: `e2e-sage-intake-${suffix}`,
+    });
+    const finishedIntake = await waitForSageJob(queuedIntake.job.id);
+    assert.equal(finishedIntake.state, "completed");
+    assert.equal(
+      ownerResultForSageJob(finishedIntake)?.intentSlug,
+      "local_meetup",
+    );
+    console.log(
+      "PASS Sage conversational discovery through Gemini and the live worker",
+    );
+  }
 
   const [key] = await db
     .insert(apiKeys)
