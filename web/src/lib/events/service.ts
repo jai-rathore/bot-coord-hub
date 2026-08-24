@@ -8,6 +8,7 @@ import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "@/db";
 import {
+  auditLogs,
   eventActivity,
   eventDimensions,
   eventOptions,
@@ -68,6 +69,8 @@ export type CreateEventInput = {
   /** RSVP events: the single fixed time, if any. */
   fixedStartsAt?: string | Date | null;
   fixedEndsAt?: string | Date | null;
+  /** Stable replay key for durable operators. */
+  idempotencyKey?: string | null;
 };
 
 function parseDate(value: unknown, field: string): Date {
@@ -89,8 +92,30 @@ function normalizeVisibility(value: unknown): EventVisibility {
 export async function createEvent(
   organizer: User,
   input: CreateEventInput,
+  actor: { kind?: "user" | "agent" | "hosted_agent"; apiKeyId?: string | null } = {},
 ): Promise<Event> {
   const db = getDb();
+  const idempotencyKey = boundedText(
+    input.idempotencyKey,
+    "idempotencyKey",
+    160,
+  ) ?? null;
+  // Replays return before time-sensitive validation. A worker recovering an
+  // old successful job must not fail merely because its original deadline has
+  // since passed.
+  if (idempotencyKey) {
+    const [existing] = await db
+      .select()
+      .from(events)
+      .where(
+        and(
+          eq(events.organizerUserId, organizer.id),
+          eq(events.idempotencyKey, idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (existing) return existing;
+  }
 
   const title = boundedText(input.title, "title", EVENT_LIMITS.titleLength, {
     required: true,
@@ -115,19 +140,6 @@ export async function createEvent(
   );
   if (deadlineAt.getTime() > maxDeadline.getTime()) {
     throw new AgentApiError(400, "The deadline is too far in the future");
-  }
-
-  const openCount = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(events)
-    .where(
-      and(eq(events.organizerUserId, organizer.id), eq(events.status, "open")),
-    );
-  if ((openCount[0]?.count ?? 0) >= EVENT_LIMITS.openEventsPerOrganizer) {
-    throw new AgentApiError(
-      429,
-      `You already have ${EVENT_LIMITS.openEventsPerOrganizer} open events. Close one before creating another.`,
-    );
   }
 
   const slots = (input.slots ?? []).map((slot, index) => ({
@@ -170,12 +182,39 @@ export async function createEvent(
       : Math.floor(Number(input.capacityMax));
 
   const timezone = boundedText(input.timezone, "timezone", 64) ?? "UTC";
+  const result = await db.transaction(async (tx) => {
+    if (idempotencyKey) {
+      const [existing] = await tx
+        .select()
+        .from(events)
+        .where(
+          and(
+            eq(events.organizerUserId, organizer.id),
+            eq(events.idempotencyKey, idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (existing) return existing;
+    }
 
-  // Slug collisions are astronomically unlikely; retry anyway rather than 500.
-  let created: Event | undefined;
-  for (let attempt = 0; attempt < 5 && !created; attempt += 1) {
-    try {
-      const [row] = await db
+    const openCount = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(events)
+      .where(
+        and(eq(events.organizerUserId, organizer.id), eq(events.status, "open")),
+      );
+    if ((openCount[0]?.count ?? 0) >= EVENT_LIMITS.openEventsPerOrganizer) {
+      throw new AgentApiError(
+        429,
+        `You already have ${EVENT_LIMITS.openEventsPerOrganizer} open events. Close one before creating another.`,
+      );
+    }
+
+    // `onConflictDoNothing` keeps the transaction usable after either the
+    // astronomically unlikely slug collision or an idempotent replay race.
+    let event: Event | undefined;
+    for (let attempt = 0; attempt < 5 && !event; attempt += 1) {
+      const [row] = await tx
         .insert(events)
         .values({
           shareSlug: generateShareSlug(),
@@ -195,121 +234,128 @@ export async function createEvent(
           allowChat: input.allowChat !== false,
           allowGuestOptions: input.allowGuestOptions !== false,
           agentName: sageNameFor(organizer),
+          idempotencyKey,
         })
+        .onConflictDoNothing()
         .returning();
-      created = row;
-    } catch (error) {
-      const message = String((error as Error)?.message ?? "");
-      if (!message.includes("events_share_slug_uidx")) throw error;
+      event = row;
+      if (!event && idempotencyKey) {
+        const [replayed] = await tx
+          .select()
+          .from(events)
+          .where(
+            and(
+              eq(events.organizerUserId, organizer.id),
+              eq(events.idempotencyKey, idempotencyKey),
+            ),
+          )
+          .limit(1);
+        if (replayed) return replayed;
+      }
     }
-  }
-  if (!created) {
-    throw new AgentApiError(500, "Could not create the event. Try again.");
-  }
-  const event = created;
+    if (!event) {
+      throw new AgentApiError(500, "Could not create the event. Try again.");
+    }
 
-  // ---- dimensions -------------------------------------------------------
-  const [attendanceDim] = await db
-    .insert(eventDimensions)
-    .values({
+    await tx.insert(eventDimensions).values({
       eventId: event.id,
       kind: "attendance",
       label: "Who's in",
       mode: "open",
       position: 0,
-    })
-    .returning();
+    });
 
-  if (slots.length > 0) {
-    const [timeDim] = await db
-      .insert(eventDimensions)
-      .values({
-        eventId: event.id,
-        kind: "time",
-        label: "When",
-        mode: "open",
-        position: 1,
-      })
-      .returning();
-    await db.insert(eventOptions).values(
-      slots.map((slot, index) => ({
+    if (slots.length > 0) {
+      const [timeDim] = await tx
+        .insert(eventDimensions)
+        .values({
+          eventId: event.id,
+          kind: "time",
+          label: "When",
+          mode: "open",
+          position: 1,
+        })
+        .returning();
+      await tx.insert(eventOptions).values(
+        slots.map((slot, index) => ({
+          eventId: event!.id,
+          dimensionId: timeDim.id,
+          startsAt: slot.startsAt,
+          endsAt: slot.endsAt,
+          position: index,
+          createdByRole: "organizer" as const,
+          createdByUserId: organizer.id,
+        })),
+      );
+    } else if (fixedStartsAt) {
+      const [timeDim] = await tx
+        .insert(eventDimensions)
+        .values({
+          eventId: event.id,
+          kind: "time",
+          label: "When",
+          mode: "fixed",
+          position: 1,
+        })
+        .returning();
+      await tx.insert(eventOptions).values({
         eventId: event.id,
         dimensionId: timeDim.id,
-        startsAt: slot.startsAt,
-        endsAt: slot.endsAt,
-        position: index,
+        startsAt: fixedStartsAt,
+        endsAt: fixedEndsAt,
+        position: 0,
         createdByRole: "organizer",
         createdByUserId: organizer.id,
-      })),
-    );
-  } else if (fixedStartsAt) {
-    const [timeDim] = await db
-      .insert(eventDimensions)
-      .values({
+      });
+    }
+
+    if (place) {
+      const [placeDim] = await tx
+        .insert(eventDimensions)
+        .values({
+          eventId: event.id,
+          kind: "place",
+          label: "Where",
+          mode: "fixed",
+          position: 2,
+        })
+        .returning();
+      await tx.insert(eventOptions).values({
         eventId: event.id,
-        kind: "time",
-        label: "When",
-        mode: "fixed",
-        position: 1,
-      })
-      .returning();
-    await db.insert(eventOptions).values({
+        dimensionId: placeDim.id,
+        label: place,
+        position: 0,
+        createdByRole: "organizer",
+        createdByUserId: organizer.id,
+      });
+    }
+
+    await tx.insert(eventParticipants).values({
       eventId: event.id,
-      dimensionId: timeDim.id,
-      startsAt: fixedStartsAt,
-      endsAt: fixedEndsAt,
-      position: 0,
-      createdByRole: "organizer",
-      createdByUserId: organizer.id,
+      userId: organizer.id,
+      role: "organizer",
+      source: "organizer",
     });
-  }
-
-  if (place) {
-    const [placeDim] = await db
-      .insert(eventDimensions)
-      .values({
-        eventId: event.id,
-        kind: "place",
-        label: "Where",
-        mode: "fixed",
-        position: 2,
-      })
-      .returning();
-    await db.insert(eventOptions).values({
+    await tx.insert(eventActivity).values({
       eventId: event.id,
-      dimensionId: placeDim.id,
-      label: place,
-      position: 0,
-      createdByRole: "organizer",
-      createdByUserId: organizer.id,
+      actorUserId: organizer.id,
+      kind: "created",
+      summary: `${displayName(organizer.name, organizer.email)} created “${title}”.`,
+      body: { slots: slots.length, quorumMin, visibility: event.visibility },
     });
-  }
-
-  // The organizer is always a participant.
-  await db.insert(eventParticipants).values({
-    eventId: event.id,
-    userId: organizer.id,
-    role: "organizer",
-    source: "organizer",
+    await tx.insert(auditLogs).values({
+      actorUserId: organizer.id,
+      actorApiKeyId: actor.apiKeyId ?? null,
+      actorKind: actor.kind ?? "user",
+      action: "event.create",
+      entityType: "event",
+      entityId: event.id,
+      metadata: { title, slots: slots.length },
+    });
+    return event;
   });
 
-  await recordActivity({
-    eventId: event.id,
-    actorUserId: organizer.id,
-    kind: "created",
-    summary: `${displayName(organizer.name, organizer.email)} created “${title}”.`,
-    body: { slots: slots.length, quorumMin, visibility: event.visibility },
-  });
-  await writeAudit({
-    actorUserId: organizer.id,
-    action: "event.create",
-    entityType: "event",
-    entityId: event.id,
-    metadata: { title, slots: slots.length },
-  });
-
-  void attendanceDim;
-  return event;
+  return result;
 }
 
 export async function joinEvent(
@@ -400,8 +446,22 @@ export async function setResponses(
   participant: EventParticipant,
   entries: ResponseEntry[],
   attendance?: EventPref,
+  operation: { idempotencyKey?: string | null } = {},
 ): Promise<void> {
   const db = getDb();
+  if (operation.idempotencyKey) {
+    const [receipt] = await db
+      .select({ id: eventActivity.id })
+      .from(eventActivity)
+      .where(
+        and(
+          eq(eventActivity.eventId, event.id),
+          eq(eventActivity.idempotencyKey, operation.idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (receipt) return;
+  }
 
   if (event.status !== "open") {
     throw new AgentApiError(409, "This event is closed to new responses.");
@@ -490,11 +550,13 @@ export async function setResponses(
     kind: "responded",
     summary: `A participant responded (${nextAttendance}).`,
     body: { entries: entries.length, attendance: nextAttendance },
+    idempotencyKey: operation.idempotencyKey ?? null,
   });
 
   await notifySubscribersOfUpdate(event, participant.userId, {
     kind: "responded",
     summary: `Someone answered (${nextAttendance}).`,
+    idempotencyKey: operation.idempotencyKey ?? undefined,
   });
 }
 
@@ -510,7 +572,7 @@ export async function setResponses(
 async function notifySubscribersOfUpdate(
   event: Event,
   actorUserId: string,
-  update: { kind: string; summary: string },
+  update: { kind: string; summary: string; idempotencyKey?: string },
 ): Promise<void> {
   const { enqueueEventNotification } = await import("@/lib/events/notify");
   const base = {
@@ -537,7 +599,9 @@ async function notifySubscribersOfUpdate(
     if (!organizerRow?.notifyUpdates) return;
     await enqueueEventNotification({
       ...base,
-      dedupeKey: `update:${update.kind}:${event.id}:${event.organizerUserId}:${Date.now()}`,
+      dedupeKey: update.idempotencyKey
+        ? `update:${event.id}:${event.organizerUserId}:${update.idempotencyKey}`
+        : `update:${update.kind}:${event.id}:${event.organizerUserId}:${Date.now()}`,
       userId: event.organizerUserId,
     });
     return;
@@ -545,7 +609,9 @@ async function notifySubscribersOfUpdate(
 
   await enqueueEventNotification({
     ...base,
-    dedupeKey: `update:${update.kind}:${event.id}:${Date.now()}`,
+    dedupeKey: update.idempotencyKey
+      ? `update:${event.id}:${update.idempotencyKey}`
+      : `update:${update.kind}:${event.id}:${Date.now()}`,
     toSubscribedParticipants: true,
     excludeUserId: actorUserId,
   });
@@ -585,10 +651,30 @@ export async function setNotifyUpdates(
 export async function addOption(
   event: Event,
   user: User,
-  input: { dimensionId: string; startsAt?: string | Date; endsAt?: string | Date | null; label?: string },
+  input: {
+    dimensionId: string;
+    startsAt?: string | Date;
+    endsAt?: string | Date | null;
+    label?: string;
+    idempotencyKey?: string | null;
+  },
   role: "organizer" | "participant",
 ): Promise<void> {
   const db = getDb();
+
+  if (input.idempotencyKey) {
+    const [replayed] = await db
+      .select({ id: eventOptions.id })
+      .from(eventOptions)
+      .where(
+        and(
+          eq(eventOptions.eventId, event.id),
+          eq(eventOptions.idempotencyKey, input.idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (replayed) return;
+  }
 
   if (event.status !== "open") {
     throw new AgentApiError(409, "This event is closed.");
@@ -649,16 +735,39 @@ export async function addOption(
     throw new AgentApiError(400, "It must end after it starts.");
   }
 
-  await db.insert(eventOptions).values({
-    eventId: event.id,
-    dimensionId: dimension.id,
-    startsAt,
-    endsAt,
-    label: label ?? null,
-    position: existing[0]?.count ?? 0,
-    createdByRole: role,
-    createdByUserId: user.id,
-  });
+  const [created] = await db
+    .insert(eventOptions)
+    .values({
+      eventId: event.id,
+      dimensionId: dimension.id,
+      startsAt,
+      endsAt,
+      label: label ?? null,
+      position: existing[0]?.count ?? 0,
+      createdByRole: role,
+      createdByUserId: user.id,
+      idempotencyKey: input.idempotencyKey ?? null,
+    })
+    .onConflictDoNothing()
+    .returning();
+  if (!created && !input.idempotencyKey) {
+    throw new AgentApiError(500, "Could not add that option. Try again.");
+  }
+  if (!created && input.idempotencyKey) {
+    const [replayed] = await db
+      .select({ id: eventOptions.id })
+      .from(eventOptions)
+      .where(
+        and(
+          eq(eventOptions.eventId, event.id),
+          eq(eventOptions.idempotencyKey, input.idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (!replayed) {
+      throw new AgentApiError(500, "Could not replay that option safely.");
+    }
+  }
 
   const optionName = label ?? formatSlot(startsAt, endsAt, event.timezone);
   await recordActivity({
@@ -669,6 +778,7 @@ export async function addOption(
       role === "organizer"
         ? `The organizer added ${optionName}.`
         : `${displayName(user.name, user.email)} suggested ${optionName}.`,
+    idempotencyKey: input.idempotencyKey ?? null,
   });
 
   // Options are public on the board under every visibility, so this is safe
@@ -679,6 +789,7 @@ export async function addOption(
       role === "organizer"
         ? `The organizer added another option: ${optionName}.`
         : `A new option was suggested: ${optionName}.`,
+    idempotencyKey: input.idempotencyKey ?? undefined,
   });
 }
 
@@ -692,9 +803,23 @@ export async function extendDeadline(
   event: Event,
   user: User,
   deadlineAt: string | Date,
+  operation: { idempotencyKey?: string | null } = {},
 ): Promise<void> {
   assertOrganizer(event, user);
   const db = getDb();
+  if (operation.idempotencyKey) {
+    const [receipt] = await db
+      .select({ id: eventActivity.id })
+      .from(eventActivity)
+      .where(
+        and(
+          eq(eventActivity.eventId, event.id),
+          eq(eventActivity.idempotencyKey, operation.idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (receipt) return;
+  }
   const next = parseDate(deadlineAt, "deadlineAt");
   if (next.getTime() <= Date.now()) {
     throw new AgentApiError(400, "Pick a deadline in the future.");
@@ -712,6 +837,7 @@ export async function extendDeadline(
     actorUserId: user.id,
     kind: "deadline_extended",
     summary: `The organizer moved the deadline to ${next.toISOString()}.`,
+    idempotencyKey: operation.idempotencyKey ?? null,
   });
 }
 
@@ -974,6 +1100,7 @@ export async function publishNote(opts: {
       ? `${who} added a note: ${preview}`
       : `${who} sent the organizer a note: ${preview}`,
     body: { noteId: note.id, visibility: note.visibility, source: note.source },
+    idempotencyKey: opts.input.idempotencyKey ?? null,
   });
 
   if (shared) {
@@ -982,6 +1109,7 @@ export async function publishNote(opts: {
     await notifySubscribersOfUpdate(event, user.id, {
       kind: "note_added",
       summary: `${who} added a note: ${preview}`,
+      idempotencyKey: opts.input.idempotencyKey ?? `note:${note.id}`,
     });
   } else {
     const { enqueueEventNotification } = await import("@/lib/events/notify");
@@ -1014,6 +1142,7 @@ export async function removeNoteAndRefresh(opts: {
   event: Event;
   user: User;
   noteId: string;
+  idempotencyKey?: string | null;
 }): Promise<EventNote> {
   const note = await removeNote(opts);
   await recordActivity({
@@ -1022,6 +1151,7 @@ export async function removeNoteAndRefresh(opts: {
     kind: "note_removed",
     summary: "The organizer removed a note.",
     body: { noteId: note.id },
+    idempotencyKey: opts.idempotencyKey ?? null,
   });
   await refreshNotesDigest(opts.event, await loadEventNotes(opts.event.id));
   return note;
@@ -1033,6 +1163,7 @@ export async function recordActivity(entry: {
   kind: string;
   summary: string;
   body?: Record<string, unknown>;
+  idempotencyKey?: string | null;
 }) {
   try {
     const db = getDb();
@@ -1042,7 +1173,8 @@ export async function recordActivity(entry: {
       kind: entry.kind,
       summary: entry.summary,
       body: entry.body ?? {},
-    });
+      idempotencyKey: entry.idempotencyKey ?? null,
+    }).onConflictDoNothing();
   } catch (error) {
     console.error("[events] activity write failed", entry.kind, error);
   }

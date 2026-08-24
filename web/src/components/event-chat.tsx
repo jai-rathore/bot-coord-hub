@@ -5,6 +5,12 @@ import { SageAvatar } from "@/components/sage-avatar";
 import type { EventBoard } from "@/lib/events/types";
 
 type ChatMessage = { id: string; role: string; text: string; createdAt: string };
+type SageChatJob = {
+  id: string;
+  state: string;
+  result?: Record<string, unknown> | null;
+  lastError?: string | null;
+};
 
 export function EventChat({
   slug,
@@ -60,36 +66,60 @@ export function EventChat({
     setMessages((prev) => [...prev, optimistic]);
 
     try {
+      const idempotencyKey = crypto.randomUUID();
       const res = await fetch(`/api/events/${slug}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error ?? "The assistant could not respond.");
-        setBusy(false);
-        return;
-      }
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `agent-${prev.length}`,
-          role: "agent",
-          text: data.reply,
-          createdAt: new Date().toISOString(),
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
         },
-      ]);
-      // Mirror any change straight back into the grid above.
-      if (data.board) onBoard(data.board as EventBoard);
+        body: JSON.stringify({ message: text, idempotencyKey }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        job?: SageChatJob;
+      };
+      if (!res.ok || !data.job) {
+        throw new Error(data.error ?? "The assistant could not respond.");
+      }
+
+      const completed =
+        data.job.state === "completed"
+          ? data.job
+          : await waitForSage(data.job.id);
+      const result = completed.result ?? {};
+      if (result.board) onBoard(result.board as EventBoard);
       setTurnsLeft(
-        typeof data.turnsRemaining === "number" ? data.turnsRemaining : null,
+        typeof result.turnsRemaining === "number"
+          ? result.turnsRemaining
+          : null,
       );
-    } catch {
-      setError("Could not reach HoneyMatcha. Check your connection.");
+      await load();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not reach HoneyMatcha. Check your connection.",
+      );
     } finally {
       setBusy(false);
     }
+  }
+
+  async function waitForSage(jobId: string): Promise<SageChatJob> {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      const response = await fetch("/api/sage/jobs", { cache: "no-store" });
+      if (!response.ok) continue;
+      const data = (await response.json()) as { jobs?: SageChatJob[] };
+      const job = data.jobs?.find((candidate) => candidate.id === jobId);
+      if (!job || ["pending", "running"].includes(job.state)) continue;
+      if (job.state === "completed") return job;
+      throw new Error(job.lastError ?? "Sage could not finish this turn.");
+    }
+    throw new Error(
+      "Sage is still working. This turn is saved in Activity, so it is safe to close this conversation.",
+    );
   }
 
   if (!open) {

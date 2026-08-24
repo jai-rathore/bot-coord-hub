@@ -1,11 +1,15 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
 import { randomBytes } from "crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "../src/db";
 import {
   apiKeys,
+  eventActivity,
+  eventDimensions,
+  eventMessages,
   eventOptions,
+  eventNotes,
   eventParticipants,
   events,
   notificationOutbox,
@@ -18,9 +22,11 @@ import {
   cancelEvent,
   createEvent,
   deleteEvent,
+  extendDeadline,
   joinEvent,
   listEventsForUser,
   lockEvent,
+  publishNote,
   rotateShareSlug,
   setResponses,
 } from "../src/lib/events/service";
@@ -34,6 +40,8 @@ import {
   listPeopleMetThroughEvents,
 } from "../src/lib/people";
 import { sageNameFor, setSageName } from "../src/lib/sage";
+import { runEventChatTurn } from "../src/lib/events/turn";
+import type { LlmProvider } from "../src/lib/llm";
 
 function ok(label: string) {
   console.log(`  ✓ ${label}`);
@@ -119,6 +127,32 @@ async function main() {
   assert.equal(timeOptions.length, 2, "two time options expected");
   ok("time and place dimensions built");
 
+  console.log("\n1b. Durable creation replay");
+  const replayInput = {
+    title: `Sage replay ${suffix}`,
+    timezone: "UTC",
+    deadlineAt: new Date(soon).toISOString(),
+    fixedStartsAt: new Date(soon + 24 * 3600_000).toISOString(),
+    idempotencyKey: `sage-replay-${suffix}`,
+  };
+  const replayedFirst = await createEvent(organizer, replayInput, {
+    kind: "hosted_agent",
+  });
+  const replayedSecond = await createEvent(organizer, replayInput, {
+    kind: "hosted_agent",
+  });
+  assert.equal(replayedSecond.id, replayedFirst.id);
+  const replayDimensions = await db
+    .select()
+    .from(eventDimensions)
+    .where(eq(eventDimensions.eventId, replayedFirst.id));
+  assert.equal(
+    replayDimensions.length,
+    2,
+    "a replay must not duplicate dimensions",
+  );
+  ok("the same Sage job creates exactly one complete event");
+
   console.log("\n2. Public view before anyone signs in");
   const publicBoard = await board(event.id, null);
   assert.equal(publicBoard.viewer.role, "public");
@@ -136,6 +170,66 @@ async function main() {
   const rejoin = await joinEvent(event, alice);
   assert.equal(rejoin.id, aliceP.id, "join must be idempotent");
   ok("joining twice does not duplicate a participant");
+
+  console.log("\n3a. Durable hosted chat replay");
+  let modelCalls = 0;
+  const deterministicProvider: LlmProvider = {
+    name: "e2e",
+    model: "deterministic",
+    async complete() {
+      modelCalls += 1;
+      return {
+        text: "I saved your event question.",
+        toolCalls: [],
+        tokensIn: 12,
+        tokensOut: 7,
+        provider: "e2e",
+        model: "deterministic",
+      };
+    },
+  };
+  const chatReplayKey = `sage-chat-${suffix}`;
+  const firstTurn = await runEventChatTurn({
+    event,
+    user: alice,
+    participant: aliceP,
+    role: "participant",
+    message: "Can we meet near transit?",
+    idempotencyKey: chatReplayKey,
+    provider: deterministicProvider,
+  });
+  const replayedTurn = await runEventChatTurn({
+    event,
+    user: alice,
+    participant: aliceP,
+    role: "participant",
+    message: "Can we meet near transit?",
+    idempotencyKey: chatReplayKey,
+    provider: deterministicProvider,
+  });
+  assert.equal(replayedTurn.reply, firstTurn.reply);
+  assert.equal(modelCalls, 1, "a completed turn replay must not call the model");
+  const chatRows = (
+    await db
+      .select()
+      .from(eventMessages)
+      .where(eq(eventMessages.eventId, event.id))
+  ).filter((row) => row.idempotencyKey?.startsWith(chatReplayKey));
+  assert.equal(chatRows.length, 2, "one human and one agent message expected");
+  assert.equal(
+    chatRows.find((row) => row.role === "agent")?.provider,
+    "e2e",
+  );
+  const [aliceAfterChat] = await db
+    .select()
+    .from(eventParticipants)
+    .where(eq(eventParticipants.id, aliceP.id));
+  assert.equal(
+    aliceAfterChat.chatTurnsUsed,
+    1,
+    "a replay must consume one participant turn",
+  );
+  ok("the same Sage chat job calls the model and counts the turn once");
 
   await setResponses(event, aliceP, [
     { optionId: timeOptions[0].id, value: "yes" },
@@ -221,6 +315,102 @@ async function main() {
     .options.filter((o) => o.createdByRole === "participant");
   assert.equal(suggested.length, 1);
   ok("a participant can suggest another time");
+
+  console.log("\n6b. Durable event mutation replay");
+  const optionReplayKey = `sage-option-${suffix}`;
+  const replayedOptionInput = {
+    dimensionId: timeDimensionId,
+    startsAt: new Date(soon + 96 * 3600_000),
+    idempotencyKey: optionReplayKey,
+  };
+  await addOption(event, organizer, replayedOptionInput, "organizer");
+  await addOption(event, organizer, replayedOptionInput, "organizer");
+  assert.equal(
+    (
+      await db
+        .select()
+        .from(eventOptions)
+        .where(
+          and(
+            eq(eventOptions.eventId, event.id),
+            eq(eventOptions.idempotencyKey, optionReplayKey),
+          ),
+        )
+    ).length,
+    1,
+    "an option replay must write once",
+  );
+
+  const responseReplayKey = `sage-response-${suffix}`;
+  await setResponses(
+    event,
+    aliceP,
+    [{ optionId: timeOptions[0].id, value: "yes" }],
+    undefined,
+    { idempotencyKey: responseReplayKey },
+  );
+  await setResponses(
+    event,
+    aliceP,
+    [{ optionId: timeOptions[0].id, value: "yes" }],
+    undefined,
+    { idempotencyKey: responseReplayKey },
+  );
+
+  const noteReplayKey = `sage-note-${suffix}`;
+  const firstNote = await publishNote({
+    event,
+    user: alice,
+    participant: aliceP,
+    input: {
+      body: "I can arrive after six.",
+      visibility: "everyone",
+      source: "chat",
+      idempotencyKey: noteReplayKey,
+    },
+  });
+  const replayedNote = await publishNote({
+    event,
+    user: alice,
+    participant: aliceP,
+    input: {
+      body: "I can arrive after six.",
+      visibility: "everyone",
+      source: "chat",
+      idempotencyKey: noteReplayKey,
+    },
+  });
+  assert.equal(replayedNote.note.id, firstNote.note.id);
+  assert.equal(
+    (
+      await db
+        .select()
+        .from(eventNotes)
+        .where(eq(eventNotes.idempotencyKey, noteReplayKey))
+    ).length,
+    1,
+    "a note replay must write once",
+  );
+
+  const deadlineReplayKey = `sage-deadline-${suffix}`;
+  const extendedDeadline = new Date(soon + 12 * 3600_000).toISOString();
+  await extendDeadline(event, organizer, extendedDeadline, {
+    idempotencyKey: deadlineReplayKey,
+  });
+  await extendDeadline(event, organizer, extendedDeadline, {
+    idempotencyKey: deadlineReplayKey,
+  });
+  const replayActivity = await db
+    .select()
+    .from(eventActivity)
+    .where(
+      and(
+        eq(eventActivity.eventId, event.id),
+        eq(eventActivity.idempotencyKey, deadlineReplayKey),
+      ),
+    );
+  assert.equal(replayActivity.length, 1, "a deadline replay must log once");
+  ok("options, responses, notes, and deadlines survive worker replay once");
 
   console.log("\n7. Authorization");
   await expectReject("a non-organizer cannot lock the event", () =>
@@ -582,6 +772,7 @@ async function main() {
   await db.delete(events).where(eq(events.id, past.id));
   await db.delete(events).where(eq(events.id, rsvp.id));
   await db.delete(events).where(eq(events.id, stillOpenEvent.id));
+  await db.delete(events).where(eq(events.id, replayedFirst.id));
   for (const u of [organizer, alice, bob, mallory]) {
     await db.delete(users).where(eq(users.id, u.id));
   }

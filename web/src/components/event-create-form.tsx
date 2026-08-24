@@ -5,6 +5,13 @@ import { useState } from "react";
 
 type Mode = "rsvp" | "times";
 
+type SageEventJob = {
+  id: string;
+  state: string;
+  result?: Record<string, unknown> | null;
+  lastError?: string | null;
+};
+
 export function EventCreateForm() {
   const router = useRouter();
 
@@ -16,6 +23,7 @@ export function EventCreateForm() {
   const [quorum, setQuorum] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
 
   // Times start empty. Pre-filling them would mean reading the clock during
   // render, which differs between server and client and breaks hydration.
@@ -24,10 +32,37 @@ export function EventCreateForm() {
   const [fixedStart, setFixedStart] = useState("");
   const [slots, setSlots] = useState<string[]>(["", ""]);
 
+  function createdEventId(job: SageEventJob) {
+    return typeof job.result?.eventId === "string" ? job.result.eventId : null;
+  }
+
+  async function waitForSage(jobId: string) {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      const response = await fetch("/api/sage/jobs", { cache: "no-store" });
+      if (!response.ok) continue;
+      const data = (await response.json()) as { jobs?: SageEventJob[] };
+      const job = data.jobs?.find((candidate) => candidate.id === jobId);
+      if (!job || ["pending", "running"].includes(job.state)) continue;
+      const eventId = createdEventId(job);
+      if (job.state === "completed" && eventId) {
+        router.push(`/app/events/${eventId}`);
+        return;
+      }
+      throw new Error(
+        job.lastError ?? "Sage could not finish creating this plan.",
+      );
+    }
+    throw new Error(
+      "Sage is still working. Your request is saved in Activity, so it is safe to leave this page.",
+    );
+  }
+
   async function submit(formEvent: React.FormEvent) {
     formEvent.preventDefault();
     setBusy(true);
     setError(null);
+    setStatus("Sage is creating the plan and its private share link.");
 
     const timezone =
       Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -50,21 +85,40 @@ export function EventCreateForm() {
     }
 
     try {
-      const res = await fetch("/api/events", {
+      const idempotencyKey = crypto.randomUUID();
+      const res = await fetch("/api/sage/jobs", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({
+          capability: "coordinate_event",
+          payload: { action: "create", ...payload },
+          idempotencyKey,
+        }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error ?? "Could not create the event.");
-        setBusy(false);
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        job?: SageEventJob;
+      };
+      if (!res.ok || !data.job) {
+        throw new Error(data.error ?? "Could not ask Sage to create the event.");
+      }
+      const eventId = createdEventId(data.job);
+      if (data.job.state === "completed" && eventId) {
+        router.push(`/app/events/${eventId}`);
         return;
       }
-      router.push(`/app/events/${data.event.id}`);
-    } catch {
-      setError("Could not reach HoneyMatcha. Check your connection.");
+      await waitForSage(data.job.id);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not reach HoneyMatcha. Check your connection.",
+      );
       setBusy(false);
+      setStatus(null);
     }
   }
 
@@ -309,12 +363,18 @@ export function EventCreateForm() {
         </p>
       )}
 
+      {status && !error && (
+        <p className="text-sm font-medium text-matcha-deep" role="status">
+          {status}
+        </p>
+      )}
+
       <button
         type="submit"
         className="button-primary w-full sm:w-auto"
         disabled={busy}
       >
-        {busy ? "Creating…" : "Create plan and get the link"}
+        {busy ? "Sage is creating it…" : "Ask Sage to create the plan"}
       </button>
     </form>
   );

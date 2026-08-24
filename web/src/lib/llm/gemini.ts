@@ -6,7 +6,7 @@
 
 import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
-/** A model turn is awaited inline in the event chat request. */
+/** A model turn is bounded so a Sage worker lease can recover promptly. */
 const GEMINI_TIMEOUT_MS = 25_000;
 import {
   LlmUnavailableError,

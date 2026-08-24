@@ -12,7 +12,7 @@ export default function NewEventPage() {
       <PageHeading
         eyebrow="Plans"
         title="Plan with a group"
-        description="Name the plan and the choices you need from people. HoneyMatcha creates one link for the group, gathers their answers, and leaves the final decision with you."
+        description="Tell Sage what the group needs to decide. Sage creates one link, HoneyMatcha gathers the answers, and the final decision stays with you."
       />
       <EventCreateForm />
     </div>

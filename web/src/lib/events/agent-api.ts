@@ -193,7 +193,11 @@ export async function agentCreateEvent(
 ) {
   assertEnabled();
   assertAgentScope(auth, "events:write");
-  const event = await createEvent(auth.user, body as unknown as CreateEventInput);
+  const event = await createEvent(
+    auth.user,
+    body as unknown as CreateEventInput,
+    { kind: "agent", apiKeyId: auth.apiKey.id },
+  );
   return {
     ok: true,
     event: {

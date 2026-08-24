@@ -216,6 +216,7 @@ export type PostNoteInput = {
   visibility?: NoteVisibility;
   optionId?: string | null;
   source?: NoteSource;
+  idempotencyKey?: string | null;
 };
 
 export type PostNoteResult = {
@@ -237,6 +238,26 @@ export async function postNote(opts: {
 }): Promise<PostNoteResult> {
   const { event, user, participant, input } = opts;
   const db = getDb();
+
+  if (input.idempotencyKey) {
+    const [replayed] = await db
+      .select()
+      .from(eventNotes)
+      .where(
+        and(
+          eq(eventNotes.eventId, event.id),
+          eq(eventNotes.idempotencyKey, input.idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (replayed) {
+      const requested = input.visibility ?? "everyone";
+      return {
+        note: replayed,
+        notice: noteVisibilityNotice(requested, replayed.visibility as NoteVisibility),
+      };
+    }
+  }
 
   if (event.status === "cancelled") {
     throw new AgentApiError(409, "This event was cancelled.");
@@ -296,8 +317,30 @@ export async function postNote(opts: {
       body,
       visibility,
       source: input.source ?? "chat",
+      idempotencyKey: input.idempotencyKey ?? null,
     })
+    .onConflictDoNothing()
     .returning();
+
+  if (!note && input.idempotencyKey) {
+    const [replayed] = await db
+      .select()
+      .from(eventNotes)
+      .where(
+        and(
+          eq(eventNotes.eventId, event.id),
+          eq(eventNotes.idempotencyKey, input.idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (replayed) {
+      return {
+        note: replayed,
+        notice: noteVisibilityNotice(requested, replayed.visibility as NoteVisibility),
+      };
+    }
+  }
+  if (!note) throw new AgentApiError(500, "Could not save this note. Try again.");
 
   return { note, notice: noteVisibilityNotice(requested, visibility) };
 }

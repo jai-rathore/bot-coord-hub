@@ -7,7 +7,7 @@
  * by hand in the UI.
  */
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   eventDimensions,
@@ -19,7 +19,12 @@ import {
   type User,
 } from "@/db/schema";
 import { AgentApiError } from "@/lib/agent-errors";
-import { getLlmProvider, hostedAgentAvailable, type LlmToolCall } from "@/lib/llm";
+import {
+  getLlmProvider,
+  hostedAgentAvailable,
+  type LlmProvider,
+  type LlmToolCall,
+} from "@/lib/llm";
 import {
   GuardrailError,
   REFUSAL_MESSAGE,
@@ -64,6 +69,12 @@ export type TurnResult = {
   board: EventBoard;
   applied: string[];
   turnsRemaining: number;
+  telemetry?: {
+    provider: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+  };
 };
 
 async function threadHistory(
@@ -100,16 +111,68 @@ async function persistMessage(entry: {
   toolCalls?: unknown[];
   tokensIn?: number;
   tokensOut?: number;
+  provider?: string | null;
+  model?: string | null;
+  idempotencyKey?: string | null;
 }) {
   const db = getDb();
-  await db.insert(eventMessages).values({
-    eventId: entry.eventId,
-    participantId: entry.participantId,
-    role: entry.role,
-    text: entry.text,
-    toolCalls: entry.toolCalls ?? [],
-    tokensIn: entry.tokensIn ?? 0,
-    tokensOut: entry.tokensOut ?? 0,
+  const [created] = await db
+    .insert(eventMessages)
+    .values({
+      eventId: entry.eventId,
+      participantId: entry.participantId,
+      role: entry.role,
+      text: entry.text,
+      toolCalls: entry.toolCalls ?? [],
+      tokensIn: entry.tokensIn ?? 0,
+      tokensOut: entry.tokensOut ?? 0,
+      provider: entry.provider ?? null,
+      model: entry.model ?? null,
+      idempotencyKey: entry.idempotencyKey ?? null,
+    })
+    .onConflictDoNothing()
+    .returning();
+  if (created) return created;
+  if (entry.idempotencyKey) {
+    const [replayed] = await db
+      .select()
+      .from(eventMessages)
+      .where(
+        and(
+          eq(eventMessages.eventId, entry.eventId),
+          eq(eventMessages.idempotencyKey, entry.idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (replayed) return replayed;
+  }
+  throw new AgentApiError(500, "Could not save this chat turn. Try again.");
+}
+
+async function countParticipantTurnOnce(
+  messageId: string,
+  participantId: string | null,
+) {
+  if (!participantId) return;
+  await getDb().transaction(async (tx) => {
+    const [claimed] = await tx
+      .update(eventMessages)
+      .set({ turnCounted: true })
+      .where(
+        and(
+          eq(eventMessages.id, messageId),
+          eq(eventMessages.turnCounted, false),
+        ),
+      )
+      .returning({ id: eventMessages.id });
+    if (!claimed) return;
+    await tx
+      .update(eventParticipants)
+      .set({
+        chatTurnsUsed: sql`${eventParticipants.chatTurnsUsed} + 1`,
+        lastSeenAt: new Date(),
+      })
+      .where(eq(eventParticipants.id, participantId));
   });
 }
 
@@ -226,13 +289,14 @@ async function applyToolCall(opts: {
   event: Event;
   user: User;
   participant: EventParticipant | null;
+  idempotencyKey?: string;
 }): Promise<{
   applied: string | null;
   reply: string | null;
   /** Something the person must be told regardless of what the model wrote. */
   notice?: string | null;
 }> {
-  const { call, role, event, user, participant } = opts;
+  const { call, role, event, user, participant, idempotencyKey } = opts;
   const args = call.args ?? {};
 
   if (HUMAN_ONLY_ACTIONS.includes(call.name as (typeof HUMAN_ONLY_ACTIONS)[number])) {
@@ -261,7 +325,7 @@ async function applyToolCall(opts: {
       }
       await setResponses(event, participant, [
         { optionId, value: value as "yes" | "no" | "maybe" },
-      ]);
+      ], undefined, { idempotencyKey });
       return { applied: `preference:${value}`, reply: null };
     }
 
@@ -271,7 +335,13 @@ async function applyToolCall(opts: {
       if (!["yes", "no", "maybe"].includes(value)) {
         return { applied: null, reply: null };
       }
-      await setResponses(event, participant, [], value as "yes" | "no" | "maybe");
+      await setResponses(
+        event,
+        participant,
+        [],
+        value as "yes" | "no" | "maybe",
+        { idempotencyKey },
+      );
       return { applied: `attendance:${value}`, reply: null };
     }
 
@@ -302,7 +372,12 @@ async function applyToolCall(opts: {
             "This event's times are fixed, so I can't add another: but I can pass your preference to the organizer.",
         };
       }
-      await addOption(event, user, { dimensionId, startsAt, label }, "participant");
+      await addOption(
+        event,
+        user,
+        { dimensionId, startsAt, label, idempotencyKey },
+        "participant",
+      );
       return { applied: "option_proposed", reply: null };
     }
 
@@ -326,14 +401,19 @@ async function applyToolCall(opts: {
             "There's no open list to add to on this event: its options are fixed.",
         };
       }
-      await addOption(event, user, { dimensionId, startsAt, label }, "organizer");
+      await addOption(
+        event,
+        user,
+        { dimensionId, startsAt, label, idempotencyKey },
+        "organizer",
+      );
       return { applied: "option_added", reply: null };
     }
 
     case "extend_deadline": {
       const deadlineAt = String(args.deadlineAt ?? "");
       if (!deadlineAt) return { applied: null, reply: null };
-      await extendDeadline(event, user, deadlineAt);
+      await extendDeadline(event, user, deadlineAt, { idempotencyKey });
       return { applied: "deadline_extended", reply: null };
     }
 
@@ -358,6 +438,7 @@ async function applyToolCall(opts: {
           visibility,
           optionId: args.optionId ? String(args.optionId) : null,
           source: "chat",
+          idempotencyKey,
         },
       });
       return {
@@ -378,7 +459,7 @@ async function applyToolCall(opts: {
     case "remove_note": {
       const noteId = String(args.noteId ?? "");
       if (!noteId) return { applied: null, reply: null };
-      await removeNoteAndRefresh({ event, user, noteId });
+      await removeNoteAndRefresh({ event, user, noteId, idempotencyKey });
       return { applied: "note_removed", reply: null };
     }
 
@@ -392,7 +473,12 @@ async function applyToolCall(opts: {
         event,
         user,
         participant,
-        input: { body: question, visibility: "organizer", source: "chat" },
+        input: {
+          body: question,
+          visibility: "organizer",
+          source: "chat",
+          idempotencyKey,
+        },
       });
       return { applied: "question_sent", reply: null };
     }
@@ -409,6 +495,9 @@ export async function runEventChatTurn(opts: {
   participant: EventParticipant | null;
   role: EventToolRole;
   message: string;
+  idempotencyKey?: string | null;
+  /** Deterministic provider injection for database integration tests. */
+  provider?: LlmProvider;
 }): Promise<TurnResult> {
   const { event, user, role } = opts;
   const db = getDb();
@@ -416,7 +505,7 @@ export async function runEventChatTurn(opts: {
   if (!event.allowChat) {
     throw new AgentApiError(403, "Chat is turned off for this event.");
   }
-  if (!hostedAgentAvailable()) {
+  if (!opts.provider && !hostedAgentAvailable()) {
     throw new AgentApiError(
       503,
       "The assistant is unavailable right now. You can still tap your answer above.",
@@ -424,6 +513,53 @@ export async function runEventChatTurn(opts: {
   }
 
   let participant = opts.participant;
+  const humanMessageKey = opts.idempotencyKey
+    ? `${opts.idempotencyKey}:human`
+    : null;
+  const agentMessageKey = opts.idempotencyKey
+    ? `${opts.idempotencyKey}:agent`
+    : null;
+  if (agentMessageKey) {
+    const [completed] = await db
+      .select()
+      .from(eventMessages)
+      .where(
+        and(
+          eq(eventMessages.eventId, event.id),
+          eq(eventMessages.idempotencyKey, agentMessageKey),
+        ),
+      )
+      .limit(1);
+    if (completed) {
+      await countParticipantTurnOnce(completed.id, participant?.id ?? null);
+      if (participant) {
+        const [fresh] = await db
+          .select()
+          .from(eventParticipants)
+          .where(eq(eventParticipants.id, participant.id))
+          .limit(1);
+        participant = fresh ?? participant;
+      }
+      return {
+        reply: completed.text,
+        board: await boardFor(event.id, user),
+        applied: [],
+        turnsRemaining:
+          role === "participant"
+            ? Math.max(0, chatTurnCap() - (participant?.chatTurnsUsed ?? 0))
+            : Number.POSITIVE_INFINITY,
+        telemetry:
+          completed.provider && completed.model
+            ? {
+                provider: completed.provider,
+                model: completed.model,
+                inputTokens: completed.tokensIn,
+                outputTokens: completed.tokensOut,
+              }
+            : undefined,
+      };
+    }
+  }
 
   // Turn cap: participants only. The organizer's own thread is metered by the
   // route's rate limiter instead.
@@ -450,6 +586,9 @@ export async function runEventChatTurn(opts: {
         participantId: participant?.id ?? null,
         role: "system",
         text: `blocked: ${error.message}`,
+        idempotencyKey: opts.idempotencyKey
+          ? `${opts.idempotencyKey}:blocked`
+          : null,
       });
       await logAnomaly(event.id, user.id, {
         reason: "guardrail",
@@ -478,7 +617,9 @@ export async function runEventChatTurn(opts: {
       ? organizerToolDefs()
       : participantToolDefs(event.allowGuestOptions);
 
-  const history = await threadHistory(event.id, participant?.id ?? null);
+  const history = (await threadHistory(event.id, participant?.id ?? null)).filter(
+    (row) => !humanMessageKey || row.idempotencyKey !== humanMessageKey,
+  );
   const messages = [
     ...history.map((row) => ({
       role: (row.role === "agent" ? "model" : "user") as "user" | "model",
@@ -492,11 +633,12 @@ export async function runEventChatTurn(opts: {
     participantId: participant?.id ?? null,
     role: role === "organizer" ? "organizer" : "participant",
     text,
+    idempotencyKey: humanMessageKey,
   });
 
   let result;
   try {
-    result = await getLlmProvider().complete({
+    result = await (opts.provider ?? getLlmProvider()).complete({
       system,
       messages,
       tools,
@@ -513,7 +655,7 @@ export async function runEventChatTurn(opts: {
   const applied: string[] = [];
   const notices: string[] = [];
   let reply: string | null = null;
-  for (const call of result.toolCalls) {
+  for (const [index, call] of result.toolCalls.entries()) {
     try {
       const outcome = await applyToolCall({
         call,
@@ -521,6 +663,9 @@ export async function runEventChatTurn(opts: {
         event,
         user,
         participant,
+        idempotencyKey: opts.idempotencyKey
+          ? `${opts.idempotencyKey}:tool:${index}`
+          : undefined,
       });
       if (outcome.applied) applied.push(outcome.applied);
       if (outcome.reply) reply = outcome.reply;
@@ -550,7 +695,7 @@ export async function runEventChatTurn(opts: {
   // confident reply over the top of it.
   reply = appendNotices(reply, notices);
 
-  await persistMessage({
+  const agentMessage = await persistMessage({
     eventId: event.id,
     participantId: participant?.id ?? null,
     role: "agent",
@@ -558,14 +703,18 @@ export async function runEventChatTurn(opts: {
     toolCalls: result.toolCalls as unknown[],
     tokensIn: result.tokensIn,
     tokensOut: result.tokensOut,
+    provider: result.provider,
+    model: result.model,
+    idempotencyKey: agentMessageKey,
   });
 
   if (role === "participant" && participant) {
+    await countParticipantTurnOnce(agentMessage.id, participant.id);
     const [updated] = await db
-      .update(eventParticipants)
-      .set({ chatTurnsUsed: participant.chatTurnsUsed + 1, lastSeenAt: new Date() })
+      .select()
+      .from(eventParticipants)
       .where(eq(eventParticipants.id, participant.id))
-      .returning();
+      .limit(1);
     participant = updated ?? participant;
   }
 
@@ -579,6 +728,12 @@ export async function runEventChatTurn(opts: {
       role === "participant"
         ? Math.max(0, chatTurnCap() - (participant?.chatTurnsUsed ?? 0))
         : Number.POSITIVE_INFINITY,
+    telemetry: {
+      provider: result.provider,
+      model: result.model,
+      inputTokens: result.tokensIn,
+      outputTokens: result.tokensOut,
+    },
   };
 }
 

@@ -7,6 +7,7 @@ import {
   agentCapabilities,
   eventActivity,
   eventDimensions,
+  eventMessages,
   eventNotes,
   eventOptions,
   eventParticipants,
@@ -159,7 +160,14 @@ async function main() {
     const db = getDb();
     try {
       await Promise.all([
-        db.select({ id: guestTasks.id }).from(guestTasks).limit(1),
+        db
+          .select({
+            id: guestTasks.id,
+            tokenEncrypted: guestTasks.tokenEncrypted,
+            idempotencyKey: guestTasks.idempotencyKey,
+          })
+          .from(guestTasks)
+          .limit(1),
         db.select({ id: agentPairings.id }).from(agentPairings).limit(1),
         db
           .select({
@@ -201,17 +209,55 @@ async function main() {
           .select({ id: agentCapabilities.id })
           .from(agentCapabilities)
           .limit(1),
-        db.select({ id: events.id }).from(events).limit(1),
+        db
+          .select({ id: events.id, idempotencyKey: events.idempotencyKey })
+          .from(events)
+          .limit(1),
         db.select({ id: eventDimensions.id }).from(eventDimensions).limit(1),
-        db.select({ id: eventOptions.id }).from(eventOptions).limit(1),
+        db
+          .select({
+            id: eventOptions.id,
+            idempotencyKey: eventOptions.idempotencyKey,
+          })
+          .from(eventOptions)
+          .limit(1),
         db
           .select({ id: eventParticipants.id })
           .from(eventParticipants)
           .limit(1),
         db.select({ id: eventResponses.id }).from(eventResponses).limit(1),
-        db.select({ id: eventActivity.id }).from(eventActivity).limit(1),
-        db.select({ id: eventNotes.id }).from(eventNotes).limit(1),
-        db.select({ id: sageJobs.id }).from(sageJobs).limit(1),
+        db
+          .select({
+            id: eventActivity.id,
+            idempotencyKey: eventActivity.idempotencyKey,
+          })
+          .from(eventActivity)
+          .limit(1),
+        db
+          .select({
+            id: eventNotes.id,
+            idempotencyKey: eventNotes.idempotencyKey,
+          })
+          .from(eventNotes)
+          .limit(1),
+        db
+          .select({
+            id: eventMessages.id,
+            idempotencyKey: eventMessages.idempotencyKey,
+            turnCounted: eventMessages.turnCounted,
+            provider: eventMessages.provider,
+            model: eventMessages.model,
+          })
+          .from(eventMessages)
+          .limit(1),
+        db
+          .select({
+            id: sageJobs.id,
+            payloadEncrypted: sageJobs.payloadEncrypted,
+            resultEncrypted: sageJobs.resultEncrypted,
+          })
+          .from(sageJobs)
+          .limit(1),
         db
           .select({ id: sageDiscoveryThreads.id })
           .from(sageDiscoveryThreads)
