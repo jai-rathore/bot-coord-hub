@@ -229,7 +229,8 @@ export async function deliverDiscoveryInbox(opts: {
   body: Record<string, unknown>;
   sessionId?: string | null;
   discoveryInterestId?: string | null;
-}): Promise<{ inboxId: string; callback: "delivered" | "failed" | "none" }> {
+  dedupeKey?: string | null;
+}): Promise<{ inboxId: string | null; callback: "delivered" | "failed" | "none" }> {
   const [created] = await getDb()
     .insert(agentInbox)
     .values({
@@ -239,8 +240,11 @@ export async function deliverDiscoveryInbox(opts: {
       kind: opts.kind,
       summary: opts.summary,
       body: opts.body,
+      dedupeKey: opts.dedupeKey ?? null,
     })
+    .onConflictDoNothing({ target: agentInbox.dedupeKey })
     .returning();
+  if (!created) return { inboxId: null, callback: "none" };
   await enqueueSageActivityTrigger({
     userId: opts.userId,
     sourceId: created.id,

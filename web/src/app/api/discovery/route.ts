@@ -3,14 +3,20 @@ import {
   blockDiscoveryParticipant,
   decideDiscoveryEnrollment,
   decideDiscoveryInterest,
+  dismissDiscoveryRecommendation,
   listDiscoveryCatalog,
   listDiscoveryInterests,
+  listDiscoveryRecommendations,
   listUserDiscoveryAudit,
   reportDiscoveryParticipant,
   requestDiscoveryIntroduction,
   submitDiscoveryEnrollment,
   type CoarseLocationInput,
 } from "@/lib/discovery-service";
+import {
+  listDiscoveryCadences,
+  setDiscoveryCadence,
+} from "@/lib/sage/discovery-cadence";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { distributedRateLimit } from "@/lib/distributed-rate-limit";
 import { jsonError } from "@/lib/http";
@@ -30,14 +36,18 @@ export async function GET() {
   const user = await currentUserOrResponse();
   if (user instanceof Response) return user;
   try {
-    const [intents, interests, audit] = await Promise.all([
+    const [intents, interests, audit, recommendations, cadences] = await Promise.all([
       listDiscoveryCatalog(user.id, { includeOwnerReview: true }),
       listDiscoveryInterests(user.id, { includeStableIds: true }),
       listUserDiscoveryAudit(user.id),
+      listDiscoveryRecommendations(user.id),
+      listDiscoveryCadences(user.id),
     ]);
     return Response.json({
       intents,
       interests,
+      recommendations,
+      cadences,
       audit: audit.map((row) => ({
         id: row.id,
         action: row.action,
@@ -75,7 +85,12 @@ export async function POST(request: Request) {
       details?: unknown;
       block?: boolean;
       candidateHandle?: unknown;
+      recommendationId?: unknown;
       idempotencyKey?: unknown;
+      enabled?: unknown;
+      intervalHours?: unknown;
+      maxRecommendations?: unknown;
+      notifyOnNew?: unknown;
     };
     if (
       body.action === "submit_enrollment" ||
@@ -232,6 +247,42 @@ export async function POST(request: Request) {
               typeof body.idempotencyKey === "string"
                 ? body.idempotencyKey
                 : undefined,
+          }),
+        });
+      case "set_cadence":
+        if (
+          typeof body.intentSlug !== "string" ||
+          typeof body.enabled !== "boolean"
+        ) {
+          return Response.json(
+            { error: "intentSlug and enabled are required" },
+            { status: 400 },
+          );
+        }
+        return Response.json({
+          cadence: await setDiscoveryCadence({
+            user,
+            intentSlug: body.intentSlug,
+            enabled: body.enabled,
+            intervalHours: body.intervalHours,
+            maxRecommendations: body.maxRecommendations,
+            notifyOnNew:
+              typeof body.notifyOnNew === "boolean"
+                ? body.notifyOnNew
+                : undefined,
+          }),
+        });
+      case "dismiss_recommendation":
+        if (typeof body.recommendationId !== "string") {
+          return Response.json(
+            { error: "recommendationId is required" },
+            { status: 400 },
+          );
+        }
+        return Response.json({
+          recommendation: await dismissDiscoveryRecommendation({
+            user,
+            recommendationId: body.recommendationId,
           }),
         });
       case "block":

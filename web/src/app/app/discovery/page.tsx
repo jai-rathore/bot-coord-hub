@@ -3,10 +3,12 @@ import { PageHeading } from "@/components/page-heading";
 import {
   listDiscoveryCatalog,
   listDiscoveryInterests,
+  listDiscoveryRecommendations,
   listUserDiscoveryAudit,
 } from "@/lib/discovery-service";
 import { ensureCurrentUser } from "@/lib/users";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
+import { listDiscoveryCadences } from "@/lib/sage/discovery-cadence";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +28,12 @@ export default async function DiscoveryPage() {
       </div>
     );
   }
-  const [intents, interests, audit] = await Promise.all([
+  const [intents, interests, audit, recommendations, cadences] = await Promise.all([
     listDiscoveryCatalog(user.id, { includeOwnerReview: true }),
     listDiscoveryInterests(user.id, { includeStableIds: true }),
     listUserDiscoveryAudit(user.id),
+    listDiscoveryRecommendations(user.id),
+    listDiscoveryCadences(user.id),
   ]);
   return (
     <div>
@@ -42,6 +46,8 @@ export default async function DiscoveryPage() {
         <DiscoveryManager
           initialIntents={intents}
           initialInterests={interests}
+          initialRecommendations={recommendations}
+          initialCadences={cadences}
           initialAudit={audit.map((row) => ({
             id: row.id,
             action: row.action,

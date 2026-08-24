@@ -189,12 +189,19 @@ const discoverySearch: CoordinationCapabilityDefinition = {
         "limit must be a whole number between 1 and 20",
       );
     }
-    return { intentSlug, limit };
+    return {
+      intentSlug,
+      limit,
+      ...(payload.onlyNewRecommendations === true
+        ? { onlyNewRecommendations: true }
+        : {}),
+    };
   },
   redactInput(input) {
     return {
       intentSlug: input.intentSlug,
       requestedLimit: input.limit ?? null,
+      onlyNewRecommendations: input.onlyNewRecommendations === true,
     };
   },
   async execute(context, input) {
@@ -219,6 +226,7 @@ const discoverySearch: CoordinationCapabilityDefinition = {
         },
         intentSlug: String(input.intentSlug),
         limit: typeof input.limit === "number" ? input.limit : undefined,
+        onlyNewRecommendations: input.onlyNewRecommendations === true,
       })) as Record<string, unknown>;
     } catch (error) {
       if (error instanceof AgentApiError) {

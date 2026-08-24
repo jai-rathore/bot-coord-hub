@@ -27,9 +27,11 @@ import {
   decideSafetyReport,
   listDiscoveryCatalog,
   listDiscoveryInterests,
+  listDiscoveryRecommendations,
   listSafetyReportsForModeration,
   reportDiscoveryParticipant,
   requestDiscoveryIntroduction,
+  materializeDiscoveryRecommendation,
   searchDiscovery,
   setDiscoverySafetyStatus,
   submitDiscoveryEnrollment,
@@ -464,6 +466,8 @@ async function main() {
   assert.equal(firstSearch.candidates.length, 1);
   const firstCandidate = firstSearch.candidates[0]!;
   assert.match(firstCandidate.candidateHandle, /^dc_/);
+  assert.match(firstCandidate.recommendationId, /^[0-9a-f-]{36}$/i);
+  assert.equal(firstCandidate.isNewRecommendation, true);
   assert.equal(firstCandidate.compatibility.verdict, "potential");
   assert.deepEqual(firstCandidate.untrustedParticipantData, {
     participantType: "host",
@@ -487,15 +491,38 @@ async function main() {
     secondSearch.candidates[0]?.candidateHandle,
     firstCandidate.candidateHandle,
   );
+  assert.equal(
+    secondSearch.candidates[0]?.recommendationId,
+    firstCandidate.recommendationId,
+    "repeat searches must refresh one durable recommendation, not duplicate it",
+  );
+  assert.equal(secondSearch.candidates[0]?.isNewRecommendation, false);
+  const savedRecommendations = await listDiscoveryRecommendations(
+    seeker.id,
+    "local_meetup",
+  );
+  assert.equal(savedRecommendations.length, 1);
+  assert.equal(JSON.stringify(savedRecommendations).includes(host.id), false);
+  assert.equal(JSON.stringify(savedRecommendations).includes(host.email), false);
+  const durableCandidateHandle = await materializeDiscoveryRecommendation({
+    actor: { user: seeker, kind: "agent", apiKeyId: key.id },
+    recommendationId: firstCandidate.recommendationId,
+  });
+  assert.match(durableCandidateHandle, /^dc_/);
 
   const request = await requestDiscoveryIntroduction({
     actor: { user: seeker, kind: "agent", apiKeyId: key.id },
-    candidateHandle: firstCandidate.candidateHandle,
+    candidateHandle: durableCandidateHandle,
     idempotencyKey: `intro-${suffix}`,
   });
   assert.equal(request.status, "pending");
   assert.equal(request.interestId, null);
   assert.equal(request.requesterConfirmed, false);
+  assert.equal(
+    (await listDiscoveryRecommendations(seeker.id, "local_meetup")).length,
+    0,
+    "a staged introduction must leave the active recommendation list",
+  );
   const [storedInterest] = await db
     .select()
     .from(discoveryInterests)

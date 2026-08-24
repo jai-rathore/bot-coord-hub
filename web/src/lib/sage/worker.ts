@@ -87,7 +87,16 @@ export async function processNextSageJob(input: {
     heartbeat.unref?.();
 
     const outcome = await capability.execute(
-      { actor: hostedAgentActor(user, run.id), jobId: job.id },
+      {
+        actor: hostedAgentActor(user, run.id),
+        jobId: job.id,
+        trigger: job.trigger as
+          | "user_request"
+          | "scheduled"
+          | "inbox"
+          | "deadline"
+          | "approval_result",
+      },
       parsedInput,
     );
     if (outcome.telemetry) {
