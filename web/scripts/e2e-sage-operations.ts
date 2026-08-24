@@ -1,7 +1,7 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "../src/db";
 import {
   auditLogs,
@@ -76,6 +76,39 @@ async function main() {
     ].map((key) => [key, process.env[key]]),
   );
   try {
+    const indexRows = (await db.execute(sql`
+      select indexname, indexdef
+      from pg_indexes
+      where schemaname = 'public'
+        and indexname = 'purpose_enrollments_cursor_idx'
+    `)) as unknown as Array<{ indexname: string; indexdef: string }>;
+    assert.equal(indexRows.length, 1);
+    assert.match(
+      indexRows[0].indexdef,
+      /intent_slug.*status.*definition_version.*id/i,
+    );
+    const candidatePlan = await db.transaction(async (tx) => {
+      await tx.execute(sql`set local enable_seqscan = off`);
+      return tx.execute(sql`
+        explain (costs off)
+        select id
+        from purpose_enrollments
+        where intent_slug = 'dating'
+          and status = 'active'
+          and definition_version = 1
+          and id >= '00000000-0000-0000-0000-000000000000'::uuid
+        order by id asc
+        limit 100
+      `);
+    });
+    const candidatePlanText = (
+      candidatePlan as unknown as Array<Record<string, string>>
+    )
+      .map((row) => row["QUERY PLAN"] ?? Object.values(row)[0] ?? "")
+      .join("\n");
+    assert.match(candidatePlanText, /purpose_enrollments_cursor_idx/i);
+    console.log("PASS discovery candidate window uses the production cursor index");
+
     const [administrator, subject] = await db
       .insert(users)
       .values([
