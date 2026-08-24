@@ -20,13 +20,13 @@ A milestone is complete only when all three columns below say **Complete**:
 
 | Milestone | Code | Production | Verified | Current gap |
 | --- | --- | --- | --- | --- |
-| Shared capability boundary | Complete | Complete | Partial | Scheduling and discovery search share domain services; other streams do not yet use Sage capabilities. |
+| Shared capability boundary | Partial | Complete | Partial | Scheduling and discovery now share domain services; events, guest requests, people, and inbox still need outcome-level Sage capabilities. |
 | Durable Sage queue | Complete | Complete | Partial | Postgres jobs, runs, steps, leases, retries, and idempotency are live; concurrency recovery still needs database integration coverage. |
 | Sage worker | Complete | Complete | Complete | The worker is live, reaches production Postgres, polls without errors, and the pre-worker queue was confirmed empty. |
 | Scheduling | Complete | Complete | Not verified | Structured Sage requests exist; real-calendar duplicate and approval behavior still needs production dogfooding. |
-| Dating discovery | Search only | Complete | Not verified | Sage cannot yet conduct enrollment intake, clarification, or interest follow-up. |
-| Recruiting discovery | Search only | Complete | Not verified | Guest compatibility requests and response monitoring are outside the Sage harness. |
-| Local meetup discovery | Search only | Complete | Not verified | No recurring search or persistent recommendations. |
+| Dating discovery | Partial | Complete | Partial | Encrypted conversational intake, clarification, location choice, snapshot preparation, anonymous search, and staged introductions are live. Signed-in activation and dual-approval dogfooding remain. |
+| Recruiting discovery | Partial | Complete | Not verified | Conversational hiring intake is live; guest compatibility requests and response monitoring are outside the Sage harness. |
+| Local meetup discovery | Partial | Complete | Not verified | Conversational meetup intake is live; recurring search and persistent recommendations remain. |
 | Events | Partial | Complete | Partial | Event chat has Gemini and role-scoped tools, but event creation and lifecycle work are not in the durable Sage harness. |
 | People and invitations | Missing | Not applicable | Not verified | Connected-agent and human UI flows exist; Sage has no outcome capability. |
 | Inbox and follow-up | Missing | Not applicable | Not verified | Trigger names exist, but inbox, deadline, approval, and scheduled producers are not wired to Sage. |
@@ -44,31 +44,38 @@ A milestone is complete only when all three columns below say **Complete**:
 
 ## Work queue
 
-### Active change
+### Latest production evidence
 
-`cursor/sage-conversational-discovery` is implementing encrypted discovery
-threads, contract-scoped intake, canonical location choices, snapshot
-preparation, and Sage-staged introductions. These remain unchecked below until
-the change is merged, deployed, and verified.
+- PRs 71 through 73 are merged and the web and worker services run the same
+  production schema and Sage discovery code.
+- A production synthetic dating turn completed through the durable queue,
+  Gemini, canonical location resolution, encrypted message storage, and run
+  telemetry. Its temporary user and all cascaded data were deleted afterward.
+- Deployment verification found and repaired a previously skipped API-key
+  migration. Preflight now checks the complete credential shape and the Sage
+  queue and conversation tables.
+- Signed-in browser dogfooding is still required before conversational
+  discovery can be called completely verified.
 
 ### P0: make the existing Sage path operational
 
 - [x] Provision `honeymatcha-sage-worker` in the live Render workspace.
 - [x] Confirm the worker uses the production database and `ENABLE_SAGE_JOBS=true`.
 - [x] Inspect jobs queued before the worker existed; the production queue was empty.
+- [x] Run a synthetic discovery turn through the production worker, Gemini, location resolver, encryption, and cleanup.
 - [ ] Run an authenticated scheduling job and discovery job end to end.
 - [ ] Verify lease heartbeats, graceful shutdown, retry, and idempotent replay in production.
 
 ### P1: complete conversational discovery
 
-- [ ] Add a narrow request interpreter that produces one typed capability request.
-- [ ] Give the model only the selected capability schema, never the entire MCP catalog.
-- [ ] Persist conversation and clarification state for missing or ambiguous enrollment fields.
-- [ ] Let Sage explain discovery purposes and prepare enrollment drafts.
-- [ ] Let Sage resolve locations and present ambiguous choices to the human.
-- [ ] Require snapshot approval before activating agent-prepared enrollment data.
-- [ ] Let Sage run a search and explain anonymous results without exposing private dimensions.
-- [ ] Let Sage stage an introduction request for human approval.
+- [x] Add a narrow request interpreter that produces one typed capability request.
+- [x] Give the model only the selected capability schema, never the entire MCP catalog.
+- [x] Persist conversation and clarification state for missing or ambiguous enrollment fields.
+- [x] Let Sage explain discovery purposes and prepare enrollment drafts.
+- [x] Let Sage resolve locations and present ambiguous choices to the human.
+- [x] Require snapshot approval before activating agent-prepared enrollment data.
+- [x] Let Sage run a search and explain anonymous results without exposing private dimensions.
+- [x] Let Sage stage an introduction request for human approval.
 - [ ] Resume the workflow after requester and recipient decisions.
 - [ ] Add provider retry, circuit breaker, concurrency, and token/cost budgets.
 
