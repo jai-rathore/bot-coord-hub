@@ -82,6 +82,11 @@ export const discoveryInterestStatusEnum = pgEnum(
   ["pending", "accepted", "declined", "withdrawn"],
 );
 
+export const discoveryRecommendationStatusEnum = pgEnum(
+  "discovery_recommendation_status",
+  ["active", "dismissed", "requested"],
+);
+
 export const userSafetyStatusEnum = pgEnum("user_safety_status", [
   "active",
   "restricted",
@@ -553,6 +558,49 @@ export const purposeEnrollments = pgTable(
   ],
 );
 
+/** Human-controlled recurring discovery. Disabled until the owner opts in. */
+export const discoveryCadences = pgTable(
+  "discovery_cadences",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    intentSlug: text("intent_slug").notNull(),
+    enabled: boolean("enabled").notNull().default(false),
+    intervalHours: integer("interval_hours").notNull().default(168),
+    maxRecommendations: integer("max_recommendations").notNull().default(3),
+    notifyOnNew: boolean("notify_on_new").notNull().default(true),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    lastJobId: uuid("last_job_id"),
+    lastOutcome: text("last_outcome"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("discovery_cadences_user_intent_uidx").on(
+      t.userId,
+      t.intentSlug,
+    ),
+    index("discovery_cadences_due_idx")
+      .on(t.nextRunAt)
+      .where(sql`${t.enabled} = true`),
+    check(
+      "discovery_cadences_interval_check",
+      sql`${t.intervalHours} between 24 and 720`,
+    ),
+    check(
+      "discovery_cadences_limit_check",
+      sql`${t.maxRecommendations} between 1 and 10`,
+    ),
+  ],
+);
+
 export const agentCapabilities = pgTable(
   "agent_capabilities",
   {
@@ -627,6 +675,67 @@ export const discoveryHandles = pgTable(
       t.expiresAt,
     ),
     index("discovery_handles_candidate_idx").on(t.candidateUserId),
+  ],
+);
+
+/**
+ * Durable anonymous possibilities. The candidate identity remains internal;
+ * only the safe projection and an owner-bound recommendation id leave the DB.
+ */
+export const discoveryRecommendations = pgTable(
+  "discovery_recommendations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    candidateUserId: uuid("candidate_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requesterEnrollmentId: uuid("requester_enrollment_id")
+      .notNull()
+      .references(() => purposeEnrollments.id, { onDelete: "cascade" }),
+    candidateEnrollmentId: uuid("candidate_enrollment_id")
+      .notNull()
+      .references(() => purposeEnrollments.id, { onDelete: "cascade" }),
+    intentSlug: text("intent_slug").notNull(),
+    compatibility: jsonb("compatibility")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    projection: jsonb("projection")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    status: discoveryRecommendationStatusEnum("status")
+      .notNull()
+      .default("active"),
+    sourceJobId: uuid("source_job_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now() + interval '30 days'`),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("discovery_recommendations_user_candidate_uidx").on(
+      t.userId,
+      t.intentSlug,
+      t.candidateUserId,
+    ),
+    index("discovery_recommendations_owner_status_idx").on(
+      t.userId,
+      t.status,
+      t.createdAt,
+    ),
+    index("discovery_recommendations_expiry_idx").on(t.expiresAt),
   ],
 );
 
@@ -1864,8 +1973,10 @@ export type OAuthRefreshToken = typeof oauthRefreshTokens.$inferSelect;
 export type AgentInbox = typeof agentInbox.$inferSelect;
 export type UserLocation = typeof userLocations.$inferSelect;
 export type PurposeEnrollment = typeof purposeEnrollments.$inferSelect;
+export type DiscoveryCadence = typeof discoveryCadences.$inferSelect;
 export type AgentCapability = typeof agentCapabilities.$inferSelect;
 export type DiscoveryHandle = typeof discoveryHandles.$inferSelect;
+export type DiscoveryRecommendation = typeof discoveryRecommendations.$inferSelect;
 export type DiscoveryInterest = typeof discoveryInterests.$inferSelect;
 export type DiscoveryDisclosure = typeof discoveryDisclosures.$inferSelect;
 export type DiscoveryBlock = typeof discoveryBlocks.$inferSelect;

@@ -8,7 +8,11 @@ import {
   getCoordinationCapability,
   listCoordinationCapabilities,
 } from "@/lib/coordination-capabilities";
-import { requestDiscoveryIntroduction } from "@/lib/discovery-service";
+import {
+  markDiscoveryRecommendationSources,
+  materializeDiscoveryRecommendation,
+  requestDiscoveryIntroduction,
+} from "@/lib/discovery-service";
 import { appOrigin } from "@/lib/connect-copy";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import { boardFor, eventById, participantFor } from "@/lib/events/access";
@@ -47,6 +51,7 @@ import {
   runSageDiscoveryIntake,
   type SageDiscoveryTelemetry,
 } from "@/lib/sage/discovery-conversation";
+import { notifyForDiscoveryRecommendations } from "@/lib/sage/discovery-cadence";
 
 export type SageCapabilityName =
   | "schedule_meeting"
@@ -69,6 +74,12 @@ export type SageCapabilityOutcome = {
 export type SageCapabilityExecutionContext = {
   actor: ActorContext;
   jobId: string;
+  trigger:
+    | "user_request"
+    | "scheduled"
+    | "inbox"
+    | "deadline"
+    | "approval_result";
 };
 
 export type SageCapabilityDefinition = {
@@ -271,6 +282,8 @@ const discoverySearch: SageCapabilityDefinition = {
           )
           .slice(0, 20)
           .map((candidate) => ({
+            recommendationId: candidate.recommendationId,
+            isNewRecommendation: candidate.isNewRecommendation === true,
             candidateHandle: candidate.candidateHandle,
             compatibility: candidate.compatibility,
             untrustedParticipantData: candidate.untrustedParticipantData,
@@ -278,6 +291,20 @@ const discoverySearch: SageCapabilityDefinition = {
             expiresAt: candidate.expiresAt,
           }))
       : [];
+    await markDiscoveryRecommendationSources(
+      candidates
+        .map((candidate) => candidate.recommendationId)
+        .filter((id): id is string => typeof id === "string"),
+      context.jobId,
+    );
+    if (context.trigger === "scheduled" && candidates.length > 0) {
+      await notifyForDiscoveryRecommendations({
+        userId: context.actor.user.id,
+        intentSlug: String(input.intentSlug),
+        count: candidates.length,
+        sourceJobId: context.jobId,
+      });
+    }
     return {
       state: "completed",
       result: {
@@ -390,12 +417,23 @@ const discoveryStageIntroduction: SageCapabilityDefinition = {
     "Save an anonymous introduction draft and wait for the requesting human before notifying anyone.",
   humanApproval: "always",
   parseInput(payload) {
+    const candidateHandle = optionalString(payload, "candidateHandle", 1_000);
+    const recommendationId = optionalString(payload, "recommendationId", 100);
+    if (Boolean(candidateHandle) === Boolean(recommendationId)) {
+      throw new SageCapabilityError(
+        "Provide exactly one candidateHandle or recommendationId",
+      );
+    }
     return {
-      candidateHandle: requiredString(payload, "candidateHandle", 1_000),
+      candidateHandle,
+      recommendationId,
     };
   },
-  redactInput() {
-    return { hasCandidateHandle: true };
+  redactInput(input) {
+    return {
+      hasCandidateHandle: Boolean(input.candidateHandle),
+      hasRecommendationId: Boolean(input.recommendationId),
+    };
   },
   redactOutput(output) {
     return {
@@ -406,9 +444,16 @@ const discoveryStageIntroduction: SageCapabilityDefinition = {
   },
   async execute(context, input) {
     try {
+      const actor = { user: context.actor.user, kind: "hosted_agent" as const };
+      const candidateHandle = input.recommendationId
+        ? await materializeDiscoveryRecommendation({
+            actor,
+            recommendationId: String(input.recommendationId),
+          })
+        : String(input.candidateHandle);
       const result = await requestDiscoveryIntroduction({
-        actor: { user: context.actor.user, kind: "hosted_agent" },
-        candidateHandle: String(input.candidateHandle),
+        actor,
+        candidateHandle,
         idempotencyKey: `sage:${context.jobId}`,
       });
       return {

@@ -11,6 +11,7 @@ import {
   shouldSageHandle,
 } from "./sage/job-store";
 import { activityPayloadForTrigger } from "./sage/triggers";
+import { validatedDiscoveryCadence } from "./sage/discovery-cadence";
 import {
   executeCoordinationCapability,
   getCoordinationCapability,
@@ -61,6 +62,19 @@ test("activity triggers carry the narrowest available domain context", () => {
     pendingOnly: true,
     limit: 20,
   });
+});
+
+test("automatic discovery cadence is opt-in and budget bounded", () => {
+  assert.deepEqual(validatedDiscoveryCadence({}), {
+    intervalHours: 168,
+    maxRecommendations: 3,
+  });
+  assert.deepEqual(
+    validatedDiscoveryCadence({ intervalHours: 24, maxRecommendations: 10 }),
+    { intervalHours: 24, maxRecommendations: 10 },
+  );
+  assert.throws(() => validatedDiscoveryCadence({ intervalHours: 12 }));
+  assert.throws(() => validatedDiscoveryCadence({ maxRecommendations: 11 }));
 });
 
 test("Sage retry delay is bounded exponential backoff", () => {
@@ -138,6 +152,18 @@ test("Sage publishes conversational discovery and human-gated handoffs", () => {
   assert.equal(
     capabilities.get("discovery_stage_introduction")?.humanApproval,
     "always",
+  );
+  const stage = getSageCapability("discovery_stage_introduction");
+  assert.deepEqual(stage.parseInput({ recommendationId: "recommendation-1" }), {
+    candidateHandle: undefined,
+    recommendationId: "recommendation-1",
+  });
+  assert.throws(() => stage.parseInput({}));
+  assert.throws(() =>
+    stage.parseInput({
+      candidateHandle: `dc_${"a".repeat(40)}`,
+      recommendationId: "recommendation-1",
+    }),
   );
 });
 

@@ -289,6 +289,14 @@ function renderTemplate(
 ): Rendered {
   const title = String(payload.title ?? "your event");
   switch (template) {
+    case "discovery_recommendations": {
+      const count = Number(payload.count ?? 1);
+      const discoveryUrl = `${eventUrl.replace(/\/$/, "")}/app/discovery`;
+      return {
+        subject: `Sage found ${count} anonymous ${count === 1 ? "possibility" : "possibilities"}`,
+        body: `Sage found ${count} new privacy-safe ${count === 1 ? "possibility" : "possibilities"}. Review the anonymous cards and decide whether to prepare an introduction.\n\n${discoveryUrl}`,
+      };
+    }
     case "event_locked":
       return {
         subject: `Responses closed: ${title}`,
@@ -350,6 +358,11 @@ function renderSms(
 ): string {
   const title = shortTitle(String(payload.title ?? "your event"));
   switch (template) {
+    case "discovery_recommendations": {
+      const count = Number(payload.count ?? 1);
+      const discoveryUrl = `${eventUrl.replace(/\/$/, "")}/app/discovery`;
+      return `HoneyMatcha: Sage found ${count} new anonymous ${count === 1 ? "possibility" : "possibilities"}. Review: ${discoveryUrl}`;
+    }
     case "event_locked":
       return payload.winner
         ? `HoneyMatcha: ${payload.winner} led for “${title}”. The organizer is confirming it. ${eventUrl}`

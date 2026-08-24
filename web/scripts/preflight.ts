@@ -23,6 +23,8 @@ import {
   discoveryInterests,
   discoveryPairHistory,
   discoveryBlocks,
+  discoveryCadences,
+  discoveryRecommendations,
   sageDiscoveryMessages,
   sageDiscoveryThreads,
   sageJobs,
@@ -204,6 +206,14 @@ async function main() {
           .from(discoveryPairHistory)
           .limit(1),
         db.select({ id: discoveryBlocks.id }).from(discoveryBlocks).limit(1),
+        db
+          .select({ id: discoveryCadences.id })
+          .from(discoveryCadences)
+          .limit(1),
+        db
+          .select({ id: discoveryRecommendations.id })
+          .from(discoveryRecommendations)
+          .limit(1),
         db.select({ id: userLocations.id }).from(userLocations).limit(1),
         db
           .select({ id: agentCapabilities.id })

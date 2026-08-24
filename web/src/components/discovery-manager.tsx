@@ -82,10 +82,32 @@ type AuditItem = {
 };
 
 type SageCandidate = {
-  candidateHandle: string;
+  recommendationId: string;
+  intentSlug: string;
+  candidateHandle?: string;
   compatibility: Record<string, unknown>;
   untrustedParticipantData: Record<string, unknown>;
   expiresAt: string;
+};
+
+type DiscoveryRecommendation = {
+  id: string;
+  intentSlug: string;
+  compatibility: Record<string, unknown>;
+  untrustedParticipantData: Record<string, unknown>;
+  expiresAt: string;
+  createdAt: string;
+};
+
+type DiscoveryCadence = {
+  intentSlug: string;
+  enabled: boolean;
+  intervalHours: number;
+  maxRecommendations: number;
+  notifyOnNew: boolean;
+  nextRunAt: string | null;
+  lastRunAt: string | null;
+  lastOutcome: string | null;
 };
 
 type SageDiscoveryJob = {
@@ -115,15 +137,18 @@ function sensitivityLabel(value: Question["sensitivity"]) {
   return "Anonymous discovery card";
 }
 
-function candidatesFromJob(job: SageDiscoveryJob): SageCandidate[] {
+function candidatesFromJob(
+  job: SageDiscoveryJob,
+  intentSlug: string,
+): SageCandidate[] {
   const candidates = job.result?.candidates;
   if (!Array.isArray(candidates)) return [];
   return candidates.filter(
     (candidate): candidate is SageCandidate =>
       Boolean(candidate) &&
       typeof candidate === "object" &&
-      typeof (candidate as SageCandidate).candidateHandle === "string",
-  );
+      typeof (candidate as SageCandidate).recommendationId === "string",
+  ).map((candidate) => ({ ...candidate, intentSlug }));
 }
 
 function QuestionInput({
@@ -195,10 +220,14 @@ function QuestionInput({
 export function DiscoveryManager({
   initialIntents,
   initialInterests,
+  initialRecommendations,
+  initialCadences,
   initialAudit,
 }: {
   initialIntents: IntentItem[];
   initialInterests: InterestItem[];
+  initialRecommendations: DiscoveryRecommendation[];
+  initialCadences: DiscoveryCadence[];
   initialAudit: AuditItem[];
 }) {
   const [intents, setIntents] = useState(initialIntents);
@@ -219,12 +248,36 @@ export function DiscoveryManager({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sageJob, setSageJob] = useState<SageDiscoveryJob | null>(null);
-  const [sageCandidates, setSageCandidates] = useState<SageCandidate[]>([]);
+  const [sageCandidates, setSageCandidates] = useState<SageCandidate[]>(
+    initialRecommendations.map((recommendation) => ({
+      recommendationId: recommendation.id,
+      intentSlug: recommendation.intentSlug,
+      compatibility: recommendation.compatibility,
+      untrustedParticipantData: recommendation.untrustedParticipantData,
+      expiresAt: recommendation.expiresAt,
+    })),
+  );
+  const [cadences, setCadences] = useState(initialCadences);
   const router = useRouter();
   const [, startTransition] = useTransition();
   const selected = useMemo(
     () => intents.find((intent) => intent.slug === selectedSlug),
     [intents, selectedSlug],
+  );
+  const selectedCadence = cadences.find(
+    (cadence) => cadence.intentSlug === selectedSlug,
+  ) ?? {
+    intentSlug: selectedSlug,
+    enabled: false,
+    intervalHours: 168,
+    maxRecommendations: 3,
+    notifyOnNew: true,
+    nextRunAt: null,
+    lastRunAt: null,
+    lastOutcome: null,
+  };
+  const visibleCandidates = sageCandidates.filter(
+    (candidate) => candidate.intentSlug === selectedSlug,
   );
 
   useEffect(() => {
@@ -246,11 +299,16 @@ export function DiscoveryManager({
         );
         if (!latest) return;
         setSageJob(latest);
-        setSageCandidates(
-          candidatesFromJob(latest).filter(
-            (candidate) => new Date(candidate.expiresAt).getTime() > Date.now(),
-          ),
+        const latestCandidates = candidatesFromJob(latest, selectedSlug).filter(
+          (candidate) => new Date(candidate.expiresAt).getTime() > Date.now(),
         );
+        setSageCandidates((current) => {
+          const byId = new Map(current.map((candidate) => [candidate.recommendationId, candidate]));
+          for (const candidate of latestCandidates) {
+            byId.set(candidate.recommendationId, candidate);
+          }
+          return [...byId.values()];
+        });
       })
       .catch(() => undefined);
     return () => {
@@ -271,9 +329,23 @@ export function DiscoveryManager({
     const data = (await response.json()) as {
       intents?: IntentItem[];
       interests?: InterestItem[];
+      recommendations?: DiscoveryRecommendation[];
+      cadences?: DiscoveryCadence[];
     };
     if (data.intents) setIntents(data.intents);
     if (data.interests) setInterests(data.interests);
+    if (data.recommendations) {
+      setSageCandidates(
+        data.recommendations.map((recommendation) => ({
+          recommendationId: recommendation.id,
+          intentSlug: recommendation.intentSlug,
+          compatibility: recommendation.compatibility,
+          untrustedParticipantData: recommendation.untrustedParticipantData,
+          expiresAt: recommendation.expiresAt,
+        })),
+      );
+    }
+    if (data.cadences) setCadences(data.cadences);
   }
 
   async function pollSageDiscovery(jobId: string) {
@@ -286,8 +358,15 @@ export function DiscoveryManager({
       if (!next) return;
       setSageJob(next);
       if (next.state === "completed") {
-        const candidates = candidatesFromJob(next);
-        setSageCandidates(candidates);
+        const candidates = candidatesFromJob(next, selectedSlug);
+        setSageCandidates((current) => {
+          const byId = new Map(current.map((candidate) => [candidate.recommendationId, candidate]));
+          for (const candidate of candidates) {
+            byId.set(candidate.recommendationId, candidate);
+          }
+          return [...byId.values()];
+        });
+        await reloadDiscoveryState();
         setMessage(
           candidates.length
             ? `Sage found ${candidates.length} anonymous ${candidates.length === 1 ? "possibility" : "possibilities"}. You decide whether to request an introduction.`
@@ -307,7 +386,6 @@ export function DiscoveryManager({
     setBusy(true);
     setError(null);
     setMessage(null);
-    setSageCandidates([]);
     try {
       const response = await fetch("/api/sage/jobs", {
         method: "POST",
@@ -342,7 +420,7 @@ export function DiscoveryManager({
     }
   }
 
-  async function requestSageIntroduction(candidateHandle: string) {
+  async function requestSageIntroduction(candidate: SageCandidate) {
     setBusy(true);
     setError(null);
     try {
@@ -355,7 +433,9 @@ export function DiscoveryManager({
         },
         body: JSON.stringify({
           capability: "discovery_stage_introduction",
-          payload: { candidateHandle },
+          payload: candidate.recommendationId
+            ? { recommendationId: candidate.recommendationId }
+            : { candidateHandle: candidate.candidateHandle },
           idempotencyKey,
         }),
       });
@@ -384,7 +464,7 @@ export function DiscoveryManager({
       }
       setSageCandidates((current) =>
         current.filter(
-          (candidate) => candidate.candidateHandle !== candidateHandle,
+          (item) => item.recommendationId !== candidate.recommendationId,
         ),
       );
       await reloadDiscoveryState();
@@ -394,6 +474,91 @@ export function DiscoveryManager({
     } catch (requestError) {
       setError(
         requestError instanceof Error ? requestError.message : "Request failed",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveCadence(
+    changes: Partial<
+      Pick<
+        DiscoveryCadence,
+        "enabled" | "intervalHours" | "maxRecommendations" | "notifyOnNew"
+      >
+    >,
+  ) {
+    if (!selected) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/discovery", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "set_cadence",
+          intentSlug: selected.slug,
+          enabled: changes.enabled ?? selectedCadence.enabled,
+          intervalHours:
+            changes.intervalHours ?? selectedCadence.intervalHours,
+          maxRecommendations:
+            changes.maxRecommendations ?? selectedCadence.maxRecommendations,
+          notifyOnNew: changes.notifyOnNew ?? selectedCadence.notifyOnNew,
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        cadence?: DiscoveryCadence;
+      };
+      if (!response.ok || !data.cadence) {
+        throw new Error(data.error ?? "Could not save automatic discovery");
+      }
+      setCadences((current) => [
+        ...current.filter((item) => item.intentSlug !== data.cadence!.intentSlug),
+        data.cadence!,
+      ]);
+      setMessage(
+        data.cadence.enabled
+          ? "Saved. Sage will search on this schedule and keep new anonymous possibilities here."
+          : "Automatic search is off for this purpose.",
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not save automatic discovery",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function dismissRecommendation(recommendationId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/discovery", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "dismiss_recommendation",
+          recommendationId,
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(data.error ?? "Could not dismiss this possibility");
+      }
+      setSageCandidates((current) =>
+        current.filter((item) => item.recommendationId !== recommendationId),
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not dismiss this possibility",
       );
     } finally {
       setBusy(false);
@@ -602,7 +767,6 @@ export function DiscoveryManager({
                   setCoarseLocation([]);
                   setClearFields(new Set());
                   setSageJob(null);
-                  setSageCandidates([]);
                   setMessage(null);
                   setError(null);
                 }}
@@ -908,11 +1072,90 @@ export function DiscoveryManager({
                       : "Ask Sage to find possibilities"}
                   </button>
 
-                  {sageCandidates.length ? (
+                  <div className="mt-5 rounded-2xl border border-matcha-soft/45 bg-matcha-soft/8 p-4">
+                    <div className="flex items-start gap-3">
+                      <input
+                        id={`cadence-${selected.slug}`}
+                        type="checkbox"
+                        checked={selectedCadence.enabled}
+                        disabled={busy}
+                        onChange={(event) =>
+                          void saveCadence({ enabled: event.target.checked })
+                        }
+                        className="mt-1 h-4 w-4 accent-matcha"
+                      />
+                      <label htmlFor={`cadence-${selected.slug}`}>
+                        <span className="block text-sm font-semibold text-ink">
+                          Let Sage keep looking
+                        </span>
+                        <span className="mt-1 block text-sm leading-6 text-muted">
+                          This is off until you enable it. Sage respects your
+                          selected operator, safety status, and one automatic
+                          search per day limit.
+                        </span>
+                      </label>
+                    </div>
+                    {selectedCadence.enabled ? (
+                      <div className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-3">
+                        <label className="grid gap-1.5 text-sm">
+                          <span className="font-medium text-ink">Check</span>
+                          <select
+                            value={selectedCadence.intervalHours}
+                            disabled={busy}
+                            onChange={(event) =>
+                              void saveCadence({
+                                intervalHours: Number(event.target.value),
+                              })
+                            }
+                            className="field"
+                          >
+                            <option value={24}>Daily</option>
+                            <option value={72}>Every 3 days</option>
+                            <option value={168}>Weekly</option>
+                            <option value={336}>Every 2 weeks</option>
+                          </select>
+                        </label>
+                        <label className="grid gap-1.5 text-sm">
+                          <span className="font-medium text-ink">At most</span>
+                          <select
+                            value={selectedCadence.maxRecommendations}
+                            disabled={busy}
+                            onChange={(event) =>
+                              void saveCadence({
+                                maxRecommendations: Number(event.target.value),
+                              })
+                            }
+                            className="field"
+                          >
+                            <option value={1}>1 possibility</option>
+                            <option value={3}>3 possibilities</option>
+                            <option value={5}>5 possibilities</option>
+                            <option value={10}>10 possibilities</option>
+                          </select>
+                        </label>
+                        <label className="flex items-center gap-2 self-end py-2.5 text-sm text-ink">
+                          <input
+                            type="checkbox"
+                            checked={selectedCadence.notifyOnNew}
+                            disabled={busy}
+                            onChange={(event) =>
+                              void saveCadence({
+                                notifyOnNew: event.target.checked,
+                              })
+                            }
+                            className="h-4 w-4 accent-matcha"
+                          />
+                          Notify me when new ones arrive
+                        </label>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {visibleCandidates.length ? (
                     <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                      {sageCandidates.map((candidate) => (
+                      {visibleCandidates.map((candidate) => (
                         <article
-                          key={candidate.candidateHandle}
+                          key={candidate.recommendationId}
                           className="rounded-2xl border border-line bg-white/70 p-4"
                         >
                           <p className="text-sm font-semibold text-ink">
@@ -941,16 +1184,28 @@ export function DiscoveryManager({
                               no identifying details are available.
                             </p>
                           )}
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() =>
-                              requestSageIntroduction(candidate.candidateHandle)
-                            }
-                            className="mt-4 rounded-lg border border-matcha px-3 py-2 text-xs font-semibold text-matcha disabled:opacity-50"
-                          >
-                            Ask Sage to prepare introduction
-                          </button>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => requestSageIntroduction(candidate)}
+                              className="rounded-lg border border-matcha px-3 py-2 text-xs font-semibold text-matcha disabled:opacity-50"
+                            >
+                              Ask Sage to prepare introduction
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                void dismissRecommendation(
+                                  candidate.recommendationId,
+                                )
+                              }
+                              className="rounded-lg px-3 py-2 text-xs font-semibold text-muted disabled:opacity-50"
+                            >
+                              Not for me
+                            </button>
+                          </div>
                         </article>
                       ))}
                     </div>
