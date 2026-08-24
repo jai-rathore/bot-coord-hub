@@ -149,6 +149,38 @@ services:
         value: "1500"
       - key: SAGE_WORKER_LEASE_MS
         value: "120000"
+      - key: SAGE_WORKER_HEARTBEAT_MS
+        value: "5000"
+      - key: SAGE_NOTIFICATION_POLL_MS
+        value: "5000"
+      - key: SAGE_NOTIFICATION_BATCH_SIZE
+        value: "25"
+      - key: SAGE_USER_DAILY_TOKEN_LIMIT
+        value: "100000"
+      - key: SAGE_USER_DAILY_COST_LIMIT_USD
+        sync: false
+      - key: SAGE_INPUT_COST_PER_MILLION_USD
+        fromService:
+          type: web
+          name: honeymatcha-web
+          envVarKey: SAGE_INPUT_COST_PER_MILLION_USD
+      - key: SAGE_OUTPUT_COST_PER_MILLION_USD
+        fromService:
+          type: web
+          name: honeymatcha-web
+          envVarKey: SAGE_OUTPUT_COST_PER_MILLION_USD
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EVENT_EMAIL_FROM
+        value: HoneyMatcha <onboarding@resend.dev>
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: TWILIO_MESSAGING_SERVICE_SID
+        sync: false
       - key: DB_POOL_MAX
         value: "3"
   - type: keyvalue

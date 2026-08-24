@@ -8,7 +8,12 @@ import {
   DATING_INTRODUCTION_DEFINITION,
   HIRING_DISCOVERY_DEFINITION,
 } from "./intent-definitions";
-import { GeminiProvider } from "./llm";
+import {
+  GeminiProvider,
+  LlmProviderError,
+  isRetryableProviderError,
+  providerRetryDelayMs,
+} from "./llm";
 import {
   buildDiscoveryIntakeRequest,
   discoveryIntakeTool,
@@ -99,6 +104,46 @@ test("Gemini is forced to call only the requested intake tool", async () => {
     JSON.stringify(requestBody).includes('"additionalProperties"'),
     false,
   );
+});
+
+test("Gemini marks only transient HTTP failures as retryable", async () => {
+  const savedFetch = globalThis.fetch;
+  try {
+    for (const [status, retryable] of [
+      [429, true],
+      [503, true],
+      [400, false],
+    ] as const) {
+      globalThis.fetch = async () => new Response("provider error", { status });
+      await assert.rejects(
+        new GeminiProvider("test-key", "test-model").complete({
+          system: "Return a short response.",
+          messages: [{ role: "user", text: "Hello" }],
+          tools: [],
+        }),
+        (error) => {
+          assert.equal(error instanceof LlmProviderError, true);
+          assert.equal(isRetryableProviderError(error), retryable);
+          return true;
+        },
+      );
+    }
+  } finally {
+    globalThis.fetch = savedFetch;
+  }
+});
+
+test("provider retry backoff is exponential and bounded", () => {
+  const saved = process.env.SAGE_PROVIDER_RETRY_BASE_MS;
+  delete process.env.SAGE_PROVIDER_RETRY_BASE_MS;
+  try {
+    assert.equal(providerRetryDelayMs(1), 500);
+    assert.equal(providerRetryDelayMs(2), 1_000);
+    assert.equal(providerRetryDelayMs(10), 4_000);
+  } finally {
+    if (saved === undefined) delete process.env.SAGE_PROVIDER_RETRY_BASE_MS;
+    else process.env.SAGE_PROVIDER_RETRY_BASE_MS = saved;
+  }
 });
 
 test("authenticated human prose is fenced and cannot close its prompt boundary", () => {

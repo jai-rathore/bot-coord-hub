@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { users } from "@/db/schema";
 import { hostedAgentActor } from "@/lib/actor";
 import { writeAudit } from "@/lib/audit";
+import { LlmBudgetExceededError } from "@/lib/llm";
 import {
   getSageCapability,
   SageCapabilityError,
@@ -37,6 +38,9 @@ export type ProcessSageJobResult =
 export async function processNextSageJob(input: {
   workerId: string;
   leaseMs?: number;
+  heartbeatMs?: number;
+  onClaim?: (jobId: string) => void;
+  onSettled?: (jobId: string) => void;
 }): Promise<ProcessSageJobResult> {
   const leaseMs = Math.max(30_000, input.leaseMs ?? 120_000);
   const claimed = await claimNextSageJob({
@@ -46,6 +50,7 @@ export async function processNextSageJob(input: {
   if (!claimed) return { processed: false };
 
   const { job, run } = claimed;
+  input.onClaim?.(job.id);
   const startedAtMs = Date.now();
   let stepId: string | null = null;
   let heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -81,10 +86,23 @@ export async function processNextSageJob(input: {
         jobId: job.id,
         workerId: input.workerId,
         leaseMs,
-      }).catch((error) => {
-        console.error("[sage-worker] lease heartbeat failed", job.id, error);
-      });
-    }, Math.max(10_000, Math.floor(leaseMs / 3)));
+      })
+        .then((extended) => {
+          console.log(
+            `[sage-worker] heartbeat job=${job.id} extended=${extended}`,
+          );
+        })
+        .catch((error) => {
+          console.error("[sage-worker] lease heartbeat failed", job.id, error);
+        });
+    },
+    Math.max(
+      1_000,
+      Math.min(
+        Math.floor(leaseMs / 2),
+        input.heartbeatMs ?? Math.floor(leaseMs / 3),
+      ),
+    ));
     heartbeat.unref?.();
 
     if (["discovery_intake", "event_chat"].includes(capability.name)) {
@@ -137,7 +155,9 @@ export async function processNextSageJob(input: {
   } catch (error) {
     if (stepId) await failSageStep(stepId, error);
     const retryable =
-      error instanceof SageCapabilityError ? error.retryable : true;
+      error instanceof SageCapabilityError
+        ? error.retryable
+        : !(error instanceof LlmBudgetExceededError);
     await failSageJob({ job, run, error, retryable, startedAtMs });
     const state = retryable
       ? job.attempts >= job.maxAttempts
@@ -161,5 +181,6 @@ export async function processNextSageJob(input: {
     return { processed: true, jobId: job.id, state };
   } finally {
     if (heartbeat) clearInterval(heartbeat);
+    input.onSettled?.(job.id);
   }
 }

@@ -10,7 +10,10 @@ import {
   validateIntentDefinition,
 } from "./intent-contract";
 import { registeredIntentHandler } from "./discovery-match";
-import { validateCombinedClaims } from "./discovery-service";
+import {
+  discoverySamplingCursor,
+  validateCombinedClaims,
+} from "./discovery-service";
 import { decryptJson, encryptJson } from "./secret-crypto";
 import { distributedRateLimit } from "./distributed-rate-limit";
 import { jsonFromAgentError } from "./http";
@@ -35,6 +38,27 @@ const NEW_YORK: CanonicalLocation = {
   region: "New York",
   locality: "New York",
 };
+
+test("discovery sampling cursors are stable per day and rotate across days", () => {
+  const first = discoverySamplingCursor({
+    userId: "00000000-0000-0000-0000-000000000001",
+    intentSlug: "dating-introduction",
+    at: new Date("2026-08-23T00:00:00.000Z"),
+  });
+  const sameDay = discoverySamplingCursor({
+    userId: "00000000-0000-0000-0000-000000000001",
+    intentSlug: "dating-introduction",
+    at: new Date("2026-08-23T23:59:59.999Z"),
+  });
+  const nextDay = discoverySamplingCursor({
+    userId: "00000000-0000-0000-0000-000000000001",
+    intentSlug: "dating-introduction",
+    at: new Date("2026-08-24T00:00:00.000Z"),
+  });
+  assert.match(first, /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
+  assert.equal(first, sameDay);
+  assert.notEqual(first, nextDay);
+});
 
 test("canonical discovery definitions enforce staged disclosure", () => {
   for (const definition of [

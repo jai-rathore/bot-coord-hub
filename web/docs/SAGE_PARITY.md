@@ -93,6 +93,11 @@ A milestone is complete only when all three columns below say **Complete**:
 
 | Work item | Code | Database test | Production | Next proof |
 | --- | --- | --- | --- | --- |
+| Indexed rotating discovery sampling and composite candidate cursor index | Implemented | Blocked locally | Pending | Apply migration 0033 and inspect the production query plan |
+| Shared provider retries, circuit breaker, concurrency leases, and per-person token/cost budgets | Implemented | Blocked locally | Pending | Apply migration 0034 and run the isolated provider race and failure proof |
+| Worker-owned leased notification draining with cron fallback | Implemented | Lease race passed previously | Pending | Configure worker delivery secrets and prove worker delivery |
+| Sage introduction continuation after requester and recipient decisions | Implemented | Blocked locally | Pending | Run anonymous-card, requester approval, recipient decision, and job completion proof |
+| Observable worker heartbeat and graceful drain state | Implemented | Unit/type checks passed | Pending | Capture a live heartbeat and SIGTERM drain during an active job |
 | Encrypt private Sage inputs and owner-visible results; redact operational payloads and steps | Complete | Passed | Deployed | Signed-in owner API/UI result check |
 | Replay-safe event creation | Complete | Passed | Deployed | Signed-in event creation dogfood |
 | `coordinate_event` create/list/review and lifecycle mutations | Complete | Passed | Deployed | Signed-in organizer lifecycle dogfood |
@@ -107,6 +112,9 @@ A milestone is complete only when all three columns below say **Complete**:
 This workstation did not have a usable local PostgreSQL environment for the
 slice, so database evidence came from isolated production one-off jobs against
 the live schema. Synthetic rows were explicitly cleaned up after each run.
+The current parity slice has not run those production jobs yet. Its database
+rows remain **Blocked locally** and its production rows remain **Pending** until
+migrations 0033 and 0034 deploy and the new evidence is captured.
 
 ### P0: make the existing Sage path operational
 

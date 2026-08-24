@@ -643,6 +643,7 @@ export async function runEventChatTurn(opts: {
       messages,
       tools,
       maxOutputTokens: 400,
+      budget: { userId: user.id },
     });
   } catch (error) {
     console.error("[events] chat turn failed", error);

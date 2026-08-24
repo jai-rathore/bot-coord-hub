@@ -554,6 +554,12 @@ export const purposeEnrollments = pgTable(
       t.status,
       t.expiresAt,
     ),
+    index("purpose_enrollments_cursor_idx").on(
+      t.intentSlug,
+      t.status,
+      t.definitionVersion,
+      t.id,
+    ),
     index("purpose_enrollments_location_idx").on(t.locationId),
   ],
 );
@@ -1855,6 +1861,85 @@ export const sageRuns = pgTable(
   ],
 );
 
+/** Shared provider state so every web and worker instance sees one circuit. */
+export const llmProviderCircuits = pgTable("llm_provider_circuits", {
+  providerKey: text("provider_key").primaryKey(),
+  provider: text("provider").notNull(),
+  model: text("model").notNull(),
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+  openedUntil: timestamp("opened_until", { withTimezone: true }),
+  lastError: text("last_error"),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+/**
+ * Short provider leases enforce fleet-wide concurrency and reserve a user's
+ * daily budget while a request is in flight. Expired leases are reclaimed.
+ */
+export const llmProviderLeases = pgTable(
+  "llm_provider_leases",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    providerKey: text("provider_key").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    usageDay: text("usage_day").notNull(),
+    inputTokensReserved: integer("input_tokens_reserved").notNull(),
+    outputTokensReserved: integer("output_tokens_reserved").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("llm_provider_leases_provider_expiry_idx").on(
+      t.providerKey,
+      t.expiresAt,
+    ),
+    index("llm_provider_leases_user_day_idx").on(
+      t.userId,
+      t.usageDay,
+    ),
+    check(
+      "llm_provider_leases_tokens_check",
+      sql`${t.inputTokensReserved} >= 0 and ${t.outputTokensReserved} >= 0`,
+    ),
+  ],
+);
+
+/** Actual provider usage used for per-person token and cost budgets. */
+export const llmDailyUsage = pgTable(
+  "llm_daily_usage",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    providerKey: text("provider_key").notNull(),
+    usageDay: text("usage_day").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("llm_daily_usage_user_provider_day_uidx").on(
+      t.userId,
+      t.providerKey,
+      t.usageDay,
+    ),
+    index("llm_daily_usage_day_idx").on(t.usageDay),
+    check(
+      "llm_daily_usage_tokens_check",
+      sql`${t.inputTokens} >= 0 and ${t.outputTokens} >= 0`,
+    ),
+  ],
+);
+
 /** Redacted, ordered capability calls made during a Sage run. */
 export const sageSteps = pgTable(
   "sage_steps",
@@ -1997,6 +2082,9 @@ export type NotificationOutbox = typeof notificationOutbox.$inferSelect;
 export type AgentOperatorPreference = typeof agentOperatorPreferences.$inferSelect;
 export type SageJob = typeof sageJobs.$inferSelect;
 export type SageRun = typeof sageRuns.$inferSelect;
+export type LlmProviderCircuit = typeof llmProviderCircuits.$inferSelect;
+export type LlmProviderLease = typeof llmProviderLeases.$inferSelect;
+export type LlmDailyUsage = typeof llmDailyUsage.$inferSelect;
 export type SageStep = typeof sageSteps.$inferSelect;
 export type SageDiscoveryThread = typeof sageDiscoveryThreads.$inferSelect;
 export type SageDiscoveryMessage = typeof sageDiscoveryMessages.$inferSelect;
