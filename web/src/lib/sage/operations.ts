@@ -6,6 +6,7 @@ import {
   desc,
   eq,
   gte,
+  gt,
   inArray,
   isNull,
   isNotNull,
@@ -90,7 +91,8 @@ export async function sageOperationsSnapshot(
     [oldestPending],
     [retryRows],
     [runRows],
-    [providerRows],
+    [activeProviderRows],
+    [openCircuitRows],
     [dailyUsageRows],
   ] = await Promise.all([
     db
@@ -123,17 +125,13 @@ export async function sageOperationsSnapshot(
       .from(sageRuns)
       .where(gte(sageRuns.startedAt, recentSince)),
     db
-      .select({
-        activeLeases: sql<number>`(
-          select count(*) from ${llmProviderLeases}
-          where ${llmProviderLeases.expiresAt} > ${now}
-        )`,
-        openCircuits: sql<number>`(
-          select count(*) from ${llmProviderCircuits}
-          where ${llmProviderCircuits.openedUntil} > ${now}
-        )`,
-      })
-      .from(sql`(select 1) provider_guard_snapshot`),
+      .select({ total: count() })
+      .from(llmProviderLeases)
+      .where(gt(llmProviderLeases.expiresAt, now)),
+    db
+      .select({ total: count() })
+      .from(llmProviderCircuits)
+      .where(gt(llmProviderCircuits.openedUntil, now)),
     db
       .select({
         inputTokens: sum(llmDailyUsage.inputTokens),
@@ -159,8 +157,8 @@ export async function sageOperationsSnapshot(
   );
   const recentInputTokens = Number(runRows?.inputTokens ?? 0);
   const recentOutputTokens = Number(runRows?.outputTokens ?? 0);
-  const activeProviderLeases = Number(providerRows?.activeLeases ?? 0);
-  const openProviderCircuits = Number(providerRows?.openCircuits ?? 0);
+  const activeProviderLeases = Number(activeProviderRows?.total ?? 0);
+  const openProviderCircuits = Number(openCircuitRows?.total ?? 0);
   const todayProviderInputTokens = Number(dailyUsageRows?.inputTokens ?? 0);
   const todayProviderOutputTokens = Number(dailyUsageRows?.outputTokens ?? 0);
   const rates = configuredTokenCost();

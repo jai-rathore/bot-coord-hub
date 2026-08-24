@@ -227,15 +227,18 @@ async function main() {
   await upsertAgentCapabilityManifest({
     apiKeyId: key.id,
     supportedIntents: {
-      local_meetup: 2,
-      hiring_compatibility: 2,
-      dating_introduction: 2,
+      local_meetup: LOCAL_MEETUP_DEFINITION.version,
+      hiring_compatibility: HIRING_DISCOVERY_DEFINITION.version,
+      dating_introduction: DATING_INTRODUCTION_DEFINITION.version,
     },
     platforms: ["integration-test"],
     metadata: { mode: "test" },
   });
   const manifest = await getAgentCapabilityManifest(key.id);
-  assert.equal(manifest?.supportedIntents.local_meetup, 2);
+  assert.equal(
+    manifest?.supportedIntents.local_meetup,
+    LOCAL_MEETUP_DEFINITION.version,
+  );
 
   await db.insert(intentTypes).values({
     slug: customIntentSlug,
@@ -708,7 +711,9 @@ async function main() {
     .returning();
   await upsertAgentCapabilityManifest({
     apiKeyId: datingKey.id,
-    supportedIntents: { dating_introduction: 2 },
+    supportedIntents: {
+      dating_introduction: DATING_INTRODUCTION_DEFINITION.version,
+    },
     platforms: ["integration-test"],
     metadata: { mode: "dating" },
   });
