@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../src/db";
 import {
+  apiKeys,
   eventDimensions,
   eventMessages,
   events,
@@ -22,8 +23,10 @@ import {
 import {
   enqueueSageJob,
   ownerResultForSageJob,
+  setAgentOperatorMode,
 } from "../src/lib/sage/job-store";
 import { deliverEventInbox } from "../src/lib/agent-inbox";
+import { generateApiKey } from "../src/lib/keys";
 
 const db = getDb();
 
@@ -177,6 +180,40 @@ async function main() {
     assert.equal(finishedTrigger.trigger, "deadline");
     assert.equal(ownerResultForSageJob(finishedTrigger)?.action, "event");
     console.log("PASS event deadline routed once to the selected Sage operator");
+
+    const externalKey = generateApiKey();
+    await db.insert(apiKeys).values({
+      userId: peer.id,
+      name: "Synthetic external operator",
+      keyPrefix: externalKey.keyPrefix,
+      keyHash: externalKey.keyHash,
+      scopes: ["inbox:read"],
+    });
+    await setAgentOperatorMode(peer.id, "external_primary");
+    const externalDelivery = await deliverEventInbox({
+      userId: peer.id,
+      eventId,
+      kind: "event.updated",
+      summary: "Synthetic external-primary review",
+      body: { eventId, template: "updated" },
+      dedupeKey: `sage-parity-external-${suffix}`,
+    });
+    assert.ok(externalDelivery.inboxId, "external operator must retain the inbox item");
+    const externalJobs = await db
+      .select({ id: sageJobs.id })
+      .from(sageJobs)
+      .where(
+        and(
+          eq(sageJobs.userId, peer.id),
+          eq(sageJobs.idempotencyKey, `inbox:${externalDelivery.inboxId}`),
+        ),
+      );
+    assert.equal(
+      externalJobs.length,
+      0,
+      "external-primary must suppress the automatic Sage job",
+    );
+    console.log("PASS external-primary inbox suppressed the duplicate Sage trigger");
 
     const privateChat = `Confirm event help ${suffix}`;
     const chat = await runCapability({
