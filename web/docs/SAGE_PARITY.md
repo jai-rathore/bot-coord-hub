@@ -51,6 +51,10 @@ A milestone is complete only when all three columns below say **Complete**:
 - A production synthetic dating turn completed through the durable queue,
   Gemini, canonical location resolution, encrypted message storage, and run
   telemetry. Its temporary user and all cascaded data were deleted afterward.
+- PR 75 is merged and deployed to both the web and worker services. Migration
+  0030, production preflight, the full event database suite, and the encrypted
+  queue/guest/invitation/session suite passed. A cross-stream live-worker
+  synthetic is the final automated proof in this slice.
 - Deployment verification found and repaired a previously skipped API-key
   migration. Preflight now checks the complete credential shape and the Sage
   queue and conversation tables.
