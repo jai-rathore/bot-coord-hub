@@ -9,6 +9,7 @@ import { fetchWithTimeout } from "@/lib/fetch-timeout";
 /** A model turn is bounded so a Sage worker lease can recover promptly. */
 const GEMINI_TIMEOUT_MS = 25_000;
 import {
+  LlmProviderError,
   LlmUnavailableError,
   type LlmProvider,
   type LlmRequest,
@@ -102,23 +103,44 @@ export class GeminiProvider implements LlmProvider {
       }
     }
 
-    const res = await fetchWithTimeout(
-      `${ENDPOINT}/${encodeURIComponent(this.model)}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": this.apiKey,
+    let res: Response;
+    try {
+      res = await fetchWithTimeout(
+        `${ENDPOINT}/${encodeURIComponent(this.model)}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": this.apiKey,
+          },
+          body: JSON.stringify(body),
+          signal: request.signal,
         },
-        body: JSON.stringify(body),
-        signal: request.signal,
-      },
-      GEMINI_TIMEOUT_MS,
-    );
+        GEMINI_TIMEOUT_MS,
+      );
+    } catch (error) {
+      const callerAborted = request.signal?.aborted === true;
+      throw new LlmProviderError(
+        callerAborted
+          ? "Gemini request was cancelled"
+          : "Gemini request timed out or could not connect",
+        { retryable: !callerAborted, cause: error },
+      );
+    }
 
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
-      throw new Error(`Gemini ${res.status}: ${detail.slice(0, 300)}`);
+      throw new LlmProviderError(
+        `Gemini ${res.status}: ${detail.slice(0, 300)}`,
+        {
+          retryable:
+            res.status === 408 ||
+            res.status === 425 ||
+            res.status === 429 ||
+            res.status >= 500,
+          status: res.status,
+        },
+      );
     }
 
     const data = (await res.json()) as GeminiResponse;

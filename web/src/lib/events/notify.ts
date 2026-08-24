@@ -2,8 +2,9 @@
  * Event notifications.
  *
  * Everything is queued into notification_outbox first and delivered by the
- * cron drain. `dedupeKey` makes enqueue replay-safe, while a delivery lease
- * prevents concurrent drainers from sending the same row at the same time.
+ * long-lived worker, with cron retained as a safety trigger. `dedupeKey` makes
+ * enqueue replay-safe, while a delivery lease prevents concurrent drainers
+ * from sending the same row at the same time.
  *
  * Delivery degrades quietly per channel. Without RESEND_API_KEY email rows
  * stay queued. Without Twilio, text rows stay queued. The product still works.
@@ -544,13 +545,14 @@ export async function claimNotificationOutbox(input: {
   });
 }
 
-/** Deliver queued notifications. Called from the cron tick. */
+/** Deliver one leased batch. Safe for worker and cron drainers to call together. */
 export async function drainNotificationOutbox(
   limit = 100,
   now = new Date(),
+  workerId?: string,
 ): Promise<DrainResult> {
   const db = getDb();
-  const claim = await claimNotificationOutbox({ limit, now });
+  const claim = await claimNotificationOutbox({ limit, now, workerId });
   const result: DrainResult = {
     claimed: claim.ids.length,
     sent: 0,

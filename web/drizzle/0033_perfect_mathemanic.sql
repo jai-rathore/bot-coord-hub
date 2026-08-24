@@ -1,0 +1,1 @@
+CREATE INDEX "purpose_enrollments_cursor_idx" ON "purpose_enrollments" USING btree ("intent_slug","status","definition_version","id");

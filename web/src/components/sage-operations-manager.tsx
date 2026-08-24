@@ -18,6 +18,10 @@ type OperationsSnapshot = {
   recentAverageLatencyMs: number;
   recentInputTokens: number;
   recentOutputTokens: number;
+  activeProviderLeases: number;
+  openProviderCircuits: number;
+  todayProviderInputTokens: number;
+  todayProviderOutputTokens: number;
   estimatedProviderCostUsd: number | null;
   alerts: OperationsAlert[];
 };
@@ -98,6 +102,8 @@ export function SageOperationsManager({
     ["Dead letters", snapshot.counts.dead_letter ?? 0],
     ["Oldest pending", ageLabel(snapshot.oldestPendingAgeSeconds)],
     ["Provider failures", snapshot.recentProviderFailures],
+    ["Open circuits", snapshot.openProviderCircuits],
+    ["Active model calls", snapshot.activeProviderLeases],
     ["Average latency", `${snapshot.recentAverageLatencyMs}ms`],
   ];
 
@@ -171,6 +177,9 @@ export function SageOperationsManager({
               Estimated cost: {snapshot.estimatedProviderCostUsd === null
                 ? "configure provider token rates"
                 : `$${snapshot.estimatedProviderCostUsd.toFixed(6)}`}
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              Today across guarded calls: {snapshot.todayProviderInputTokens.toLocaleString()} input tokens and {snapshot.todayProviderOutputTokens.toLocaleString()} output tokens.
             </p>
           </div>
           <button

@@ -15,6 +15,7 @@ import { getDb } from "@/db";
 import {
   agentOperatorPreferences,
   apiKeys,
+  discoveryInterests,
   sageJobs,
   sageRuns,
   sageSteps,
@@ -326,7 +327,7 @@ export async function extendSageJobLease(input: {
   leaseMs: number;
 }) {
   const now = new Date();
-  await getDb()
+  const rows = await getDb()
     .update(sageJobs)
     .set({
       leaseExpiresAt: new Date(now.getTime() + input.leaseMs),
@@ -338,7 +339,9 @@ export async function extendSageJobLease(input: {
         eq(sageJobs.workerId, input.workerId),
         eq(sageJobs.state, "running"),
       ),
-    );
+    )
+    .returning({ id: sageJobs.id });
+  return rows.length === 1;
 }
 
 export async function startSageStep(input: {
@@ -505,6 +508,51 @@ export async function completeWaitingSageScheduleJobs(
         eq(sageJobs.capability, "schedule_meeting"),
         eq(sageJobs.state, "waiting_human"),
         sql`${sageJobs.result}->>'sessionId' = ${sessionId}`,
+      ),
+    )
+    .returning({ id: sageJobs.id });
+}
+
+/**
+ * Advance the Sage introduction job that created this private interest. The
+ * interest stores only `sage:<job id>` as its internal idempotency key, so no
+ * stable candidate identifier needs to appear in the job's public result.
+ */
+export async function advanceWaitingSageDiscoveryJob(input: {
+  interestId: string;
+  state: "waiting_human" | "completed";
+  result: Record<string, unknown>;
+  redactedResult: Record<string, unknown>;
+}) {
+  const db = getDb();
+  const [interest] = await db
+    .select({
+      requesterUserId: discoveryInterests.requesterUserId,
+      idempotencyKey: discoveryInterests.idempotencyKey,
+    })
+    .from(discoveryInterests)
+    .where(eq(discoveryInterests.id, input.interestId))
+    .limit(1);
+  const match = interest?.idempotencyKey?.match(
+    /^sage:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
+  );
+  if (!interest || !match) return [];
+  const now = new Date();
+  return db
+    .update(sageJobs)
+    .set({
+      state: input.state,
+      result: input.redactedResult,
+      resultEncrypted: encryptJson(input.result),
+      completedAt: input.state === "completed" ? now : null,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(sageJobs.id, match[1]),
+        eq(sageJobs.userId, interest.requesterUserId),
+        eq(sageJobs.capability, "prepare_discovery_introduction"),
+        eq(sageJobs.state, "waiting_human"),
       ),
     )
     .returning({ id: sageJobs.id });

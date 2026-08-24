@@ -7,6 +7,7 @@ import {
   eq,
   gte,
   inArray,
+  isNull,
   isNotNull,
   lt,
   lte,
@@ -18,6 +19,9 @@ import {
 import { getDb } from "@/db";
 import {
   auditLogs,
+  llmDailyUsage,
+  llmProviderCircuits,
+  llmProviderLeases,
   notificationOutbox,
   sageJobs,
   sageRuns,
@@ -30,7 +34,12 @@ const ACTIVE_STATES = ["pending", "running", "waiting_human"] as const;
 const RECOVERABLE_STATES = ["failed", "dead_letter"] as const;
 
 export type SageOperationsAlert = {
-  key: "queue_age" | "dead_letters" | "repeated_retries" | "provider_failures";
+  key:
+    | "queue_age"
+    | "dead_letters"
+    | "repeated_retries"
+    | "provider_failures"
+    | "provider_circuit";
   severity: "warning" | "critical";
   message: string;
 };
@@ -45,6 +54,10 @@ export type SageOperationsSnapshot = {
   recentAverageLatencyMs: number;
   recentInputTokens: number;
   recentOutputTokens: number;
+  activeProviderLeases: number;
+  openProviderCircuits: number;
+  todayProviderInputTokens: number;
+  todayProviderOutputTokens: number;
   estimatedProviderCostUsd: number | null;
   alerts: SageOperationsAlert[];
 };
@@ -71,7 +84,15 @@ export async function sageOperationsSnapshot(
 ): Promise<SageOperationsSnapshot> {
   const db = getDb();
   const recentSince = new Date(now.getTime() - 15 * 60_000);
-  const [stateRows, [oldestPending], [retryRows], [runRows]] = await Promise.all([
+  const usageDay = now.toISOString().slice(0, 10);
+  const [
+    stateRows,
+    [oldestPending],
+    [retryRows],
+    [runRows],
+    [providerRows],
+    [dailyUsageRows],
+  ] = await Promise.all([
     db
       .select({ state: sageJobs.state, total: count() })
       .from(sageJobs)
@@ -101,6 +122,25 @@ export async function sageOperationsSnapshot(
       })
       .from(sageRuns)
       .where(gte(sageRuns.startedAt, recentSince)),
+    db
+      .select({
+        activeLeases: sql<number>`(
+          select count(*) from ${llmProviderLeases}
+          where ${llmProviderLeases.expiresAt} > ${now}
+        )`,
+        openCircuits: sql<number>`(
+          select count(*) from ${llmProviderCircuits}
+          where ${llmProviderCircuits.openedUntil} > ${now}
+        )`,
+      })
+      .from(sql`(select 1) provider_guard_snapshot`),
+    db
+      .select({
+        inputTokens: sum(llmDailyUsage.inputTokens),
+        outputTokens: sum(llmDailyUsage.outputTokens),
+      })
+      .from(llmDailyUsage)
+      .where(eq(llmDailyUsage.usageDay, usageDay)),
   ]);
   const counts = Object.fromEntries(
     stateRows.map((row) => [row.state, Number(row.total)]),
@@ -119,6 +159,10 @@ export async function sageOperationsSnapshot(
   );
   const recentInputTokens = Number(runRows?.inputTokens ?? 0);
   const recentOutputTokens = Number(runRows?.outputTokens ?? 0);
+  const activeProviderLeases = Number(providerRows?.activeLeases ?? 0);
+  const openProviderCircuits = Number(providerRows?.openCircuits ?? 0);
+  const todayProviderInputTokens = Number(dailyUsageRows?.inputTokens ?? 0);
+  const todayProviderOutputTokens = Number(dailyUsageRows?.outputTokens ?? 0);
   const rates = configuredTokenCost();
   const estimatedProviderCostUsd = rates
     ? Number(
@@ -158,6 +202,13 @@ export async function sageOperationsSnapshot(
       message: `${recentProviderFailures} hosted-model attempts failed in the last 15 minutes.`,
     });
   }
+  if (openProviderCircuits > 0) {
+    alerts.push({
+      key: "provider_circuit",
+      severity: "critical",
+      message: `${openProviderCircuits} hosted-model ${openProviderCircuits === 1 ? "circuit is" : "circuits are"} open. Requests are being held for recovery.`,
+    });
+  }
   return {
     generatedAt: now.toISOString(),
     counts,
@@ -168,6 +219,10 @@ export async function sageOperationsSnapshot(
     recentAverageLatencyMs,
     recentInputTokens,
     recentOutputTokens,
+    activeProviderLeases,
+    openProviderCircuits,
+    todayProviderInputTokens,
+    todayProviderOutputTokens,
     estimatedProviderCostUsd,
     alerts,
   };
@@ -310,6 +365,9 @@ export async function requeueSageJob(input: {
 export type SageRetentionResult = {
   deletedJobs: number;
   deletedNotifications: number;
+  deletedProviderUsage: number;
+  deletedProviderLeases: number;
+  deletedProviderCircuits: number;
 };
 
 export async function cleanupSageOperations(input: {
@@ -326,6 +384,7 @@ export async function cleanupSageOperations(input: {
   const failedNotificationCutoff = new Date(
     now.getTime() - 90 * 24 * 60 * 60_000,
   );
+  const providerUsageDayCutoff = standardCutoff.toISOString().slice(0, 10);
   return db.transaction(async (tx) => {
     const deletedJobs = await tx
       .delete(sageJobs)
@@ -365,7 +424,49 @@ export async function cleanupSageOperations(input: {
             ),
           )
           .returning({ id: notificationOutbox.id });
-    if (deletedJobs.length > 0 || deletedNotifications.length > 0) {
+    const deletedProviderUsage = await tx
+      .delete(llmDailyUsage)
+      .where(
+        and(
+          input.onlyUserId
+            ? eq(llmDailyUsage.userId, input.onlyUserId)
+            : undefined,
+          lt(llmDailyUsage.usageDay, providerUsageDayCutoff),
+        ),
+      )
+      .returning({ id: llmDailyUsage.id });
+    const deletedProviderLeases = await tx
+      .delete(llmProviderLeases)
+      .where(
+        and(
+          input.onlyUserId
+            ? eq(llmProviderLeases.userId, input.onlyUserId)
+            : undefined,
+          lte(llmProviderLeases.expiresAt, now),
+        ),
+      )
+      .returning({ id: llmProviderLeases.id });
+    const deletedProviderCircuits = input.onlyUserId
+      ? []
+      : await tx
+          .delete(llmProviderCircuits)
+          .where(
+            and(
+              lt(llmProviderCircuits.updatedAt, standardCutoff),
+              or(
+                isNull(llmProviderCircuits.openedUntil),
+                lte(llmProviderCircuits.openedUntil, now),
+              ),
+            ),
+          )
+          .returning({ providerKey: llmProviderCircuits.providerKey });
+    if (
+      deletedJobs.length > 0 ||
+      deletedNotifications.length > 0 ||
+      deletedProviderUsage.length > 0 ||
+      deletedProviderLeases.length > 0 ||
+      deletedProviderCircuits.length > 0
+    ) {
       await tx.insert(auditLogs).values({
         actorKind: "system",
         action: "sage.retention_cleanup",
@@ -374,6 +475,9 @@ export async function cleanupSageOperations(input: {
         metadata: {
           deletedJobs: deletedJobs.length,
           deletedNotifications: deletedNotifications.length,
+          deletedProviderUsage: deletedProviderUsage.length,
+          deletedProviderLeases: deletedProviderLeases.length,
+          deletedProviderCircuits: deletedProviderCircuits.length,
           scopedUserId: input.onlyUserId ?? null,
         },
       });
@@ -381,6 +485,9 @@ export async function cleanupSageOperations(input: {
     return {
       deletedJobs: deletedJobs.length,
       deletedNotifications: deletedNotifications.length,
+      deletedProviderUsage: deletedProviderUsage.length,
+      deletedProviderLeases: deletedProviderLeases.length,
+      deletedProviderCircuits: deletedProviderCircuits.length,
     };
   });
 }

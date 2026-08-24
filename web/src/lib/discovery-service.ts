@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "crypto";
 import {
   and,
+  asc,
   desc,
   eq,
   gt,
@@ -53,6 +54,7 @@ import {
   type CanonicalLocation,
 } from "@/lib/location-resolver";
 import { decryptJson, encryptJson } from "@/lib/secret-crypto";
+import { advanceWaitingSageDiscoveryJob } from "@/lib/sage/job-store";
 import { boundedText } from "@/lib/validation";
 
 const DISCOVERY_TOKEN_PREFIX = "dc_";
@@ -71,11 +73,63 @@ const DISCOVERY_AUDIT_ACTIONS = [
   "discovery.safety_status_changed",
 ] as const;
 
+const DISCOVERY_SAMPLE_SIZE = 100;
+
+/**
+ * Rotate each seeker's indexed candidate window once per UTC day. UUID ordering
+ * lets Postgres start at this cursor and wrap without sorting the active fleet.
+ */
+export function discoverySamplingCursor(input: {
+  userId: string;
+  intentSlug: string;
+  at?: Date;
+}): string {
+  const day = Math.floor((input.at ?? new Date()).getTime() / 86_400_000);
+  const hex = createHash("sha256")
+    .update(`${input.userId}:${input.intentSlug}:${day}`)
+    .digest("hex")
+    .slice(0, 32);
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20),
+  ].join("-");
+}
+
 export type DiscoveryActor = {
   user: User;
   kind: "user" | "agent" | "hosted_agent";
   apiKeyId?: string | null;
 };
+
+async function safelyAdvanceSageDiscoveryJob(input: Parameters<
+  typeof advanceWaitingSageDiscoveryJob
+>[0]) {
+  try {
+    await advanceWaitingSageDiscoveryJob(input);
+  } catch (error) {
+    // The human decision is already durable. A continuation failure belongs in
+    // operations and must never roll back or misreport that decision.
+    console.error("[sage] discovery continuation failed", input.interestId, error);
+  }
+}
+
+async function safelyPostDiscoveryInboxCallbacks(
+  inboxIds: string[],
+  trigger: "inbox" | "approval_result" = "inbox",
+) {
+  const results = await Promise.allSettled(
+    inboxIds.map((inboxId) => postDiscoveryInboxCallback(inboxId, trigger)),
+  );
+  for (const result of results) {
+    if (result.status === "rejected") {
+      // The durable inbox row is the source of truth and remains pollable.
+      console.error("[discovery] operator callback failed", result.reason);
+    }
+  }
+}
 
 export function discoverySubmissionRequiresHumanApproval(
   kind: DiscoveryActor["kind"],
@@ -1642,11 +1696,28 @@ export async function searchDiscovery(opts: {
     definition.discovery.pageLimit,
   );
   const db = getDb();
-  const candidates = await db
+  const sampleCursor = discoverySamplingCursor({
+    userId: opts.actor.user.id,
+    intentSlug: opts.intentSlug,
+  });
+  const candidateSelection = {
+    enrollment: purposeEnrollments,
+    location: userLocations,
+    safetyStatus: userSafety.status,
+  };
+  const candidateFilter = and(
+    eq(purposeEnrollments.intentSlug, opts.intentSlug),
+    eq(purposeEnrollments.definitionVersion, definition.version),
+    eq(purposeEnrollments.status, "active"),
+    ne(purposeEnrollments.userId, opts.actor.user.id),
+    or(
+      isNull(purposeEnrollments.expiresAt),
+      gt(purposeEnrollments.expiresAt, new Date()),
+    ),
+  );
+  const firstCandidateWindow = await db
     .select({
-      enrollment: purposeEnrollments,
-      location: userLocations,
-      safetyStatus: userSafety.status,
+      ...candidateSelection,
     })
     .from(purposeEnrollments)
     .leftJoin(
@@ -1656,18 +1727,34 @@ export async function searchDiscovery(opts: {
     .leftJoin(userSafety, eq(purposeEnrollments.userId, userSafety.userId))
     .where(
       and(
-        eq(purposeEnrollments.intentSlug, opts.intentSlug),
-        eq(purposeEnrollments.definitionVersion, definition.version),
-        eq(purposeEnrollments.status, "active"),
-        ne(purposeEnrollments.userId, opts.actor.user.id),
-        or(
-          isNull(purposeEnrollments.expiresAt),
-          gt(purposeEnrollments.expiresAt, new Date()),
-        ),
+        candidateFilter,
+        gte(purposeEnrollments.id, sampleCursor),
       ),
     )
-    .orderBy(sql`random()`)
-    .limit(100);
+    .orderBy(asc(purposeEnrollments.id))
+    .limit(DISCOVERY_SAMPLE_SIZE);
+  const wrappedCandidateWindow =
+    firstCandidateWindow.length < DISCOVERY_SAMPLE_SIZE
+      ? await db
+          .select({
+            ...candidateSelection,
+          })
+          .from(purposeEnrollments)
+          .leftJoin(
+            userLocations,
+            eq(purposeEnrollments.locationId, userLocations.id),
+          )
+          .leftJoin(
+            userSafety,
+            eq(purposeEnrollments.userId, userSafety.userId),
+          )
+          .where(
+            and(candidateFilter, lt(purposeEnrollments.id, sampleCursor)),
+          )
+          .orderBy(asc(purposeEnrollments.id))
+          .limit(DISCOVERY_SAMPLE_SIZE - firstCandidateWindow.length)
+      : [];
+  const candidates = [...firstCandidateWindow, ...wrappedCandidateWindow];
   const existingRecommendations = await db
     .select()
     .from(discoveryRecommendations)
@@ -2311,7 +2398,7 @@ export async function requestDiscoveryIntroduction(opts: {
       ),
     );
   if (inboxId) {
-    await postDiscoveryInboxCallback(inboxId);
+    await safelyPostDiscoveryInboxCallbacks([inboxId]);
   }
   if (alreadyExisted) {
     return {
@@ -2469,7 +2556,7 @@ export async function decideDiscoveryInterest(opts: {
       return { confirmed: updated, inboxId: inbox?.id ?? null };
     });
     if (inboxId) {
-      await postDiscoveryInboxCallback(inboxId);
+      await safelyPostDiscoveryInboxCallbacks([inboxId]);
     }
     await writeAudit({
       actorUserId: opts.user.id,
@@ -2480,6 +2567,24 @@ export async function decideDiscoveryInterest(opts: {
       metadata: {
         decision: "confirm_request",
         intentSlug: confirmed.intentSlug,
+      },
+    });
+    await safelyAdvanceSageDiscoveryJob({
+      interestId: confirmed.id,
+      state: "waiting_human",
+      result: {
+        ok: true,
+        status: confirmed.status,
+        requesterConfirmed: true,
+        waitingForHuman: true,
+        message:
+          "You approved the anonymous introduction request. Sage is waiting for the other person's private decision.",
+      },
+      redactedResult: {
+        ok: true,
+        status: confirmed.status,
+        requesterConfirmed: true,
+        waitingForHuman: true,
       },
     });
     return {
@@ -2520,7 +2625,7 @@ export async function decideDiscoveryInterest(opts: {
       interest.requesterUserId,
       interest.recipientUserId,
     );
-    const [updated] = await db.transaction(async (tx) => {
+    const { updated, inboxId } = await db.transaction(async (tx) => {
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtext(${pairKey}))`,
       );
@@ -2538,7 +2643,9 @@ export async function decideDiscoveryInterest(opts: {
           ),
         )
         .returning();
-      if (!rows[0]) return rows;
+      if (!rows[0]) {
+        return { updated: null, inboxId: null };
+      }
       await tx
         .insert(discoveryPairHistory)
         .values({
@@ -2560,10 +2667,30 @@ export async function decideDiscoveryInterest(opts: {
             updatedAt: new Date(),
           },
         });
-      return rows;
+      const [inbox] = await tx
+        .insert(agentInbox)
+        .values({
+          userId: interest.requesterUserId,
+          discoveryInterestId: interest.id,
+          kind: "discovery.introduction_closed",
+          summary:
+            "The anonymous introduction did not move forward. No private reason or identity was disclosed.",
+          body: {
+            intentSlug: interest.intentSlug,
+            instructions:
+              "Tell your human only that this introduction did not move forward. Do not infer whether the other person declined or a private constraint did not overlap.",
+          },
+          dedupeKey: `discovery:${interest.id}:closed:${interest.requesterUserId}`,
+        })
+        .onConflictDoNothing({ target: agentInbox.dedupeKey })
+        .returning({ id: agentInbox.id });
+      return { updated: rows[0], inboxId: inbox?.id ?? null };
     });
     if (!updated) {
       throw new AgentApiError(409, "Introduction decision changed");
+    }
+    if (inboxId) {
+      await safelyPostDiscoveryInboxCallbacks([inboxId], "approval_result");
     }
     await writeAudit({
       actorUserId: opts.user.id,
@@ -2571,6 +2698,22 @@ export async function decideDiscoveryInterest(opts: {
       entityType: "discovery_interest",
       entityId: interest.id,
       metadata: { decision: "decline", intentSlug: interest.intentSlug },
+    });
+    await safelyAdvanceSageDiscoveryJob({
+      interestId: updated.id,
+      state: "completed",
+      result: {
+        ok: true,
+        status: updated.status,
+        waitingForHuman: false,
+        message:
+          "The anonymous introduction did not move forward. Sage has no private reason or identity to disclose.",
+      },
+      redactedResult: {
+        ok: true,
+        status: updated.status,
+        waitingForHuman: false,
+      },
     });
     return { interestId: updated.id, status: updated.status };
   }
@@ -2644,7 +2787,7 @@ export async function decideDiscoveryInterest(opts: {
   );
   const privateVerdict = privateCompatibility.verdict;
   if (privateVerdict === "incompatible") {
-    const [closed] = await db.transaction(async (tx) => {
+    const { closed, inboxIds } = await db.transaction(async (tx) => {
       const pairKey = canonicalDiscoveryPair(
         interest.requesterUserId,
         interest.recipientUserId,
@@ -2729,33 +2872,59 @@ export async function decideDiscoveryInterest(opts: {
             updatedAt: new Date(),
           },
         });
-      await tx.insert(agentInbox).values([
-        {
-          userId: interest.requesterUserId,
-          discoveryInterestId: interest.id,
-          kind: "discovery.private_mismatch",
-          summary:
-            "An anonymous introduction did not pass the private compatibility gate.",
-          body: {
-            intentSlug: interest.intentSlug,
-            instructions:
-              "Tell your human only that private constraints did not overlap. Do not infer which constraint.",
+      const inboxRows = await tx
+        .insert(agentInbox)
+        .values([
+          {
+            userId: interest.requesterUserId,
+            discoveryInterestId: interest.id,
+            kind: "discovery.private_mismatch",
+            summary:
+              "An anonymous introduction did not pass the private compatibility gate.",
+            body: {
+              intentSlug: interest.intentSlug,
+              instructions:
+                "Tell your human only that private constraints did not overlap. Do not infer which constraint.",
+            },
+            dedupeKey: `discovery:${interest.id}:mismatch:${interest.requesterUserId}`,
           },
-        },
-        {
-          userId: interest.recipientUserId,
-          discoveryInterestId: interest.id,
-          kind: "discovery.private_mismatch",
-          summary:
-            "An anonymous introduction did not pass the private compatibility gate.",
-          body: {
-            intentSlug: interest.intentSlug,
-            instructions:
-              "Tell your human only that private constraints did not overlap. Do not infer which constraint.",
+          {
+            userId: interest.recipientUserId,
+            discoveryInterestId: interest.id,
+            kind: "discovery.private_mismatch",
+            summary:
+              "An anonymous introduction did not pass the private compatibility gate.",
+            body: {
+              intentSlug: interest.intentSlug,
+              instructions:
+                "Tell your human only that private constraints did not overlap. Do not infer which constraint.",
+            },
+            dedupeKey: `discovery:${interest.id}:mismatch:${interest.recipientUserId}`,
           },
-        },
-      ]);
-      return rows;
+        ])
+        .onConflictDoNothing({ target: agentInbox.dedupeKey })
+        .returning({ id: agentInbox.id });
+      return {
+        closed: rows[0],
+        inboxIds: inboxRows.map((row) => row.id),
+      };
+    });
+    await safelyPostDiscoveryInboxCallbacks(inboxIds, "approval_result");
+    await safelyAdvanceSageDiscoveryJob({
+      interestId: closed.id,
+      state: "completed",
+      result: {
+        ok: true,
+        status: closed.status,
+        waitingForHuman: false,
+        message:
+          "The anonymous introduction did not move forward because private constraints did not overlap. No private dimension or identity was disclosed.",
+      },
+      redactedResult: {
+        ok: true,
+        status: closed.status,
+        waitingForHuman: false,
+      },
     });
     return {
       interestId: closed.id,
@@ -2767,7 +2936,7 @@ export async function decideDiscoveryInterest(opts: {
     };
   }
 
-  const { updated, sessionId } = await db.transaction(async (tx) => {
+  const { updated, sessionId, inboxIds } = await db.transaction(async (tx) => {
     const pairKey = canonicalDiscoveryPair(
       interest.requesterUserId,
       interest.recipientUserId,
@@ -2806,7 +2975,10 @@ export async function decideDiscoveryInterest(opts: {
               definition.version,
             ),
             eq(purposeEnrollments.updatedAt, enrollment.updatedAt),
-            gt(purposeEnrollments.expiresAt, new Date()),
+            or(
+              isNull(purposeEnrollments.expiresAt),
+              gt(purposeEnrollments.expiresAt, new Date()),
+            ),
           ),
         )
         .returning({ id: purposeEnrollments.id });
@@ -2912,41 +3084,49 @@ export async function decideDiscoveryInterest(opts: {
       .update(discoveryInterests)
       .set({ sessionId: createdSessionId })
       .where(eq(discoveryInterests.id, interest.id));
-    await tx.insert(agentInbox).values([
-      {
-        userId: interest.requesterUserId,
-        discoveryInterestId: interest.id,
-        sessionId: createdSessionId,
-        kind: "discovery.introduction_accepted",
-        summary:
-          "Mutual interest confirmed. Only currently authorized introduction fields are available.",
-        body: {
-          intentSlug: interest.intentSlug,
+    const inboxRows = await tx
+      .insert(agentInbox)
+      .values([
+        {
+          userId: interest.requesterUserId,
+          discoveryInterestId: interest.id,
           sessionId: createdSessionId,
-          instructions:
-            "Call list_discovery_interests to read the currently authorized disclosure. Do not infer or request undisclosed details.",
+          kind: "discovery.introduction_accepted",
+          summary:
+            "Mutual interest confirmed. Only currently authorized introduction fields are available.",
+          body: {
+            intentSlug: interest.intentSlug,
+            sessionId: createdSessionId,
+            instructions:
+              "Call list_discovery_interests to read the currently authorized disclosure. Do not infer or request undisclosed details.",
+          },
+          dedupeKey: `discovery:${interest.id}:accepted:${interest.requesterUserId}`,
         },
-      },
-      {
-        userId: interest.recipientUserId,
-        discoveryInterestId: interest.id,
-        sessionId: createdSessionId,
-        kind: "discovery.introduction_accepted",
-        summary:
-          "Mutual interest confirmed. Only currently authorized introduction fields are available.",
-        body: {
-          intentSlug: interest.intentSlug,
+        {
+          userId: interest.recipientUserId,
+          discoveryInterestId: interest.id,
           sessionId: createdSessionId,
-          instructions:
-            "Call list_discovery_interests to read the currently authorized disclosure. Do not infer or request undisclosed details.",
+          kind: "discovery.introduction_accepted",
+          summary:
+            "Mutual interest confirmed. Only currently authorized introduction fields are available.",
+          body: {
+            intentSlug: interest.intentSlug,
+            sessionId: createdSessionId,
+            instructions:
+              "Call list_discovery_interests to read the currently authorized disclosure. Do not infer or request undisclosed details.",
+          },
+          dedupeKey: `discovery:${interest.id}:accepted:${interest.recipientUserId}`,
         },
-      },
-    ]);
+      ])
+      .onConflictDoNothing({ target: agentInbox.dedupeKey })
+      .returning({ id: agentInbox.id });
     return {
       updated: { ...claimed, sessionId: createdSessionId },
       sessionId: createdSessionId,
+      inboxIds: inboxRows.map((row) => row.id),
     };
   });
+  await safelyPostDiscoveryInboxCallbacks(inboxIds, "approval_result");
   await writeAudit({
     actorUserId: opts.user.id,
     action: "discovery.interest_decided",
@@ -2957,6 +3137,24 @@ export async function decideDiscoveryInterest(opts: {
       intentSlug: interest.intentSlug,
       disclosedFields: definition.disclosure.fields,
       sessionId,
+    },
+  });
+  await safelyAdvanceSageDiscoveryJob({
+    interestId: updated.id,
+    state: "completed",
+    result: {
+      ok: true,
+      status: updated.status,
+      sessionId,
+      waitingForHuman: false,
+      message:
+        "Mutual interest was confirmed. Sage opened the private introduction session with only the fields both people authorized.",
+    },
+    redactedResult: {
+      ok: true,
+      status: updated.status,
+      hasSession: true,
+      waitingForHuman: false,
     },
   });
   return {

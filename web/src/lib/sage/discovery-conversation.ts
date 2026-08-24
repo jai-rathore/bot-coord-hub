@@ -355,15 +355,16 @@ export async function runSageDiscoveryIntake(input: {
     });
   }
   const provider = getLlmProvider();
-  const completion = await provider.complete(
-    buildDiscoveryIntakeRequest({
+  const completion = await provider.complete({
+    ...buildDiscoveryIntakeRequest({
       intentName: contract.name,
       definition: contract.definition,
       draft: parseDraft(thread.draftEncrypted),
       history,
       userText: decryptSecret(message.bodyEncrypted),
     }),
-  );
+    budget: { userId: input.user.id },
+  });
   const toolCall = completion.toolCalls[0];
   if (
     completion.toolCalls.length !== 1 ||

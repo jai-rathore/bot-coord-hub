@@ -314,6 +314,7 @@ export async function deliverEventInbox(opts: {
 
 export async function postDiscoveryInboxCallback(
   inboxId: string,
+  trigger: "inbox" | "approval_result" = "inbox",
 ): Promise<"delivered" | "failed" | "none"> {
   const [item] = await getDb()
     .select()
@@ -324,7 +325,7 @@ export async function postDiscoveryInboxCallback(
   await enqueueSageActivityTrigger({
     userId: item.userId,
     sourceId: item.id,
-    trigger: "inbox",
+    trigger,
     sessionId: item.sessionId,
     eventId: item.eventId,
   });

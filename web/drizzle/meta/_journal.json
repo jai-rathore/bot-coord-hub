@@ -232,6 +232,20 @@
       "when": 1787538947978,
       "tag": "0032_stale_absorbing_man",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1787540894535,
+      "tag": "0033_perfect_mathemanic",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1787541201782,
+      "tag": "0034_omniscient_blue_shield",
+      "breakpoints": true
     }
   ]
 }

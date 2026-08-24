@@ -9,6 +9,7 @@ import {
   intentTypes,
   purposeEnrollments,
   safetyReports,
+  sageJobs,
   sessions,
   userLocations,
   users,
@@ -42,6 +43,7 @@ import {
   listSessionsForUser,
 } from "../src/lib/sessions";
 import { issueLocationResolutionToken } from "../src/lib/location-resolver";
+import { ownerResultForSageJob } from "../src/lib/sage/job-store";
 
 process.env.TOKEN_ENCRYPTION_KEY =
   process.env.TOKEN_ENCRYPTION_KEY ??
@@ -510,10 +512,22 @@ async function main() {
   });
   assert.match(durableCandidateHandle, /^dc_/);
 
+  const [waitingSageIntroduction] = await db
+    .insert(sageJobs)
+    .values({
+      userId: seeker.id,
+      capability: "prepare_discovery_introduction",
+      trigger: "user_request",
+      payload: { hasRecommendationId: true },
+      state: "waiting_human",
+      attempts: 1,
+      result: { waitingForHuman: true },
+    })
+    .returning();
   const request = await requestDiscoveryIntroduction({
     actor: { user: seeker, kind: "agent", apiKeyId: key.id },
     candidateHandle: durableCandidateHandle,
-    idempotencyKey: `intro-${suffix}`,
+    idempotencyKey: `sage:${waitingSageIntroduction.id}`,
   });
   assert.equal(request.status, "pending");
   assert.equal(request.interestId, null);
@@ -539,6 +553,15 @@ async function main() {
     interestId,
     decision: "confirm_request",
   });
+  const [sageAfterRequesterApproval] = await db
+    .select()
+    .from(sageJobs)
+    .where(eq(sageJobs.id, waitingSageIntroduction.id));
+  assert.equal(sageAfterRequesterApproval.state, "waiting_human");
+  assert.equal(
+    ownerResultForSageJob(sageAfterRequesterApproval)?.requesterConfirmed,
+    true,
+  );
   const beforeApproval = await listDiscoveryInterests(host.id, {
     includeStableIds: true,
   });
@@ -554,6 +577,15 @@ async function main() {
   assert.equal(accepted.status, "accepted");
   assert.ok(accepted.sessionId);
   assert.equal(accepted.disclosure, null);
+  const [completedSageIntroduction] = await db
+    .select()
+    .from(sageJobs)
+    .where(eq(sageJobs.id, waitingSageIntroduction.id));
+  assert.equal(completedSageIntroduction.state, "completed");
+  assert.equal(
+    ownerResultForSageJob(completedSageIntroduction)?.sessionId,
+    accepted.sessionId,
+  );
   const acceptedForHost = await listDiscoveryInterests(host.id, {
     includeStableIds: true,
   });

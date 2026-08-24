@@ -160,6 +160,7 @@ export async function refreshNotesDigest(
       messages: [{ role: "user", text: user }],
       tools: [],
       maxOutputTokens: 160,
+      budget: { userId: event.organizerUserId },
     });
     digest = boundDigest(result.text);
   } catch (error) {
