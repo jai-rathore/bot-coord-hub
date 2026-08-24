@@ -24,13 +24,13 @@ A milestone is complete only when all three columns below say **Complete**:
 | Durable Sage queue | Complete | Complete | Complete | Postgres jobs, encrypted private payloads/results, redacted telemetry, leases, retries, and idempotency are live. Concurrent claims, idempotent enqueue, expired-lease recovery, and audited requeue passed in production. |
 | Sage worker | Complete | Complete | Complete | The worker is live, reaches production Postgres, polls without errors, and the pre-worker queue was confirmed empty. |
 | Scheduling | Complete | Complete | Not verified | Structured Sage requests exist; real-calendar duplicate and approval behavior still needs production dogfooding. |
-| Dating discovery | Partial | Complete | Partial | Encrypted conversational intake, clarification, location choice, snapshot preparation, anonymous search, and staged introductions are live. Signed-in activation and dual-approval dogfooding remain. |
-| Recruiting discovery | Partial | Complete | Partial | Conversational hiring intake plus replay-safe private guest creation and response monitoring are live. The worker path passed a production synthetic; a real candidate response and signed-in review remain. |
+| Dating discovery | Complete | Complete | Partial | Encrypted conversational intake, clarification, location choice, snapshot preparation, anonymous search, staged introductions, and post-decision job continuation are live. The production worker and full dual-approval lifecycle passed; signed-in browser activation remains. |
+| Recruiting discovery | Complete | Complete | Partial | Conversational hiring intake plus replay-safe private guest creation and response monitoring are live. The worker path passed a production synthetic; a real candidate response and signed-in review remain. |
 | Local meetup discovery | Complete | Complete | Partial | Conversational meetup intake, opt-in recurring search, and durable anonymous recommendations are live. A scheduled search passed through the production worker; signed-in cadence review remains. |
 | Events | Complete | Complete | Partial | Durable, replay-safe coordination and hosted event chat passed through the production worker and Gemini. Signed-in organizer and participant dogfooding remains. |
 | People and invitations | Complete | Complete | Partial | Sage can review people and create a private, unsent invitation link, and the production worker path passed. Signed-in review remains; approval, revocation, and relationship-policy changes stay human-controlled. |
-| Inbox and follow-up | Partial | Complete | Partial | Sage reviews activity, inbox, sessions, and event boards. Operator-safe automatic routing is live and passed both Sage-primary delivery and external-primary suppression; signed-in continuation dogfooding remains. |
-| Operations and scale | Partial | Partial | Partial | Dead-letter recovery, notification leases, retention, and queue/provider metrics are production-proven. Indexed candidate scanning, worker-owned notification draining, real alert delivery, and signed-in admin review remain. |
+| Inbox and follow-up | Complete | Complete | Partial | Sage reviews activity, inbox, sessions, and event boards. Operator-safe automatic routing is live and passed both Sage-primary delivery and external-primary suppression; signed-in continuation dogfooding remains. |
+| Operations and scale | Complete | Partial | Partial | Indexed candidate scanning, provider retries/circuits/concurrency/budgets, dead-letter recovery, notification leases, retention, metrics, live heartbeats, and restart safety are production-proven. The worker has no email or SMS delivery credentials, and signed-in admin review remains. |
 
 ## Architecture invariants
 
@@ -88,16 +88,45 @@ A milestone is complete only when all three columns below say **Complete**:
   queue and conversation tables.
 - Signed-in browser dogfooding is still required before conversational
   discovery can be called completely verified.
+- PRs 85 through 89 are merged. Migrations 0033 and 0034 are live across the
+  web, worker, events cron, and cleanup cron services. The actual web and
+  worker services have explicit provider retry, concurrency, circuit, lease,
+  and 100,000-token daily per-person limits.
+- Production job `job-da5ru60u01pc7389v7j0` proved the indexed discovery query
+  plan, provider retry, fleet concurrency, shared circuit opening, token and
+  configured-cost budget enforcement, queue and outbox races, dead-letter
+  recovery, retention, metrics, alerts, and synthetic cleanup.
+- Production job `job-da5rufrm8hqs73dn3geg` passed the full deterministic
+  discovery suite, including anonymous cards, requester confirmation,
+  recipient acceptance, completed Sage continuation state, selective
+  disclosure, safety controls, and retention cleanup.
+- Production jobs `job-da5ruprbc2fs73a32png` and
+  `job-da5rvoqjobas73fnmfg0` repeated event coordination, Gemini event chat,
+  guest recruiting requests, connection review, activity review, proactive
+  Sage routing, and external-primary suppression through the live worker.
+- Production job `job-da5s3kajobas73fo0va0` passed conversational Sage
+  discovery through Gemini and the live worker. Controlled jobs
+  `job-da5s9fojo6nc73didgi0` and `job-da5sa3rm8hqs73do4u50` emitted successful
+  lease heartbeats, survived rolling worker restarts, completed, and cleaned
+  up. Render did not expose a process-level `SIGTERM` drain log, so that exact
+  signal assertion remains open.
+- Safe environment probes confirmed neither the web nor worker currently has
+  Resend or Twilio credentials. The worker-owned notification loop is live but
+  real email or SMS delivery cannot be marked verified until credentials are
+  configured.
+- This Codex session had no callable authenticated browser connection. Signed-in
+  scheduling, discovery, and admin UX dogfooding remain open instead of being
+  inferred from backend proof.
 
 ### Active implementation slice
 
 | Work item | Code | Database test | Production | Next proof |
 | --- | --- | --- | --- | --- |
-| Indexed rotating discovery sampling and composite candidate cursor index | Implemented | Blocked locally | Pending | Apply migration 0033 and inspect the production query plan |
-| Shared provider retries, circuit breaker, concurrency leases, and per-person token/cost budgets | Implemented | Blocked locally | Pending | Apply migration 0034 and run the isolated provider race and failure proof |
-| Worker-owned leased notification draining with cron fallback | Implemented | Lease race passed previously | Pending | Configure worker delivery secrets and prove worker delivery |
-| Sage introduction continuation after requester and recipient decisions | Implemented | Blocked locally | Pending | Run anonymous-card, requester approval, recipient decision, and job completion proof |
-| Observable worker heartbeat and graceful drain state | Implemented | Unit/type checks passed | Pending | Capture a live heartbeat and SIGTERM drain during an active job |
+| Indexed rotating discovery sampling and composite candidate cursor index | Complete | Passed | Deployed | Production query plan passed in `job-da5ru60u01pc7389v7j0` |
+| Shared provider retries, circuit breaker, concurrency leases, and per-person token/cost budgets | Complete | Passed | Deployed | Provider race, retry, circuit, token, and configured-cost proofs passed in `job-da5ru60u01pc7389v7j0` |
+| Worker-owned leased notification draining with cron fallback | Complete | Lease race passed | Partial | Configure worker delivery secrets and prove worker-owned external delivery |
+| Sage introduction continuation after requester and recipient decisions | Complete | Passed | Deployed | Full request, dual decision, completed job, privacy, and cleanup proof passed in `job-da5rufrm8hqs73dn3geg` |
+| Observable worker heartbeat and graceful drain state | Complete | Passed | Partial | Heartbeat and rolling-restart survival passed; capture the process-level drain signal if Render exposes it |
 | Encrypt private Sage inputs and owner-visible results; redact operational payloads and steps | Complete | Passed | Deployed | Signed-in owner API/UI result check |
 | Replay-safe event creation | Complete | Passed | Deployed | Signed-in event creation dogfood |
 | `coordinate_event` create/list/review and lifecycle mutations | Complete | Passed | Deployed | Signed-in organizer lifecycle dogfood |
@@ -111,10 +140,9 @@ A milestone is complete only when all three columns below say **Complete**:
 
 This workstation did not have a usable local PostgreSQL environment for the
 slice, so database evidence came from isolated production one-off jobs against
-the live schema. Synthetic rows were explicitly cleaned up after each run.
-The current parity slice has not run those production jobs yet. Its database
-rows remain **Blocked locally** and its production rows remain **Pending** until
-migrations 0033 and 0034 deploy and the new evidence is captured.
+the live schema. Synthetic rows were explicitly cleaned up after each passing
+run. The full unit suite, lint, type checks, build, route rendering checks, and
+GitHub CI also passed.
 
 ### P0: make the existing Sage path operational
 
@@ -122,9 +150,11 @@ migrations 0033 and 0034 deploy and the new evidence is captured.
 - [x] Confirm the worker uses the production database and `ENABLE_SAGE_JOBS=true`.
 - [x] Inspect jobs queued before the worker existed; the production queue was empty.
 - [x] Run a synthetic discovery turn through the production worker, Gemini, location resolver, encryption, and cleanup.
-- [ ] Run an authenticated scheduling job and discovery job end to end.
+- [x] Run a hosted Sage discovery job through Gemini and the production worker.
+- [ ] Run authenticated signed-in scheduling and discovery from the production UI.
 - [x] **Automated production proof:** Verify concurrent claims, expired-lease recovery, retry history, and idempotent replay.
-- [ ] Verify a live lease heartbeat and graceful worker shutdown during a long-running job.
+- [x] Verify live lease heartbeats and completion across a rolling worker restart.
+- [ ] Capture the process-level drain signal during an active job if Render exposes it.
 
 ### P1: complete conversational discovery
 
@@ -136,8 +166,8 @@ migrations 0033 and 0034 deploy and the new evidence is captured.
 - [x] Require snapshot approval before activating agent-prepared enrollment data.
 - [x] Let Sage run a search and explain anonymous results without exposing private dimensions.
 - [x] Let Sage stage an introduction request for human approval.
-- [ ] Resume the workflow after requester and recipient decisions.
-- [ ] Add provider retry, circuit breaker, concurrency, and token/cost budgets.
+- [x] Resume the workflow after requester and recipient decisions.
+- [x] Add and production-prove provider retry, circuit breaker, concurrency, and token/cost budgets.
 
 ### P2: cover the remaining product streams
 
@@ -176,8 +206,9 @@ migrations 0033 and 0034 deploy and the new evidence is captured.
 - [x] **Code-only:** Emit queue age, run latency, attempts, outcomes, provider tokens, and configurable provider cost metrics.
 - [x] **Code-only:** Alert configured administrators on queue age, repeated retries, dead letters, and repeated provider failures.
 - [x] **Automated production proof:** Deploy migration 0032 and pass the Sage operations production race and recovery proof.
-- [ ] Replace randomized candidate sampling with indexed buckets or cursors before fleet-wide scans.
-- [ ] Move notification draining to a leased worker path while retaining cron as a trigger only.
+- [x] Replace randomized candidate sampling with an indexed rotating cursor before fleet-wide scans.
+- [x] Move notification draining to a leased worker path while retaining cron as fallback.
+- [ ] Configure worker email or SMS credentials and prove real worker-owned delivery.
 
 ## Rollout gates
 
