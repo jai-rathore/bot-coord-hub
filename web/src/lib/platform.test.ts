@@ -6,6 +6,7 @@ import {
   generateGuestToken,
   hashGuestEmail,
   hashGuestToken,
+  matchesGuestEmailHash,
 } from "./guest-tokens";
 import {
   DEFAULT_AGENT_SCOPES,
@@ -125,6 +126,7 @@ test("different participant policies force confirmation", () => {
 
 test("guest capabilities are random, hashed, and email-bound", () => {
   process.env.GUEST_TOKEN_PEPPER = "test-guest-pepper";
+  delete process.env.TOKEN_ENCRYPTION_KEY;
   const first = generateGuestToken();
   const second = generateGuestToken();
   assert.match(first.rawToken, /^gt_/);
@@ -134,6 +136,19 @@ test("guest capabilities are random, hashed, and email-bound", () => {
     hashGuestEmail("Person@Example.com"),
     hashGuestEmail("person@example.com"),
   );
+});
+
+test("guest email bindings work across web and worker secrets", () => {
+  process.env.GUEST_TOKEN_PEPPER = "legacy-web-pepper";
+  delete process.env.TOKEN_ENCRYPTION_KEY;
+  const legacy = hashGuestEmail("person@example.com");
+
+  process.env.TOKEN_ENCRYPTION_KEY = "shared-web-worker-encryption-key";
+  const shared = hashGuestEmail("person@example.com");
+  assert.notEqual(shared, legacy);
+  assert.equal(matchesGuestEmailHash(shared, "person@example.com"), true);
+  assert.equal(matchesGuestEmailHash(legacy, "person@example.com"), true);
+  assert.equal(matchesGuestEmailHash(legacy, "other@example.com"), false);
 });
 
 test("public invite tokens are signed, tamper-evident, and URL-safe", () => {

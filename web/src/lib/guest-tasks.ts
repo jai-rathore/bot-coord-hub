@@ -26,6 +26,7 @@ import {
   hashGuestEmail,
   hashGuestIp,
   hashGuestToken,
+  matchesGuestEmailHash,
 } from "@/lib/guest-tokens";
 import {
   assertPayloadSize,
@@ -680,7 +681,10 @@ export async function respondToGuestTask(opts: {
   })!.toLowerCase();
   const task = await resolveGuestTask(opts.publicId, opts.rawToken);
   const emailHash = hashGuestEmail(email);
-  if (task.targetEmailHash && task.targetEmailHash !== emailHash) {
+  if (
+    task.targetEmailHash &&
+    !matchesGuestEmailHash(task.targetEmailHash, email)
+  ) {
     throw new AgentApiError(
       403,
       "Use the email address this private request was sent to",
