@@ -1726,8 +1726,8 @@ export const eventNotes = pgTable(
 );
 
 /**
- * Durable, idempotent notification queue. `dedupeKey` is unique, so a cron
- * retry can never double-send.
+ * Durable notification queue. `dedupeKey` prevents duplicate rows and delivery
+ * leases prevent concurrent drainers from sending the same row together.
  */
 export const notificationOutbox = pgTable(
   "notification_outbox",
@@ -1748,6 +1748,8 @@ export const notificationOutbox = pgTable(
     failedAt: timestamp("failed_at", { withTimezone: true }),
     lastError: text("last_error"),
     attempts: integer("attempts").notNull().default(0),
+    leasedBy: text("leased_by"),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -1755,7 +1757,7 @@ export const notificationOutbox = pgTable(
   (t) => [
     uniqueIndex("notification_outbox_dedupe_uidx").on(t.dedupeKey),
     index("notification_outbox_pending_idx")
-      .on(t.scheduledFor)
+      .on(t.scheduledFor, t.leaseExpiresAt)
       .where(sql`${t.sentAt} is null`),
     // Both are joined and filtered on, and this is the fastest-growing table.
     index("notification_outbox_user_idx").on(t.userId),

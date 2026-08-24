@@ -2,16 +2,17 @@
  * Event notifications.
  *
  * Everything is queued into notification_outbox first and delivered by the
- * cron drain, so a retry can never double-send: `dedupeKey` is unique and the
- * insert is a no-op on conflict.
+ * cron drain. `dedupeKey` makes enqueue replay-safe, while a delivery lease
+ * prevents concurrent drainers from sending the same row at the same time.
  *
  * Delivery degrades quietly per channel. Without RESEND_API_KEY email rows
  * stay queued. Without Twilio, text rows stay queued. The product still works.
  */
 
+import { randomUUID } from "node:crypto";
 import { appOrigin } from "@/lib/connect-copy";
 import { fetchWithTimeout } from "@/lib/fetch-timeout";
-import { and, asc, eq, inArray, isNull, lte } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   eventParticipants,
@@ -289,6 +290,13 @@ function renderTemplate(
 ): Rendered {
   const title = String(payload.title ?? "your event");
   switch (template) {
+    case "sage_operations_alert": {
+      const operationsUrl = `${eventUrl.replace(/\/$/, "")}/app/admin/sage`;
+      return {
+        subject: `Sage operations needs attention: ${String(payload.alert ?? "queue health")}`,
+        body: `${String(payload.message ?? "Sage operations crossed a configured safety threshold.")}\n\nReview the queue and recovery controls:\n${operationsUrl}`,
+      };
+    }
     case "discovery_recommendations": {
       const count = Number(payload.count ?? 1);
       const discoveryUrl = `${eventUrl.replace(/\/$/, "")}/app/discovery`;
@@ -358,6 +366,10 @@ function renderSms(
 ): string {
   const title = shortTitle(String(payload.title ?? "your event"));
   switch (template) {
+    case "sage_operations_alert": {
+      const operationsUrl = `${eventUrl.replace(/\/$/, "")}/app/admin/sage`;
+      return `HoneyMatcha operations: ${String(payload.message ?? "Sage needs attention")}. ${operationsUrl}`;
+    }
     case "discovery_recommendations": {
       const count = Number(payload.count ?? 1);
       const discoveryUrl = `${eventUrl.replace(/\/$/, "")}/app/discovery`;
@@ -471,7 +483,66 @@ export async function sendTestSms(to: string): Promise<string | undefined> {
   );
 }
 
-export type DrainResult = { sent: number; failed: number; skipped: number };
+export type DrainResult = {
+  claimed: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+};
+
+export type NotificationOutboxClaim = {
+  workerId: string;
+  ids: string[];
+};
+
+/**
+ * Claim a bounded batch before doing network I/O. The row lock protects the
+ * claim itself and the durable lease protects it after the transaction ends.
+ */
+export async function claimNotificationOutbox(input: {
+  limit?: number;
+  now?: Date;
+  leaseMs?: number;
+  workerId?: string;
+  /** Constrain maintenance verification without touching unrelated rows. */
+  onlyIds?: string[];
+} = {}): Promise<NotificationOutboxClaim> {
+  const db = getDb();
+  const now = input.now ?? new Date();
+  const limit = Math.max(1, Math.min(500, Math.floor(input.limit ?? 100)));
+  const leaseMs = Math.max(30_000, Math.min(15 * 60_000, input.leaseMs ?? 120_000));
+  const workerId = input.workerId ?? `outbox:${process.pid}:${randomUUID()}`;
+  const leaseExpiresAt = new Date(now.getTime() + leaseMs);
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .select({ id: notificationOutbox.id })
+      .from(notificationOutbox)
+      .where(
+        and(
+          input.onlyIds?.length
+            ? inArray(notificationOutbox.id, input.onlyIds)
+            : undefined,
+          isNull(notificationOutbox.sentAt),
+          lt(notificationOutbox.attempts, 5),
+          lte(notificationOutbox.scheduledFor, now),
+          or(
+            isNull(notificationOutbox.leaseExpiresAt),
+            lte(notificationOutbox.leaseExpiresAt, now),
+          ),
+        ),
+      )
+      .orderBy(asc(notificationOutbox.scheduledFor))
+      .limit(limit)
+      .for("update", { skipLocked: true });
+    if (rows.length === 0) return { workerId, ids: [] };
+    const ids = rows.map((row) => row.id);
+    await tx
+      .update(notificationOutbox)
+      .set({ leasedBy: workerId, leaseExpiresAt })
+      .where(inArray(notificationOutbox.id, ids));
+    return { workerId, ids };
+  });
+}
 
 /** Deliver queued notifications. Called from the cron tick. */
 export async function drainNotificationOutbox(
@@ -479,7 +550,14 @@ export async function drainNotificationOutbox(
   now = new Date(),
 ): Promise<DrainResult> {
   const db = getDb();
-  const result: DrainResult = { sent: 0, failed: 0, skipped: 0 };
+  const claim = await claimNotificationOutbox({ limit, now });
+  const result: DrainResult = {
+    claimed: claim.ids.length,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+  };
+  if (claim.ids.length === 0) return result;
 
   const pending = await db
     .select({
@@ -493,18 +571,15 @@ export async function drainNotificationOutbox(
     .leftJoin(events, eq(notificationOutbox.eventId, events.id))
     .where(
       and(
+        inArray(notificationOutbox.id, claim.ids),
+        eq(notificationOutbox.leasedBy, claim.workerId),
         isNull(notificationOutbox.sentAt),
-        lte(notificationOutbox.scheduledFor, now),
       ),
     )
     .orderBy(asc(notificationOutbox.scheduledFor))
-    .limit(limit);
+    .limit(claim.ids.length);
 
   for (const entry of pending) {
-    if (entry.row.attempts >= 5) {
-      result.skipped += 1;
-      continue;
-    }
     const channel = entry.row.channel === "sms" ? "sms" : "email";
     if (channel === "email" && !emailConfigured()) {
       result.skipped += 1;
@@ -539,8 +614,20 @@ export async function drainNotificationOutbox(
       }
       await db
         .update(notificationOutbox)
-        .set({ sentAt: new Date(), attempts: entry.row.attempts + 1 })
-        .where(eq(notificationOutbox.id, entry.row.id));
+        .set({
+          sentAt: new Date(),
+          attempts: entry.row.attempts + 1,
+          failedAt: null,
+          lastError: null,
+          leasedBy: null,
+          leaseExpiresAt: null,
+        })
+        .where(
+          and(
+            eq(notificationOutbox.id, entry.row.id),
+            eq(notificationOutbox.leasedBy, claim.workerId),
+          ),
+        );
       result.sent += 1;
     } catch (error) {
       await db
@@ -549,10 +636,44 @@ export async function drainNotificationOutbox(
           failedAt: new Date(),
           attempts: entry.row.attempts + 1,
           lastError: String((error as Error)?.message ?? error).slice(0, 500),
+          scheduledFor: new Date(
+            now.getTime() + Math.min(60 * 60_000, 30_000 * 2 ** entry.row.attempts),
+          ),
+          leasedBy: null,
+          leaseExpiresAt: null,
         })
-        .where(eq(notificationOutbox.id, entry.row.id));
+        .where(
+          and(
+            eq(notificationOutbox.id, entry.row.id),
+            eq(notificationOutbox.leasedBy, claim.workerId),
+          ),
+        );
       result.failed += 1;
     }
+  }
+
+  const processedIds = new Set(pending.map((entry) => entry.row.id));
+  const skippedIds = claim.ids.filter((id) => !processedIds.has(id));
+  const undeliverableIds = pending
+    .filter((entry) => {
+      const channel = entry.row.channel === "sms" ? "sms" : "email";
+      return (
+        (channel === "email" && (!emailConfigured() || !entry.email)) ||
+        (channel === "sms" && (!smsConfigured() || !entry.phoneE164))
+      );
+    })
+    .map((entry) => entry.row.id);
+  const releaseIds = [...skippedIds, ...undeliverableIds];
+  if (releaseIds.length > 0) {
+    await db
+      .update(notificationOutbox)
+      .set({ leasedBy: null, leaseExpiresAt: null })
+      .where(
+        and(
+          inArray(notificationOutbox.id, releaseIds),
+          eq(notificationOutbox.leasedBy, claim.workerId),
+        ),
+      );
   }
 
   return result;

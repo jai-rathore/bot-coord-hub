@@ -6,6 +6,10 @@ import {
   smsConfigured,
 } from "../src/lib/events/notify";
 import { eventsFeatureEnabled } from "../src/lib/events-feature";
+import {
+  enqueueSageOperationsAlerts,
+  sageOperationsSnapshot,
+} from "../src/lib/sage/operations";
 
 async function main() {
   if (!eventsFeatureEnabled()) {
@@ -18,9 +22,15 @@ async function main() {
     `events tick: scanned=${tick.scanned} locked=${tick.locked} expired=${tick.expired} reminders=${tick.remindersQueued}`,
   );
 
+  const sageOperations = await sageOperationsSnapshot();
+  const sageAlertsQueued = await enqueueSageOperationsAlerts(sageOperations);
+  console.log(
+    `[sage-metrics] ${JSON.stringify({ ...sageOperations, alertsQueued: sageAlertsQueued })}`,
+  );
+
   const drain = await drainNotificationOutbox();
   console.log(
-    `outbox: sent=${drain.sent} failed=${drain.failed} skipped=${drain.skipped}` +
+    `outbox: claimed=${drain.claimed} sent=${drain.sent} failed=${drain.failed} skipped=${drain.skipped}` +
       (emailConfigured() ? "" : " (email not configured — rows stay queued)") +
       (smsConfigured() ? "" : " (sms not configured — text rows stay queued)"),
   );

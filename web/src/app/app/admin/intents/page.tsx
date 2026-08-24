@@ -55,6 +55,7 @@ export default async function IntentAdministrationPage() {
         <div className="mt-4 flex flex-wrap gap-4 text-sm">
           <Link href="/agents/tasks">Open supported task catalog →</Link>
           <Link href="/app/admin/safety">Review discovery safety reports →</Link>
+          <Link href="/app/admin/sage">Review Sage queue health →</Link>
         </div>
       </div>
       <IntentModeration initialPending={pending} canRunTriage />

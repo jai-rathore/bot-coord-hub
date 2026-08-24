@@ -30,7 +30,7 @@ A milestone is complete only when all three columns below say **Complete**:
 | Events | Complete | Complete | Partial | Durable, replay-safe coordination and hosted event chat passed through the production worker and Gemini. Signed-in organizer and participant dogfooding remains. |
 | People and invitations | Complete | Complete | Partial | Sage can review people and create a private, unsent invitation link, and the production worker path passed. Signed-in review remains; approval, revocation, and relationship-policy changes stay human-controlled. |
 | Inbox and follow-up | Partial | Complete | Partial | Sage reviews activity, inbox, sessions, and event boards. Operator-safe automatic routing is live and passed both Sage-primary delivery and external-primary suppression; signed-in continuation dogfooding remains. |
-| Operations and scale | Partial | Partial | Not verified | The indexed cadence scan and recommendation expiry cleanup are complete locally. Dead-letter recovery, notification leases, broader retention, metrics, and alerts remain. |
+| Operations and scale | Partial | Partial | Not verified | The indexed cadence scan is live. Dead-letter recovery, notification leases, retention, metrics, and alerts are complete locally; migration 0032 and production race proof remain. |
 
 ## Architecture invariants
 
@@ -92,7 +92,7 @@ A milestone is complete only when all three columns below say **Complete**:
 | Hosted event chat through encrypted Sage jobs and redacted run steps | Complete | Passed | Deployed | Signed-in organizer and participant chat dogfood |
 | Operator-safe inbox, approval, session, and event-deadline triggers plus visible Sage updates | Complete | Passed | Deployed | Signed-in approval and session continuation comparison |
 | Opt-in discovery cadence, per-user budget, notification choice, and durable anonymous recommendations | Complete | Passed | Deployed | Signed-in cadence setup, notification, dismissal, and introduction review |
-| Operations UI and recovery tooling | Not started | Not started | Not deployed | Add audited dead-letter recovery, notification leases, retention, metrics, and alerts |
+| Operations UI and recovery tooling | Complete locally | Pending | Not deployed | Migration 0032, production claim/recovery/retention proof, and signed-in admin review |
 
 This workstation did not have a usable local PostgreSQL environment for the
 slice, so database evidence came from isolated production one-off jobs against
@@ -150,12 +150,13 @@ the live schema. Synthetic rows were explicitly cleaned up after each run.
 
 ### P4: reliability, operations, and scale
 
-- [ ] Add database integration tests for concurrent claiming, expired leases, retries, and idempotency races.
-- [ ] Add an internal dead-letter and requeue console with append-only audit records.
-- [ ] Add retention cleanup for completed jobs, runs, steps, recommendations, and expired discovery handles.
-- [ ] Lease notification outbox rows before sending so multiple drainers cannot double-send.
-- [ ] Emit queue age, run latency, attempts, outcomes, provider tokens, and provider cost metrics.
-- [ ] Alert on queue age, repeated retries, dead letters, and unavailable providers.
+- [x] **Code-only:** Add production database verification for idempotent enqueue races, concurrent queue and outbox claims, expired leases, audited requeue, and retention.
+- [x] **Code-only:** Add an internal dead-letter and requeue console with append-only audit records.
+- [x] **Code-only:** Add retention cleanup for completed jobs, runs, steps, recommendations, expired handles, and notification history.
+- [x] **Code-only:** Lease notification outbox rows before sending so multiple drainers cannot send concurrently.
+- [x] **Code-only:** Emit queue age, run latency, attempts, outcomes, provider tokens, and configurable provider cost metrics.
+- [x] **Code-only:** Alert configured administrators on queue age, repeated retries, dead letters, and repeated provider failures.
+- [ ] Deploy migration 0032 and pass the Sage operations production race and recovery proof.
 - [ ] Replace randomized candidate sampling with indexed buckets or cursors before fleet-wide scans.
 - [ ] Move notification draining to a leased worker path while retaining cron as a trigger only.
 

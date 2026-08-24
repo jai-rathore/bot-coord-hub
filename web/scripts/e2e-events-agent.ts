@@ -239,7 +239,7 @@ async function main() {
   });
   assert.equal(first, true, "first enqueue should queue");
   assert.equal(repeat, false, "second enqueue must dedupe");
-  ok("a repeated enqueue is deduped, so a cron retry cannot double-send");
+  ok("a repeated enqueue is deduped before any delivery attempt");
 
   console.log("\n8. Draining without an email provider leaves rows queued");
   const savedKey = process.env.RESEND_API_KEY;

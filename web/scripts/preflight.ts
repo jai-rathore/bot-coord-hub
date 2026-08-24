@@ -18,6 +18,7 @@ import {
   guestTasks,
   intentTypes,
   links,
+  notificationOutbox,
   publicInvites,
   purposeEnrollments,
   discoveryInterests,
@@ -213,6 +214,14 @@ async function main() {
         db
           .select({ id: discoveryRecommendations.id })
           .from(discoveryRecommendations)
+          .limit(1),
+        db
+          .select({
+            id: notificationOutbox.id,
+            leasedBy: notificationOutbox.leasedBy,
+            leaseExpiresAt: notificationOutbox.leaseExpiresAt,
+          })
+          .from(notificationOutbox)
           .limit(1),
         db.select({ id: userLocations.id }).from(userLocations).limit(1),
         db
