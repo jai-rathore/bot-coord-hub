@@ -22,6 +22,9 @@ import {
   discoveryInterests,
   discoveryPairHistory,
   discoveryBlocks,
+  sageDiscoveryMessages,
+  sageDiscoveryThreads,
+  sageJobs,
   userLocations,
 } from "../src/db/schema";
 import {
@@ -159,7 +162,12 @@ async function main() {
         db.select({ id: guestTasks.id }).from(guestTasks).limit(1),
         db.select({ id: agentPairings.id }).from(agentPairings).limit(1),
         db
-          .select({ scopes: apiKeys.scopes })
+          .select({
+            scopes: apiKeys.scopes,
+            audience: apiKeys.audience,
+            expiresAt: apiKeys.expiresAt,
+            callbackUrl: apiKeys.callbackUrl,
+          })
           .from(apiKeys)
           .where(isNull(apiKeys.revokedAt))
           .limit(1),
@@ -203,12 +211,21 @@ async function main() {
         db.select({ id: eventResponses.id }).from(eventResponses).limit(1),
         db.select({ id: eventActivity.id }).from(eventActivity).limit(1),
         db.select({ id: eventNotes.id }).from(eventNotes).limit(1),
+        db.select({ id: sageJobs.id }).from(sageJobs).limit(1),
+        db
+          .select({ id: sageDiscoveryThreads.id })
+          .from(sageDiscoveryThreads)
+          .limit(1),
+        db
+          .select({ id: sageDiscoveryMessages.id })
+          .from(sageDiscoveryMessages)
+          .limit(1),
       ]);
       checks.push({
         name: "Current schema",
         ok: true,
         detail:
-          "guest, pairing, invite, profile, discovery, location, safety, capability, and event tables available",
+          "agent credentials, guest, pairing, invite, profile, discovery, event, and Sage tables available",
       });
     } catch (error) {
       checks.push({
