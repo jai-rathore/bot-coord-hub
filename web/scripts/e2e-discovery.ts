@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "crypto";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../src/db";
 import {
   apiKeys,
@@ -9,6 +9,7 @@ import {
   intentTypes,
   purposeEnrollments,
   safetyReports,
+  sageDiscoveryThreads,
   sageJobs,
   sessions,
   userLocations,
@@ -84,6 +85,24 @@ async function waitForSageJob(jobId: string): Promise<SageJob> {
     await pause(500);
   }
   throw new Error(`Sage discovery job ${jobId} did not finish within 90 seconds`);
+}
+
+async function waitForSyntheticSageWork(userIds: string[]) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const activeJobs = await db
+      .select({ id: sageJobs.id })
+      .from(sageJobs)
+      .where(
+        and(
+          inArray(sageJobs.userId, userIds),
+          inArray(sageJobs.state, ["pending", "running", "waiting_human"]),
+        ),
+      )
+      .limit(1);
+    if (activeJobs.length === 0) return;
+    await pause(250);
+  }
+  throw new Error("Synthetic Sage work did not settle before cleanup");
 }
 
 function resolvedCity(userId: string, city: string, region = "NY") {
@@ -245,6 +264,20 @@ async function main() {
         "I would like a small local chess meetup near Park Slope on Saturday afternoons.",
       clientMessageId: `e2e-sage-intake-${suffix}`,
     });
+    const holdThreadMs = Math.min(
+      30_000,
+      Math.max(0, Number(process.env.E2E_SAGE_HOLD_THREAD_MS ?? 0)),
+    );
+    if (holdThreadMs > 0) {
+      await db.transaction(async (tx) => {
+        await tx
+          .select({ id: sageDiscoveryThreads.id })
+          .from(sageDiscoveryThreads)
+          .where(eq(sageDiscoveryThreads.id, queuedIntake.threadId))
+          .for("update");
+        await tx.execute(sql`select pg_sleep(${holdThreadMs / 1_000})`);
+      });
+    }
     const finishedIntake = await waitForSageJob(queuedIntake.job.id);
     assert.equal(finishedIntake.state, "completed");
     assert.equal(
@@ -990,6 +1023,9 @@ main()
       .from(users)
       .where(inArray(users.clerkUserId, clerkIds));
     if (rows.length) {
+      if (process.env.E2E_SAGE_HOSTED_MODEL === "true") {
+        await waitForSyntheticSageWork(rows.map((row) => row.id));
+      }
       await db.delete(users).where(
         inArray(
           users.id,
