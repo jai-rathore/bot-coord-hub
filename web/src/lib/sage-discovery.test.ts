@@ -95,6 +95,10 @@ test("Gemini is forced to call only the requested intake tool", async () => {
     toolConfig?.functionCallingConfig?.allowedFunctionNames,
     ["update_discovery_draft"],
   );
+  assert.equal(
+    JSON.stringify(requestBody).includes('"additionalProperties"'),
+    false,
+  );
 });
 
 test("authenticated human prose is fenced and cannot close its prompt boundary", () => {
