@@ -1023,7 +1023,9 @@ main()
       .from(users)
       .where(inArray(users.clerkUserId, clerkIds));
     if (rows.length) {
-      await waitForSyntheticSageWork(rows.map((row) => row.id));
+      if (process.env.E2E_SAGE_HOSTED_MODEL === "true") {
+        await waitForSyntheticSageWork(rows.map((row) => row.id));
+      }
       await db.delete(users).where(
         inArray(
           users.id,
