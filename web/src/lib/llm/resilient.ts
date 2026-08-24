@@ -2,6 +2,7 @@ import {
   and,
   count,
   eq,
+  lte,
   sql,
   sum,
 } from "drizzle-orm";
@@ -142,7 +143,7 @@ async function reserveProviderRequest(
     );
     await tx
       .delete(llmProviderLeases)
-      .where(sql`${llmProviderLeases.expiresAt} <= ${now}`);
+      .where(lte(llmProviderLeases.expiresAt, now));
 
     const [circuit] = await tx
       .select()
