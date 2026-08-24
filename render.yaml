@@ -54,6 +54,10 @@ services:
         value: "false"
       - key: INTENT_ADMIN_EMAILS
         sync: false
+      - key: SAGE_INPUT_COST_PER_MILLION_USD
+        sync: false
+      - key: SAGE_OUTPUT_COST_PER_MILLION_USD
+        sync: false
       # Set to the exact token shown by OpenAI during plugin submission.
       - key: OPENAI_APPS_CHALLENGE
         sync: false
@@ -208,3 +212,20 @@ services:
         sync: false
       - key: TOKEN_ENCRYPTION_KEY
         sync: false
+      - key: INTENT_ADMIN_EMAILS
+        fromService:
+          type: web
+          name: honeymatcha-web
+          envVarKey: INTENT_ADMIN_EMAILS
+      # Optional provider rates power the estimated-cost metric without
+      # hard-coding prices that change outside this repository.
+      - key: SAGE_INPUT_COST_PER_MILLION_USD
+        fromService:
+          type: web
+          name: honeymatcha-web
+          envVarKey: SAGE_INPUT_COST_PER_MILLION_USD
+      - key: SAGE_OUTPUT_COST_PER_MILLION_USD
+        fromService:
+          type: web
+          name: honeymatcha-web
+          envVarKey: SAGE_OUTPUT_COST_PER_MILLION_USD

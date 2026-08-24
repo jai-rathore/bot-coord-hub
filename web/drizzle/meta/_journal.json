@@ -225,6 +225,13 @@
       "when": 1787537568834,
       "tag": "0031_heavy_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1787538947978,
+      "tag": "0032_stale_absorbing_man",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,7 @@ import {
   failSageJob,
   failSageStep,
   finishSageJob,
+  recordSageRunProvider,
   recordSageRunTelemetry,
   safeSageError,
   startSageStep,
@@ -85,6 +86,14 @@ export async function processNextSageJob(input: {
       });
     }, Math.max(10_000, Math.floor(leaseMs / 3)));
     heartbeat.unref?.();
+
+    if (["discovery_intake", "event_chat"].includes(capability.name)) {
+      await recordSageRunProvider(
+        run.id,
+        process.env.HOSTED_AGENT_PROVIDER?.trim() || "gemini",
+        process.env.HOSTED_AGENT_MODEL?.trim() || "configured-default",
+      );
+    }
 
     const outcome = await capability.execute(
       {

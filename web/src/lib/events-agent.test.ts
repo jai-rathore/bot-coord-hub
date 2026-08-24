@@ -446,6 +446,7 @@ test("every template renders a subject, a body, and the event link", () => {
     "deadline_soon",
     "organizer_digest",
     "discovery_recommendations",
+    "sage_operations_alert",
     "something_unknown",
   ]) {
     const rendered = renderTemplate(

@@ -32,6 +32,7 @@
     "test:e2e-events-agent": "tsx scripts/e2e-events-agent.ts",
     "test:e2e-sage-parity": "tsx scripts/e2e-sage-parity.ts",
     "test:e2e-sage-cadence": "tsx scripts/e2e-sage-cadence.ts",
+    "test:e2e-sage-operations": "tsx scripts/e2e-sage-operations.ts",
     "test:e2e-meet": "tsx scripts/e2e-meet.ts",
     "perf:baseline": "node scripts/perf-baseline.mjs",
     "perf:bench": "tsx scripts/perf-bench.ts",

@@ -1,12 +1,13 @@
 import { config } from "dotenv";
 import { cleanupExpiredDiscoveryData } from "../src/lib/discovery-service";
+import { cleanupSageOperations } from "../src/lib/sage/operations";
 
 config({ path: ".env.local" });
 config();
 
-cleanupExpiredDiscoveryData()
-  .then((result) => {
-    console.log(JSON.stringify({ ok: true, ...result }));
+Promise.all([cleanupExpiredDiscoveryData(), cleanupSageOperations()])
+  .then(([discovery, sageOperations]) => {
+    console.log(JSON.stringify({ ok: true, discovery, sageOperations }));
     process.exit(0);
   })
   .catch((error) => {

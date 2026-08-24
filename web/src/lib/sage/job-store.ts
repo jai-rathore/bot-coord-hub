@@ -204,9 +204,12 @@ export async function listSageJobsForUser(userId: string, limit = 20) {
 export async function claimNextSageJob(input: {
   workerId: string;
   leaseMs: number;
+  /** Operations tests and targeted recovery may constrain a claim. */
+  jobId?: string;
+  now?: Date;
 }): Promise<ClaimedSageJob | null> {
   const db = getDb();
-  const now = new Date();
+  const now = input.now ?? new Date();
   const nowSql = now.toISOString();
   const leaseExpiresAt = new Date(now.getTime() + input.leaseMs);
 
@@ -216,6 +219,7 @@ export async function claimNextSageJob(input: {
       .from(sageJobs)
       .where(
         and(
+          input.jobId ? eq(sageJobs.id, input.jobId) : undefined,
           sql`${sageJobs.attempts} < ${sageJobs.maxAttempts}`,
           sql`not exists (
             select 1
@@ -382,6 +386,17 @@ export async function recordSageRunTelemetry(
       inputTokens: Math.max(0, Math.floor(telemetry.inputTokens)),
       outputTokens: Math.max(0, Math.floor(telemetry.outputTokens)),
     })
+    .where(eq(sageRuns.id, runId));
+}
+
+export async function recordSageRunProvider(
+  runId: string,
+  provider: string,
+  model: string,
+) {
+  await getDb()
+    .update(sageRuns)
+    .set({ provider: provider.slice(0, 120), model: model.slice(0, 160) })
     .where(eq(sageRuns.id, runId));
 }
 

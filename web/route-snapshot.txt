@@ -16,6 +16,7 @@ dynamic  /agents/tasks
 dynamic  /api/a2a
 dynamic  /api/admin/discovery/reports
 dynamic  /api/admin/discovery/safety
+dynamic  /api/admin/sage
 dynamic  /api/confirms
 dynamic  /api/confirms/[id]
 dynamic  /api/discovery
@@ -119,6 +120,7 @@ dynamic  /app
 dynamic  /app/activity
 dynamic  /app/admin/intents
 dynamic  /app/admin/safety
+dynamic  /app/admin/sage
 dynamic  /app/agent
 dynamic  /app/attention
 dynamic  /app/code
