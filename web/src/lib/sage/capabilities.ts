@@ -1,15 +1,28 @@
 import type { ActorContext } from "@/lib/actor";
+import { AgentApiError } from "@/lib/agent-errors";
 import {
   CoordinationCapabilityError,
   getCoordinationCapability,
   listCoordinationCapabilities,
 } from "@/lib/coordination-capabilities";
+import { requestDiscoveryIntroduction } from "@/lib/discovery-service";
+import {
+  prepareSageDiscoveryEnrollment,
+  runSageDiscoveryIntake,
+  type SageDiscoveryTelemetry,
+} from "@/lib/sage/discovery-conversation";
 
-export type SageCapabilityName = "schedule_meeting" | "discovery_search";
+export type SageCapabilityName =
+  | "schedule_meeting"
+  | "discovery_search"
+  | "discovery_intake"
+  | "discovery_prepare_enrollment"
+  | "discovery_stage_introduction";
 
 export type SageCapabilityOutcome = {
   state: "waiting_human" | "completed";
   result: Record<string, unknown>;
+  telemetry?: SageDiscoveryTelemetry;
 };
 
 export type SageCapabilityExecutionContext = {
@@ -43,6 +56,18 @@ function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function requiredString(
+  payload: Record<string, unknown>,
+  field: string,
+  maximum = 200,
+) {
+  const value = payload[field];
+  if (typeof value !== "string" || !value.trim() || value.length > maximum) {
+    throw new SageCapabilityError(`${field} is required`);
+  }
+  return value.trim();
 }
 
 const sharedSchedule = getCoordinationCapability("schedule_meeting");
@@ -157,13 +182,128 @@ const discoverySearch: SageCapabilityDefinition = {
   },
 };
 
+const discoveryIntake: SageCapabilityDefinition = {
+  name: "discovery_intake",
+  version: 1,
+  description:
+    "Turn one authenticated human message into a typed discovery draft update without activating discovery.",
+  humanApproval: "never",
+  parseInput(payload) {
+    return {
+      threadId: requiredString(payload, "threadId", 100),
+      messageId: requiredString(payload, "messageId", 100),
+      intentSlug: requiredString(payload, "intentSlug", 100),
+    };
+  },
+  redactInput(input) {
+    return {
+      threadId: input.threadId,
+      messageId: input.messageId,
+      intentSlug: input.intentSlug,
+    };
+  },
+  async execute(context, input) {
+    try {
+      const outcome = await runSageDiscoveryIntake({
+        user: context.actor.user,
+        threadId: String(input.threadId),
+        messageId: String(input.messageId),
+      });
+      return {
+        state: "completed",
+        result: outcome.result,
+        telemetry: outcome.telemetry,
+      };
+    } catch (error) {
+      if (error instanceof AgentApiError) {
+        throw new SageCapabilityError(error.message, error.status >= 500);
+      }
+      throw error;
+    }
+  },
+};
+
+const discoveryPrepareEnrollment: SageCapabilityDefinition = {
+  name: "discovery_prepare_enrollment",
+  version: 1,
+  description:
+    "Prepare a Sage discovery draft for the human's exact snapshot review without activating it.",
+  humanApproval: "always",
+  parseInput(payload) {
+    return { threadId: requiredString(payload, "threadId", 100) };
+  },
+  redactInput(input) {
+    return { threadId: input.threadId };
+  },
+  async execute(context, input) {
+    try {
+      return {
+        state: "waiting_human",
+        result: await prepareSageDiscoveryEnrollment({
+          user: context.actor.user,
+          threadId: String(input.threadId),
+        }),
+      };
+    } catch (error) {
+      if (error instanceof AgentApiError) {
+        throw new SageCapabilityError(error.message, error.status >= 500);
+      }
+      throw error;
+    }
+  },
+};
+
+const discoveryStageIntroduction: SageCapabilityDefinition = {
+  name: "discovery_stage_introduction",
+  version: 1,
+  description:
+    "Save an anonymous introduction draft and wait for the requesting human before notifying anyone.",
+  humanApproval: "always",
+  parseInput(payload) {
+    return {
+      candidateHandle: requiredString(payload, "candidateHandle", 1_000),
+    };
+  },
+  redactInput() {
+    return { hasCandidateHandle: true };
+  },
+  async execute(context, input) {
+    try {
+      const result = await requestDiscoveryIntroduction({
+        actor: { user: context.actor.user, kind: "hosted_agent" },
+        candidateHandle: String(input.candidateHandle),
+        idempotencyKey: `sage:${context.jobId}`,
+      });
+      return {
+        state: "waiting_human",
+        result: {
+          ok: true,
+          status: result.status,
+          requesterConfirmed: false,
+          waitingForHuman: true,
+          message:
+            "Sage prepared the anonymous introduction request. Approve it yourself before the other person is notified.",
+        },
+      };
+    } catch (error) {
+      if (error instanceof AgentApiError) {
+        throw new SageCapabilityError(error.message, error.status >= 500);
+      }
+      throw error;
+    }
+  },
+};
+
 const registry: Record<SageCapabilityName, SageCapabilityDefinition> = {
   schedule_meeting: scheduleMeeting,
   discovery_search: discoverySearch,
+  discovery_intake: discoveryIntake,
+  discovery_prepare_enrollment: discoveryPrepareEnrollment,
+  discovery_stage_introduction: discoveryStageIntroduction,
 };
 
 export function listSageCapabilities() {
-  const shared = new Map(
+  const shared = new Map<string, { humanApproval: "always" | "policy" | "never" }>(
     listCoordinationCapabilities().map((capability) => [
       capability.name,
       capability,

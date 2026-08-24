@@ -53,6 +53,7 @@ dynamic  /api/profiles/[handle]/connect
 dynamic  /api/public-invites
 dynamic  /api/public-invites/[id]/revoke
 dynamic  /api/public-invites/redeem
+dynamic  /api/sage/discovery
 dynamic  /api/sage/jobs
 dynamic  /api/sage/operator
 dynamic  /api/sessions

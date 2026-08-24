@@ -42,7 +42,7 @@ export const CAPABILITIES: Capability[] = [
     id: "events",
     title: "Group events",
     line: "One link, one deadline. Everyone picks a time without an account.",
-    sage: "ready",
+    sage: "soon",
     href: "/app/events/new",
     flag: "events",
     glyph: "calendar",

@@ -26,6 +26,10 @@ import {
   enqueueSageJob,
   finishSageJob,
 } from "../src/lib/sage/job-store";
+import {
+  enqueueSageDiscoveryMessage,
+  publicSageDiscoveryThread,
+} from "../src/lib/sage/discovery-conversation";
 import { syncUserIdentity } from "../src/lib/users";
 
 function hashApiKey(rawKey: string) {
@@ -108,6 +112,30 @@ async function main() {
     result: { e2e: true },
     startedAtMs: Date.now(),
   });
+
+  const privateDiscoveryMessage = `I am looking for a private match ${suffix}`;
+  const queuedDiscoveryTurn = await enqueueSageDiscoveryMessage({
+    user: alice,
+    intentSlug: "dating_introduction",
+    message: privateDiscoveryMessage,
+    clientMessageId: `e2e-${suffix}`,
+  });
+  if (
+    JSON.stringify(queuedDiscoveryTurn.job.payload).includes(
+      privateDiscoveryMessage,
+    )
+  ) {
+    throw new Error("Sage queue payload must not contain discovery prose");
+  }
+  const discoveryThread = await publicSageDiscoveryThread({
+    user: alice,
+    intentSlug: "dating_introduction",
+  });
+  if (
+    discoveryThread.messages.at(-1)?.body !== privateDiscoveryMessage
+  ) {
+    throw new Error("Sage must decrypt discovery prose only for its owner");
+  }
 
   const origin = "http://localhost:3000";
   const capResults = await Promise.allSettled(

@@ -6,12 +6,12 @@ const AGENT_CHOICES = [
   {
     label: "Included with your account",
     title: "Use Sage",
-    body: "Sage is HoneyMatcha's private agent for you. It can coordinate every workflow here without another app or subscription.",
+    body: "Sage is HoneyMatcha's private agent for you. Scheduling and private discovery work without another app or subscription. Group event orchestration is the next workflow we are bringing into Sage.",
   },
   {
     label: "Optional",
     title: "Bring your own agent",
-    body: "Connect ChatGPT, Claude, Gemini, Grok, Cursor, or any MCP-compatible agent. It uses the same capabilities and approval rules as Sage.",
+    body: "Connect ChatGPT, Claude, Gemini, Grok, Cursor, or any MCP-compatible agent. Connected agents can use every current capability with the same approval rules.",
   },
 ] as const;
 
@@ -92,6 +92,11 @@ export function CapabilityOverview() {
                 <p className="mt-1 text-sm leading-6 text-muted">
                   {capability.line}
                 </p>
+                <span className="mt-2 inline-flex rounded-full border border-line bg-white px-2.5 py-1 text-[0.68rem] font-semibold text-muted">
+                  {capability.sage === "ready"
+                    ? "Sage ready"
+                    : "Connect your own agent for this today"}
+                </span>
               </div>
             </article>
           ))}

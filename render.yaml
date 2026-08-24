@@ -98,6 +98,30 @@ services:
         value: "true"
       - key: ENABLE_DISCOVERY
         value: "true"
+      - key: ENABLE_CANONICAL_LOCATIONS
+        fromService:
+          type: web
+          name: honeymatcha-web
+          envVarKey: ENABLE_CANONICAL_LOCATIONS
+      - key: HOSTED_AGENT_PROVIDER
+        value: gemini
+      - key: HOSTED_AGENT_MODEL
+        value: gemini-3.7-flash
+      - key: GEMINI_API_KEY
+        fromService:
+          type: web
+          name: honeymatcha-web
+          envVarKey: GEMINI_API_KEY
+      - key: GEOAPIFY_API_KEY
+        fromService:
+          type: web
+          name: honeymatcha-web
+          envVarKey: GEOAPIFY_API_KEY
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: honeymatcha-rate-limit
+          property: connectionString
       - key: GOOGLE_CALENDAR_ENABLED
         value: "true"
       - key: GOOGLE_CLIENT_ID

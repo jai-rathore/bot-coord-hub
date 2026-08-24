@@ -32,6 +32,8 @@ export type LlmRequest = {
   system: string;
   messages: LlmMessage[];
   tools: LlmToolDef[];
+  /** Force exactly one call to this advertised tool when the provider supports it. */
+  requiredToolName?: string;
   maxOutputTokens?: number;
   temperature?: number;
   signal?: AbortSignal;

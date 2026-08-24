@@ -1733,6 +1733,79 @@ export const sageSteps = pgTable(
   ],
 );
 
+/**
+ * Encrypted conversational state for Sage-assisted discovery intake. The
+ * durable Sage queue stores only these opaque ids, never the person's raw
+ * dating, recruiting, or meetup prose.
+ */
+export const sageDiscoveryThreads = pgTable(
+  "sage_discovery_threads",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    intentSlug: text("intent_slug").notNull(),
+    state: text("state").notNull().default("collecting"),
+    draftEncrypted: text("draft_encrypted").notNull(),
+    pendingLocationsEncrypted: text("pending_locations_encrypted"),
+    latestJobId: uuid("latest_job_id").references(() => sageJobs.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("sage_discovery_threads_user_intent_uidx").on(
+      t.userId,
+      t.intentSlug,
+    ),
+    index("sage_discovery_threads_updated_idx").on(t.updatedAt),
+    check(
+      "sage_discovery_threads_state_check",
+      sql`${t.state} in ('collecting', 'ready_for_review', 'submitted', 'closed')`,
+    ),
+  ],
+);
+
+/** Encrypted human and Sage turns belonging to one discovery intake. */
+export const sageDiscoveryMessages = pgTable(
+  "sage_discovery_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    threadId: uuid("thread_id")
+      .notNull()
+      .references(() => sageDiscoveryThreads.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    clientMessageId: text("client_message_id"),
+    bodyEncrypted: text("body_encrypted").notNull(),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("sage_discovery_messages_thread_created_idx").on(
+      t.threadId,
+      t.createdAt,
+    ),
+    uniqueIndex("sage_discovery_messages_client_uidx")
+      .on(t.threadId, t.clientMessageId)
+      .where(sql`${t.clientMessageId} is not null`),
+    check(
+      "sage_discovery_messages_role_check",
+      sql`${t.role} in ('human', 'sage')`,
+    ),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type AgentProfile = typeof agentProfiles.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
@@ -1776,3 +1849,5 @@ export type AgentOperatorPreference = typeof agentOperatorPreferences.$inferSele
 export type SageJob = typeof sageJobs.$inferSelect;
 export type SageRun = typeof sageRuns.$inferSelect;
 export type SageStep = typeof sageSteps.$inferSelect;
+export type SageDiscoveryThread = typeof sageDiscoveryThreads.$inferSelect;
+export type SageDiscoveryMessage = typeof sageDiscoveryMessages.$inferSelect;
