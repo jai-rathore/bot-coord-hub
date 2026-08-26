@@ -37,7 +37,7 @@ export const SAKURA_TREE = {
   canopyRadiusFactor: 0.46,
 } as const;
 
-/** Draw knobs the scene must not silently inflate — huge falling leaves ate the trunk on iPhone. */
+/** Draw knobs the scene must not silently inflate: huge falling leaves ate the trunk on iPhone. */
 export const SAKURA_TREE_DRAW = {
   trunkHeightFactor: 0.26,
   fallingWidth: 1.8,
