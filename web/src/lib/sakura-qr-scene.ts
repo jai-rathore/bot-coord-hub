@@ -2,14 +2,16 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import {
+  classifySakuraTile,
   encodeSakuraQr,
   hexToRgb,
-  isFinderModule,
   mulberry32,
+  planSakuraStacks,
   SAKURA_QR,
   type SakuraQrMatrix,
   type SakuraQrMount,
   type SakuraQrMountOptions,
+  type SakuraTileKind,
 } from "./sakura-qr";
 
 const QUIET = 2.4;
@@ -22,6 +24,7 @@ type Tile = {
   col: number;
   dark: boolean;
   finder: boolean;
+  kind: SakuraTileKind;
   height: number;
   color: THREE.Color;
   mergeColor: THREE.Color;
@@ -354,29 +357,49 @@ function buildTrunk(
   return { bark, tips, sites, height };
 }
 
+function tileHeight(kind: SakuraTileKind, dark: boolean): number {
+  if (kind === "finder") return dark ? 0.36 : 0.14;
+  if (kind === "trunk") return 0.7;
+  if (kind === "canopy") return 0.34;
+  if (kind === "grass") return 0.44;
+  return 0.12;
+}
+
+function gardenColor(
+  kind: SakuraTileKind,
+  dark: boolean,
+  rng: () => number,
+): THREE.Color {
+  if (kind === "finder") {
+    return varyColor(rgbColor(dark ? SAKURA_QR.darkDeep : SAKURA_QR.lightPure), 0.02, rng);
+  }
+  if (kind === "trunk") return varyColor(rgbColor(SAKURA_QR.bark), 0.04, rng);
+  if (kind === "canopy") return varyColor(rgbColor(SAKURA_QR.darkBlossom), 0.05, rng);
+  if (kind === "grass") return varyColor(rgbColor(SAKURA_QR.dark), 0.035, rng);
+  return varyColor(rgbColor(SAKURA_QR.plot), 0.03, rng);
+}
+
 function buildTiles(matrix: SakuraQrMatrix, rng: () => number): Tile[] {
-  const dark = rgbColor(SAKURA_QR.dark);
   const darkDeep = rgbColor(SAKURA_QR.darkDeep);
   const darkBlossom = rgbColor(SAKURA_QR.darkBlossom);
-  const plot = rgbColor(SAKURA_QR.plot);
   const lightPure = rgbColor(SAKURA_QR.lightPure);
   const blossomLight = rgbColor(SAKURA_QR.blossomWhite);
   const tiles: Tile[] = [];
   let index = 0;
   for (let row = 0; row < matrix.size; row += 1) {
     for (let col = 0; col < matrix.size; col += 1) {
-      const finder = isFinderModule(row, col, matrix.size);
       const isDark = matrix.dark[row][col];
+      const kind = classifySakuraTile(row, col, matrix.size, isDark);
+      const finder = kind === "finder";
       tiles.push({
         index,
         row,
         col,
         dark: isDark,
         finder,
-        height: finder ? (isDark ? 0.42 : 0.2) : isDark ? 0.46 : 0.16,
-        color: isDark
-          ? varyColor(finder ? darkDeep : dark, 0.03, rng)
-          : varyColor(plot, 0.025, rng),
+        kind,
+        height: tileHeight(kind, isDark),
+        color: gardenColor(kind, isDark, rng),
         mergeColor: isDark
           ? varyColor(finder ? darkDeep : darkBlossom, 0.04, rng)
           : varyColor(finder ? lightPure : blossomLight, 0.02, rng),
@@ -386,6 +409,51 @@ function buildTiles(matrix: SakuraQrMatrix, rng: () => number): Tile[] {
     }
   }
   return tiles;
+}
+
+function buildRoots(
+  tiles: Tile[],
+  origin: number,
+  rng: () => number,
+): THREE.BufferGeometry {
+  const pieces: THREE.BufferGeometry[] = [];
+  const dummy = new THREE.Object3D();
+  const trunkTiles = tiles.filter((tile) => tile.kind === "trunk");
+  const anchors = trunkTiles.length
+    ? trunkTiles
+    : tiles.filter((tile) => tile.kind === "canopy").slice(0, 8);
+
+  for (const tile of anchors) {
+    const x = origin + tile.col;
+    const z = origin + tile.row;
+    const length = Math.max(0.55, Math.hypot(x, z));
+    dummy.position.set(x * 0.45, 0.16, z * 0.45);
+    dummy.lookAt(x, 0.05, z);
+    dummy.rotateX(Math.PI / 2);
+    dummy.updateMatrix();
+    const geo = new THREE.CylinderGeometry(0.1, 0.28, length, 6);
+    geo.applyMatrix4(dummy.matrix);
+    pieces.push(geo);
+  }
+
+  for (let i = 0; i < 5; i += 1) {
+    const angle = (i / 5) * Math.PI * 2 + rng() * 0.4;
+    const length = 1.4 + rng() * 1.8;
+    dummy.position.set(Math.cos(angle) * 0.35, 0.12, Math.sin(angle) * 0.35);
+    dummy.lookAt(Math.cos(angle) * length, 0.02, Math.sin(angle) * length);
+    dummy.rotateX(Math.PI / 2);
+    dummy.updateMatrix();
+    const geo = new THREE.CylinderGeometry(0.05, 0.18, length, 5);
+    geo.applyMatrix4(dummy.matrix);
+    pieces.push(geo);
+  }
+
+  const flare = new THREE.ConeGeometry(1.15, 1.05, 8);
+  flare.translate(0, 0.35, 0);
+  pieces.push(flare);
+  const merged = mergeGeometries(pieces);
+  for (const piece of pieces) piece.dispose();
+  return merged ?? new THREE.ConeGeometry(1.15, 1.05, 8);
 }
 
 function writeCards(
@@ -442,24 +510,25 @@ export async function mountSakuraQrScene(
     compact ||
     (typeof navigator !== "undefined" && /Mobi|Android|iPhone/i.test(navigator.userAgent)) ||
     n > 41;
-  const treeScale = compact ? 1.2 : 1.52;
+  const treeScale = compact ? 0.94 : 1.08;
   const tiles = buildTiles(matrix, rng);
+  const stacks = planSakuraStacks(matrix, mobile);
   const reduced = options.reducedMotion;
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: !mobile,
-    alpha: false,
+    alpha: true,
     powerPreference: mobile ? "low-power" : "high-performance",
     preserveDrawingBuffer: true,
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
-  renderer.setClearColor(rgbColor(SAKURA_QR.cream), 1);
+  renderer.setClearColor(0x000000, 0);
   renderer.shadowMap.enabled = false;
 
   const scene = new THREE.Scene();
-  scene.background = rgbColor(SAKURA_QR.cream);
+  scene.background = null;
 
   const spanBase = n / 2 + QUIET;
   const camera = new THREE.OrthographicCamera(-spanBase, spanBase, spanBase, -spanBase, 0.1, n * 12);
@@ -476,13 +545,6 @@ export async function mountSakuraQrScene(
   fill.position.set(-n * 0.6, n * 0.35, -n * 0.25);
   scene.add(fill);
   scene.add(new THREE.AmbientLight(0xf7f1e6, 0.28));
-
-  const slab = new THREE.Mesh(
-    new RoundedBoxGeometry(n + QUIET * 2 + 0.8, 1.15, n + QUIET * 2 + 0.8, 2, 0.28),
-    new THREE.MeshLambertMaterial({ color: rgbColor(SAKURA_QR.stone) }),
-  );
-  slab.position.y = -0.72;
-  scene.add(slab);
 
   const shadow = new THREE.Mesh(
     new THREE.CircleGeometry(n * 0.32, 24),
@@ -505,6 +567,32 @@ export async function mountSakuraQrScene(
 
   const dummy = new THREE.Object3D();
   const mix = new THREE.Color();
+  const stackGeo = new RoundedBoxGeometry(0.86, 1, 0.86, 1, 0.1);
+  const stackMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const stackMesh = new THREE.InstancedMesh(
+    stackGeo,
+    stackMat,
+    Math.max(1, stacks.length),
+  );
+  stackMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const trunkBark = rgbColor(SAKURA_QR.bark);
+  const trunkBarkDeep = rgbColor(SAKURA_QR.barkDeep);
+  const canopyPinks = [
+    rgbColor(SAKURA_QR.blossom),
+    rgbColor(SAKURA_QR.blossomDeep),
+    rgbColor("#ffe8ee"),
+    rgbColor("#f6d0c6"),
+  ];
+  stacks.forEach((stack, index) => {
+    stackMesh.setColorAt(
+      index,
+      stack.kind === "trunk"
+        ? varyColor(stack.layer > 5 ? trunkBarkDeep : trunkBark, 0.05, rng)
+        : varyColor(canopyPinks[index % canopyPinks.length], 0.06, rng),
+    );
+  });
+  if (stackMesh.instanceColor) stackMesh.instanceColor.needsUpdate = true;
+  scene.add(stackMesh);
 
   function writeTiles(amount: number, scan: boolean) {
     for (const tile of tiles) {
@@ -521,6 +609,36 @@ export async function mountSakuraQrScene(
     if (tileMesh.instanceColor) tileMesh.instanceColor.needsUpdate = true;
   }
 
+  function writeStacks(amount: number, scan: boolean) {
+    const live = scan ? 0 : Math.max(0, 1 - amount);
+    stackMesh.visible = live > 0.04;
+    if (!stackMesh.visible) {
+      dummy.scale.setScalar(0);
+      dummy.updateMatrix();
+      stackMesh.setMatrixAt(0, dummy.matrix);
+      stackMesh.instanceMatrix.needsUpdate = true;
+      return;
+    }
+    for (let i = 0; i < stacks.length; i += 1) {
+      const stack = stacks[i];
+      const rise = (0.28 + stack.layer * 0.86) * live;
+      dummy.position.set(
+        origin + stack.col + stack.offsetX,
+        rise,
+        origin + stack.row + stack.offsetZ,
+      );
+      dummy.scale.set(
+        stack.scale,
+        Math.max(0.04, stack.scale * 0.84 * live),
+        stack.scale,
+      );
+      dummy.quaternion.identity();
+      dummy.updateMatrix();
+      stackMesh.setMatrixAt(i, dummy.matrix);
+    }
+    stackMesh.instanceMatrix.needsUpdate = true;
+  }
+
   const blades: { x: number; z: number; sx: number; sy: number; rot: number; tilt: number; phase: number }[] = [];
   const tuftFlowers: Card[] = [];
   const flowerColors = [
@@ -529,10 +647,10 @@ export async function mountSakuraQrScene(
     rgbColor(SAKURA_QR.blossomDeep),
   ];
   for (const tile of tiles) {
-    if (!tile.finder || !tile.dark) continue;
+    if (tile.kind !== "grass") continue;
     const x = origin + tile.col;
     const z = origin + tile.row;
-    const bunch = mobile ? 9 : 14;
+    const bunch = mobile ? 5 : 8;
     for (let i = 0; i < bunch; i += 1) {
       blades.push({
         x: x + (rng() - 0.5) * 0.72,
@@ -571,6 +689,12 @@ export async function mountSakuraQrScene(
     new THREE.MeshLambertMaterial({ color: rgbColor(SAKURA_QR.bark) }),
   );
   tree.add(barkMesh);
+  const roots = buildRoots(tiles, origin, rng);
+  const rootMesh = new THREE.Mesh(
+    roots,
+    new THREE.MeshLambertMaterial({ color: rgbColor(SAKURA_QR.barkDeep) }),
+  );
+  tree.add(rootMesh);
 
   const petalColors = [
     rgbColor("#fff6f7"),
@@ -699,14 +823,16 @@ export async function mountSakuraQrScene(
   function placeCamera(amount: number) {
     const elev = THREE.MathUtils.lerp(ISO_ELEV, Math.PI / 2 - 0.018, amount);
     const yaw = THREE.MathUtils.lerp(ISO_YAW, 0, amount);
-    const distance = n * 2.35;
+    const distance = n * 2.7;
     const worldTree = treeHeight * treeScale;
-    const span = THREE.MathUtils.lerp(
-      Math.max(n * (compact ? 0.6 : 0.52), worldTree * 0.48) + (compact ? 1.3 : 2),
-      spanBase + 0.35,
+    const aspect = viewWidth / Math.max(1, viewHeight);
+    const fitX = THREE.MathUtils.lerp(n * 0.64 + 2.4, spanBase + 0.45, amount);
+    const fitY = THREE.MathUtils.lerp(
+      Math.max(n * 0.4, worldTree * 0.62) + (compact ? 2.4 : 3.6),
+      spanBase + 0.45,
       amount,
     );
-    const aspect = viewWidth / Math.max(1, viewHeight);
+    const span = Math.max(fitY, fitX / Math.max(aspect, 0.4));
     camera.left = -span * aspect;
     camera.right = span * aspect;
     camera.top = span;
@@ -716,7 +842,7 @@ export async function mountSakuraQrScene(
       Math.sin(elev) * distance,
       Math.cos(elev) * Math.cos(yaw) * distance,
     );
-    look.set(0, THREE.MathUtils.lerp(treeHeight * treeScale * 0.36, 0, amount), 0);
+    look.set(0, THREE.MathUtils.lerp(worldTree * 0.2, 0, amount), 0);
     camera.lookAt(look);
     camera.updateProjectionMatrix();
   }
@@ -780,6 +906,7 @@ export async function mountSakuraQrScene(
 
   function applyPose(time: number, amount: number, delta: number, scan = false) {
     writeTiles(amount, scan);
+    writeStacks(amount, scan);
     writeGrass(time, scan ? 1 : amount);
     placeCamera(amount);
     const live = 1 - amount;
@@ -877,10 +1004,14 @@ export async function mountSakuraQrScene(
       renderer.dispose();
       tileGeo.dispose();
       tileMat.dispose();
+      stackGeo.dispose();
+      stackMat.dispose();
       bladeGeo.dispose();
       bladeMat.dispose();
       bark.dispose();
+      roots.dispose();
       (barkMesh.material as THREE.Material).dispose();
+      (rootMesh.material as THREE.Material).dispose();
       petalTex.dispose();
       flowerTex.dispose();
       leafTex.dispose();
@@ -888,11 +1019,10 @@ export async function mountSakuraQrScene(
       petalMat.dispose();
       flowerMat.dispose();
       leafMat.dispose();
-      slab.geometry.dispose();
-      (slab.material as THREE.Material).dispose();
       shadow.geometry.dispose();
       (shadow.material as THREE.Material).dispose();
       tileMesh.dispose();
+      stackMesh.dispose();
       grassMesh.dispose();
       petalMesh.dispose();
       flowerMesh.dispose();

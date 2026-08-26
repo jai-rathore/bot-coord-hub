@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  classifySakuraTile,
   contrastRatio,
   encodeSakuraQr,
   isFinderModule,
+  planSakuraStacks,
   relativeLuminance,
   SAKURA_QR,
 } from "./sakura-qr";
@@ -25,11 +27,46 @@ test("module colors stay scanner-dark and scanner-light", () => {
   assert.ok(relativeLuminance(SAKURA_QR.dark) < 0.12);
   assert.ok(relativeLuminance(SAKURA_QR.darkDeep) < relativeLuminance(SAKURA_QR.dark));
   assert.ok(relativeLuminance(SAKURA_QR.darkBlossom) < 0.12);
+  assert.ok(relativeLuminance(SAKURA_QR.bark) < 0.12);
+  assert.ok(relativeLuminance(SAKURA_QR.barkDeep) < relativeLuminance(SAKURA_QR.bark));
   assert.ok(relativeLuminance(SAKURA_QR.light) > 0.85);
   assert.ok(contrastRatio(SAKURA_QR.dark, SAKURA_QR.light) > 7);
   assert.ok(relativeLuminance(SAKURA_QR.blossomWhite) > 0.85);
   assert.ok(contrastRatio(SAKURA_QR.dark, SAKURA_QR.light) > 7);
   assert.ok(contrastRatio(SAKURA_QR.darkBlossom, SAKURA_QR.blossomWhite) > 7);
+  assert.ok(contrastRatio(SAKURA_QR.bark, SAKURA_QR.light) > 7);
+});
+
+test("dark modules become trunk, canopy, or grass the way tree.icqr.com does", () => {
+  const matrix = encodeSakuraQr("https://honeymatcha.io/jai?meet=1");
+  const mid = Math.floor(matrix.size / 2);
+  assert.equal(classifySakuraTile(0, 0, matrix.size, true), "finder");
+  assert.equal(classifySakuraTile(8, 8, matrix.size, false), "plot");
+  const kinds = new Set<string>();
+  let trunkStacks = 0;
+  let canopyStacks = 0;
+  for (let row = 0; row < matrix.size; row += 1) {
+    for (let col = 0; col < matrix.size; col += 1) {
+      kinds.add(
+        classifySakuraTile(row, col, matrix.size, matrix.dark[row][col]),
+      );
+    }
+  }
+  for (const stack of planSakuraStacks(matrix)) {
+    if (stack.kind === "trunk") trunkStacks += 1;
+    else canopyStacks += 1;
+  }
+  assert.ok(kinds.has("finder"));
+  assert.ok(kinds.has("plot"));
+  assert.ok(kinds.has("grass") || kinds.has("canopy"));
+  assert.equal(
+    classifySakuraTile(mid, mid, matrix.size, true) === "trunk" ||
+      classifySakuraTile(mid, mid, matrix.size, false) === "plot",
+    true,
+  );
+  assert.ok(canopyStacks > trunkStacks);
+  assert.ok(trunkStacks + canopyStacks > matrix.size);
+  assert.deepEqual(planSakuraStacks(matrix), planSakuraStacks(matrix));
 });
 
 test("the same url always grows the same tree", () => {

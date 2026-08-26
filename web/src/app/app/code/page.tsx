@@ -48,32 +48,30 @@ export default async function MyCodePage() {
         description="Use this when you meet someone new. They can scan or open your link, choose what they want to plan, and compare times with you."
       />
 
-      <section className="surface-card p-5 sm:p-7">
-        <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center">
-          <ShareQr
-            url={meetUrl}
-            alt={`QR code for ${displayName}`}
-            downloadName={`honeymatcha-${profile.handle}.png`}
-            size={280}
-          />
-          <div className="min-w-0 flex-1 space-y-4">
-            <div>
-              <p className="text-sm font-semibold text-ink">Your link</p>
-              <p className="mt-1 font-mono text-sm break-all text-matcha">
-                honeymatcha.io/{profile.handle}
-              </p>
-            </div>
-            <CopyBlock text={publicUrl} label="Copy link" />
-            {/* Full-screen and forced-light, for the moment two people are
-                actually holding a phone between them. */}
-            <MeetCode
-              handle={profile.handle}
-              displayName={displayName}
-              origin={origin}
-              label="Show full screen"
-              className="button-primary w-full cursor-pointer sm:w-auto"
-            />
+      <section className="flex flex-col items-start gap-6 sm:flex-row sm:items-center">
+        <ShareQr
+          url={meetUrl}
+          alt={`QR code for ${displayName}`}
+          downloadName={`honeymatcha-${profile.handle}.png`}
+          size={320}
+        />
+        <div className="min-w-0 flex-1 space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-ink">Your link</p>
+            <p className="mt-1 font-mono text-sm break-all text-matcha">
+              honeymatcha.io/{profile.handle}
+            </p>
           </div>
+          <CopyBlock text={publicUrl} label="Copy link" />
+          {/* Full-screen and forced-light, for the moment two people are
+              actually holding a phone between them. */}
+          <MeetCode
+            handle={profile.handle}
+            displayName={displayName}
+            origin={origin}
+            label="Show full screen"
+            className="button-primary w-full cursor-pointer sm:w-auto"
+          />
         </div>
       </section>
 

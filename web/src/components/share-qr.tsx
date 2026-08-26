@@ -10,11 +10,11 @@ import { webglAvailable, type SakuraQrMount } from "@/lib/sakura-qr";
  * already in the page, so a round trip would only add latency to something a
  * person is holding up in front of someone else.
  *
- * The garden is a real QR matrix. Dark tiles and blossom-dark modules stay
- * scanner-black, light tiles stay cream, and the three finder patterns are
- * left geometrically exact. High error correction covers the tree in the
- * center. Tap to flatten the garden into a high-contrast code for a dim bar
- * or a fussy camera.
+ * The garden is a real QR matrix, grown the way tree.icqr.com does it: dark
+ * modules near the centre stack into trunk, the mid-ring becomes canopy, and
+ * the outer ring is grass. Finder patterns stay geometrically exact. High
+ * error correction covers the tree. Tap to flatten the garden into a
+ * high-contrast code for a dim bar or a fussy camera.
  */
 export function ShareQr({
   url,
@@ -122,12 +122,12 @@ export function ShareQr({
         onClick={() => setReveal((open) => !open)}
         aria-pressed={reveal}
         aria-label={`${alt}. ${reveal ? "Showing high-contrast code. Tap to return to the sakura garden." : "Sakura garden code. Tap to show a high-contrast code."}`}
-        className="block w-full cursor-pointer rounded-2xl border border-line bg-[#f6f1e7] p-0 text-left shadow-[0_18px_40px_rgba(23,63,46,0.12)]"
+        className="block w-full cursor-pointer bg-transparent p-0 text-left"
       >
-        <span className="relative block aspect-square overflow-hidden rounded-2xl">
+        <span className="relative block aspect-[4/5]">
           {!ready ? (
             <span
-              className="absolute inset-0 animate-pulse bg-[linear-gradient(160deg,#f6f1e7,#eadfcd_55%,#f3c1cc33)]"
+              className="absolute inset-0 animate-pulse bg-[radial-gradient(circle_at_50%_60%,#f3c1cc33,transparent_62%)]"
               aria-hidden
             />
           ) : null}
