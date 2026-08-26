@@ -156,10 +156,11 @@ export function classifySakuraTile(
 
 export function planSakuraStacks(
   _matrix: SakuraQrMatrix,
-  _compact = false,
+  compact = false,
 ): SakuraStack[] {
   // Voxel stacks used to fill the air between the QR plot and the
   // canopy. The tree now sits on the matrix with a smooth trunk.
+  void compact;
   return [];
 }
 
