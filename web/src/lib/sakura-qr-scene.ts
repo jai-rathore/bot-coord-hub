@@ -7,6 +7,7 @@ import {
   hexToRgb,
   mulberry32,
   planSakuraStacks,
+  sakuraDisplayScale,
   SAKURA_QR,
   type SakuraQrMatrix,
   type SakuraQrMount,
@@ -91,7 +92,7 @@ function makeTexture(
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
+  texture.anisotropy = 16;
   texture.generateMipmaps = true;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.magFilter = THREE.LinearFilter;
@@ -287,8 +288,8 @@ function buildTrunk(
   const tipNodes: THREE.Object3D[] = [];
   const trunkRadius = Math.max(0.85, grid * 0.05);
   const trunkHeight = grid * 0.42;
-  const radial = high ? 24 : 12;
-  const branchRadial = high ? 14 : 8;
+  const radial = high ? 32 : 12;
+  const branchRadial = high ? 16 : 8;
 
   let y = 0;
   let radius = trunkRadius;
@@ -536,7 +537,6 @@ export async function mountSakuraQrScene(
     alpha: true,
     powerPreference: high ? "high-performance" : "default",
     preserveDrawingBuffer: true,
-    samples: high ? 8 : 4,
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -576,7 +576,7 @@ export async function mountSakuraQrScene(
   shadow.position.y = 0.02;
   scene.add(shadow);
 
-  const tileGeo = new RoundedBoxGeometry(0.94, 1, 0.94, high ? 2 : 1, 0.1);
+  const tileGeo = new RoundedBoxGeometry(0.94, 1, 0.94, high ? 3 : 1, 0.12);
   const tileMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     roughness: 0.82,
@@ -699,7 +699,7 @@ export async function mountSakuraQrScene(
     }
   }
 
-  const bladeTex = makeTexture(paintBlade, high ? 512 : 128);
+  const bladeTex = makeTexture(paintBlade, high ? 1024 : 128);
   const bladeMat = spriteMaterial(bladeTex);
   const bladeGeo = new THREE.PlaneGeometry(1, 1);
   bladeGeo.translate(0, 0.5, 0);
@@ -755,9 +755,14 @@ export async function mountSakuraQrScene(
     card.y -= crownY;
   }
 
-  const petalTex = makeTexture(paintPetal, high ? 512 : 128);
-  const flowerTex = makeTexture(paintFlower, high ? 512 : 128);
-  const leafTex = makeTexture(paintLeaf, high ? 512 : 128);
+  const petalTex = makeTexture(paintPetal, high ? 1024 : 128);
+  const flowerTex = makeTexture(paintFlower, high ? 1024 : 128);
+  const leafTex = makeTexture(paintLeaf, high ? 1024 : 128);
+  const anisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy());
+  for (const tex of [bladeTex, petalTex, flowerTex, leafTex]) {
+    tex.anisotropy = anisotropy;
+    tex.needsUpdate = true;
+  }
   const petalMat = spriteMaterial(petalTex);
   const flowerMat = spriteMaterial(flowerTex);
   const leafMat = spriteMaterial(leafTex);
@@ -998,8 +1003,10 @@ export async function mountSakuraQrScene(
     const box = parent?.getBoundingClientRect();
     viewWidth = Math.max(1, box?.width || canvas.clientWidth || 240);
     viewHeight = Math.max(1, box?.height || canvas.clientHeight || viewWidth);
-    const dpr = Math.min(window.devicePixelRatio || 1, high ? 3 : 2);
-    renderer.setPixelRatio(dpr);
+    const scale = sakuraDisplayScale(high);
+    const maxEdge = 4096;
+    const capped = Math.min(scale, maxEdge / Math.max(viewWidth, viewHeight));
+    renderer.setPixelRatio(capped);
     renderer.setSize(viewWidth, viewHeight, false);
     placeCamera(reveal);
   }
@@ -1035,6 +1042,9 @@ export async function mountSakuraQrScene(
   loop();
 
   window.addEventListener("resize", onResize);
+  const viewport = window.visualViewport;
+  viewport?.addEventListener("resize", onResize);
+  viewport?.addEventListener("scroll", onResize);
   const observer =
     typeof ResizeObserver !== "undefined" && canvas.parentElement
       ? new ResizeObserver(onResize)
@@ -1066,6 +1076,8 @@ export async function mountSakuraQrScene(
       disposed = true;
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", onResize);
+      viewport?.removeEventListener("resize", onResize);
+      viewport?.removeEventListener("scroll", onResize);
       observer?.disconnect();
       renderer.dispose();
       tileGeo.dispose();

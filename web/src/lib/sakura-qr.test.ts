@@ -7,6 +7,7 @@ import {
   isFinderModule,
   planSakuraStacks,
   relativeLuminance,
+  sakuraDisplayScale,
   SAKURA_QR,
 } from "./sakura-qr";
 
@@ -61,6 +62,13 @@ test("dark modules become trunk, canopy, or grass the way tree.icqr.com does", (
   );
   assert.deepEqual(stacks, []);
   assert.deepEqual(planSakuraStacks(matrix, true), []);
+});
+
+test("display scale stays finite and supersamples the full-size garden", () => {
+  assert.ok(Number.isFinite(sakuraDisplayScale(true)));
+  assert.ok(sakuraDisplayScale(true) >= sakuraDisplayScale(false));
+  assert.ok(sakuraDisplayScale(true) >= 1);
+  assert.ok(sakuraDisplayScale(true) <= 6);
 });
 
 test("the same url always grows the same tree", () => {

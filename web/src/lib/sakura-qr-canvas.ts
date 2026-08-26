@@ -3,6 +3,7 @@ import {
   encodeSakuraQr,
   mulberry32,
   planSakuraStacks,
+  sakuraDisplayScale,
   SAKURA_QR,
   type SakuraQrMatrix,
   type SakuraQrMount,
@@ -311,12 +312,14 @@ export async function mountSakuraQrCanvas(
     const box = parent?.getBoundingClientRect();
     cssWidth = Math.max(1, box?.width || canvas.clientWidth || 240);
     cssHeight = Math.max(1, box?.height || canvas.clientHeight || cssWidth);
-    const dpr = Math.min(window.devicePixelRatio || 1, options.compact ? 2 : 3);
-    canvas.width = Math.round(cssWidth * dpr);
-    canvas.height = Math.round(cssHeight * dpr);
+    const scale = sakuraDisplayScale(!options.compact);
+    const maxEdge = 4096;
+    const capped = Math.min(scale, maxEdge / Math.max(cssWidth, cssHeight));
+    canvas.width = Math.round(cssWidth * capped);
+    canvas.height = Math.round(cssHeight * capped);
     canvas.style.width = "100%";
     canvas.style.height = "100%";
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(capped, 0, 0, capped, 0, 0);
   }
 
   function render(timeMs: number) {
@@ -341,6 +344,9 @@ export async function mountSakuraQrCanvas(
   loop(0);
 
   window.addEventListener("resize", onResize);
+  const viewport = window.visualViewport;
+  viewport?.addEventListener("resize", onResize);
+  viewport?.addEventListener("scroll", onResize);
   const observer =
     typeof ResizeObserver !== "undefined" && canvas.parentElement
       ? new ResizeObserver(onResize)
@@ -372,6 +378,8 @@ export async function mountSakuraQrCanvas(
       disposed = true;
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", onResize);
+      viewport?.removeEventListener("resize", onResize);
+      viewport?.removeEventListener("scroll", onResize);
       observer?.disconnect();
     },
   };

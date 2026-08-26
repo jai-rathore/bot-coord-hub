@@ -134,7 +134,7 @@ export function ShareQr({
           <canvas
             ref={canvasRef}
             className="absolute inset-0 h-full w-full touch-manipulation"
-            style={{ opacity: ready ? 1 : 0 }}
+            style={{ opacity: ready ? 1 : 0, imageRendering: "auto" }}
           />
         </span>
       </button>

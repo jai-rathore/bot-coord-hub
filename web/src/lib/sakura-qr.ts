@@ -71,6 +71,21 @@ export type SakuraQrMount = {
   dispose: () => void;
 };
 
+/**
+ * Backing resolution for the garden canvas.
+ *
+ * A phone pinch-zoom does not change `devicePixelRatio`; it just stretches
+ * the existing bitmap. Multiply by `visualViewport.scale` and a little extra
+ * supersample so a close look stays sharp.
+ */
+export function sakuraDisplayScale(high: boolean): number {
+  const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
+  const pinch =
+    typeof window === "undefined" ? 1 : window.visualViewport?.scale ?? 1;
+  const extra = high ? 1.5 : 1;
+  return Math.min(dpr * Math.max(1, pinch) * extra, high ? 6 : 3);
+}
+
 export function hashSeed(input: string): number {
   let hash = 2166136261;
   for (let i = 0; i < input.length; i += 1) {
