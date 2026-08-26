@@ -35,9 +35,6 @@ export const SAKURA_QR = {
 export const SAKURA_TREE = {
   trunkRadius: 2.6,
   canopyRadiusFactor: 0.46,
-  // Only a short rise of bark out of the centre tiles. Taller canopy
-  // voxels used to float between the trunk and the plot.
-  trunkRiseLayers: 2,
 } as const;
 
 export type SakuraTileKind = "finder" | "trunk" | "canopy" | "grass" | "plot";
@@ -158,38 +155,12 @@ export function classifySakuraTile(
 }
 
 export function planSakuraStacks(
-  matrix: SakuraQrMatrix,
-  compact = false,
+  _matrix: SakuraQrMatrix,
+  _compact = false,
 ): SakuraStack[] {
-  const rng = mulberry32(matrix.seed ^ 0x5a7a);
-  const stacks: SakuraStack[] = [];
-  const rise = compact
-    ? 1
-    : SAKURA_TREE.trunkRiseLayers;
-
-  for (let row = 0; row < matrix.size; row += 1) {
-    for (let col = 0; col < matrix.size; col += 1) {
-      const kind = classifySakuraTile(
-        row,
-        col,
-        matrix.size,
-        matrix.dark[row][col],
-      );
-      if (kind !== "trunk") continue;
-      for (let layer = 1; layer <= rise; layer += 1) {
-        stacks.push({
-          row,
-          col,
-          layer,
-          kind: "trunk",
-          offsetX: (rng() - 0.5) * 0.1,
-          offsetZ: (rng() - 0.5) * 0.1,
-          scale: Math.max(0.7, 1 - layer * 0.08),
-        });
-      }
-    }
-  }
-  return stacks;
+  // Voxel stacks used to fill the air between the QR plot and the
+  // canopy. The tree now sits on the matrix with a smooth trunk.
+  return [];
 }
 
 export function hexToRgb(hex: string): [number, number, number] {

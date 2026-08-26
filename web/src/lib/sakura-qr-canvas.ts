@@ -275,16 +275,16 @@ function paint(
   }
 
   if (!reducedMotion && art > 0.08) {
-    for (let i = 0; i < 18; i += 1) {
+    for (let i = 0; i < 12; i += 1) {
       const seed = mulberry32(matrix.seed + i * 97)();
       const span = treeSize * 0.72;
-      const fall = (timeMs * (0.028 + seed * 0.022) + seed * 400) % span;
+      const fall = (timeMs * (0.022 + seed * 0.018) + seed * 400) % span;
       const progress = fall / span;
       const fade = progress < 0.58 ? 1 : Math.max(0, 1 - (progress - 0.58) / 0.42);
-      const x = treeX + (seed - 0.5) * treeSize * 0.28 + Math.sin(timeMs * 0.0012 + i) * 10;
+      const x = treeX + (seed - 0.5) * treeSize * 0.34 + Math.sin(timeMs * 0.0012 + i) * 12;
       const y = treeY - treeSize * 0.18 + fall;
-      ctx.globalAlpha = 0.92 * art * fade;
-      drawBlossom(ctx, x, y, 6 + seed * 5, timeMs * 0.002 + i, false);
+      ctx.globalAlpha = 0.95 * art * fade;
+      drawBlossom(ctx, x, y, 8 + seed * 6, timeMs * 0.002 + i, false);
       ctx.globalAlpha = 1;
     }
   }

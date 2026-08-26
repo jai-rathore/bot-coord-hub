@@ -287,7 +287,6 @@ function buildTrunk(
   const tipNodes: THREE.Object3D[] = [];
   const trunkRadius = Math.max(0.85, grid * 0.05);
   const trunkHeight = grid * 0.42;
-  const crownY = trunkHeight * 0.22;
   const radial = high ? 24 : 12;
   const branchRadial = high ? 14 : 8;
 
@@ -305,6 +304,7 @@ function buildTrunk(
     y += height * 0.96;
     radius = nextRadius;
   }
+  const crownY = y;
 
   function grow(
     parent: THREE.Object3D,
@@ -327,9 +327,9 @@ function buildTrunk(
     const count = depth < 2 ? 4 : depth < 4 ? 3 : rng() > 0.2 ? 2 : 1;
     for (let i = 0; i < count; i += 1) {
       const child = new THREE.Group();
-      child.rotation.z = (i - (count - 1) / 2) * (0.34 + depth * 0.1) + (rng() - 0.5) * 0.12;
+      child.rotation.z = (i - (count - 1) / 2) * (0.42 + depth * 0.1) + (rng() - 0.5) * 0.12;
       child.rotation.y = rng() * Math.PI * 2;
-      child.rotation.x = depth === 0 ? 0.16 + rng() * 0.2 : 0.48 + rng() * 0.7;
+      child.rotation.x = depth === 0 ? 0.42 + rng() * 0.28 : 0.48 + rng() * 0.7;
       tip.add(child);
       grow(child, length * (0.68 + rng() * 0.14), branchRadius * 0.74, depth + 1);
     }
@@ -338,7 +338,7 @@ function buildTrunk(
   const crown = new THREE.Group();
   crown.position.y = crownY;
   root.add(crown);
-  grow(crown, trunkHeight * 0.72, trunkRadius * 0.62, 0);
+  grow(crown, trunkHeight * 0.34, trunkRadius * 0.46, 0);
   root.updateMatrixWorld(true);
   const tips = tipNodes.map((node) =>
     new THREE.Vector3().setFromMatrixPosition(node.matrixWorld),
@@ -636,7 +636,7 @@ export async function mountSakuraQrScene(
 
   function writeStacks(amount: number, scan: boolean) {
     const live = scan ? 0 : Math.max(0, 1 - amount);
-    stackMesh.visible = live > 0.04;
+    stackMesh.visible = stacks.length > 0 && live > 0.04;
     if (!stackMesh.visible) {
       dummy.scale.setScalar(0);
       dummy.updateMatrix();
@@ -823,39 +823,46 @@ export async function mountSakuraQrScene(
       new THREE.Vector3(0, treeHeight, 0);
     spawnScratch.copy(source);
     tree.localToWorld(spawnScratch);
-    petal.x = spawnScratch.x + (rng() - 0.5) * 0.35;
-    petal.z = spawnScratch.z + (rng() - 0.5) * 0.35;
-    petal.y = spawnScratch.y + rng() * 0.25;
+    const out = 0.55 + rng() * 0.9;
+    petal.x = spawnScratch.x + (rng() - 0.5) * out;
+    petal.z = spawnScratch.z + (rng() - 0.5) * out;
+    petal.y = spawnScratch.y - 0.15 - rng() * 0.55;
     petal.bornY = petal.y;
   }
 
-  const petalCount = reduced ? 0 : compact ? 18 : 42;
+  const petalCount = reduced ? 0 : compact ? 10 : 16;
   const petals: Petal[] = Array.from({ length: petalCount }, () => {
     const petal: Petal = {
       x: 0,
       y: 0,
       z: 0,
       bornY: 0,
-      speed: 0.42 + rng() * 0.5,
-      drift: 0.16 + rng() * 0.22,
+      speed: 0.28 + rng() * 0.32,
+      drift: 0.22 + rng() * 0.28,
       rx: rng() * Math.PI,
       ry: rng() * Math.PI,
       rz: rng() * Math.PI,
       spin: (rng() - 0.5) * 2.4,
       phase: rng() * Math.PI * 2,
-      scale: 0.95 + rng() * 0.55,
+      scale: 1.55 + rng() * 0.85,
     };
     spawnFromBranch(petal);
-    petal.y -= rng() * Math.max(0.4, petal.y * 0.62);
+    petal.y -= rng() * Math.max(1.2, petal.y * 0.45);
     return petal;
   });
   const fallingMat = spriteMaterial(petalTex);
-  fallingMat.alphaTest = 0.04;
+  fallingMat.alphaTest = 0.02;
+  fallingMat.depthWrite = false;
   const fallingMesh = new THREE.InstancedMesh(
-    new THREE.PlaneGeometry(1.45, 1.7),
+    new THREE.PlaneGeometry(1.9, 2.2),
     fallingMat,
     Math.max(1, petalCount),
   );
+  fallingMesh.renderOrder = 4;
+  petals.forEach((_, i) =>
+    fallingMesh.setColorAt(i, varyColor(petalColors[i % petalColors.length], 0.05, rng)),
+  );
+  if (fallingMesh.instanceColor) fallingMesh.instanceColor.needsUpdate = true;
   fallingMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(fallingMesh);
 
@@ -863,7 +870,8 @@ export async function mountSakuraQrScene(
   let reveal = targetReveal;
   let frame = 0;
   let disposed = false;
-  const clock = new THREE.Clock();
+  let elapsed = 0;
+  let lastTick = performance.now();
 
   function placeCamera(amount: number) {
     const elev = THREE.MathUtils.lerp(ISO_ELEV, Math.PI / 2 - 0.018, amount);
@@ -997,8 +1005,11 @@ export async function mountSakuraQrScene(
   }
 
   function render() {
-    const time = clock.elapsedTime;
-    const delta = Math.min(clock.getDelta(), 0.05);
+    const now = performance.now();
+    const delta = Math.min((now - lastTick) / 1000, 0.05);
+    lastTick = now;
+    elapsed += delta;
+    const time = elapsed;
     const ease = reduced ? 1 : 0.055;
     reveal += (targetReveal - reveal) * ease;
     if (Math.abs(targetReveal - reveal) < 0.002) reveal = targetReveal;
@@ -1014,7 +1025,7 @@ export async function mountSakuraQrScene(
 
   const onResize = () => {
     resize();
-    applyPose(clock.elapsedTime, reveal, 0);
+    applyPose(elapsed, reveal, 0);
     renderer.render(scene, camera);
   };
 
@@ -1035,18 +1046,18 @@ export async function mountSakuraQrScene(
       targetReveal = next ? 1 : 0;
       if (reduced) {
         reveal = targetReveal;
-        applyPose(clock.elapsedTime, reveal, 0);
+        applyPose(elapsed, reveal, 0);
         renderer.render(scene, camera);
       }
     },
     resize: onResize,
     capturePng(mode = "view") {
       const scan = mode === "scan";
-      applyPose(clock.elapsedTime, scan ? 1 : reveal, 0, scan);
+      applyPose(elapsed, scan ? 1 : reveal, 0, scan);
       renderer.render(scene, camera);
       const dataUrl = renderer.domElement.toDataURL("image/png");
       if (scan) {
-        applyPose(clock.elapsedTime, reveal, 0, false);
+        applyPose(elapsed, reveal, 0, false);
         renderer.render(scene, camera);
       }
       return dataUrl;

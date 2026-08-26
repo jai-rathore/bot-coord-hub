@@ -59,15 +59,8 @@ test("dark modules become trunk, canopy, or grass the way tree.icqr.com does", (
       classifySakuraTile(mid, mid, matrix.size, false) === "plot",
     true,
   );
-  assert.ok(stacks.length > 0);
-  assert.ok(stacks.every((stack) => stack.kind === "trunk" && stack.layer <= 2));
-  assert.equal(
-    stacks.some((stack) => stack.kind === "canopy"),
-    false,
-    "canopy voxels used to float between the trunk and the plot",
-  );
-  assert.ok(planSakuraStacks(matrix, true).every((stack) => stack.layer <= 1));
-  assert.deepEqual(planSakuraStacks(matrix), planSakuraStacks(matrix));
+  assert.deepEqual(stacks, []);
+  assert.deepEqual(planSakuraStacks(matrix, true), []);
 });
 
 test("the same url always grows the same tree", () => {
