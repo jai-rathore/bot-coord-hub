@@ -123,6 +123,24 @@ function paintPetal(ctx: CanvasRenderingContext2D, size: number) {
   ctx.stroke();
 }
 
+function paintFallingPetal(ctx: CanvasRenderingContext2D, size: number) {
+  ctx.clearRect(0, 0, size, size);
+  ctx.translate(size / 2, size / 2);
+  ctx.beginPath();
+  ctx.moveTo(0, size * 0.46);
+  ctx.bezierCurveTo(size * 0.46, size * 0.12, size * 0.34, -size * 0.4, 0, -size * 0.16);
+  ctx.bezierCurveTo(-size * 0.34, -size * 0.4, -size * 0.46, size * 0.12, 0, size * 0.46);
+  const fill = ctx.createLinearGradient(0, -size * 0.38, 0, size * 0.46);
+  fill.addColorStop(0, "#ffe4ea");
+  fill.addColorStop(0.4, "#ff9eb4");
+  fill.addColorStop(1, "#e56b88");
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = "rgba(214, 86, 118, 0.45)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
 function paintFlower(ctx: CanvasRenderingContext2D, size: number) {
   ctx.clearRect(0, 0, size, size);
   const cx = size / 2;
@@ -542,7 +560,7 @@ export async function mountSakuraQrScene(
   const origin = tileOrigin(n);
   const compact = Boolean(options.compact);
   const high = !compact;
-  const treeScale = compact ? 0.78 : 0.88;
+  const treeScale = compact ? 0.92 : 1.02;
   const tiles = buildTiles(matrix, rng);
   const stacks = planSakuraStacks(matrix, compact);
   const reduced = options.reducedMotion;
@@ -776,10 +794,11 @@ export async function mountSakuraQrScene(
   }
 
   const petalTex = makeTexture(paintPetal, high ? 1024 : 512);
+  const fallingTex = makeTexture(paintFallingPetal, high ? 1024 : 512);
   const flowerTex = makeTexture(paintFlower, high ? 1024 : 512);
   const leafTex = makeTexture(paintLeaf, high ? 1024 : 256);
   const anisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy());
-  for (const tex of [bladeTex, petalTex, flowerTex, leafTex]) {
+  for (const tex of [bladeTex, petalTex, fallingTex, flowerTex, leafTex]) {
     tex.anisotropy = anisotropy;
     tex.needsUpdate = true;
   }
@@ -871,17 +890,17 @@ export async function mountSakuraQrScene(
       rz: rng() * Math.PI,
       spin: (rng() - 0.5) * 1.8,
       phase: rng() * Math.PI * 2,
-      scale: 1.28 + rng() * 0.32,
+      scale: 1.2 + rng() * 0.28,
     };
     spawnFromBranch(petal);
     return petal;
   });
-  const fallingMat = spriteMaterial(petalTex);
+  const fallingMat = spriteMaterial(fallingTex);
   fallingMat.alphaTest = 0;
   fallingMat.depthTest = false;
   fallingMat.depthWrite = false;
   const fallingMesh = new THREE.InstancedMesh(
-    new THREE.PlaneGeometry(3.4, 4.0),
+    new THREE.PlaneGeometry(5.8, 6.8),
     fallingMat,
     Math.max(1, petalCount),
   );
@@ -913,13 +932,13 @@ export async function mountSakuraQrScene(
     const distance = n * 2.7;
     const worldTree = treeHeight * treeScale;
     const aspect = viewWidth / Math.max(1, viewHeight);
-    const fitX = THREE.MathUtils.lerp(n * 0.64 + 2.4, spanBase + 0.45, amount);
+    const fitX = THREE.MathUtils.lerp(n * 0.52 + 1.6, spanBase + 0.45, amount);
     const fitY = THREE.MathUtils.lerp(
-      Math.max(n * 0.5, worldTree * 1.02) + (compact ? 2.8 : 4.6),
+      Math.max(n * 0.42, worldTree * 0.95) + (compact ? 1.8 : 2.6),
       spanBase + 0.55,
       amount,
     );
-    const span = Math.max(fitY, fitX / Math.max(aspect, 0.35));
+    const span = Math.max(fitY, fitX / Math.max(aspect, 0.62));
     camera.left = -span * aspect;
     camera.right = span * aspect;
     camera.top = span;
@@ -1165,6 +1184,7 @@ export async function mountSakuraQrScene(
       branchBarkMat.dispose();
       (rootMesh.material as THREE.Material).dispose();
       petalTex.dispose();
+      fallingTex.dispose();
       flowerTex.dispose();
       leafTex.dispose();
       bladeTex.dispose();

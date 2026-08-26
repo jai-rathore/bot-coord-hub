@@ -310,7 +310,7 @@ function paint(
       const x = treeX + (seed - 0.5) * treeSize * 0.42 + Math.sin(timeMs * 0.0012 + i) * 14;
       const y = treeY - treeSize * 0.12 + fall;
       ctx.globalAlpha = 0.95 * (1 - stages.canopy) * fade;
-      drawBlossom(ctx, x, y, 11 + seed * 6, timeMs * 0.002 + i, false);
+      drawBlossom(ctx, x, y, 14 + seed * 7, timeMs * 0.002 + i, false);
       ctx.globalAlpha = 1;
     }
   }
