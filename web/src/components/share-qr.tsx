@@ -124,7 +124,7 @@ export function ShareQr({
         aria-label={`${alt}. ${reveal ? "Showing high-contrast code. Tap to return to the sakura garden." : "Sakura garden code. Tap to show a high-contrast code."}`}
         className="block w-full cursor-pointer bg-transparent p-0 text-left"
       >
-        <span className="relative block aspect-[4/5]">
+        <span className="relative block aspect-[3/4]">
           {!ready ? (
             <span
               className="absolute inset-0 animate-pulse bg-[radial-gradient(circle_at_50%_60%,#f3c1cc33,transparent_62%)]"

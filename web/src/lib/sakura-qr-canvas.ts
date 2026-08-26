@@ -202,11 +202,11 @@ function paint(
   const rng = mulberry32(matrix.seed);
   const n = matrix.size;
   const art = 1 - reveal;
-  const cell = Math.min(cssWidth, cssHeight) / (n + 8);
+  const cell = Math.min(cssWidth, cssHeight) / (n + 11);
   const tw = cell * (1.05 + art * 0.15);
   const th = cell * (0.52 + reveal * 0.48);
   const originX = cssWidth / 2;
-  const originY = cssHeight * (0.3 + reveal * 0.14);
+  const originY = cssHeight * (0.46 + reveal * 0.08);
 
   const order: Array<[number, number]> = [];
   for (let row = 0; row < n; row += 1) {
@@ -261,7 +261,7 @@ function paint(
 
   const treeX = originX;
   const treeY = originY + ((n * th) / 2) * 0.38;
-  const treeSize = n * cell * 1.15;
+  const treeSize = n * cell * 0.52;
   if (art > 0.04) {
     const sway = reducedMotion ? 0 : Math.sin(timeMs * 0.0018) * 8 * art;
     ctx.save();

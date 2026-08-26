@@ -199,11 +199,14 @@ export function planSakuraStacks(
         Math.round(canopyLayers * (0.28 + 0.72 * t * t)),
       );
       const dome = Math.floor(t * 2.4);
+      // Dome: low next to the trunk, higher toward the edge, so the canopy
+      // grows out of the stacked bark instead of sitting on a flat shelf.
+      const start = Math.max(2, Math.round(trunkLayers * (0.4 + 0.45 * (1 - t))));
       for (let layer = 0; layer < layersHere; layer += 1) {
         stacks.push({
           row,
           col,
-          layer: layer + dome,
+          layer: start + layer + dome,
           kind: "canopy",
           offsetX: (rng() - 0.5) * 0.28,
           offsetZ: (rng() - 0.5) * 0.28,

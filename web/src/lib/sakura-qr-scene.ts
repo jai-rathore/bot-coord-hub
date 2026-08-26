@@ -510,7 +510,7 @@ export async function mountSakuraQrScene(
     compact ||
     (typeof navigator !== "undefined" && /Mobi|Android|iPhone/i.test(navigator.userAgent)) ||
     n > 41;
-  const treeScale = compact ? 0.94 : 1.08;
+  const treeScale = compact ? 0.78 : 0.88;
   const tiles = buildTiles(matrix, rng);
   const stacks = planSakuraStacks(matrix, mobile);
   const reduced = options.reducedMotion;
@@ -707,10 +707,11 @@ export async function mountSakuraQrScene(
   const counts = mobile
     ? { petals: 1400, flowers: 340, leaves: 260 }
     : { petals: 2400, flowers: 520, leaves: 380 };
+  const crownSites = sites.filter((site) => site.y > treeHeight * 0.16);
   const canopy = sampleCanopy(
     rng,
     counts,
-    sites,
+    crownSites.length ? crownSites : sites,
     tips,
     petalColors,
     leafColors,
@@ -749,10 +750,10 @@ export async function mountSakuraQrScene(
   tree.updateMatrixWorld(true);
 
   const groundPetals: Card[] = [];
-  const groundCount = mobile ? 22 : 36;
+  const groundCount = mobile ? 8 : 12;
   for (let i = 0; i < groundCount; i += 1) {
     const theta = rng() * Math.PI * 2;
-    const r = 0.7 + rng() * 2.4;
+    const r = 1.6 + rng() * 3.4;
     addCard(
       groundPetals,
       Math.cos(theta) * r,
@@ -828,11 +829,11 @@ export async function mountSakuraQrScene(
     const aspect = viewWidth / Math.max(1, viewHeight);
     const fitX = THREE.MathUtils.lerp(n * 0.64 + 2.4, spanBase + 0.45, amount);
     const fitY = THREE.MathUtils.lerp(
-      Math.max(n * 0.4, worldTree * 0.62) + (compact ? 2.4 : 3.6),
-      spanBase + 0.45,
+      Math.max(n * 0.55, worldTree * 1.05) + (compact ? 4.4 : 7.2),
+      spanBase + 0.55,
       amount,
     );
-    const span = Math.max(fitY, fitX / Math.max(aspect, 0.4));
+    const span = Math.max(fitY, fitX / Math.max(aspect, 0.35));
     camera.left = -span * aspect;
     camera.right = span * aspect;
     camera.top = span;
@@ -842,7 +843,7 @@ export async function mountSakuraQrScene(
       Math.sin(elev) * distance,
       Math.cos(elev) * Math.cos(yaw) * distance,
     );
-    look.set(0, THREE.MathUtils.lerp(worldTree * 0.2, 0, amount), 0);
+    look.set(0, THREE.MathUtils.lerp(worldTree * 0.08, 0, amount), 0);
     camera.lookAt(look);
     camera.updateProjectionMatrix();
   }
