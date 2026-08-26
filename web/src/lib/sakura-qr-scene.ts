@@ -287,8 +287,8 @@ function buildTrunk(
   const dummy = new THREE.Object3D();
   const root = new THREE.Group();
   const tipNodes: THREE.Object3D[] = [];
-  const trunkRadius = Math.max(0.92, grid * 0.056);
-  const trunkHeight = grid * 0.28;
+  const trunkRadius = Math.max(0.95, grid * 0.058);
+  const trunkHeight = grid * 0.22;
   const radial = high ? 32 : 12;
   const branchRadial = high ? 16 : 8;
 
@@ -331,7 +331,7 @@ function buildTrunk(
       const child = new THREE.Group();
       child.rotation.z = (i - (count - 1) / 2) * (0.42 + depth * 0.1) + (rng() - 0.5) * 0.12;
       child.rotation.y = rng() * Math.PI * 2;
-      child.rotation.x = depth === 0 ? 0.42 + rng() * 0.28 : 0.48 + rng() * 0.7;
+      child.rotation.x = depth === 0 ? 0.62 + rng() * 0.32 : 0.5 + rng() * 0.65;
       tip.add(child);
       grow(child, length * (0.68 + rng() * 0.14), branchRadius * 0.74, depth + 1);
     }
@@ -340,7 +340,7 @@ function buildTrunk(
   const crown = new THREE.Group();
   crown.position.y = crownY;
   root.add(crown);
-  grow(crown, trunkHeight * 0.52, trunkRadius * 0.52, 0);
+  grow(crown, trunkHeight * 0.3, trunkRadius * 0.5, 0);
   root.updateMatrixWorld(true);
   const tips = tipNodes.map((node) =>
     new THREE.Vector3().setFromMatrixPosition(node.matrixWorld),
@@ -840,10 +840,11 @@ export async function mountSakuraQrScene(
       new THREE.Vector3(0, treeHeight, 0);
     spawnScratch.copy(source);
     tree.localToWorld(spawnScratch);
-    const out = 0.45 + rng() * 0.7;
-    petal.x = spawnScratch.x + (rng() - 0.5) * out;
-    petal.z = spawnScratch.z + (rng() - 0.5) * out;
-    petal.y = spawnScratch.y - 0.2 - rng() * 0.35;
+    const theta = rng() * Math.PI * 2;
+    const r = 1.5 + rng() * 2.4;
+    petal.x = Math.cos(theta) * r;
+    petal.z = Math.sin(theta) * r;
+    petal.y = Math.max(2.4, spawnScratch.y * 0.48) + rng() * 1.1;
     petal.bornY = petal.y;
   }
 
@@ -861,17 +862,18 @@ export async function mountSakuraQrScene(
       rz: rng() * Math.PI,
       spin: (rng() - 0.5) * 2.4,
       phase: rng() * Math.PI * 2,
-      scale: 0.95 + rng() * 0.35,
+      scale: 1.15 + rng() * 0.4,
     };
     spawnFromBranch(petal);
     petal.y -= rng() * Math.max(1.2, petal.y * 0.45);
     return petal;
   });
   const fallingMat = spriteMaterial(petalTex);
-  fallingMat.alphaTest = 0.02;
+  fallingMat.alphaTest = 0;
+  fallingMat.depthTest = false;
   fallingMat.depthWrite = false;
   const fallingMesh = new THREE.InstancedMesh(
-    new THREE.PlaneGeometry(1.15, 1.35),
+    new THREE.PlaneGeometry(1.55, 1.85),
     fallingMat,
     Math.max(1, petalCount),
   );

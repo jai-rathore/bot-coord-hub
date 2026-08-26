@@ -131,7 +131,7 @@ function drawTree(
     }
   }
 
-  branch(cx, cy + size * 0.28, -Math.PI / 2, size * 0.26, size * 0.052, 0);
+  branch(cx, cy + size * 0.28, -Math.PI / 2, size * 0.2, size * 0.054, 0);
   ctx.restore();
 }
 
