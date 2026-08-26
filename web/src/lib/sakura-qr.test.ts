@@ -8,6 +8,7 @@ import {
   planSakuraStacks,
   relativeLuminance,
   sakuraDisplayScale,
+  sakuraFlattenStages,
   SAKURA_QR,
 } from "./sakura-qr";
 
@@ -62,6 +63,22 @@ test("dark modules become trunk, canopy, or grass the way tree.icqr.com does", (
   );
   assert.deepEqual(stacks, []);
   assert.deepEqual(planSakuraStacks(matrix, true), []);
+});
+
+test("flatten pours the canopy in before the trunk and the overhead camera", () => {
+  const rest = sakuraFlattenStages(0);
+  assert.equal(rest.canopy, 0);
+  assert.equal(rest.trunk, 0);
+  assert.equal(rest.camera, 0);
+  assert.equal(rest.tiles, 0);
+  const early = sakuraFlattenStages(0.28);
+  assert.ok(early.canopy > early.trunk);
+  assert.ok(early.tiles > early.camera);
+  const done = sakuraFlattenStages(1);
+  assert.equal(done.canopy, 1);
+  assert.equal(done.trunk, 1);
+  assert.equal(done.camera, 1);
+  assert.equal(done.tiles, 1);
 });
 
 test("display scale stays finite and supersamples the full-size garden", () => {

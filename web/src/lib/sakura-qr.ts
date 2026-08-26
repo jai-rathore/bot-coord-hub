@@ -78,6 +78,30 @@ export type SakuraQrMount = {
  * the existing bitmap. Multiply by `visualViewport.scale` and a little extra
  * supersample so a close look stays sharp.
  */
+/**
+ * Staged 3D → QR flatten, the way tree.icqr.com does it: the canopy
+ * pours into the plot first, the trunk sinks into the centre tiles,
+ * then the camera finishes overhead as the modules become the code.
+ */
+export function sakuraFlattenStages(amount: number): {
+  canopy: number;
+  trunk: number;
+  camera: number;
+  tiles: number;
+} {
+  const t = Math.min(1, Math.max(0, amount));
+  const smooth = (start: number, end: number) => {
+    const u = Math.min(1, Math.max(0, (t - start) / (end - start)));
+    return u * u * (3 - 2 * u);
+  };
+  return {
+    canopy: smooth(0, 0.55),
+    trunk: smooth(0.1, 0.82),
+    camera: smooth(0.12, 1),
+    tiles: smooth(0.05, 0.72),
+  };
+}
+
 export function sakuraDisplayScale(high: boolean): number {
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
   const pinch =
