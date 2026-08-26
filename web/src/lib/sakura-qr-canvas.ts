@@ -47,6 +47,7 @@ function drawTree(
   size: number,
   rng: () => number,
   alpha: number,
+  sway = 0,
 ) {
   if (alpha <= 0.02) return;
   ctx.save();
@@ -116,10 +117,11 @@ function drawTree(
     for (let i = 0; i < splits; i += 1) {
       const spread = (i - (splits - 1) / 2) * (0.45 + depth * 0.08);
       const droop = depth > 2 ? 0.25 + rng() * 0.35 : 0;
+      const wind = depth >= 1 ? sway * (0.4 + depth * 0.12) : 0;
       branch(
         x2,
         y2,
-        angle + spread + (rng() - 0.5) * 0.2 + droop,
+        angle + spread + (rng() - 0.5) * 0.2 + droop + wind,
         length * (0.62 + rng() * 0.18),
         width * 0.68,
         depth + 1,
@@ -263,24 +265,26 @@ function paint(
   const treeY = originY + ((n * th) / 2) * 0.38;
   const treeSize = n * cell * 0.52;
   if (art > 0.04) {
-    const sway = reducedMotion ? 0 : Math.sin(timeMs * 0.0018) * 8 * art;
+    const sway = reducedMotion ? 0 : Math.sin(timeMs * 0.0018) * 0.12 * art;
     ctx.save();
     ctx.translate(treeX, treeY + treeSize * 0.22);
     ctx.scale(1, Math.max(0.06, art));
     ctx.translate(-treeX, -(treeY + treeSize * 0.22));
-    ctx.translate(sway, 0);
-    drawTree(ctx, treeX, treeY, treeSize, rng, art);
+    drawTree(ctx, treeX, treeY, treeSize, rng, art, sway);
     ctx.restore();
   }
 
   if (!reducedMotion && art > 0.08) {
-    for (let i = 0; i < 28; i += 1) {
+    for (let i = 0; i < 18; i += 1) {
       const seed = mulberry32(matrix.seed + i * 97)();
-      const fall = (timeMs * (0.045 + seed * 0.04) + seed * 400) % (treeSize * 0.85);
+      const span = treeSize * 0.72;
+      const fall = (timeMs * (0.028 + seed * 0.022) + seed * 400) % span;
+      const progress = fall / span;
+      const fade = progress < 0.58 ? 1 : Math.max(0, 1 - (progress - 0.58) / 0.42);
       const x = treeX + (seed - 0.5) * treeSize * 0.28 + Math.sin(timeMs * 0.0012 + i) * 10;
-      const y = treeY - treeSize * 0.22 + fall;
-      ctx.globalAlpha = 0.85 * art;
-      drawBlossom(ctx, x, y, 5 + seed * 5, timeMs * 0.002 + i, false);
+      const y = treeY - treeSize * 0.18 + fall;
+      ctx.globalAlpha = 0.92 * art * fade;
+      drawBlossom(ctx, x, y, 6 + seed * 5, timeMs * 0.002 + i, false);
       ctx.globalAlpha = 1;
     }
   }
@@ -307,7 +311,7 @@ export async function mountSakuraQrCanvas(
     const box = parent?.getBoundingClientRect();
     cssWidth = Math.max(1, box?.width || canvas.clientWidth || 240);
     cssHeight = Math.max(1, box?.height || canvas.clientHeight || cssWidth);
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, options.compact ? 2 : 3);
     canvas.width = Math.round(cssWidth * dpr);
     canvas.height = Math.round(cssHeight * dpr);
     canvas.style.width = "100%";

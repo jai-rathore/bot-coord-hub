@@ -43,18 +43,13 @@ test("dark modules become trunk, canopy, or grass the way tree.icqr.com does", (
   assert.equal(classifySakuraTile(0, 0, matrix.size, true), "finder");
   assert.equal(classifySakuraTile(8, 8, matrix.size, false), "plot");
   const kinds = new Set<string>();
-  let trunkStacks = 0;
-  let canopyStacks = 0;
+  const stacks = planSakuraStacks(matrix);
   for (let row = 0; row < matrix.size; row += 1) {
     for (let col = 0; col < matrix.size; col += 1) {
       kinds.add(
         classifySakuraTile(row, col, matrix.size, matrix.dark[row][col]),
       );
     }
-  }
-  for (const stack of planSakuraStacks(matrix)) {
-    if (stack.kind === "trunk") trunkStacks += 1;
-    else canopyStacks += 1;
   }
   assert.ok(kinds.has("finder"));
   assert.ok(kinds.has("plot"));
@@ -64,8 +59,14 @@ test("dark modules become trunk, canopy, or grass the way tree.icqr.com does", (
       classifySakuraTile(mid, mid, matrix.size, false) === "plot",
     true,
   );
-  assert.ok(canopyStacks > trunkStacks);
-  assert.ok(trunkStacks + canopyStacks > matrix.size);
+  assert.ok(stacks.length > 0);
+  assert.ok(stacks.every((stack) => stack.kind === "trunk" && stack.layer <= 2));
+  assert.equal(
+    stacks.some((stack) => stack.kind === "canopy"),
+    false,
+    "canopy voxels used to float between the trunk and the plot",
+  );
+  assert.ok(planSakuraStacks(matrix, true).every((stack) => stack.layer <= 1));
   assert.deepEqual(planSakuraStacks(matrix), planSakuraStacks(matrix));
 });
 
