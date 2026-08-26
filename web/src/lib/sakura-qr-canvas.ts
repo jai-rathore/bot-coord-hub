@@ -1,7 +1,8 @@
 import {
+  classifySakuraTile,
   encodeSakuraQr,
-  isFinderModule,
   mulberry32,
+  planSakuraStacks,
   SAKURA_QR,
   type SakuraQrMatrix,
   type SakuraQrMount,
@@ -130,27 +131,19 @@ function drawTree(
   ctx.restore();
 }
 
-function drawPaper(ctx: CanvasRenderingContext2D, size: number, rng: () => number) {
-  const wash = ctx.createRadialGradient(
-    size * 0.5,
-    size * 0.42,
-    size * 0.1,
-    size * 0.5,
-    size * 0.5,
-    size * 0.72,
-  );
-  wash.addColorStop(0, "#fbf6ee");
-  wash.addColorStop(0.65, SAKURA_QR.cream);
-  wash.addColorStop(1, "#eadfcd");
-  ctx.fillStyle = wash;
-  ctx.fillRect(0, 0, size, size);
-
-  ctx.globalAlpha = 0.045;
-  for (let i = 0; i < 80; i += 1) {
-    ctx.fillStyle = rng() > 0.5 ? SAKURA_QR.matchaSoft : SAKURA_QR.blossom;
-    ctx.fillRect(rng() * size, rng() * size, 1 + rng() * 2, 8 + rng() * 18);
+function gardenFill(
+  kind: ReturnType<typeof classifySakuraTile>,
+  dark: boolean,
+  reveal: number,
+): string {
+  if (kind === "finder") return dark ? SAKURA_QR.darkDeep : SAKURA_QR.lightPure;
+  if (reveal > 0.45) {
+    return dark ? SAKURA_QR.darkBlossom : SAKURA_QR.blossomWhite;
   }
-  ctx.globalAlpha = 1;
+  if (kind === "trunk") return SAKURA_QR.bark;
+  if (kind === "canopy") return SAKURA_QR.darkBlossom;
+  if (kind === "grass") return SAKURA_QR.dark;
+  return SAKURA_QR.plot;
 }
 
 function drawIsoTile(
@@ -199,21 +192,21 @@ function drawIsoTile(
 function paint(
   ctx: CanvasRenderingContext2D,
   matrix: SakuraQrMatrix,
-  cssSize: number,
+  cssWidth: number,
+  cssHeight: number,
   reveal: number,
   timeMs: number,
   reducedMotion: boolean,
 ) {
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
   const rng = mulberry32(matrix.seed);
-  drawPaper(ctx, cssSize, rng);
-
   const n = matrix.size;
   const art = 1 - reveal;
-  const cell = cssSize / (n + 6);
+  const cell = Math.min(cssWidth, cssHeight) / (n + 11);
   const tw = cell * (1.05 + art * 0.15);
   const th = cell * (0.52 + reveal * 0.48);
-  const originX = cssSize / 2;
-  const originY = cssSize * (0.22 + reveal * 0.12);
+  const originX = cssWidth / 2;
+  const originY = cssHeight * (0.46 + reveal * 0.08);
 
   const order: Array<[number, number]> = [];
   for (let row = 0; row < n; row += 1) {
@@ -227,25 +220,48 @@ function paint(
     const isoX = originX + ((col - row) * tw) / 2;
     const isoY = originY + ((col + row) * th) / 2;
     const dark = matrix.dark[row][col];
-    const finder = isFinderModule(row, col, n);
-    const fill = dark
-      ? finder
-        ? SAKURA_QR.darkDeep
-        : reveal > 0.45
-          ? SAKURA_QR.darkBlossom
-          : SAKURA_QR.dark
-      : finder
-        ? SAKURA_QR.lightPure
-        : reveal > 0.45
-          ? SAKURA_QR.blossomWhite
-          : SAKURA_QR.plot;
-    const height = (dark ? cell * 0.35 : cell * 0.12) * art;
-    drawIsoTile(ctx, isoX, isoY, tw * 0.92, th * 0.92, height, fill);
+    const kind = classifySakuraTile(row, col, n, dark);
+    const height =
+      (kind === "trunk"
+        ? cell * 0.55
+        : kind === "grass"
+          ? cell * 0.38
+          : dark
+            ? cell * 0.28
+            : cell * 0.1) * art;
+    drawIsoTile(ctx, isoX, isoY, tw * 0.92, th * 0.92, height, gardenFill(kind, dark, reveal));
+  }
+
+  if (art > 0.05) {
+    const stacks = planSakuraStacks(matrix, cssWidth < 230);
+    const stackOrder = [...stacks].sort(
+      (a, b) => a.row + a.col + a.layer - (b.row + b.col + b.layer),
+    );
+    for (const stack of stackOrder) {
+      const isoX = originX + ((stack.col - stack.row + stack.offsetX) * tw) / 2;
+      const isoY = originY + ((stack.col + stack.row + stack.offsetZ) * th) / 2;
+      const lift = cell * 0.42 * stack.layer * art;
+      drawIsoTile(
+        ctx,
+        isoX,
+        isoY - lift,
+        tw * 0.78 * stack.scale,
+        th * 0.78 * stack.scale,
+        cell * 0.3 * art,
+        stack.kind === "trunk"
+          ? stack.layer > 5
+            ? SAKURA_QR.barkDeep
+            : SAKURA_QR.bark
+          : stack.layer % 2
+            ? SAKURA_QR.blossom
+            : SAKURA_QR.blossomDeep,
+      );
+    }
   }
 
   const treeX = originX;
-  const treeY = originY + ((n * th) / 2) * 0.42;
-  const treeSize = n * cell * 1.35;
+  const treeY = originY + ((n * th) / 2) * 0.38;
+  const treeSize = n * cell * 0.52;
   if (art > 0.04) {
     const sway = reducedMotion ? 0 : Math.sin(timeMs * 0.0018) * 8 * art;
     ctx.save();
@@ -275,7 +291,7 @@ export async function mountSakuraQrCanvas(
   options: SakuraQrMountOptions,
 ): Promise<SakuraQrMount> {
   const matrix = encodeSakuraQr(options.url);
-  const surface = canvas.getContext("2d", { alpha: false });
+  const surface = canvas.getContext("2d", { alpha: true });
   if (!surface) throw new Error("Canvas 2D is unavailable");
   const ctx: CanvasRenderingContext2D = surface;
 
@@ -283,14 +299,17 @@ export async function mountSakuraQrCanvas(
   let reveal = targetReveal;
   let frame = 0;
   let disposed = false;
-  let cssSize = 240;
+  let cssWidth = 240;
+  let cssHeight = 300;
 
   function resize() {
     const parent = canvas.parentElement;
-    cssSize = Math.max(1, parent?.clientWidth || canvas.clientWidth || 240);
+    const box = parent?.getBoundingClientRect();
+    cssWidth = Math.max(1, box?.width || canvas.clientWidth || 240);
+    cssHeight = Math.max(1, box?.height || canvas.clientHeight || cssWidth);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(cssSize * dpr);
-    canvas.height = Math.round(cssSize * dpr);
+    canvas.width = Math.round(cssWidth * dpr);
+    canvas.height = Math.round(cssHeight * dpr);
     canvas.style.width = "100%";
     canvas.style.height = "100%";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -299,7 +318,7 @@ export async function mountSakuraQrCanvas(
   function render(timeMs: number) {
     reveal += (targetReveal - reveal) * (options.reducedMotion ? 1 : 0.08);
     if (Math.abs(targetReveal - reveal) < 0.002) reveal = targetReveal;
-    paint(ctx, matrix, cssSize, reveal, timeMs, options.reducedMotion);
+    paint(ctx, matrix, cssWidth, cssHeight, reveal, timeMs, options.reducedMotion);
   }
 
   function loop(timeMs: number) {
@@ -333,14 +352,15 @@ export async function mountSakuraQrCanvas(
       paint(
         ctx,
         matrix,
-        cssSize,
+        cssWidth,
+        cssHeight,
         mode === "scan" ? 1 : reveal,
         0,
         options.reducedMotion,
       );
       const dataUrl = canvas.toDataURL("image/png");
       if (mode === "scan") {
-        paint(ctx, matrix, cssSize, reveal, 0, options.reducedMotion);
+        paint(ctx, matrix, cssWidth, cssHeight, reveal, 0, options.reducedMotion);
       }
       return dataUrl;
     },

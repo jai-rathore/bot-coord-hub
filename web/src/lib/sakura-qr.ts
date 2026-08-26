@@ -27,6 +27,30 @@ export const SAKURA_QR = {
   stamen: "#f3e0b8",
 } as const;
 
+/**
+ * How the tree grows out of the matrix, matching tree.icqr.com:
+ * dark modules near the centre become trunk, the mid-ring becomes canopy,
+ * and the outer ring becomes grass. Light modules stay the dirt path.
+ */
+export const SAKURA_TREE = {
+  trunkRadius: 2.6,
+  canopyRadiusFactor: 0.46,
+  trunkLayers: 10,
+  canopyLayers: 8,
+} as const;
+
+export type SakuraTileKind = "finder" | "trunk" | "canopy" | "grass" | "plot";
+
+export type SakuraStack = {
+  row: number;
+  col: number;
+  layer: number;
+  kind: "trunk" | "canopy";
+  offsetX: number;
+  offsetZ: number;
+  scale: number;
+};
+
 export type SakuraQrMatrix = {
   size: number;
   version: number;
@@ -107,6 +131,91 @@ export function isFinderModule(
     inFinder(row, col - (size - 7)) ||
     inFinder(row - (size - 7), col)
   );
+}
+
+export function moduleDistanceFromCenter(
+  row: number,
+  col: number,
+  size: number,
+): number {
+  const center = (size - 1) / 2;
+  return Math.hypot(col - center, row - center);
+}
+
+export function classifySakuraTile(
+  row: number,
+  col: number,
+  size: number,
+  dark: boolean,
+): SakuraTileKind {
+  if (isFinderModule(row, col, size)) return "finder";
+  if (!dark) return "plot";
+  const dist = moduleDistanceFromCenter(row, col, size);
+  if (dist < SAKURA_TREE.trunkRadius) return "trunk";
+  if (dist < size * SAKURA_TREE.canopyRadiusFactor) return "canopy";
+  return "grass";
+}
+
+export function planSakuraStacks(
+  matrix: SakuraQrMatrix,
+  compact = false,
+): SakuraStack[] {
+  const rng = mulberry32(matrix.seed ^ 0x5a7a);
+  const stacks: SakuraStack[] = [];
+  const trunkLayers = compact
+    ? Math.max(6, SAKURA_TREE.trunkLayers - 3)
+    : SAKURA_TREE.trunkLayers;
+  const canopyLayers = compact
+    ? Math.max(4, SAKURA_TREE.canopyLayers - 2)
+    : SAKURA_TREE.canopyLayers;
+  const canopyRadius = matrix.size * SAKURA_TREE.canopyRadiusFactor;
+
+  for (let row = 0; row < matrix.size; row += 1) {
+    for (let col = 0; col < matrix.size; col += 1) {
+      const kind = classifySakuraTile(
+        row,
+        col,
+        matrix.size,
+        matrix.dark[row][col],
+      );
+      if (kind === "trunk") {
+        for (let layer = 1; layer < trunkLayers; layer += 1) {
+          stacks.push({
+            row,
+            col,
+            layer,
+            kind: "trunk",
+            offsetX: (rng() - 0.5) * 0.16,
+            offsetZ: (rng() - 0.5) * 0.16,
+            scale: Math.max(0.55, 1 - layer * 0.045),
+          });
+        }
+        continue;
+      }
+      if (kind !== "canopy") continue;
+      const t = 1 - moduleDistanceFromCenter(row, col, matrix.size) / canopyRadius;
+      const layersHere = Math.max(
+        2,
+        Math.round(canopyLayers * (0.28 + 0.72 * t * t)),
+      );
+      const dome = Math.floor(t * 2.4);
+      // Dome: low next to the trunk, higher toward the edge, so the canopy
+      // grows out of the stacked bark instead of sitting on a flat shelf.
+      const start = Math.max(2, Math.round(trunkLayers * (0.4 + 0.45 * (1 - t))));
+      for (let layer = 0; layer < layersHere; layer += 1) {
+        stacks.push({
+          row,
+          col,
+          layer: start + layer + dome,
+          kind: "canopy",
+          offsetX: (rng() - 0.5) * 0.28,
+          offsetZ: (rng() - 0.5) * 0.28,
+          scale: 0.78 + rng() * 0.28,
+        });
+      }
+    }
+  }
+  return stacks;
 }
 
 export function hexToRgb(hex: string): [number, number, number] {
