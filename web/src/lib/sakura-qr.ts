@@ -97,8 +97,8 @@ export function sakuraFlattenStages(amount: number): {
   return {
     canopy: smooth(0, 0.55),
     trunk: smooth(0.1, 0.82),
-    camera: smooth(0.08, 1),
-    tiles: smooth(0.2, 1),
+    camera: smooth(0.12, 1),
+    tiles: smooth(0.05, 0.72),
   };
 }
 

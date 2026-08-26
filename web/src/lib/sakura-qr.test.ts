@@ -73,7 +73,7 @@ test("flatten pours the canopy in before the trunk and the overhead camera", () 
   assert.equal(rest.tiles, 0);
   const early = sakuraFlattenStages(0.28);
   assert.ok(early.canopy > early.trunk);
-  assert.ok(early.trunk > early.tiles);
+  assert.ok(early.tiles > early.camera);
   const done = sakuraFlattenStages(1);
   assert.equal(done.canopy, 1);
   assert.equal(done.trunk, 1);

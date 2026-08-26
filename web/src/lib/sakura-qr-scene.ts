@@ -635,7 +635,9 @@ export async function mountSakuraQrScene(
       dummy.quaternion.identity();
       dummy.updateMatrix();
       tileMesh.setMatrixAt(tile.index, dummy.matrix);
-      mix.copy(tile.color).lerp(scan ? tile.scanColor : tile.mergeColor, amount);
+      const colorT =
+        tile.kind === "trunk" ? Math.min(1, amount * 1.35) : amount;
+      mix.copy(tile.color).lerp(scan ? tile.scanColor : tile.mergeColor, colorT);
       tileMesh.setColorAt(tile.index, mix);
     }
     tileMesh.instanceMatrix.needsUpdate = true;
@@ -1013,7 +1015,7 @@ export async function mountSakuraQrScene(
       );
       rootMesh.position.y = -stages.trunk * 0.4;
       rootMesh.visible = stages.trunk < 0.62;
-      tree.visible = stages.canopy < 0.98 || stages.trunk < 0.78;
+      tree.visible = stages.canopy < 0.9 && stages.trunk < 0.58;
     }
     shadow.scale.setScalar(Math.max(0.2, 1 - stages.trunk));
     shadow.visible = !scan && stages.trunk < 0.96;
