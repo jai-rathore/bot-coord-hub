@@ -865,11 +865,10 @@ export async function mountSakuraQrScene(
       scale: 1.15 + rng() * 0.4,
     };
     spawnFromBranch(petal);
-    petal.y -= rng() * Math.max(1.2, petal.y * 0.45);
     return petal;
   });
   const fallingMat = spriteMaterial(petalTex);
-  fallingMat.alphaTest = 0;
+  fallingMat.alphaTest = 0.08;
   fallingMat.depthTest = false;
   fallingMat.depthWrite = false;
   const fallingMesh = new THREE.InstancedMesh(
@@ -973,13 +972,9 @@ export async function mountSakuraQrScene(
       petal.ry += delta * petal.spin * live;
       petal.rz += delta * 2.4 * live;
       dummy.position.set(petal.x, petal.y, petal.z);
-      euler.set(petal.rx, petal.ry, petal.rz);
-      dummy.quaternion.setFromEuler(euler);
-      dummy.scale.set(
-        petal.scale * Math.max(0.55, fade) * Math.max(0.4, live),
-        petal.scale * fade * Math.max(0.4, live),
-        1,
-      );
+      dummy.quaternion.copy(camera.quaternion);
+      dummy.rotateZ(petal.spin + time * 1.4 * live);
+      dummy.scale.setScalar(petal.scale * fade * Math.max(0.45, live));
       dummy.updateMatrix();
       fallingMesh.setMatrixAt(i, dummy.matrix);
     }
