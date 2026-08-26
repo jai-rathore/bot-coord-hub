@@ -256,15 +256,15 @@ function sampleCanopy(
   }
 
   for (let i = 0; i < counts.petals; i += 1) {
-    const p = place(i % 5 === 0 ? along : ends, 0.2 + rng() * 0.28);
+    const p = place(i % 5 === 0 ? along : ends, 0.1 + rng() * 0.18);
     addCard(petals, p.x, p.y, p.z, rng, varyColor(petalColors[i % petalColors.length], 0.07, rng));
   }
   for (let i = 0; i < counts.flowers; i += 1) {
-    const p = place(ends, 0.1 + rng() * 0.16);
+    const p = place(ends, 0.06 + rng() * 0.12);
     addCard(flowers, p.x, p.y, p.z, rng, varyColor(petalColors[(i + 2) % petalColors.length], 0.05, rng));
   }
   for (let i = 0; i < counts.leaves; i += 1) {
-    const p = place(along, 0.08 + rng() * 0.14);
+    const p = place(along, 0.05 + rng() * 0.1);
     addCard(leaves, p.x, p.y, p.z, rng, varyColor(leafColors[i % leafColors.length], 0.08, rng));
   }
   return { petals, flowers, leaves };
@@ -287,8 +287,8 @@ function buildTrunk(
   const dummy = new THREE.Object3D();
   const root = new THREE.Group();
   const tipNodes: THREE.Object3D[] = [];
-  const trunkRadius = Math.max(0.95, grid * 0.058);
-  const trunkHeight = grid * 0.22;
+  const trunkRadius = Math.max(0.88, grid * 0.052);
+  const trunkHeight = grid * 0.155;
   const radial = high ? 32 : 12;
   const branchRadial = high ? 16 : 8;
 
@@ -322,25 +322,33 @@ function buildTrunk(
     const tip = new THREE.Group();
     tip.position.y = length;
     parent.add(tip);
-    if (depth >= 7 || length < 0.42) {
+    if (depth >= 8 || length < 0.3) {
       tipNodes.push(tip);
       return;
     }
-    const count = depth < 2 ? 5 : depth < 4 ? 4 : rng() > 0.15 ? 3 : 2;
+    const count = depth < 2 ? 6 : depth < 4 ? 5 : rng() > 0.12 ? 4 : 3;
     for (let i = 0; i < count; i += 1) {
       const child = new THREE.Group();
-      child.rotation.z = (i - (count - 1) / 2) * (0.42 + depth * 0.1) + (rng() - 0.5) * 0.12;
+      child.rotation.z = (i - (count - 1) / 2) * (0.48 + depth * 0.08) + (rng() - 0.5) * 0.1;
       child.rotation.y = rng() * Math.PI * 2;
-      child.rotation.x = depth === 0 ? 0.62 + rng() * 0.32 : 0.5 + rng() * 0.65;
+      child.rotation.x = 0.55 + rng() * 0.62;
       tip.add(child);
-      grow(child, length * (0.68 + rng() * 0.14), branchRadius * 0.74, depth + 1);
+      grow(child, length * (0.64 + rng() * 0.14), branchRadius * 0.76, depth + 1);
     }
   }
 
   const crown = new THREE.Group();
   crown.position.y = crownY;
   root.add(crown);
-  grow(crown, trunkHeight * 0.3, trunkRadius * 0.5, 0);
+  const firstCount = 6;
+  for (let i = 0; i < firstCount; i += 1) {
+    const child = new THREE.Group();
+    child.rotation.z = (i - (firstCount - 1) / 2) * 0.4 + (rng() - 0.5) * 0.08;
+    child.rotation.y = (i / firstCount) * Math.PI * 2 + (rng() - 0.5) * 0.18;
+    child.rotation.x = 0.78 + rng() * 0.32;
+    crown.add(child);
+    grow(child, trunkHeight * 0.46, trunkRadius * 0.46, 1);
+  }
   root.updateMatrixWorld(true);
   const tips = tipNodes.map((node) =>
     new THREE.Vector3().setFromMatrixPosition(node.matrixWorld),
@@ -752,8 +760,8 @@ export async function mountSakuraQrScene(
   ];
   const leafColors = [rgbColor(SAKURA_QR.matcha), rgbColor(SAKURA_QR.matchaSoft), rgbColor("#5c8f68")];
   const counts = compact
-    ? { petals: 1600, flowers: 400, leaves: 280 }
-    : { petals: 3400, flowers: 740, leaves: 520 };
+    ? { petals: 2200, flowers: 560, leaves: 380 }
+    : { petals: 4300, flowers: 960, leaves: 680 };
   const crownSites = sites.filter((site) => site.y > treeHeight * 0.08);
   const canopy = sampleCanopy(
     rng,
@@ -767,9 +775,9 @@ export async function mountSakuraQrScene(
     card.y -= crownY;
   }
 
-  const petalTex = makeTexture(paintPetal, high ? 1024 : 128);
-  const flowerTex = makeTexture(paintFlower, high ? 1024 : 128);
-  const leafTex = makeTexture(paintLeaf, high ? 1024 : 128);
+  const petalTex = makeTexture(paintPetal, high ? 1024 : 512);
+  const flowerTex = makeTexture(paintFlower, high ? 1024 : 512);
+  const leafTex = makeTexture(paintLeaf, high ? 1024 : 256);
   const anisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy());
   for (const tex of [bladeTex, petalTex, flowerTex, leafTex]) {
     tex.anisotropy = anisotropy;
@@ -802,6 +810,7 @@ export async function mountSakuraQrScene(
   tree.add(crown);
   scene.add(tuftMesh);
   tree.scale.set(treeScale, treeScale, treeScale);
+  tree.position.y = -0.28;
   scene.add(tree);
   tree.updateMatrixWorld(true);
 
@@ -841,44 +850,51 @@ export async function mountSakuraQrScene(
     spawnScratch.copy(source);
     tree.localToWorld(spawnScratch);
     const theta = rng() * Math.PI * 2;
-    const r = 1.5 + rng() * 2.4;
+    const r = 1.4 + rng() * 3.4;
     petal.x = Math.cos(theta) * r;
     petal.z = Math.sin(theta) * r;
-    petal.y = Math.max(2.4, spawnScratch.y * 0.48) + rng() * 1.1;
+    petal.y = Math.max(3.4, spawnScratch.y * 0.58) + rng() * 1.4;
     petal.bornY = petal.y;
   }
 
-  const petalCount = reduced ? 0 : compact ? 16 : 26;
+  const petalCount = reduced ? 0 : compact ? 28 : 38;
   const petals: Petal[] = Array.from({ length: petalCount }, () => {
     const petal: Petal = {
       x: 0,
       y: 0,
       z: 0,
       bornY: 0,
-      speed: 0.2 + rng() * 0.22,
-      drift: 0.2 + rng() * 0.26,
+      speed: 0.11 + rng() * 0.12,
+      drift: 0.16 + rng() * 0.2,
       rx: rng() * Math.PI,
       ry: rng() * Math.PI,
       rz: rng() * Math.PI,
-      spin: (rng() - 0.5) * 2.4,
+      spin: (rng() - 0.5) * 1.8,
       phase: rng() * Math.PI * 2,
-      scale: 1.15 + rng() * 0.4,
+      scale: 1.28 + rng() * 0.32,
     };
     spawnFromBranch(petal);
     return petal;
   });
   const fallingMat = spriteMaterial(petalTex);
-  fallingMat.alphaTest = 0.08;
+  fallingMat.alphaTest = 0;
   fallingMat.depthTest = false;
   fallingMat.depthWrite = false;
   const fallingMesh = new THREE.InstancedMesh(
-    new THREE.PlaneGeometry(1.55, 1.85),
+    new THREE.PlaneGeometry(3.4, 4.0),
     fallingMat,
     Math.max(1, petalCount),
   );
-  fallingMesh.renderOrder = 4;
+  fallingMesh.frustumCulled = false;
+  fallingMesh.renderOrder = 8;
+  const fallingPinks = [
+    rgbColor("#ff9eb4"),
+    rgbColor("#f27894"),
+    rgbColor(SAKURA_QR.blossomDeep),
+    rgbColor("#ffc2d0"),
+  ];
   petals.forEach((_, i) =>
-    fallingMesh.setColorAt(i, varyColor(petalColors[i % petalColors.length], 0.05, rng)),
+    fallingMesh.setColorAt(i, varyColor(fallingPinks[i % fallingPinks.length], 0.04, rng)),
   );
   if (fallingMesh.instanceColor) fallingMesh.instanceColor.needsUpdate = true;
   fallingMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -899,7 +915,7 @@ export async function mountSakuraQrScene(
     const aspect = viewWidth / Math.max(1, viewHeight);
     const fitX = THREE.MathUtils.lerp(n * 0.64 + 2.4, spanBase + 0.45, amount);
     const fitY = THREE.MathUtils.lerp(
-      Math.max(n * 0.55, worldTree * 1.05) + (compact ? 4.4 : 7.2),
+      Math.max(n * 0.5, worldTree * 1.02) + (compact ? 2.8 : 4.6),
       spanBase + 0.55,
       amount,
     );
