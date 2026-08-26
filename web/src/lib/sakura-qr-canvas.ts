@@ -4,6 +4,7 @@ import {
   mulberry32,
   planSakuraStacks,
   sakuraDisplayScale,
+  sakuraFlattenStages,
   SAKURA_QR,
   type SakuraQrMatrix,
   type SakuraQrMount,
@@ -262,20 +263,25 @@ function paint(
     }
   }
 
+  const stages = sakuraFlattenStages(reveal);
   const treeX = originX;
   const treeY = originY + ((n * th) / 2) * 0.38;
   const treeSize = n * cell * 0.52;
-  if (art > 0.04) {
-    const sway = reducedMotion ? 0 : Math.sin(timeMs * 0.0018) * 0.12 * art;
+  if (art > 0.04 && stages.trunk < 0.98) {
+    const sway = reducedMotion ? 0 : Math.sin(timeMs * 0.0018) * 0.12 * (1 - stages.canopy);
     ctx.save();
+    ctx.globalAlpha *= Math.max(0, 1 - stages.canopy * 0.85);
     ctx.translate(treeX, treeY + treeSize * 0.22);
-    ctx.scale(1, Math.max(0.06, art));
+    ctx.scale(
+      Math.max(0.12, 1 - stages.canopy * 0.28),
+      Math.max(0.05, 1 - stages.trunk),
+    );
     ctx.translate(-treeX, -(treeY + treeSize * 0.22));
-    drawTree(ctx, treeX, treeY, treeSize, rng, art, sway);
+    drawTree(ctx, treeX, treeY, treeSize, rng, 1 - stages.canopy * 0.35, sway);
     ctx.restore();
   }
 
-  if (!reducedMotion && art > 0.08) {
+  if (!reducedMotion && stages.canopy < 0.72) {
     for (let i = 0; i < 12; i += 1) {
       const seed = mulberry32(matrix.seed + i * 97)();
       const span = treeSize * 0.72;
@@ -284,8 +290,8 @@ function paint(
       const fade = progress < 0.58 ? 1 : Math.max(0, 1 - (progress - 0.58) / 0.42);
       const x = treeX + (seed - 0.5) * treeSize * 0.34 + Math.sin(timeMs * 0.0012 + i) * 12;
       const y = treeY - treeSize * 0.18 + fall;
-      ctx.globalAlpha = 0.95 * art * fade;
-      drawBlossom(ctx, x, y, 8 + seed * 6, timeMs * 0.002 + i, false);
+      ctx.globalAlpha = 0.9 * (1 - stages.canopy) * fade;
+      drawBlossom(ctx, x, y, 3.4 + seed * 2.4, timeMs * 0.002 + i, false);
       ctx.globalAlpha = 1;
     }
   }
