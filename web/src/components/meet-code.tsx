@@ -85,8 +85,8 @@ export function MeetCode({
       aria-modal="true"
       aria-label="Your HoneyMatcha code"
       /* Opaque, forced-light, and above everything: the camera pointed at this
-         screen must see a white field and nothing else. */
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 overflow-y-auto bg-white p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+         screen must see a cream field and nothing else. */
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5 overflow-y-auto bg-[#f7f3ea] p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]"
     >
       <button
         type="button"
@@ -119,9 +119,9 @@ export function MeetCode({
       <ShareQr
         url={meetUrl}
         alt={`QR code to meet ${displayName} on HoneyMatcha`}
-        size={320}
+        size={420}
         showDownload={false}
-        className="max-w-[min(20rem,78vw)]"
+        className="w-full max-w-[min(26rem,90vw)]"
       />
 
       <p className="font-mono text-sm text-[#2f694a]">

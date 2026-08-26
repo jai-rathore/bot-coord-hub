@@ -1,0 +1,40 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  contrastRatio,
+  encodeSakuraQr,
+  isFinderModule,
+  relativeLuminance,
+  SAKURA_QR,
+} from "./sakura-qr";
+
+test("meet links encode as a high-redundancy matrix with intact finders", () => {
+  const matrix = encodeSakuraQr("https://honeymatcha.io/anubha?meet=1");
+  assert.ok(matrix.version >= 2 && matrix.version <= 8);
+  assert.equal(matrix.size, matrix.version * 4 + 17);
+  assert.equal(matrix.dark[0][0], true);
+  assert.equal(matrix.dark[0][matrix.size - 1], true);
+  assert.equal(matrix.dark[matrix.size - 1][0], true);
+  assert.equal(matrix.reserved[0][0], true);
+  assert.equal(isFinderModule(0, 0, matrix.size), true);
+  assert.equal(isFinderModule(6, 6, matrix.size), true);
+  assert.equal(isFinderModule(8, 8, matrix.size), false);
+});
+
+test("module colors stay scanner-dark and scanner-light", () => {
+  assert.ok(relativeLuminance(SAKURA_QR.dark) < 0.12);
+  assert.ok(relativeLuminance(SAKURA_QR.darkDeep) < relativeLuminance(SAKURA_QR.dark));
+  assert.ok(relativeLuminance(SAKURA_QR.darkBlossom) < 0.12);
+  assert.ok(relativeLuminance(SAKURA_QR.light) > 0.85);
+  assert.ok(contrastRatio(SAKURA_QR.dark, SAKURA_QR.light) > 7);
+  assert.ok(relativeLuminance(SAKURA_QR.blossomWhite) > 0.85);
+  assert.ok(contrastRatio(SAKURA_QR.dark, SAKURA_QR.light) > 7);
+  assert.ok(contrastRatio(SAKURA_QR.darkBlossom, SAKURA_QR.blossomWhite) > 7);
+});
+
+test("the same url always grows the same tree", () => {
+  const first = encodeSakuraQr("https://honeymatcha.io/tea");
+  const second = encodeSakuraQr("https://honeymatcha.io/tea");
+  assert.equal(first.seed, second.seed);
+  assert.deepEqual(first.dark, second.dark);
+});

@@ -472,7 +472,7 @@ export function EventClient({
                     url={shareUrl}
                     alt={`QR code for ${board.event.title}`}
                     downloadName={`honeymatcha-${slug}.png`}
-                    size={176}
+                    size={200}
                   />
                   <p className="max-w-xs text-xs text-muted">
                     Anyone can scan this to see the event. Responding still

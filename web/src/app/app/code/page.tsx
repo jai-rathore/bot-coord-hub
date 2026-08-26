@@ -54,7 +54,7 @@ export default async function MyCodePage() {
             url={meetUrl}
             alt={`QR code for ${displayName}`}
             downloadName={`honeymatcha-${profile.handle}.png`}
-            size={200}
+            size={280}
           />
           <div className="min-w-0 flex-1 space-y-4">
             <div>

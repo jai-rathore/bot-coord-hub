@@ -52,6 +52,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "redis": "^6.2.1",
+    "three": "^0.185.1",
     "tsx": "^4.23.12"
   },
   "devDependencies": {

@@ -14,7 +14,7 @@ export function PublicInviteQr({
       url={inviteUrl}
       alt={`QR code for ${label || "HoneyMatcha public invitation"}`}
       downloadName="honeymatcha-public-invite.png"
-      size={192}
+      size={220}
     />
   );
 }
