@@ -7,6 +7,7 @@ import {
   isFinderModule,
   planSakuraStacks,
   relativeLuminance,
+  sakuraDisplayScale,
   SAKURA_QR,
 } from "./sakura-qr";
 
@@ -43,18 +44,13 @@ test("dark modules become trunk, canopy, or grass the way tree.icqr.com does", (
   assert.equal(classifySakuraTile(0, 0, matrix.size, true), "finder");
   assert.equal(classifySakuraTile(8, 8, matrix.size, false), "plot");
   const kinds = new Set<string>();
-  let trunkStacks = 0;
-  let canopyStacks = 0;
+  const stacks = planSakuraStacks(matrix);
   for (let row = 0; row < matrix.size; row += 1) {
     for (let col = 0; col < matrix.size; col += 1) {
       kinds.add(
         classifySakuraTile(row, col, matrix.size, matrix.dark[row][col]),
       );
     }
-  }
-  for (const stack of planSakuraStacks(matrix)) {
-    if (stack.kind === "trunk") trunkStacks += 1;
-    else canopyStacks += 1;
   }
   assert.ok(kinds.has("finder"));
   assert.ok(kinds.has("plot"));
@@ -64,9 +60,15 @@ test("dark modules become trunk, canopy, or grass the way tree.icqr.com does", (
       classifySakuraTile(mid, mid, matrix.size, false) === "plot",
     true,
   );
-  assert.ok(canopyStacks > trunkStacks);
-  assert.ok(trunkStacks + canopyStacks > matrix.size);
-  assert.deepEqual(planSakuraStacks(matrix), planSakuraStacks(matrix));
+  assert.deepEqual(stacks, []);
+  assert.deepEqual(planSakuraStacks(matrix, true), []);
+});
+
+test("display scale stays finite and supersamples the full-size garden", () => {
+  assert.ok(Number.isFinite(sakuraDisplayScale(true)));
+  assert.ok(sakuraDisplayScale(true) >= sakuraDisplayScale(false));
+  assert.ok(sakuraDisplayScale(true) >= 1);
+  assert.ok(sakuraDisplayScale(true) <= 6);
 });
 
 test("the same url always grows the same tree", () => {

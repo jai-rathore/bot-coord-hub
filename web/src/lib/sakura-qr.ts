@@ -35,8 +35,6 @@ export const SAKURA_QR = {
 export const SAKURA_TREE = {
   trunkRadius: 2.6,
   canopyRadiusFactor: 0.46,
-  trunkLayers: 10,
-  canopyLayers: 8,
 } as const;
 
 export type SakuraTileKind = "finder" | "trunk" | "canopy" | "grass" | "plot";
@@ -72,6 +70,21 @@ export type SakuraQrMount = {
   capturePng: (mode?: "view" | "scan") => string;
   dispose: () => void;
 };
+
+/**
+ * Backing resolution for the garden canvas.
+ *
+ * A phone pinch-zoom does not change `devicePixelRatio`; it just stretches
+ * the existing bitmap. Multiply by `visualViewport.scale` and a little extra
+ * supersample so a close look stays sharp.
+ */
+export function sakuraDisplayScale(high: boolean): number {
+  const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
+  const pinch =
+    typeof window === "undefined" ? 1 : window.visualViewport?.scale ?? 1;
+  const extra = high ? 1.5 : 1;
+  return Math.min(dpr * Math.max(1, pinch) * extra, high ? 6 : 3);
+}
 
 export function hashSeed(input: string): number {
   let hash = 2166136261;
@@ -157,65 +170,13 @@ export function classifySakuraTile(
 }
 
 export function planSakuraStacks(
-  matrix: SakuraQrMatrix,
+  _matrix: SakuraQrMatrix,
   compact = false,
 ): SakuraStack[] {
-  const rng = mulberry32(matrix.seed ^ 0x5a7a);
-  const stacks: SakuraStack[] = [];
-  const trunkLayers = compact
-    ? Math.max(6, SAKURA_TREE.trunkLayers - 3)
-    : SAKURA_TREE.trunkLayers;
-  const canopyLayers = compact
-    ? Math.max(4, SAKURA_TREE.canopyLayers - 2)
-    : SAKURA_TREE.canopyLayers;
-  const canopyRadius = matrix.size * SAKURA_TREE.canopyRadiusFactor;
-
-  for (let row = 0; row < matrix.size; row += 1) {
-    for (let col = 0; col < matrix.size; col += 1) {
-      const kind = classifySakuraTile(
-        row,
-        col,
-        matrix.size,
-        matrix.dark[row][col],
-      );
-      if (kind === "trunk") {
-        for (let layer = 1; layer < trunkLayers; layer += 1) {
-          stacks.push({
-            row,
-            col,
-            layer,
-            kind: "trunk",
-            offsetX: (rng() - 0.5) * 0.16,
-            offsetZ: (rng() - 0.5) * 0.16,
-            scale: Math.max(0.55, 1 - layer * 0.045),
-          });
-        }
-        continue;
-      }
-      if (kind !== "canopy") continue;
-      const t = 1 - moduleDistanceFromCenter(row, col, matrix.size) / canopyRadius;
-      const layersHere = Math.max(
-        2,
-        Math.round(canopyLayers * (0.28 + 0.72 * t * t)),
-      );
-      const dome = Math.floor(t * 2.4);
-      // Dome: low next to the trunk, higher toward the edge, so the canopy
-      // grows out of the stacked bark instead of sitting on a flat shelf.
-      const start = Math.max(2, Math.round(trunkLayers * (0.4 + 0.45 * (1 - t))));
-      for (let layer = 0; layer < layersHere; layer += 1) {
-        stacks.push({
-          row,
-          col,
-          layer: start + layer + dome,
-          kind: "canopy",
-          offsetX: (rng() - 0.5) * 0.28,
-          offsetZ: (rng() - 0.5) * 0.28,
-          scale: 0.78 + rng() * 0.28,
-        });
-      }
-    }
-  }
-  return stacks;
+  // Voxel stacks used to fill the air between the QR plot and the
+  // canopy. The tree now sits on the matrix with a smooth trunk.
+  void compact;
+  return [];
 }
 
 export function hexToRgb(hex: string): [number, number, number] {
