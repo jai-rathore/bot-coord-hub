@@ -61,13 +61,11 @@ function NavLink({
 export function AppNav({
   attentionCount = 0,
   eventsUnreadCount = 0,
-  discoveryEnabled = false,
   agentConnected = false,
   handle = null,
 }: {
   attentionCount?: number;
   eventsUnreadCount?: number;
-  discoveryEnabled?: boolean;
   agentConnected?: boolean;
   handle?: string | null;
 }) {
@@ -96,12 +94,6 @@ export function AppNav({
     },
   ];
 
-  if (discoveryEnabled) {
-    items.push({
-      item: { href: "/app/discovery", label: "Discover", hint: "Find the right people" },
-      icon: "discovery",
-    });
-  }
   if (handle) {
     items.push({
       item: { href: "/app/code", label: "Share", hint: "Your meeting code and public page" },
@@ -172,7 +164,6 @@ export function AppNav({
       <MobileTabBar
         attentionCount={attentionCount}
         eventsUnreadCount={eventsUnreadCount}
-        discoveryEnabled={discoveryEnabled}
         agentConnected={agentConnected}
         handle={handle}
       />

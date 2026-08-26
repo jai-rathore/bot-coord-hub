@@ -5,7 +5,6 @@ import { currentUser } from "@clerk/nextjs/server";
 import { BrandAtmosphere } from "@/components/brand-atmosphere";
 import { CapabilityOverview } from "@/components/capability-overview";
 import { HomeHero } from "@/components/home-hero";
-import { RecruitingAlignmentSection } from "@/components/recruiting-alignment-section";
 import { SignedInHome } from "@/components/signed-in-home";
 import type { SageProactiveUpdate } from "@/components/sage-proactive-updates";
 import { SiteHeader } from "@/components/site-header";
@@ -14,7 +13,6 @@ import { getHomeStatus } from "@/lib/home-status";
 import { sageNameFor } from "@/lib/sage";
 import { isNextControlFlowError } from "@/lib/next-errors";
 import { ensureCurrentUser } from "@/lib/users";
-import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import {
   eventsForDashboard,
@@ -150,7 +148,6 @@ export default async function HomePage() {
         events={home.events}
         unreadEventCount={home.unreadEventCount}
         eventsEnabled={home.eventsEnabled}
-        discoveryEnabled={discoveryFeatureEnabled()}
         agentConnected={home.agentConnected}
         calendarConnected={home.calendarConnected}
         attentionCount={home.attentionCount}
@@ -169,11 +166,7 @@ export default async function HomePage() {
       </div>
 
       <main className="mx-auto w-full max-w-[72rem] flex-1 py-14 sm:py-20">
-        <RecruitingAlignmentSection />
-
-        <div className="mt-16 sm:mt-24">
         <CapabilityOverview />
-        </div>
 
         <section
           aria-labelledby="how-title"

@@ -36,13 +36,11 @@ function isActive(pathname: string, item: { href: string; exact?: boolean }) {
 export function MobileTabBar({
   attentionCount,
   eventsUnreadCount,
-  discoveryEnabled,
   agentConnected,
   handle,
 }: {
   attentionCount: number;
   eventsUnreadCount: number;
-  discoveryEnabled: boolean;
   agentConnected: boolean;
   handle: string | null;
 }) {
@@ -70,13 +68,6 @@ export function MobileTabBar({
     label: "Recruiting",
     glyph: "briefcase",
   });
-  if (discoveryEnabled) {
-    overflow.push({
-      href: "/app/discovery",
-      label: "Discover",
-      glyph: "discovery",
-    });
-  }
   if (attentionCount > 0 || agentConnected) {
     overflow.push({
       href: "/app/attention",

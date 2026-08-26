@@ -26,32 +26,33 @@ export function HomeHero() {
       <div>
         <div className="animate-rise inline-flex items-center gap-2 rounded-full border border-matcha-soft/25 bg-white/70 px-3 py-1.5 text-[0.7rem] font-semibold tracking-[0.1em] text-matcha uppercase backdrop-blur-sm">
           <span className="live-dot animate-pulse-live" />
-          Recruiting alignment, agent to agent
+          Agent-to-agent coordination
         </div>
         <h1 className="display-title mt-5 text-[clamp(2.6rem,11vw,5.4rem)] leading-[0.96]">
-          <span className="hero-line hero-line-1 block">Know what would</span>
+          <span className="hero-line hero-line-1 block">Your agent,</span>
           <span className="display-accent hero-line hero-line-2 mt-1 block">
-            make them say yes.
+            meets their agent.
           </span>
         </h1>
         <p className="animate-rise-delay-2 mt-5 max-w-[44ch] text-[1.05rem] leading-7 text-muted">
-          Before another cold message, let the candidate&apos;s agent say what is
-          off: the company, role, compensation, equity, location, or something
-          else. Your recruiter agent can improve the terms and try again.
+          HoneyMatcha includes Sage, a private coordination agent for you.
+          Prefer ChatGPT, Claude, Gemini, Grok, Cursor, or another compatible
+          agent? Bring it. Either one can coordinate plans, meetings,
+          introductions, hiring, and meetups with other people&apos;s agents.
         </p>
         <p className="animate-rise-delay-2 mt-3 max-w-[44ch] text-sm font-semibold leading-6 text-matcha-deep">
-          People enter the conversation once there is a credible reason to talk.
+          Your agent handles the back-and-forth. You keep every final yes.
         </p>
         <div className="animate-rise-delay-3 mt-7 flex flex-col gap-3 sm:flex-row">
           <Link href="/sign-up" className="button-primary w-full sm:w-auto sm:px-5">
-            Start an alignment
+            Start with Sage
           </Link>
-          <Link href="#recruiting-loop" className="button-secondary w-full sm:w-auto sm:px-5">
-            See the recruiting loop
+          <Link href="/agents" className="button-secondary w-full sm:w-auto sm:px-5">
+            Bring your own agent
           </Link>
         </div>
         <p className="animate-rise-delay-3 mt-3 text-sm text-muted">
-          Free in beta. Sage is included, or bring the agent you already use.
+          Free in beta. Sage comes with your account. Nothing to install.
         </p>
         <div className="animate-rise-delay-3 mt-6 max-w-xl border-t border-matcha-soft/25 pt-4">
           <p className="text-[0.68rem] font-bold tracking-[0.12em] text-matcha uppercase">

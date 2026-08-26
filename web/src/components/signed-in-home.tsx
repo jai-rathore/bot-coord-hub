@@ -17,7 +17,6 @@ export function SignedInHome({
   events,
   unreadEventCount,
   eventsEnabled,
-  discoveryEnabled,
   agentConnected,
   calendarConnected,
   attentionCount,
@@ -30,7 +29,6 @@ export function SignedInHome({
   events: EventWithUpdates[];
   unreadEventCount: number;
   eventsEnabled: boolean;
-  discoveryEnabled: boolean;
   agentConnected: boolean;
   calendarConnected: boolean;
   attentionCount: number;
@@ -40,45 +38,42 @@ export function SignedInHome({
   const displayName = firstName ?? "there";
   const activeAgent = agentConnected ? "your connected agent" : sageName;
   const journeys = [
+    eventsEnabled
+      ? {
+          href: "/app/events/new",
+          title: "Plan an event",
+          body: "Pick a time with one or more people.",
+          detail: "Dinners, trips, team days",
+          glyph: "calendar" as const,
+        }
+      : {
+          title: "Plan an event",
+          body: "Pick a time with one or more people.",
+          detail: "Dinners, trips, team days",
+          glyph: "calendar" as const,
+          comingSoon: true,
+        },
     {
       href: "/app/recruiting",
-      title: "Align a recruiting conversation",
-      body: "Paste a role, let the agents surface fit gaps, and bring people in only when a call is credible.",
-      detail: "Company, role, compensation, equity",
+      title: "Recruiting",
+      body: "Align the role and candidate before the first call.",
+      detail: "Role, compensation, equity",
       glyph: "briefcase" as const,
     },
-    ...(eventsEnabled
-      ? [
-          {
-            href: "/app/events/new",
-            title: "Plan with a group",
-            body: "Share one link, collect everyone's availability, and settle the plan.",
-            detail: "Dinners, trips, team days",
-            glyph: "calendar" as const,
-          },
-        ]
-      : []),
     {
       href: "/app/agent",
       title: "Schedule one-on-one",
-      body:
-        "Ask " +
-        activeAgent +
-        " to coordinate calendars with another person or agent.",
+      body: "Let agents compare calendars and bring back a time.",
       detail: "Coffee, calls, introductions",
       glyph: "handshake" as const,
     },
-    ...(discoveryEnabled
-      ? [
-          {
-            href: "/app/discovery",
-            title: "Find the right people",
-            body: "Set private criteria, let Sage search, and reveal identities only after mutual interest.",
-            detail: "Dating, hiring, local meetups",
-            glyph: "search" as const,
-          },
-        ]
-      : []),
+    {
+      title: "Dating & local meetups",
+      body: "Private, approval-first discovery.",
+      detail: "Dating · nearby connections",
+      glyph: "search" as const,
+      comingSoon: true,
+    },
   ];
 
   return (
@@ -86,7 +81,6 @@ export function SignedInHome({
       <AppNav
         attentionCount={attentionCount}
         eventsUnreadCount={unreadEventCount}
-        discoveryEnabled={discoveryEnabled}
         agentConnected={agentConnected}
         handle={handle}
       />
@@ -109,34 +103,60 @@ export function SignedInHome({
             <h2 id="start-here" className="text-sm font-semibold text-ink">
               Start here
             </h2>
-            <p className="text-xs text-muted">Every panel below opens a workflow.</p>
+            <p className="text-xs text-muted">Choose an outcome to begin.</p>
           </div>
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {journeys.map((journey) => (
-              <Link
-                key={journey.href}
-                href={journey.href}
-                className="action-tile group flex min-h-[13rem] flex-col p-5 no-underline"
-              >
-                <span className="flex items-start justify-between gap-3">
-                  <span className="text-matcha">
-                    <CapabilityMark glyph={journey.glyph} />
+            {journeys.map((journey) => {
+              const tile = (
+                <>
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="text-matcha">
+                      <CapabilityMark glyph={journey.glyph} />
+                    </span>
+                    <span
+                      className={`text-xs font-semibold ${
+                        journey.comingSoon
+                          ? "rounded-full border border-line bg-white px-2.5 py-1 text-muted"
+                          : "text-matcha-deep transition-transform group-hover:translate-x-1"
+                      }`}
+                    >
+                      {journey.comingSoon ? (
+                        "Coming soon"
+                      ) : (
+                        <>
+                          Open <span aria-hidden="true">→</span>
+                        </>
+                      )}
+                    </span>
                   </span>
-                  <span className="text-sm font-semibold text-matcha-deep transition-transform group-hover:translate-x-1">
-                    Open <span aria-hidden="true">→</span>
+                  <span className="mt-6 block font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-[-0.03em] text-matcha-deep">
+                    {journey.title}
                   </span>
-                </span>
-                <span className="mt-6 block font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-[-0.03em] text-matcha-deep">
-                  {journey.title}
-                </span>
-                <span className="mt-2 block text-sm leading-6 text-muted">
-                  {journey.body}
-                </span>
-                <span className="mt-auto block pt-5 text-xs font-semibold tracking-[0.06em] text-matcha uppercase">
-                  {journey.detail}
-                </span>
-              </Link>
-            ))}
+                  <span className="mt-2 block text-sm leading-6 text-muted">
+                    {journey.body}
+                  </span>
+                  <span className="mt-auto block pt-5 text-xs font-semibold tracking-[0.06em] text-matcha uppercase">
+                    {journey.detail}
+                  </span>
+                </>
+              );
+              return journey.href && !journey.comingSoon ? (
+                <Link
+                  key={journey.title}
+                  href={journey.href}
+                  className="action-tile group flex min-h-[13rem] flex-col p-5 no-underline"
+                >
+                  {tile}
+                </Link>
+              ) : (
+                <article
+                  key={journey.title}
+                  className="action-tile flex min-h-[13rem] flex-col border-dashed bg-white/40 p-5"
+                >
+                  {tile}
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -219,8 +239,8 @@ export function SignedInHome({
             {events.length === 0 ? (
               <div className="grid gap-2 py-6 sm:grid-cols-[1fr_auto] sm:items-center">
                 <p className="text-sm leading-6 text-muted">
-                  No active plans yet. Start with a group event when you need to
-                  gather availability from several people at once.
+                  No active plans yet. Start a plan when you need to gather
+                  availability from one or more people.
                 </p>
                 <Link
                   href="/app/events/new"

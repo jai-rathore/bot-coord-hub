@@ -7,7 +7,6 @@ import { isNextControlFlowError } from "@/lib/next-errors";
 import { getProfileForUser } from "@/lib/agent-profiles";
 import { ensureCurrentUser } from "@/lib/users";
 import { agentIsConnected } from "@/lib/home-status";
-import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import { listEventsWithUpdates } from "@/lib/events/updates";
 
@@ -88,7 +87,6 @@ export default async function AppLayout({
       <AppNav
         attentionCount={attentionCount}
         eventsUnreadCount={eventsUnreadCount}
-        discoveryEnabled={discoveryFeatureEnabled()}
         agentConnected={agentConnected}
         handle={handle}
       />

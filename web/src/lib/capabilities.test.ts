@@ -7,19 +7,22 @@ import {
   stateFor,
 } from "./capabilities";
 
-test("your own agent runs every capability", () => {
+test("your own agent runs every available capability", () => {
   for (const capability of CAPABILITIES) {
     assert.equal(
       stateFor(capability, "own"),
-      "ready",
-      `${capability.id} should be ready for a personal agent`,
+      capability.availability,
+      `${capability.id} should follow product availability`,
     );
   }
 });
 
 test("Sage runs only what it has learned", () => {
   for (const capability of CAPABILITIES) {
-    assert.equal(stateFor(capability, "sage"), capability.sage);
+    assert.equal(
+      stateFor(capability, "sage"),
+      capability.availability === "soon" ? "soon" : capability.sage,
+    );
   }
 });
 
@@ -51,7 +54,10 @@ test("feature flags hide capabilities a signed-in person cannot reach", () => {
 test("the unlock nudge counts only what an agent would actually add", () => {
   assert.equal(
     lockedCount(CAPABILITIES),
-    CAPABILITIES.filter((capability) => capability.sage === "soon").length,
+    CAPABILITIES.filter(
+      (capability) =>
+        capability.availability === "ready" && capability.sage === "soon",
+    ).length,
   );
   assert.equal(lockedCount([]), 0);
 
@@ -60,6 +66,9 @@ test("the unlock nudge counts only what an agent would actually add", () => {
   const eventsOnly = enabledCapabilities({ events: true, discovery: false });
   assert.equal(
     lockedCount(eventsOnly),
-    eventsOnly.filter((capability) => capability.sage === "soon").length,
+    eventsOnly.filter(
+      (capability) =>
+        capability.availability === "ready" && capability.sage === "soon",
+    ).length,
   );
 });

@@ -28,6 +28,8 @@ export type Capability = {
   title: string;
   /** What it does, in the words someone would use out loud. */
   line: string;
+  /** Whether HoneyMatcha exposes this workflow as a finished product today. */
+  availability: CapabilityState;
   /** Sage runs this one today, or is still learning it. */
   sage: CapabilityState;
   /** Where a signed-in person goes to use it. */
@@ -40,9 +42,10 @@ export type Capability = {
 export const CAPABILITIES: Capability[] = [
   {
     id: "events",
-    title: "Group events",
-    line: "One link, one deadline. Everyone picks a time without an account.",
-    sage: "soon",
+    title: "Plan an event",
+    line: "One link for one or more people to choose a time.",
+    availability: "ready",
+    sage: "ready",
     href: "/app/events/new",
     flag: "events",
     glyph: "calendar",
@@ -51,15 +54,17 @@ export const CAPABILITIES: Capability[] = [
     id: "meet",
     title: "Meet one-on-one",
     line: "Calendars compared for you. Free/busy only: never event titles.",
+    availability: "ready",
     sage: "ready",
     href: "/app/agent",
     glyph: "handshake",
   },
   {
     id: "intro",
-    title: "Introductions",
-    line: "Put in touch with someone new, only once you both say yes.",
-    sage: "ready",
+    title: "Dating",
+    line: "Private, approval-first introductions.",
+    availability: "soon",
+    sage: "soon",
     href: "/app/discovery",
     flag: "discovery",
     glyph: "search",
@@ -68,6 +73,7 @@ export const CAPABILITIES: Capability[] = [
     id: "hiring",
     title: "Recruiting alignment",
     line: "Surface why outreach missed, revise the role, and introduce people only after the terms align.",
+    availability: "ready",
     sage: "ready",
     href: "/app/recruiting",
     glyph: "briefcase",
@@ -76,7 +82,8 @@ export const CAPABILITIES: Capability[] = [
     id: "meetup",
     title: "Local meetups",
     line: "Find people nearby who want the same thing on the same evening.",
-    sage: "ready",
+    availability: "soon",
+    sage: "soon",
     href: "/app/discovery",
     flag: "discovery",
     glyph: "pin",
@@ -93,6 +100,7 @@ export function stateFor(
   capability: Capability,
   operator: Operator,
 ): CapabilityState {
+  if (capability.availability === "soon") return "soon";
   return operator === "own" ? "ready" : capability.sage;
 }
 
@@ -108,5 +116,8 @@ export function enabledCapabilities(flags: {
 
 /** How many capabilities connecting an agent would unlock, for a nudge. */
 export function lockedCount(capabilities: Capability[]): number {
-  return capabilities.filter((capability) => capability.sage === "soon").length;
+  return capabilities.filter(
+    (capability) =>
+      capability.availability === "ready" && capability.sage === "soon",
+  ).length;
 }
