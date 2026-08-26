@@ -895,29 +895,28 @@ export async function mountSakuraQrScene(
     spawnFromBranch(petal);
     return petal;
   });
-  const fallingMat = spriteMaterial(fallingTex);
-  fallingMat.alphaTest = 0;
-  fallingMat.depthTest = false;
-  fallingMat.depthWrite = false;
-  const fallingMesh = new THREE.InstancedMesh(
-    new THREE.PlaneGeometry(5.8, 6.8),
-    fallingMat,
-    Math.max(1, petalCount),
-  );
-  fallingMesh.frustumCulled = false;
-  fallingMesh.renderOrder = 8;
+  const fallingGeo = new THREE.PlaneGeometry(3.6, 4.2);
   const fallingPinks = [
     rgbColor("#ff9eb4"),
     rgbColor("#f27894"),
     rgbColor(SAKURA_QR.blossomDeep),
     rgbColor("#ffc2d0"),
   ];
-  petals.forEach((_, i) =>
-    fallingMesh.setColorAt(i, varyColor(fallingPinks[i % fallingPinks.length], 0.04, rng)),
-  );
-  if (fallingMesh.instanceColor) fallingMesh.instanceColor.needsUpdate = true;
-  fallingMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  scene.add(fallingMesh);
+  const fallingGroup = new THREE.Group();
+  fallingGroup.renderOrder = 8;
+  const fallingSprites = petals.map((_, i) => {
+    const mat = spriteMaterial(fallingTex);
+    mat.alphaTest = 0;
+    mat.depthTest = false;
+    mat.depthWrite = false;
+    mat.color.copy(varyColor(fallingPinks[i % fallingPinks.length], 0.04, rng));
+    const mesh = new THREE.Mesh(fallingGeo, mat);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 8;
+    fallingGroup.add(mesh);
+    return mesh;
+  });
+  scene.add(fallingGroup);
 
   let targetReveal = options.reveal ? 1 : 0;
   let reveal = targetReveal;
@@ -979,16 +978,13 @@ export async function mountSakuraQrScene(
   function writePetals(delta: number, time: number, amount: number) {
     const live = 1 - amount;
     if (petalCount === 0 || live < 0.06) {
-      dummy.scale.setScalar(0);
-      dummy.updateMatrix();
-      fallingMesh.setMatrixAt(0, dummy.matrix);
-      fallingMesh.instanceMatrix.needsUpdate = true;
-      fallingMesh.visible = false;
+      fallingGroup.visible = false;
       return;
     }
-    fallingMesh.visible = true;
+    fallingGroup.visible = true;
     for (let i = 0; i < petals.length; i += 1) {
       const petal = petals[i];
+      const sprite = fallingSprites[i];
       if (amount < 0.18) {
         petal.y -= petal.speed * delta;
         petal.x += Math.sin(time * 0.9 + petal.phase) * petal.drift * delta;
@@ -1003,17 +999,13 @@ export async function mountSakuraQrScene(
         spawnFromBranch(petal);
         fade = 1;
       }
-      petal.rx += delta * 1.8 * live;
-      petal.ry += delta * petal.spin * live;
-      petal.rz += delta * 2.4 * live;
-      dummy.position.set(petal.x, petal.y, petal.z);
-      dummy.quaternion.copy(camera.quaternion);
-      dummy.rotateZ(petal.spin + time * 1.4 * live);
-      dummy.scale.setScalar(petal.scale * fade * Math.max(0.45, live));
-      dummy.updateMatrix();
-      fallingMesh.setMatrixAt(i, dummy.matrix);
+      sprite.position.set(petal.x, petal.y, petal.z);
+      sprite.quaternion.copy(camera.quaternion);
+      sprite.rotateZ(petal.spin + time * 1.4 * live);
+      sprite.scale.setScalar(petal.scale * fade * Math.max(0.45, live));
+      const mat = sprite.material as THREE.MeshBasicMaterial;
+      mat.opacity = Math.max(0.35, fade * live);
     }
-    fallingMesh.instanceMatrix.needsUpdate = true;
   }
 
   function applyPose(time: number, amount: number, delta: number, scan = false) {
@@ -1201,10 +1193,12 @@ export async function mountSakuraQrScene(
       leafMesh.dispose();
       tuftMesh.dispose();
       groundMesh.dispose();
-      fallingMesh.dispose();
+      fallingGeo.dispose();
+      for (const sprite of fallingSprites) {
+        (sprite.material as THREE.Material).dispose();
+      }
       (tuftMesh.material as THREE.Material).dispose();
       (groundMesh.material as THREE.Material).dispose();
-      (fallingMesh.material as THREE.Material).dispose();
     },
   };
 }
