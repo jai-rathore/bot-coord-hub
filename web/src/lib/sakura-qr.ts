@@ -37,15 +37,6 @@ export const SAKURA_TREE = {
   canopyRadiusFactor: 0.46,
 } as const;
 
-/** Draw knobs the scene must not silently inflate: huge falling leaves ate the trunk on iPhone. */
-export const SAKURA_TREE_DRAW = {
-  trunkHeightFactor: 0.26,
-  fallingWidth: 1.8,
-  fallingHeight: 2.15,
-  fallingCountLite: 12,
-  fallingCountFull: 16,
-} as const;
-
 export type SakuraTileKind = "finder" | "trunk" | "canopy" | "grass" | "plot";
 
 export type SakuraStack = {
@@ -117,26 +108,6 @@ export function sakuraDisplayScale(high: boolean): number {
     typeof window === "undefined" ? 1 : window.visualViewport?.scale ?? 1;
   const extra = high ? 1.5 : 1;
   return Math.min(dpr * Math.max(1, pinch) * extra, high ? 6 : 3);
-}
-
-/**
- * Phones cannot survive the desktop garden: the last density pass built
- * thousands of branch cylinders and 4k canopy sprites, and iOS killed the tab.
- */
-export function sakuraPreferLiteGpu(input: {
-  compact?: boolean;
-  userAgent?: string;
-  width?: number;
-} = {}): boolean {
-  if (input.compact) return true;
-  const ua =
-    input.userAgent ??
-    (typeof navigator === "undefined" ? "" : navigator.userAgent);
-  if (/iPhone|iPad|iPod|Android/i.test(ua)) return true;
-  const width =
-    input.width ??
-    (typeof window === "undefined" ? 1024 : window.innerWidth || 1024);
-  return width > 0 && width < 480;
 }
 
 export function hashSeed(input: string): number {

@@ -86,8 +86,8 @@ function drawTree(
     );
     ctx.stroke();
 
-    if (depth >= 6 || length < size * 0.03) {
-      const count = 8 + Math.floor(rng() * 6);
+    if (depth >= 6 || length < size * 0.035) {
+      const count = 3 + Math.floor(rng() * 4);
       for (let i = 0; i < count; i += 1) {
         drawBlossom(
           ctx,
@@ -115,7 +115,7 @@ function drawTree(
       return;
     }
 
-    const splits = depth < 2 ? 5 : 4;
+    const splits = depth < 2 ? 3 : 2;
     for (let i = 0; i < splits; i += 1) {
       const spread = (i - (splits - 1) / 2) * (0.45 + depth * 0.08);
       const droop = depth > 2 ? 0.25 + rng() * 0.35 : 0;
@@ -131,26 +131,7 @@ function drawTree(
     }
   }
 
-  const stemTop = cy + size * 0.28 - size * 0.24;
-  ctx.strokeStyle = SAKURA_QR.bark;
-  ctx.lineWidth = size * 0.05;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(cx, cy + size * 0.28);
-  ctx.lineTo(cx, stemTop);
-  ctx.stroke();
-  const first = 5;
-  for (let i = 0; i < first; i += 1) {
-    const spread = (i - (first - 1) / 2) * 0.42;
-    branch(
-      cx,
-      stemTop,
-      -Math.PI / 2 + spread + (rng() - 0.5) * 0.12,
-      size * 0.2,
-      size * 0.032,
-      1,
-    );
-  }
+  branch(cx, cy + size * 0.28, -Math.PI / 2, size * 0.38, size * 0.048, 0);
   ctx.restore();
 }
 
@@ -301,16 +282,16 @@ function paint(
   }
 
   if (!reducedMotion && stages.canopy < 0.72) {
-    for (let i = 0; i < 22; i += 1) {
+    for (let i = 0; i < 12; i += 1) {
       const seed = mulberry32(matrix.seed + i * 97)();
-      const span = treeSize * 0.78;
-      const fall = (timeMs * (0.016 + seed * 0.012) + seed * 400) % span;
+      const span = treeSize * 0.72;
+      const fall = (timeMs * (0.022 + seed * 0.018) + seed * 400) % span;
       const progress = fall / span;
       const fade = progress < 0.58 ? 1 : Math.max(0, 1 - (progress - 0.58) / 0.42);
-      const x = treeX + (seed - 0.5) * treeSize * 0.42 + Math.sin(timeMs * 0.0012 + i) * 14;
-      const y = treeY - treeSize * 0.12 + fall;
-      ctx.globalAlpha = 0.95 * (1 - stages.canopy) * fade;
-      drawBlossom(ctx, x, y, 7 + seed * 4, timeMs * 0.002 + i, false);
+      const x = treeX + (seed - 0.5) * treeSize * 0.34 + Math.sin(timeMs * 0.0012 + i) * 12;
+      const y = treeY - treeSize * 0.18 + fall;
+      ctx.globalAlpha = 0.9 * (1 - stages.canopy) * fade;
+      drawBlossom(ctx, x, y, 3.4 + seed * 2.4, timeMs * 0.002 + i, false);
       ctx.globalAlpha = 1;
     }
   }
