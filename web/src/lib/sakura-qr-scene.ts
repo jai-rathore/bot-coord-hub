@@ -125,20 +125,14 @@ function paintPetal(ctx: CanvasRenderingContext2D, size: number) {
 
 function paintFallingPetal(ctx: CanvasRenderingContext2D, size: number) {
   ctx.clearRect(0, 0, size, size);
-  ctx.translate(size / 2, size / 2);
+  ctx.fillStyle = "#ff7d9a";
   ctx.beginPath();
-  ctx.moveTo(0, size * 0.46);
-  ctx.bezierCurveTo(size * 0.46, size * 0.12, size * 0.34, -size * 0.4, 0, -size * 0.16);
-  ctx.bezierCurveTo(-size * 0.34, -size * 0.4, -size * 0.46, size * 0.12, 0, size * 0.46);
-  const fill = ctx.createLinearGradient(0, -size * 0.38, 0, size * 0.46);
-  fill.addColorStop(0, "#ffe4ea");
-  fill.addColorStop(0.4, "#ff9eb4");
-  fill.addColorStop(1, "#e56b88");
-  ctx.fillStyle = fill;
+  ctx.ellipse(size / 2, size / 2, size * 0.44, size * 0.48, -0.35, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "rgba(214, 86, 118, 0.45)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  ctx.fillStyle = "#ffc2d0";
+  ctx.beginPath();
+  ctx.ellipse(size * 0.46, size * 0.46, size * 0.18, size * 0.22, -0.35, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function paintFlower(ctx: CanvasRenderingContext2D, size: number) {
@@ -274,15 +268,15 @@ function sampleCanopy(
   }
 
   for (let i = 0; i < counts.petals; i += 1) {
-    const p = place(i % 5 === 0 ? along : ends, 0.1 + rng() * 0.18);
+    const p = place(i % 4 === 0 ? along : ends, 0.18 + rng() * 0.32);
     addCard(petals, p.x, p.y, p.z, rng, varyColor(petalColors[i % petalColors.length], 0.07, rng));
   }
   for (let i = 0; i < counts.flowers; i += 1) {
-    const p = place(ends, 0.06 + rng() * 0.12);
+    const p = place(ends, 0.12 + rng() * 0.22);
     addCard(flowers, p.x, p.y, p.z, rng, varyColor(petalColors[(i + 2) % petalColors.length], 0.05, rng));
   }
   for (let i = 0; i < counts.leaves; i += 1) {
-    const p = place(along, 0.05 + rng() * 0.1);
+    const p = place(along, 0.1 + rng() * 0.18);
     addCard(leaves, p.x, p.y, p.z, rng, varyColor(leafColors[i % leafColors.length], 0.08, rng));
   }
   return { petals, flowers, leaves };
@@ -363,9 +357,9 @@ function buildTrunk(
     const child = new THREE.Group();
     child.rotation.z = (i - (firstCount - 1) / 2) * 0.4 + (rng() - 0.5) * 0.08;
     child.rotation.y = (i / firstCount) * Math.PI * 2 + (rng() - 0.5) * 0.18;
-    child.rotation.x = 0.78 + rng() * 0.32;
+    child.rotation.x = 0.9 + rng() * 0.28;
     crown.add(child);
-    grow(child, trunkHeight * 0.46, trunkRadius * 0.46, 1);
+    grow(child, trunkHeight * 0.62, trunkRadius * 0.46, 1);
   }
   root.updateMatrixWorld(true);
   const tips = tipNodes.map((node) =>
@@ -794,7 +788,10 @@ export async function mountSakuraQrScene(
   }
 
   const petalTex = makeTexture(paintPetal, high ? 1024 : 512);
-  const fallingTex = makeTexture(paintFallingPetal, high ? 1024 : 512);
+  const fallingTex = makeTexture(paintFallingPetal, 256);
+  fallingTex.generateMipmaps = false;
+  fallingTex.minFilter = THREE.LinearFilter;
+  fallingTex.magFilter = THREE.LinearFilter;
   const flowerTex = makeTexture(paintFlower, high ? 1024 : 512);
   const leafTex = makeTexture(paintLeaf, high ? 1024 : 256);
   const anisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy());
@@ -895,7 +892,7 @@ export async function mountSakuraQrScene(
     spawnFromBranch(petal);
     return petal;
   });
-  const fallingGeo = new THREE.PlaneGeometry(3.6, 4.2);
+  const fallingGeo = new THREE.PlaneGeometry(compact ? 6.8 : 5.2, compact ? 7.8 : 6.0);
   const fallingPinks = [
     rgbColor("#ff9eb4"),
     rgbColor("#f27894"),
