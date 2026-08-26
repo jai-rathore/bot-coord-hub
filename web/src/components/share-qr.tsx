@@ -68,7 +68,12 @@ export function ShareQr({
           return;
         }
         mountRef.current = handle;
-        setDownloadUrl(handle.capturePng("scan"));
+        try {
+          const png = handle.capturePng("scan");
+          if (png) setDownloadUrl(png);
+        } catch {
+          setDownloadUrl(null);
+        }
         setReady(true);
       } catch {
         if (!active) return;
@@ -85,7 +90,12 @@ export function ShareQr({
             return;
           }
           mountRef.current = handle;
-          setDownloadUrl(handle.capturePng("scan"));
+          try {
+            const png = handle.capturePng("scan");
+            if (png) setDownloadUrl(png);
+          } catch {
+            setDownloadUrl(null);
+          }
           setReady(true);
         } catch {
           if (active) setError(true);

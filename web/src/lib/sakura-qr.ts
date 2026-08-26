@@ -110,6 +110,26 @@ export function sakuraDisplayScale(high: boolean): number {
   return Math.min(dpr * Math.max(1, pinch) * extra, high ? 6 : 3);
 }
 
+/**
+ * Phones cannot survive the desktop garden: the last density pass built
+ * thousands of branch cylinders and 4k canopy sprites, and iOS killed the tab.
+ */
+export function sakuraPreferLiteGpu(input: {
+  compact?: boolean;
+  userAgent?: string;
+  width?: number;
+} = {}): boolean {
+  if (input.compact) return true;
+  const ua =
+    input.userAgent ??
+    (typeof navigator === "undefined" ? "" : navigator.userAgent);
+  if (/iPhone|iPad|iPod|Android/i.test(ua)) return true;
+  const width =
+    input.width ??
+    (typeof window === "undefined" ? 1024 : window.innerWidth || 1024);
+  return width > 0 && width < 480;
+}
+
 export function hashSeed(input: string): number {
   let hash = 2166136261;
   for (let i = 0; i < input.length; i += 1) {

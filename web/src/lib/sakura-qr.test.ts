@@ -9,6 +9,7 @@ import {
   relativeLuminance,
   sakuraDisplayScale,
   sakuraFlattenStages,
+  sakuraPreferLiteGpu,
   SAKURA_QR,
 } from "./sakura-qr";
 
@@ -86,6 +87,34 @@ test("display scale stays finite and supersamples the full-size garden", () => {
   assert.ok(sakuraDisplayScale(true) >= sakuraDisplayScale(false));
   assert.ok(sakuraDisplayScale(true) >= 1);
   assert.ok(sakuraDisplayScale(true) <= 6);
+});
+
+test("phones and compact cards take the lite garden so iOS does not die", () => {
+  assert.equal(sakuraPreferLiteGpu({ compact: true, userAgent: "Mozilla/5.0" }), true);
+  assert.equal(
+    sakuraPreferLiteGpu({
+      compact: false,
+      userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+      width: 390,
+    }),
+    true,
+  );
+  assert.equal(
+    sakuraPreferLiteGpu({
+      compact: false,
+      userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+      width: 1280,
+    }),
+    false,
+  );
+  assert.equal(
+    sakuraPreferLiteGpu({
+      compact: false,
+      userAgent: "Mozilla/5.0",
+      width: 390,
+    }),
+    true,
+  );
 });
 
 test("the same url always grows the same tree", () => {
