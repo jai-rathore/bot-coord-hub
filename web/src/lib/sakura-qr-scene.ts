@@ -11,6 +11,7 @@ import {
   sakuraFlattenStages,
   sakuraPreferLiteGpu,
   SAKURA_QR,
+  SAKURA_TREE_DRAW,
   type SakuraQrMatrix,
   type SakuraQrMount,
   type SakuraQrMountOptions,
@@ -301,7 +302,7 @@ function buildTrunk(
   const root = new THREE.Group();
   const tipNodes: THREE.Object3D[] = [];
   const trunkRadius = Math.max(0.88, grid * 0.052);
-  const trunkHeight = grid * 0.155;
+  const trunkHeight = grid * SAKURA_TREE_DRAW.trunkHeightFactor;
   const radial = high ? 32 : 12;
   const branchRadial = high ? 16 : 8;
 
@@ -361,9 +362,9 @@ function buildTrunk(
     const child = new THREE.Group();
     child.rotation.z = (i - (firstCount - 1) / 2) * 0.4 + (rng() - 0.5) * 0.08;
     child.rotation.y = (i / firstCount) * Math.PI * 2 + (rng() - 0.5) * 0.18;
-    child.rotation.x = 0.9 + rng() * 0.28;
+    child.rotation.x = 0.58 + rng() * 0.22;
     crown.add(child);
-    grow(child, trunkHeight * 0.62, trunkRadius * 0.46, 1);
+    grow(child, trunkHeight * 0.36, trunkRadius * 0.46, 1);
   }
   root.updateMatrixWorld(true);
   const tips = tipNodes.map((node) =>
@@ -752,7 +753,8 @@ export async function mountSakuraQrScene(
     color: rgbColor(SAKURA_QR.bark),
     roughness: 0.68,
     metalness: 0.04,
-    transparent: true,
+    transparent: false,
+    depthWrite: true,
   });
   const branchBarkMat = barkMat.clone();
   const trunkMesh = new THREE.Mesh(trunk, barkMat);
@@ -836,7 +838,7 @@ export async function mountSakuraQrScene(
   tree.add(crown);
   scene.add(tuftMesh);
   tree.scale.set(treeScale, treeScale, treeScale);
-  tree.position.y = -0.28;
+  tree.position.y = 0;
   scene.add(tree);
   tree.updateMatrixWorld(true);
 
@@ -879,11 +881,15 @@ export async function mountSakuraQrScene(
     const r = 1.4 + rng() * 3.4;
     petal.x = Math.cos(theta) * r;
     petal.z = Math.sin(theta) * r;
-    petal.y = Math.max(3.4, spawnScratch.y * 0.58) + rng() * 1.4;
+    petal.y = Math.max(2.4, spawnScratch.y * 0.42) + rng() * 0.8;
     petal.bornY = petal.y;
   }
 
-  const petalCount = reduced ? 0 : compact || lite ? 18 : 26;
+  const petalCount = reduced
+    ? 0
+    : compact || lite
+      ? SAKURA_TREE_DRAW.fallingCountLite
+      : SAKURA_TREE_DRAW.fallingCountFull;
   const petals: Petal[] = Array.from({ length: petalCount }, () => {
     const petal: Petal = {
       x: 0,
@@ -897,12 +903,15 @@ export async function mountSakuraQrScene(
       rz: rng() * Math.PI,
       spin: (rng() - 0.5) * 1.8,
       phase: rng() * Math.PI * 2,
-      scale: 1.2 + rng() * 0.28,
+      scale: 0.95 + rng() * 0.18,
     };
     spawnFromBranch(petal);
     return petal;
   });
-  const fallingGeo = new THREE.PlaneGeometry(compact ? 6.8 : 5.2, compact ? 7.8 : 6.0);
+  const fallingGeo = new THREE.PlaneGeometry(
+    SAKURA_TREE_DRAW.fallingWidth,
+    SAKURA_TREE_DRAW.fallingHeight,
+  );
   const fallingPinks = [
     rgbColor("#ff9eb4"),
     rgbColor("#f27894"),
@@ -910,16 +919,16 @@ export async function mountSakuraQrScene(
     rgbColor("#ffc2d0"),
   ];
   const fallingGroup = new THREE.Group();
-  fallingGroup.renderOrder = 8;
+  fallingGroup.renderOrder = 3;
   const fallingSprites = petals.map((_, i) => {
     const mat = spriteMaterial(fallingTex);
-    mat.alphaTest = 0;
-    mat.depthTest = false;
+    mat.alphaTest = 0.08;
+    mat.depthTest = true;
     mat.depthWrite = false;
     mat.color.copy(varyColor(fallingPinks[i % fallingPinks.length], 0.04, rng));
     const mesh = new THREE.Mesh(fallingGeo, mat);
     mesh.frustumCulled = false;
-    mesh.renderOrder = 8;
+    mesh.renderOrder = 3;
     fallingGroup.add(mesh);
     return mesh;
   });
@@ -1033,10 +1042,12 @@ export async function mountSakuraQrScene(
       crown.position.y = crownY * Math.max(0.08, 1 - stages.canopy * 0.72);
       crown.scale.setScalar(1);
       branchMesh.visible = stages.canopy < 0.82;
+      branchBarkMat.transparent = stages.canopy > 0.04;
       branchBarkMat.opacity = Math.max(0, 1 - stages.canopy * 1.15);
       const spread = 1 + stages.trunk * 0.55;
       trunkMesh.scale.set(spread, Math.max(0.02, 1 - stages.trunk * 1.05), spread);
       trunkMesh.position.y = -stages.trunk * 0.55;
+      barkMat.transparent = stages.trunk > 0.04;
       barkMat.opacity = Math.max(0, 1 - stages.trunk * 1.25);
       trunkMesh.visible = stages.trunk < 0.72;
       rootMesh.scale.set(
