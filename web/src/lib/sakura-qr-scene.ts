@@ -326,7 +326,7 @@ function buildTrunk(
     new THREE.Vector3().setFromMatrixPosition(node.matrixWorld),
   );
   const sites: THREE.Vector3[] = [];
-  root.traverse((object) => {
+  root.traverse((object: THREE.Object3D) => {
     if (object instanceof THREE.Mesh) {
       const geometry = object.geometry.clone();
       geometry.applyMatrix4(object.matrixWorld);

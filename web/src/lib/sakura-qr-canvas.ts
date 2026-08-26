@@ -275,8 +275,9 @@ export async function mountSakuraQrCanvas(
   options: SakuraQrMountOptions,
 ): Promise<SakuraQrMount> {
   const matrix = encodeSakuraQr(options.url);
-  const ctx = canvas.getContext("2d", { alpha: false });
-  if (!ctx) throw new Error("Canvas 2D is unavailable");
+  const surface = canvas.getContext("2d", { alpha: false });
+  if (!surface) throw new Error("Canvas 2D is unavailable");
+  const ctx: CanvasRenderingContext2D = surface;
 
   let targetReveal = options.reveal ? 1 : 0;
   let reveal = targetReveal;
