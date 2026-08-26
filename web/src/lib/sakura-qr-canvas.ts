@@ -87,7 +87,7 @@ function drawTree(
     ctx.stroke();
 
     if (depth >= 6 || length < size * 0.035) {
-      const count = 3 + Math.floor(rng() * 4);
+      const count = 5 + Math.floor(rng() * 5);
       for (let i = 0; i < count; i += 1) {
         drawBlossom(
           ctx,
@@ -115,7 +115,7 @@ function drawTree(
       return;
     }
 
-    const splits = depth < 2 ? 3 : 2;
+    const splits = depth < 2 ? 4 : 3;
     for (let i = 0; i < splits; i += 1) {
       const spread = (i - (splits - 1) / 2) * (0.45 + depth * 0.08);
       const droop = depth > 2 ? 0.25 + rng() * 0.35 : 0;
@@ -131,7 +131,7 @@ function drawTree(
     }
   }
 
-  branch(cx, cy + size * 0.28, -Math.PI / 2, size * 0.38, size * 0.048, 0);
+  branch(cx, cy + size * 0.28, -Math.PI / 2, size * 0.26, size * 0.052, 0);
   ctx.restore();
 }
 
@@ -282,7 +282,7 @@ function paint(
   }
 
   if (!reducedMotion && stages.canopy < 0.72) {
-    for (let i = 0; i < 12; i += 1) {
+    for (let i = 0; i < 16; i += 1) {
       const seed = mulberry32(matrix.seed + i * 97)();
       const span = treeSize * 0.72;
       const fall = (timeMs * (0.022 + seed * 0.018) + seed * 400) % span;
@@ -291,7 +291,7 @@ function paint(
       const x = treeX + (seed - 0.5) * treeSize * 0.34 + Math.sin(timeMs * 0.0012 + i) * 12;
       const y = treeY - treeSize * 0.18 + fall;
       ctx.globalAlpha = 0.9 * (1 - stages.canopy) * fade;
-      drawBlossom(ctx, x, y, 3.4 + seed * 2.4, timeMs * 0.002 + i, false);
+      drawBlossom(ctx, x, y, 6.2 + seed * 3.8, timeMs * 0.002 + i, false);
       ctx.globalAlpha = 1;
     }
   }
