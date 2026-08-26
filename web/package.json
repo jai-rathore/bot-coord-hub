@@ -43,6 +43,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.4",
+    "@types/three": "^0.185.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "iso-3166": "^4.4.0",
