@@ -1,23 +1,16 @@
-import {
-  and,
-  count,
-  desc,
-  eq,
-  gt,
-  gte,
-  isNull,
-  lt,
-  sql,
-} from "drizzle-orm";
+import { and, count, desc, eq, gt, gte, isNull, lt, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   guestResponses,
   guestTasks,
   auditLogs,
   sessionMessages,
+  users,
   type GuestTask,
   type User,
 } from "@/db/schema";
+import { deliverHiringInbox } from "@/lib/agent-inbox";
+import { getPublishedProfileByHandle } from "@/lib/agent-profiles";
 import { writeAudit } from "@/lib/audit";
 import { AgentApiError } from "@/lib/agent-errors";
 import { getSessionForUser } from "@/lib/sessions";
@@ -35,21 +28,45 @@ import {
   LIMITS,
 } from "@/lib/validation";
 import {
+  HIRING_DIMENSIONS,
   matchHiringConstraints,
   type CandidateConstraints,
+  type HiringConversationSignal,
+  type HiringDimension,
+  type HiringInterest,
+  type HiringSharingMode,
   type RoleConstraints,
 } from "@/lib/hiring-match";
 import { decryptSecret, encryptSecret } from "@/lib/secret-crypto";
+import {
+  consumeLocationResolutionToken,
+  type CanonicalLocation,
+} from "@/lib/location-resolver";
+import { getActiveHiringParticipantType } from "@/lib/discovery-service";
+
+const HIRING_CURRENCY_CODES = [
+  "USD",
+  "EUR",
+  "GBP",
+  "CAD",
+  "AUD",
+  "INR",
+  "SGD",
+  "CHF",
+] as const;
 
 export type GuestTaskType =
-  | "binary_choice"
-  | "text_response"
-  | "availability"
-  | "hiring_compatibility";
+  "binary_choice" | "text_response" | "availability" | "hiring_compatibility";
 
 export type GuestTaskActor = {
   apiKeyId?: string | null;
   kind?: "user" | "agent" | "hosted_agent";
+};
+
+export type GuestResponseActor = {
+  userId?: string | null;
+  apiKeyId?: string | null;
+  kind?: "guest" | "agent" | "hosted_agent";
 };
 
 const TASK_TYPES = new Set<GuestTaskType>([
@@ -97,7 +114,10 @@ function normalizeConfig(
       );
     }
     if (choices.some((choice) => choice.length > 80)) {
-      throw new AgentApiError(400, "Each choice must be 80 characters or fewer");
+      throw new AgentApiError(
+        400,
+        "Each choice must be 80 characters or fewer",
+      );
     }
     return { choices };
   }
@@ -113,15 +133,19 @@ function normalizeConfig(
   if (taskType === "hiring_compatibility") {
     return {
       fields: [
-        "compensation",
-        "location",
+        "company interest",
+        "role interest and scope",
+        "annual compensation and currency",
+        "equity",
+        "city and vicinity",
         "work mode",
+        "employment type",
         "sponsorship",
         "start timing",
         "level",
       ],
       privacy:
-        "The organizer receives only the compatibility result, never your submitted values.",
+        "You choose whether the recruiter sees only alignment gaps or the exact expectations you approve. Your full response stays encrypted.",
     };
   }
 
@@ -133,7 +157,10 @@ function normalizeConfig(
   };
 }
 
-function normalizeStringList(value: unknown, field: string): string[] | undefined {
+function normalizeStringList(
+  value: unknown,
+  field: string,
+): string[] | undefined {
   if (value == null) return undefined;
   if (!Array.isArray(value)) {
     throw new AgentApiError(400, `${field} must be a list`);
@@ -152,9 +179,60 @@ function normalizeStringList(value: unknown, field: string): string[] | undefine
   return values.length ? values : undefined;
 }
 
+function normalizeHiringLocations(
+  value: unknown,
+  field: string,
+  resolutionUserId?: string,
+): Array<string | CanonicalLocation> | undefined {
+  if (value == null) return undefined;
+  if (!Array.isArray(value)) {
+    throw new AgentApiError(400, `${field} must be a list`);
+  }
+  const locations = value.map((item) => {
+    if (typeof item !== "string" || !item.trim()) {
+      throw new AgentApiError(400, `${field} must contain location choices`);
+    }
+    const normalized = item.trim();
+    if (normalized.startsWith("hlr_")) {
+      if (!resolutionUserId) {
+        throw new AgentApiError(
+          400,
+          `${field} location token cannot be verified`,
+        );
+      }
+      return consumeLocationResolutionToken(
+        resolutionUserId,
+        normalized,
+        "city",
+      );
+    }
+    if (normalized.length > 120) {
+      throw new AgentApiError(400, `${field} contains an overly long value`);
+    }
+    return normalized;
+  });
+  if (locations.length > 20) {
+    throw new AgentApiError(400, `${field} has too many values`);
+  }
+  return locations.length ? locations : undefined;
+}
+
+function normalizeHiringEnum<T extends string>(
+  value: unknown,
+  field: string,
+  allowed: readonly T[],
+): T | undefined {
+  if (value == null || value === "") return undefined;
+  if (typeof value !== "string" || !allowed.includes(value as T)) {
+    throw new AgentApiError(400, `${field} is invalid`);
+  }
+  return value as T;
+}
+
 function normalizeRoleConstraints(
   taskType: GuestTaskType,
   value: unknown,
+  resolutionUserId?: string,
 ): Record<string, unknown> {
   if (taskType !== "hiring_compatibility") return {};
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -176,6 +254,18 @@ function normalizeRoleConstraints(
   ) {
     throw new AgentApiError(400, "compensationMaximum is invalid");
   }
+  const equityMaximumPercent =
+    input.equityMaximumPercent == null
+      ? undefined
+      : Number(input.equityMaximumPercent);
+  if (
+    equityMaximumPercent != null &&
+    (!Number.isFinite(equityMaximumPercent) ||
+      equityMaximumPercent < 0 ||
+      equityMaximumPercent > 100)
+  ) {
+    throw new AgentApiError(400, "equityMaximumPercent is invalid");
+  }
   const latestStart =
     boundedText(input.latestStart, "latestStart", 40) ?? undefined;
   if (latestStart && Number.isNaN(new Date(latestStart).getTime())) {
@@ -185,18 +275,107 @@ function normalizeRoleConstraints(
     typeof input.sponsorshipAvailable === "boolean"
       ? input.sponsorshipAvailable
       : undefined;
+  const compensationCurrency = normalizeHiringEnum(
+    input.compensationCurrency,
+    "compensationCurrency",
+    HIRING_CURRENCY_CODES,
+  );
+  const locationRadiusMiles =
+    input.locationRadiusMiles == null
+      ? undefined
+      : Number(input.locationRadiusMiles);
+  if (
+    locationRadiusMiles != null &&
+    (!Number.isFinite(locationRadiusMiles) ||
+      locationRadiusMiles < 0 ||
+      locationRadiusMiles > 500)
+  ) {
+    throw new AgentApiError(400, "locationRadiusMiles is invalid");
+  }
   return {
-    ...(compensationMaximum == null ? {} : { compensationMaximum }),
-    ...(normalizeStringList(input.locations, "locations")
-      ? { locations: normalizeStringList(input.locations, "locations") }
+    ...(boundedText(input.companyName, "companyName", 120)
+      ? { companyName: boundedText(input.companyName, "companyName", 120) }
       : {}),
+    ...(boundedText(input.roleTitle, "roleTitle", 120)
+      ? { roleTitle: boundedText(input.roleTitle, "roleTitle", 120) }
+      : {}),
+    ...(compensationMaximum == null ? {} : { compensationMaximum }),
+    ...(compensationCurrency ? { compensationCurrency } : {}),
+    ...(equityMaximumPercent == null ? {} : { equityMaximumPercent }),
+    ...(normalizeHiringLocations(input.locations, "locations", resolutionUserId)
+      ? {
+          locations: normalizeHiringLocations(
+            input.locations,
+            "locations",
+            resolutionUserId,
+          ),
+        }
+      : {}),
+    ...(locationRadiusMiles == null ? {} : { locationRadiusMiles }),
     ...(normalizeStringList(input.workModes, "workModes")
       ? { workModes: normalizeStringList(input.workModes, "workModes") }
+      : {}),
+    ...(normalizeStringList(input.employmentTypes, "employmentTypes")
+      ? {
+          employmentTypes: normalizeStringList(
+            input.employmentTypes,
+            "employmentTypes",
+          ),
+        }
       : {}),
     ...(sponsorshipAvailable == null ? {} : { sponsorshipAvailable }),
     ...(latestStart ? { latestStart } : {}),
     ...(normalizeStringList(input.levels, "levels")
       ? { levels: normalizeStringList(input.levels, "levels") }
+      : {}),
+    ...(normalizeStringList(input.roleFocus, "roleFocus")
+      ? { roleFocus: normalizeStringList(input.roleFocus, "roleFocus") }
+      : {}),
+  };
+}
+
+function candidateFacingRoleTerms(
+  privateConfig: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...(typeof privateConfig.companyName === "string"
+      ? { companyName: privateConfig.companyName }
+      : {}),
+    ...(typeof privateConfig.roleTitle === "string"
+      ? { roleTitle: privateConfig.roleTitle }
+      : {}),
+    ...(typeof privateConfig.compensationMaximum === "number"
+      ? { compensationMaximum: privateConfig.compensationMaximum }
+      : {}),
+    ...(typeof privateConfig.compensationCurrency === "string"
+      ? { compensationCurrency: privateConfig.compensationCurrency }
+      : {}),
+    ...(typeof privateConfig.equityMaximumPercent === "number"
+      ? { equityMaximumPercent: privateConfig.equityMaximumPercent }
+      : {}),
+    ...(Array.isArray(privateConfig.locations)
+      ? { locations: privateConfig.locations }
+      : {}),
+    ...(typeof privateConfig.locationRadiusMiles === "number"
+      ? { locationRadiusMiles: privateConfig.locationRadiusMiles }
+      : {}),
+    ...(Array.isArray(privateConfig.workModes)
+      ? { workModes: privateConfig.workModes }
+      : {}),
+    ...(Array.isArray(privateConfig.employmentTypes)
+      ? { employmentTypes: privateConfig.employmentTypes }
+      : {}),
+    ...(typeof privateConfig.sponsorshipAvailable === "boolean"
+      ? { sponsorshipAvailable: privateConfig.sponsorshipAvailable }
+      : {}),
+    ...(typeof privateConfig.latestStart === "string"
+      ? { latestStart: privateConfig.latestStart }
+      : {}),
+    ...(Array.isArray(privateConfig.levels)
+      ? { levels: privateConfig.levels }
+      : {}),
+    ...(Array.isArray(privateConfig.roleFocus)
+      ? { roleFocus: privateConfig.roleFocus }
       : {}),
   };
 }
@@ -234,11 +413,8 @@ export async function createGuestTask(opts: {
   /** Stable replay key for a durable hosted-agent creation job. */
   idempotencyKey?: unknown;
 }) {
-  const idempotencyKey = boundedText(
-    opts.idempotencyKey,
-    "idempotencyKey",
-    160,
-  ) ?? null;
+  const idempotencyKey =
+    boundedText(opts.idempotencyKey, "idempotencyKey", 160) ?? null;
   const origin = opts.origin.replace(/\/$/, "");
   if (idempotencyKey) {
     const [existing] = await getDb()
@@ -269,40 +445,53 @@ export async function createGuestTask(opts: {
     }
   }
   const taskType = normalizeTaskType(opts.taskType);
-  const title = boundedText(
-    opts.title,
-    "title",
-    LIMITS.titleLength,
-    { required: true },
-  )!;
+  const title = boundedText(opts.title, "title", LIMITS.titleLength, {
+    required: true,
+  })!;
   const description =
-    boundedText(
-      opts.description,
-      "description",
-      LIMITS.descriptionLength,
-    ) ?? null;
-  const targetEmail = boundedText(
-    opts.targetEmail,
-    "targetEmail",
-    320,
-    { required: true },
-  )!.toLowerCase();
+    boundedText(opts.description, "description", LIMITS.descriptionLength) ??
+    null;
+  const targetEmail = boundedText(opts.targetEmail, "targetEmail", 320, {
+    required: true,
+  })!.toLowerCase();
   if (!targetEmail.includes("@")) {
     throw new AgentApiError(400, "targetEmail must be a valid email");
   }
-  const config = normalizeConfig(taskType, opts.config);
-  const privateConfig = normalizeRoleConstraints(
+  const normalizedConfig = normalizeConfig(taskType, opts.config);
+  const normalizedPrivateConfig = normalizeRoleConstraints(
     taskType,
     opts.privateConfig,
+    opts.organizer.id,
   );
-  const expiresInMinutes = Math.floor(Math.min(
-    Math.max(Number(opts.expiresInMinutes ?? 7 * 24 * 60), 15),
-    30 * 24 * 60,
-  ));
-  const maxResponses = Math.floor(Math.min(
-    Math.max(Number(opts.maxResponses ?? 1), 1),
-    20,
-  ));
+  const [targetUser] =
+    taskType === "hiring_compatibility"
+      ? await getDb()
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, targetEmail))
+          .limit(1)
+      : [];
+  const privateConfig = {
+    ...normalizedPrivateConfig,
+    ...(targetUser?.id ? { _targetUserId: targetUser.id } : {}),
+  };
+  const config =
+    taskType === "hiring_compatibility"
+      ? {
+          ...normalizedConfig,
+          offer: candidateFacingRoleTerms(privateConfig),
+          revisionCount: 0,
+        }
+      : normalizedConfig;
+  const expiresInMinutes = Math.floor(
+    Math.min(
+      Math.max(Number(opts.expiresInMinutes ?? 7 * 24 * 60), 15),
+      30 * 24 * 60,
+    ),
+  );
+  const maxResponses = Math.floor(
+    Math.min(Math.max(Number(opts.maxResponses ?? 1), 1), 20),
+  );
   const sessionId = opts.sessionId
     ? assertUuid(opts.sessionId, "sessionId")
     : null;
@@ -359,7 +548,10 @@ export async function createGuestTask(opts: {
         targetEmailHash: hashGuestEmail(targetEmail),
         tokenHash,
         tokenPrefix,
-        tokenEncrypted: idempotencyKey ? encryptSecret(rawToken) : null,
+        tokenEncrypted:
+          idempotencyKey || taskType === "hiring_compatibility"
+            ? encryptSecret(rawToken)
+            : null,
         idempotencyKey,
         expiresAt: new Date(Date.now() + expiresInMinutes * 60_000),
         maxResponses,
@@ -380,7 +572,10 @@ export async function createGuestTask(opts: {
       if (replayed) return replayed;
     }
     if (!inserted) {
-      throw new AgentApiError(500, "Could not create the guest request. Try again.");
+      throw new AgentApiError(
+        500,
+        "Could not create the guest request. Try again.",
+      );
     }
     await tx.insert(auditLogs).values({
       actorUserId: opts.organizer.id,
@@ -416,6 +611,59 @@ export async function createGuestTask(opts: {
     warning: idempotencyKey
       ? "This private response link is shown only to you. Share it only with the recipient."
       : "This private response link is shown once. Share it only with the recipient.",
+  };
+}
+
+export async function createHiringProposalForHandle(opts: {
+  organizer: User;
+  targetHandle: unknown;
+  title: unknown;
+  description?: unknown;
+  privateConfig?: unknown;
+  origin: string;
+  idempotencyKey?: unknown;
+  actor?: GuestTaskActor;
+}) {
+  const targetHandle = boundedText(opts.targetHandle, "targetHandle", 80, {
+    required: true,
+  })!;
+  const target = await getPublishedProfileByHandle(targetHandle);
+  if (!target) {
+    throw new AgentApiError(404, "Candidate recruiting link not found");
+  }
+  if (target.owner.id === opts.organizer.id) {
+    throw new AgentApiError(400, "You cannot send a role to your own agent");
+  }
+  if ((await getActiveHiringParticipantType(target.owner.id)) !== "candidate") {
+    throw new AgentApiError(
+      409,
+      "This person is not currently accepting private role briefs",
+    );
+  }
+
+  const created = await createGuestTask({
+    organizer: opts.organizer,
+    taskType: "hiring_compatibility",
+    title: opts.title,
+    description: opts.description,
+    privateConfig: opts.privateConfig,
+    targetEmail: target.owner.email,
+    expiresInMinutes: 7 * 24 * 60,
+    maxResponses: 1,
+    origin: opts.origin,
+    idempotencyKey: opts.idempotencyKey,
+    actor: opts.actor,
+  });
+  const notification = await notifyHiringCandidateAgent({
+    organizer: opts.organizer,
+    publicId: created.task.publicId,
+  });
+  return {
+    task: created.task,
+    publicId: created.task.publicId,
+    notification,
+    message:
+      "The role is with the candidate's agent. It can return approved gaps or ask you to improve adjustable terms.",
   };
 }
 
@@ -460,6 +708,326 @@ export async function getGuestTaskForOrganizer(
       createdAt: response.createdAt.toISOString(),
     })),
   };
+}
+
+export async function listHiringAlignmentsForOrganizer(organizer: User) {
+  const tasks = await getDb()
+    .select()
+    .from(guestTasks)
+    .where(
+      and(
+        eq(guestTasks.organizerUserId, organizer.id),
+        eq(guestTasks.taskType, "hiring_compatibility"),
+      ),
+    )
+    .orderBy(desc(guestTasks.createdAt));
+
+  return Promise.all(
+    tasks.map(async (task) => {
+      const [latest] = await getDb()
+        .select({
+          id: guestResponses.id,
+          response: guestResponses.response,
+          createdAt: guestResponses.createdAt,
+        })
+        .from(guestResponses)
+        .where(eq(guestResponses.guestTaskId, task.id))
+        .orderBy(desc(guestResponses.createdAt))
+        .limit(1);
+      return {
+        task: serializeTask(task),
+        offer: candidateFacingRoleTerms(task.privateConfig),
+        latestAlignment: latest
+          ? {
+              id: latest.id,
+              response: latest.response,
+              createdAt: latest.createdAt.toISOString(),
+            }
+          : null,
+      };
+    }),
+  );
+}
+
+async function hiringTaskForOrganizer(organizer: User, publicId: string) {
+  const [task] = await getDb()
+    .select()
+    .from(guestTasks)
+    .where(
+      and(
+        eq(guestTasks.publicId, publicId),
+        eq(guestTasks.organizerUserId, organizer.id),
+        eq(guestTasks.taskType, "hiring_compatibility"),
+      ),
+    )
+    .limit(1);
+  if (!task) throw new AgentApiError(404, "Hiring alignment request not found");
+  return task;
+}
+
+function targetUserIdForHiringTask(task: GuestTask): string | null {
+  const value = (task.privateConfig as Record<string, unknown>)._targetUserId;
+  return typeof value === "string" ? value : null;
+}
+
+export async function notifyHiringCandidateAgent(opts: {
+  organizer: User;
+  publicId: string;
+}) {
+  const task = await hiringTaskForOrganizer(opts.organizer, opts.publicId);
+  if (
+    task.revokedAt ||
+    task.expiresAt <= new Date() ||
+    ["revoked", "expired"].includes(task.status)
+  ) {
+    throw new AgentApiError(409, "This hiring alignment is no longer active");
+  }
+  const targetUserId = targetUserIdForHiringTask(task);
+  if (!targetUserId) {
+    return {
+      delivered: false,
+      reach: "share_private_link" as const,
+      message:
+        "No HoneyMatcha candidate agent was found. Send the private link yourself.",
+    };
+  }
+  const delivered = await deliverHiringInbox({
+    userId: targetUserId,
+    kind: "hiring.alignment_requested",
+    summary: `A recruiter asked to align on ${task.title}`,
+    body: {
+      publicId: task.publicId,
+      title: task.title,
+      offer: candidateFacingRoleTerms(task.privateConfig),
+      instructions:
+        "Call read_inbound_hiring_request, review the role with your human, then call respond_to_hiring_request only with expectations they approve sharing.",
+    },
+    dedupeKey: `hiring:${task.id}:request`,
+  });
+  await writeAudit({
+    actorUserId: opts.organizer.id,
+    actorKind: "user",
+    action: "hiring.candidate_agent_notified",
+    entityType: "guest_task",
+    entityId: task.id,
+    metadata: { publicId: task.publicId, inboxId: delivered.inboxId },
+  });
+  return {
+    delivered: true,
+    reach: "candidate_agent" as const,
+    message:
+      "The request is in the candidate's HoneyMatcha agent inbox. The candidate still decides what to share.",
+  };
+}
+
+export async function reviseHiringGuestTask(opts: {
+  organizer: User;
+  publicId: string;
+  privateConfig: unknown;
+  candidateFacingUpdate?: unknown;
+  actor?: GuestTaskActor;
+}) {
+  const task = await hiringTaskForOrganizer(opts.organizer, opts.publicId);
+  if (
+    task.revokedAt ||
+    task.expiresAt <= new Date() ||
+    ["revoked", "expired"].includes(task.status)
+  ) {
+    throw new AgentApiError(409, "This hiring alignment is no longer active");
+  }
+  const revised = normalizeRoleConstraints(
+    "hiring_compatibility",
+    opts.privateConfig,
+    opts.organizer.id,
+  );
+  if (!Object.keys(revised).length) {
+    throw new AgentApiError(400, "Add at least one revised role term");
+  }
+  const privateConfig = {
+    ...(task.privateConfig as Record<string, unknown>),
+    ...revised,
+  };
+  const currentConfig = task.config as Record<string, unknown>;
+  const revisionCount = Number(currentConfig.revisionCount ?? 0) + 1;
+  const candidateFacingUpdate = boundedText(
+    opts.candidateFacingUpdate,
+    "candidateFacingUpdate",
+    1_000,
+  );
+  const config = {
+    ...currentConfig,
+    offer: candidateFacingRoleTerms(privateConfig),
+    revisionCount,
+    ...(candidateFacingUpdate ? { candidateFacingUpdate } : {}),
+  };
+
+  const db = getDb();
+  const [latest] = await db
+    .select()
+    .from(guestResponses)
+    .where(eq(guestResponses.guestTaskId, task.id))
+    .orderBy(desc(guestResponses.createdAt))
+    .limit(1);
+  let alignment: Record<string, unknown> | null = null;
+  if (latest?.privateResponse) {
+    const candidate = JSON.parse(
+      decryptSecret(latest.privateResponse),
+    ) as CandidateConstraints;
+    if (
+      candidate.recruiterMayRevise === false ||
+      candidate.conversationSignal === "not_interested" ||
+      candidate.companyInterest === "not_interested"
+    ) {
+      throw new AgentApiError(
+        409,
+        "The candidate did not approve revised outreach. Respect their signal.",
+      );
+    }
+    alignment = matchHiringConstraints(
+      privateConfig as RoleConstraints,
+      candidate,
+    ) as unknown as Record<string, unknown>;
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(guestTasks)
+      .set({ privateConfig, config, updatedAt: new Date() })
+      .where(eq(guestTasks.id, task.id));
+    if (latest && alignment) {
+      await tx
+        .update(guestResponses)
+        .set({ response: alignment })
+        .where(eq(guestResponses.id, latest.id));
+    }
+  });
+
+  await writeAudit({
+    actorUserId: opts.organizer.id,
+    actorApiKeyId: opts.actor?.apiKeyId ?? null,
+    actorKind: opts.actor?.kind ?? "user",
+    action: "hiring.role_revised",
+    entityType: "guest_task",
+    entityId: task.id,
+    metadata: {
+      publicId: task.publicId,
+      revisionCount,
+      alignment: alignment?.alignment ?? null,
+    },
+  });
+
+  const targetUserId = targetUserIdForHiringTask(task);
+  if (targetUserId) {
+    await deliverHiringInbox({
+      userId: targetUserId,
+      kind: "hiring.role_revised",
+      summary: `The recruiter revised the terms for ${task.title}`,
+      body: {
+        publicId: task.publicId,
+        revisionCount,
+        offer: candidateFacingRoleTerms(privateConfig),
+        alignment,
+        candidateFacingUpdate: candidateFacingUpdate ?? null,
+        instructions:
+          "Call read_inbound_hiring_request and show the revised terms to your human. Do not accept an introduction without their final yes.",
+      },
+      dedupeKey: `hiring:${task.id}:revision:${revisionCount}`,
+    }).catch((error) => {
+      console.error(
+        "[hiring] candidate agent revision notification failed",
+        error,
+      );
+    });
+  }
+
+  return {
+    ...(await getGuestTaskForOrganizer(opts.organizer, opts.publicId)),
+    offer: candidateFacingRoleTerms(privateConfig),
+    alignment,
+    revisionCount,
+  };
+}
+
+async function inboundHiringTask(user: User, publicId: string) {
+  const [task] = await getDb()
+    .select()
+    .from(guestTasks)
+    .where(
+      and(
+        eq(guestTasks.publicId, publicId),
+        eq(guestTasks.taskType, "hiring_compatibility"),
+      ),
+    )
+    .limit(1);
+  if (
+    !task ||
+    !task.targetEmailHash ||
+    !matchesGuestEmailHash(task.targetEmailHash, user.email)
+  ) {
+    throw new AgentApiError(404, "Inbound hiring request not found");
+  }
+  if (
+    task.revokedAt ||
+    task.expiresAt <= new Date() ||
+    ["revoked", "expired"].includes(task.status)
+  ) {
+    throw new AgentApiError(
+      410,
+      "This inbound hiring request is no longer active",
+    );
+  }
+  return task;
+}
+
+export async function readInboundHiringRequest(user: User, publicId: string) {
+  const task = await inboundHiringTask(user, publicId);
+  const [latest] = await getDb()
+    .select({ response: guestResponses.response })
+    .from(guestResponses)
+    .where(eq(guestResponses.guestTaskId, task.id))
+    .orderBy(desc(guestResponses.createdAt))
+    .limit(1);
+  return {
+    publicId: task.publicId,
+    title: task.title,
+    description: task.description,
+    offer: candidateFacingRoleTerms(task.privateConfig),
+    candidateFacingUpdate:
+      (task.config as Record<string, unknown>).candidateFacingUpdate ?? null,
+    revisionCount: Number(
+      (task.config as Record<string, unknown>).revisionCount ?? 0,
+    ),
+    status: task.status,
+    expiresAt: task.expiresAt.toISOString(),
+    latestAlignment: latest?.response ?? null,
+    instructions:
+      "Share only expectations your human approved. A ready-for-intro result still requires their final yes.",
+  };
+}
+
+export async function respondToInboundHiringRequest(opts: {
+  user: User;
+  publicId: string;
+  response: unknown;
+  idempotencyKey: unknown;
+  actor?: GuestResponseActor;
+}) {
+  const task = await inboundHiringTask(opts.user, opts.publicId);
+  if (!task.tokenEncrypted) {
+    throw new AgentApiError(
+      409,
+      "This older request can only be answered through its private link",
+    );
+  }
+  return respondToGuestTask({
+    publicId: task.publicId,
+    rawToken: decryptSecret(task.tokenEncrypted),
+    email: opts.user.email,
+    response: opts.response,
+    idempotencyKey: opts.idempotencyKey,
+    clientIp: "agent-authenticated",
+    actor: opts.actor ?? { userId: opts.user.id, kind: "agent" },
+  });
 }
 
 export async function revokeGuestTask(
@@ -527,6 +1095,15 @@ async function resolveGuestTask(publicId: string, rawToken: string) {
 
 export async function readGuestTask(publicId: string, rawToken: string) {
   const task = await resolveGuestTask(publicId, rawToken);
+  const [latestResponse] =
+    task.taskType === "hiring_compatibility"
+      ? await getDb()
+          .select({ response: guestResponses.response })
+          .from(guestResponses)
+          .where(eq(guestResponses.guestTaskId, task.id))
+          .orderBy(desc(guestResponses.createdAt))
+          .limit(1)
+      : [];
   return {
     publicId: task.publicId,
     taskType: task.taskType,
@@ -537,6 +1114,7 @@ export async function readGuestTask(publicId: string, rawToken: string) {
     expiresAt: task.expiresAt.toISOString(),
     requiresEmail: Boolean(task.targetEmailHash),
     remainingResponses: Math.max(0, task.maxResponses - task.responseCount),
+    ...(latestResponse ? { latestAlignment: latestResponse.response } : {}),
   };
 }
 
@@ -583,6 +1161,27 @@ function validateResponse(
   }
 
   if (task.taskType === "hiring_compatibility") {
+    const companyInterest = normalizeHiringEnum<HiringInterest>(
+      response.companyInterest,
+      "companyInterest",
+      ["interested", "open", "not_interested"],
+    );
+    const roleInterest = normalizeHiringEnum<HiringInterest>(
+      response.roleInterest,
+      "roleInterest",
+      ["interested", "open", "not_interested"],
+    );
+    const sharingMode =
+      normalizeHiringEnum<HiringSharingMode>(
+        response.sharingMode,
+        "sharingMode",
+        ["gaps_only", "exact_expectations"],
+      ) ?? "gaps_only";
+    const conversationSignal = normalizeHiringEnum<HiringConversationSignal>(
+      response.conversationSignal,
+      "conversationSignal",
+      ["ready_if_aligned", "open_to_revision", "not_interested"],
+    );
     const compensationMinimum =
       response.compensationMinimum == null
         ? undefined
@@ -595,18 +1194,70 @@ function validateResponse(
     ) {
       throw new AgentApiError(400, "compensationMinimum is invalid");
     }
+    const equityMinimumPercent =
+      response.equityMinimumPercent == null
+        ? undefined
+        : Number(response.equityMinimumPercent);
+    if (
+      equityMinimumPercent != null &&
+      (!Number.isFinite(equityMinimumPercent) ||
+        equityMinimumPercent < 0 ||
+        equityMinimumPercent > 100)
+    ) {
+      throw new AgentApiError(400, "equityMinimumPercent is invalid");
+    }
+    const compensationCurrency = normalizeHiringEnum(
+      response.compensationCurrency,
+      "compensationCurrency",
+      HIRING_CURRENCY_CODES,
+    );
+    const locationRadiusMiles =
+      response.locationRadiusMiles == null
+        ? undefined
+        : Number(response.locationRadiusMiles);
+    if (
+      locationRadiusMiles != null &&
+      (!Number.isFinite(locationRadiusMiles) ||
+        locationRadiusMiles < 0 ||
+        locationRadiusMiles > 500)
+    ) {
+      throw new AgentApiError(400, "locationRadiusMiles is invalid");
+    }
     const earliestStart =
       boundedText(response.earliestStart, "earliestStart", 40) ?? undefined;
     if (earliestStart && Number.isNaN(new Date(earliestStart).getTime())) {
       throw new AgentApiError(400, "earliestStart must be a date");
     }
     const candidate: CandidateConstraints = {
+      ...(companyInterest ? { companyInterest } : {}),
+      ...(roleInterest ? { roleInterest } : {}),
       ...(compensationMinimum == null ? {} : { compensationMinimum }),
-      ...(normalizeStringList(response.locations, "locations")
-        ? { locations: normalizeStringList(response.locations, "locations") }
+      ...(compensationCurrency ? { compensationCurrency } : {}),
+      ...(equityMinimumPercent == null ? {} : { equityMinimumPercent }),
+      ...(normalizeHiringLocations(
+        response.locations,
+        "locations",
+        `guest-task:${task.publicId}`,
+      )
+        ? {
+            locations: normalizeHiringLocations(
+              response.locations,
+              "locations",
+              `guest-task:${task.publicId}`,
+            ),
+          }
         : {}),
+      ...(locationRadiusMiles == null ? {} : { locationRadiusMiles }),
       ...(normalizeStringList(response.workModes, "workModes")
         ? { workModes: normalizeStringList(response.workModes, "workModes") }
+        : {}),
+      ...(normalizeStringList(response.employmentTypes, "employmentTypes")
+        ? {
+            employmentTypes: normalizeStringList(
+              response.employmentTypes,
+              "employmentTypes",
+            ),
+          }
         : {}),
       ...(typeof response.sponsorshipRequired === "boolean"
         ? { sponsorshipRequired: response.sponsorshipRequired }
@@ -614,6 +1265,33 @@ function validateResponse(
       ...(earliestStart ? { earliestStart } : {}),
       ...(normalizeStringList(response.levels, "levels")
         ? { levels: normalizeStringList(response.levels, "levels") }
+        : {}),
+      ...(normalizeStringList(response.roleFocus, "roleFocus")
+        ? { roleFocus: normalizeStringList(response.roleFocus, "roleFocus") }
+        : {}),
+      sharingMode,
+      ...(normalizeStringList(response.priorityDimensions, "priorityDimensions")
+        ? {
+            priorityDimensions: normalizeStringList(
+              response.priorityDimensions,
+              "priorityDimensions",
+            )!.filter((value): value is HiringDimension =>
+              HIRING_DIMENSIONS.includes(value as HiringDimension),
+            ),
+          }
+        : {}),
+      ...(typeof response.recruiterMayRevise === "boolean"
+        ? { recruiterMayRevise: response.recruiterMayRevise }
+        : {}),
+      ...(conversationSignal ? { conversationSignal } : {}),
+      ...(boundedText(response.approvedNote, "approvedNote", 1_000)
+        ? {
+            approvedNote: boundedText(
+              response.approvedNote,
+              "approvedNote",
+              1_000,
+            )!,
+          }
         : {}),
     };
     const match = matchHiringConstraints(
@@ -639,26 +1317,26 @@ function validateResponse(
   return {
     publicResponse: {
       slots: slots.map((slot, index) => {
-      if (!slot || typeof slot !== "object" || Array.isArray(slot)) {
-        throw new AgentApiError(400, `slots[${index}] must be an object`);
-      }
-      const candidate = slot as Record<string, unknown>;
-      const start = new Date(String(candidate.start ?? ""));
-      const end = new Date(String(candidate.end ?? ""));
-      if (
-        Number.isNaN(start.getTime()) ||
-        Number.isNaN(end.getTime()) ||
-        end <= start
-      ) {
-        throw new AgentApiError(400, `slots[${index}] has invalid times`);
-      }
-      return {
-        start: start.toISOString(),
-        end: end.toISOString(),
-        timezone:
-          boundedText(candidate.timezone, `slots[${index}].timezone`, 80) ??
-          "UTC",
-      };
+        if (!slot || typeof slot !== "object" || Array.isArray(slot)) {
+          throw new AgentApiError(400, `slots[${index}] must be an object`);
+        }
+        const candidate = slot as Record<string, unknown>;
+        const start = new Date(String(candidate.start ?? ""));
+        const end = new Date(String(candidate.end ?? ""));
+        if (
+          Number.isNaN(start.getTime()) ||
+          Number.isNaN(end.getTime()) ||
+          end <= start
+        ) {
+          throw new AgentApiError(400, `slots[${index}] has invalid times`);
+        }
+        return {
+          start: start.toISOString(),
+          end: end.toISOString(),
+          timezone:
+            boundedText(candidate.timezone, `slots[${index}].timezone`, 80) ??
+            "UTC",
+        };
       }),
     },
   };
@@ -671,11 +1349,9 @@ export async function respondToGuestTask(opts: {
   response: unknown;
   idempotencyKey: unknown;
   clientIp: string;
+  actor?: GuestResponseActor;
 }) {
-  const idempotencyKey = assertUuid(
-    opts.idempotencyKey,
-    "Idempotency-Key",
-  );
+  const idempotencyKey = assertUuid(opts.idempotencyKey, "Idempotency-Key");
   const email = boundedText(opts.email, "email", 320, {
     required: true,
   })!.toLowerCase();
@@ -755,8 +1431,9 @@ export async function respondToGuestTask(opts: {
   });
 
   await writeAudit({
-    actorUserId: null,
-    actorKind: "guest",
+    actorUserId: opts.actor?.userId ?? null,
+    actorApiKeyId: opts.actor?.apiKeyId ?? null,
+    actorKind: opts.actor?.kind ?? "guest",
     action: "guest_task.responded",
     entityType: "guest_task",
     entityId: task.id,
@@ -768,10 +1445,33 @@ export async function respondToGuestTask(opts: {
     },
   });
 
+  if (task.taskType === "hiring_compatibility" && !result.idempotent) {
+    await deliverHiringInbox({
+      userId: task.organizerUserId,
+      kind: "hiring.candidate_response",
+      summary: `A candidate responded to ${task.title}`,
+      body: {
+        publicId: task.publicId,
+        responseId: result.response.id,
+        instructions:
+          "Call read_guest_task to review approved expectations and alignment gaps. Do not contact the candidate outside the agreed channel.",
+      },
+      dedupeKey: `hiring:${task.id}:response:${result.response.id}`,
+    }).catch((error) => {
+      console.error(
+        "[hiring] recruiter agent response notification failed",
+        error,
+      );
+    });
+  }
+
   return {
     ok: true,
     idempotent: result.idempotent,
     status: "received",
     responseId: result.response.id,
+    ...(task.taskType === "hiring_compatibility"
+      ? { alignment: result.response.response }
+      : {}),
   };
 }

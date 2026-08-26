@@ -83,6 +83,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/join/[token]` | Public / signed-in request | Signed, reusable public connection invitation |
 | `/app/**` | Clerk protected | Dashboard shell |
 | `/app/tasks` | Auth | Task history + request a new task type |
+| `/app/recruiting` | Auth | Choose candidate or employer mode, activate structured private criteria, and create/revise targeted alignment memos |
 | `/app/agent` | Auth | Ask Sage to schedule and choose the primary operator |
 | `/app/discovery` | Auth | Approve discovery profiles and ask Sage to search anonymously |
 | `/app/people` | Auth | Private invites, public links/QRs, approvals, and revocation |
@@ -93,7 +94,8 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/api/google/callback` | Public (OAuth) | OAuth redirect |
 | `/api/v1/*` | Bearer API key | Agent API (me, links, public invites, sessions, intents, schedule, confirms) |
 | `/api/v1/pairings/*` | Public, short-lived | Device-style agent connection |
-| `/api/v1/guest-tasks/*` | Scoped agent | Create/read/revoke guest capabilities |
+| `/api/v1/guest-tasks/*` | Scoped agent | Create/read/revoke guest capabilities and notify/revise hiring requests |
+| `/api/v1/hiring/requests/*` | Scoped candidate agent | Read and answer hiring requests addressed to its human |
 | `/api/guest/tasks/*` | Guest capability | Read/respond to exactly one guest task |
 | `/api/a2a` | Scoped agent | A2A v1 JSON-RPC (`SendMessage`, `GetTask`) |
 | `/api/v1/openapi` | Public | OpenAPI-ish map |
@@ -147,12 +149,18 @@ remain human-gated at booking and introduction boundaries.
 
 ## hiring_compatibility
 
-Agents create a targeted `hiring_compatibility` guest task with employer hard
-constraints in `privateConfig`. Candidates submit compensation floor, location,
-work mode, sponsorship, timing, and level through the no-account guest page.
-HoneyMatcha returns only `compatible`, `incompatible`, or `human_review` plus
-per-dimension results. Candidate raw values are encrypted and never returned to
-the organizer; the result never ranks or automatically rejects candidates.
+The recruiting UI first asks whether the human is looking for work or hiring.
+It uses controlled role, level, employment, work-mode, and sponsorship choices,
+currency-tagged annual compensation, and canonical city anchors with an explicit
+vicinity radius. Agents create a targeted `hiring_compatibility` guest task with
+the same company, role, compensation, equity, work, timing, and scope terms in
+`privateConfig`. After
+explicit recruiter approval, HoneyMatcha can notify a paired candidate agent;
+people without an agent use the same no-account guest link. Candidates choose
+gap-only or exact approved sharing and whether revised outreach is welcome.
+Recruiters may update adjustable terms, re-run the encrypted comparison, and
+inform the candidate agent. A `ready_for_intro` result still requires both
+humans' final yes. The result never ranks or automatically rejects candidates.
 
 ## MCP
 

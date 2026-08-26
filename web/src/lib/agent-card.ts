@@ -6,10 +6,9 @@ export function getAgentCard(baseUrl: string) {
   const discoveryEnabled = discoveryFeatureEnabled();
   return {
     name: "HoneyMatcha",
-    description:
-      discoveryEnabled
-        ? "Helps personal agents discover compatible people for a specific purpose, coordinate privately, and pause for human-approved disclosure and action."
-        : "Helps personal agents coordinate privately and pause for human-approved disclosure and action.",
+    description: discoveryEnabled
+      ? "Helps personal agents discover compatible people for a specific purpose, coordinate privately, and pause for human-approved disclosure and action."
+      : "Helps personal agents coordinate privately and pause for human-approved disclosure and action.",
     supportedInterfaces: [
       {
         url: `${base}/api/a2a`,
@@ -75,10 +74,10 @@ export function getAgentCard(baseUrl: string) {
       },
       {
         id: "hiring-compatibility",
-        name: "Check hiring compatibility",
+        name: "Align recruiting expectations",
         description:
-          "Compare private hard constraints and return only compatibility by dimension, with human review for missing information.",
-        tags: ["hiring", "privacy", "compatibility"],
+          "Let either side create a private recruiting mandate. Candidate agents can accept role briefs through a durable handle link; either side can search the opt-in network, negotiate approved gaps, and arrange a call only after mutual approval.",
+        tags: ["hiring", "search", "privacy", "negotiation", "approval"],
       },
       ...(discoveryEnabled
         ? [

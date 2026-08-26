@@ -279,10 +279,18 @@ test("city typeahead uses the server-side Geoapify adapter and returns no coordi
     });
     assert.equal(result.suggestions[0]?.place.locality, "New York");
     assert.equal("lat" in (result.suggestions[0]?.place ?? {}), false);
+    assert.equal("latitude" in (result.suggestions[0]?.place ?? {}), false);
     assert.equal(
       result.suggestions[0]?.resolutionToken.includes("New York"),
       false,
     );
+    const resolvedCity = consumeLocationResolutionToken(
+      "user-a",
+      result.suggestions[0]?.resolutionToken,
+      "city",
+    );
+    assert.equal(resolvedCity.latitude, 40.7);
+    assert.equal(resolvedCity.longitude, -74);
     const numericPlaceName = await resolveLocationSuggestions({
       userId: "user-a",
       query: "100 Mile House",

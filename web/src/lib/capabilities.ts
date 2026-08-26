@@ -66,11 +66,10 @@ export const CAPABILITIES: Capability[] = [
   },
   {
     id: "hiring",
-    title: "Hiring matches",
-    line: "Compare what a role and a candidate need before either is named.",
+    title: "Recruiting alignment",
+    line: "Surface why outreach missed, revise the role, and introduce people only after the terms align.",
     sage: "ready",
-    href: "/app/discovery",
-    flag: "discovery",
+    href: "/app/recruiting",
     glyph: "briefcase",
   },
   {

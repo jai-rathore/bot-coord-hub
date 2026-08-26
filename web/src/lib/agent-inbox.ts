@@ -261,6 +261,42 @@ export async function deliverDiscoveryInbox(opts: {
   return { inboxId: created.id, callback };
 }
 
+/** Deliver an expectation-alignment handoff to a candidate or recruiter agent. */
+export async function deliverHiringInbox(opts: {
+  userId: string;
+  kind: string;
+  summary: string;
+  body: Record<string, unknown>;
+  dedupeKey: string;
+}): Promise<{ inboxId: string | null; callback: "delivered" | "failed" | "none" }> {
+  const [created] = await getDb()
+    .insert(agentInbox)
+    .values({
+      userId: opts.userId,
+      kind: opts.kind,
+      summary: opts.summary,
+      body: opts.body,
+      dedupeKey: opts.dedupeKey,
+    })
+    .onConflictDoNothing({ target: agentInbox.dedupeKey })
+    .returning();
+  if (!created) return { inboxId: null, callback: "none" };
+
+  await enqueueSageActivityTrigger({
+    userId: opts.userId,
+    sourceId: created.id,
+    trigger: "inbox",
+  });
+  const callback = await postAgentCallbacks({
+    userId: opts.userId,
+    inboxId: created.id,
+    sessionId: null,
+    kind: opts.kind,
+    summary: opts.summary,
+  });
+  return { inboxId: created.id, callback };
+}
+
 /**
  * Deliver one event notification to a human's agent.
  *
@@ -473,7 +509,9 @@ async function postAgentCallbacks(opts: {
     eventId: opts.eventId ?? null,
     kind: opts.kind,
     summary: opts.summary,
-    instructions: opts.eventId
+    instructions: opts.kind.startsWith("hiring.")
+      ? "Call get_inbox, follow the hiring item's instructions, and involve your human before sharing expectations or agreeing to an introduction."
+      : opts.eventId
       ? "Call get_inbox, then get_event_board for this eventId. Answer with respond_to_event once your human has told you what works. Do not lock, cancel, or book anything yourself."
       : "Call get_inbox, then read_board for this session. Do not book a Google Calendar event yourself.",
   });

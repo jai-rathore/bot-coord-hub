@@ -1,6 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  LocationAutocomplete,
+  type CanonicalLocationSuggestion,
+} from "@/components/location-autocomplete";
+import {
+  HIRING_CURRENCIES,
+  HIRING_EMPLOYMENT_TYPES,
+  HIRING_LEVELS,
+  HIRING_RADIUS_OPTIONS,
+  HIRING_ROLE_FAMILIES,
+  HIRING_WORK_MODES,
+  formatHiringMoney,
+} from "@/lib/hiring-options";
 
 type GuestTask = {
   publicId: string;
@@ -15,6 +28,19 @@ type GuestTask = {
   status: string;
   expiresAt: string;
   remainingResponses: number;
+  latestAlignment?: HiringAlignment;
+};
+
+type HiringAlignment = {
+  alignment?: string;
+  verdict?: string;
+  note?: string;
+  nextStep?: string;
+  gaps?: Array<{
+    dimension?: string;
+    message?: string;
+    recruiterCanAdjust?: boolean;
+  }>;
 };
 
 type SlotDraft = {
@@ -27,6 +53,39 @@ function tokenStorageKey(publicId: string) {
   return `honeymatcha:guest:${publicId}`;
 }
 
+function formatLocationValue(value: unknown) {
+  if (typeof value === "string") return value;
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof (value as Record<string, unknown>).label === "string"
+  ) {
+    return String((value as Record<string, unknown>).label);
+  }
+  return "";
+}
+
+function offerValue(
+  key: string,
+  value: unknown,
+  offer: Record<string, unknown>,
+) {
+  if (key === "compensationMaximum") {
+    return formatHiringMoney(value, offer.compensationCurrency);
+  }
+  if (key === "locationRadiusMiles") {
+    return Number(value) === 0
+      ? "Selected cities only"
+      : `Within ${Number(value)} miles`;
+  }
+  if (Array.isArray(value)) {
+    return value.map(formatLocationValue).filter(Boolean).join(", ");
+  }
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return String(value);
+}
+
 export function GuestTaskClient({ publicId }: { publicId: string }) {
   const [token, setToken] = useState<string | null>(null);
   const [task, setTask] = useState<GuestTask | null>(null);
@@ -34,11 +93,23 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
   const [choice, setChoice] = useState("");
   const [text, setText] = useState("");
   const [compensationMinimum, setCompensationMinimum] = useState("");
-  const [locations, setLocations] = useState("");
-  const [workModes, setWorkModes] = useState("");
+  const [compensationCurrency, setCompensationCurrency] = useState("USD");
+  const [equityMinimumPercent, setEquityMinimumPercent] = useState("");
+  const [companyInterest, setCompanyInterest] = useState("open");
+  const [roleInterest, setRoleInterest] = useState("open");
+  const [locations, setLocations] = useState<CanonicalLocationSuggestion[]>([]);
+  const [locationRadiusMiles, setLocationRadiusMiles] = useState("25");
+  const [workMode, setWorkMode] = useState("");
+  const [employmentType, setEmploymentType] = useState("");
   const [sponsorshipRequired, setSponsorshipRequired] = useState("no");
   const [earliestStart, setEarliestStart] = useState("");
-  const [levels, setLevels] = useState("");
+  const [level, setLevel] = useState("");
+  const [roleFocus, setRoleFocus] = useState("");
+  const [sharingMode, setSharingMode] = useState("gaps_only");
+  const [recruiterMayRevise, setRecruiterMayRevise] = useState(true);
+  const [conversationSignal, setConversationSignal] = useState("open_to_revision");
+  const [approvedNote, setApprovedNote] = useState("");
+  const [alignment, setAlignment] = useState<HiringAlignment | null>(null);
   const [slots, setSlots] = useState<SlotDraft[]>([
     { start: "", end: "", timezone: "UTC" },
   ]);
@@ -72,7 +143,22 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
         if (!cancelled) {
           setToken(resolved);
           setTask(data.task);
-          setStatus("ready");
+          const offer = data.task.config?.offer as
+            | Record<string, unknown>
+            | undefined;
+          if (
+            offer &&
+            typeof offer === "object" &&
+            typeof offer.compensationCurrency === "string"
+          ) {
+            setCompensationCurrency(offer.compensationCurrency);
+          }
+          if (data.task.latestAlignment) {
+            setAlignment(data.task.latestAlignment);
+            setStatus("done");
+          } else {
+            setStatus("ready");
+          }
         }
       })
       .catch((reason: unknown) => {
@@ -113,20 +199,30 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
                 compensationMinimum: compensationMinimum
                   ? Number(compensationMinimum)
                   : undefined,
-                locations: locations
-                  .split(",")
-                  .map((value) => value.trim())
-                  .filter(Boolean),
-                workModes: workModes
-                  .split(",")
-                  .map((value) => value.trim())
-                  .filter(Boolean),
+                compensationCurrency: compensationMinimum
+                  ? compensationCurrency
+                  : undefined,
+                equityMinimumPercent: equityMinimumPercent
+                  ? Number(equityMinimumPercent)
+                  : undefined,
+                companyInterest,
+                roleInterest,
+                locations: locations.map(
+                  (location) => location.resolutionToken,
+                ),
+                locationRadiusMiles: locations.length
+                  ? Number(locationRadiusMiles)
+                  : undefined,
+                workModes: workMode ? [workMode] : [],
+                employmentTypes: employmentType ? [employmentType] : [],
                 sponsorshipRequired: sponsorshipRequired === "yes",
                 earliestStart: earliestStart || undefined,
-                levels: levels
-                  .split(",")
-                  .map((value) => value.trim())
-                  .filter(Boolean),
+                levels: level ? [level] : [],
+                roleFocus: roleFocus ? [roleFocus] : [],
+                sharingMode,
+                recruiterMayRevise,
+                conversationSignal,
+                approvedNote: approvedNote || undefined,
               }
           : {
               slots: slots.map((slot) => ({
@@ -150,7 +246,10 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
       );
       const data = await result.json();
       if (!result.ok) throw new Error(data.error ?? "Could not send response");
-      window.sessionStorage.removeItem(tokenStorageKey(publicId));
+      if (task.taskType !== "hiring_compatibility") {
+        window.sessionStorage.removeItem(tokenStorageKey(publicId));
+      }
+      if (data.alignment) setAlignment(data.alignment);
       setStatus("done");
     } catch (reason) {
       setError(
@@ -172,6 +271,47 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
     );
   }
   if (status === "done") {
+    if (task.taskType === "hiring_compatibility") {
+      const gaps = Array.isArray(alignment?.gaps) ? alignment.gaps : [];
+      const ready = alignment?.alignment === "ready_for_intro";
+      return (
+        <div role="status">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-matcha">
+            Private alignment sent
+          </p>
+          <h1 className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold text-matcha-deep">
+            {ready ? "The terms align." : "You can skip the cold reply."}
+          </h1>
+          <p className="mt-3 leading-7 text-muted">
+            {alignment?.note ??
+              "HoneyMatcha sent only the expectations you approved. The recruiter can revise adjustable terms without seeing anything else."}
+          </p>
+          {gaps.length ? (
+            <div className="mt-5 rounded-xl border border-line bg-white/65 p-4">
+              <p className="text-xs font-bold tracking-[0.1em] text-matcha uppercase">
+                What is not aligned yet
+              </p>
+              <ul className="mt-3 space-y-2">
+                {gaps.map((gap, index) => (
+                  <li key={`${gap.dimension}-${index}`} className="flex gap-2 text-sm text-ink">
+                    <span className="mt-1 text-honey" aria-hidden="true">●</span>
+                    <span>{gap.message ?? gap.dimension}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <p className="mt-4 text-sm font-medium leading-6 text-matcha-deep">
+            {alignment?.nextStep ??
+              "Keep this private link. If the recruiter updates the terms, the new alignment will appear here and in your agent's inbox."}
+          </p>
+          <p className="mt-3 text-xs leading-5 text-muted">
+            This tab keeps the scoped capability in session storage so you can
+            see recruiter-approved revisions. It cannot access anything else.
+          </p>
+        </div>
+      );
+    }
     return (
       <div role="status">
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-matcha">
@@ -204,6 +344,40 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
         <p className="mt-3 rounded-lg border border-matcha-soft bg-[rgba(111,154,124,0.08)] p-3 text-sm text-matcha-deep">
           {task.config.privacy}
         </p>
+      ) : null}
+      {task.taskType === "hiring_compatibility" &&
+      task.config.offer &&
+      typeof task.config.offer === "object" ? (
+        <div className="mt-4 rounded-xl border border-line bg-white/68 p-4">
+          <p className="text-xs font-bold tracking-[0.1em] text-matcha uppercase">
+            What the recruiter shared
+          </p>
+          <dl className="mt-3 grid gap-x-5 gap-y-2 text-sm sm:grid-cols-2">
+            {Object.entries(task.config.offer as Record<string, unknown>)
+              .filter(([key]) => key !== "compensationCurrency")
+              .map(([key, value]) => (
+                <div key={key}>
+                  <dt className="text-xs text-muted">
+                    {key
+                      .replace(/([A-Z])/g, " $1")
+                      .replace(/^./, (letter) => letter.toUpperCase())}
+                  </dt>
+                  <dd className="font-medium text-ink">
+                    {offerValue(
+                      key,
+                      value,
+                      task.config.offer as Record<string, unknown>,
+                    )}
+                  </dd>
+                </div>
+              ))}
+          </dl>
+          {typeof task.config.candidateFacingUpdate === "string" ? (
+            <p className="mt-3 border-t border-line pt-3 text-sm leading-6 text-matcha-deep">
+              Latest update: {task.config.candidateFacingUpdate}
+            </p>
+          ) : null}
+        </div>
       ) : null}
       <p className="mt-3 text-xs text-muted">
         Expires {new Date(task.expiresAt).toLocaleString()}
@@ -333,42 +507,125 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
         {task.taskType === "hiring_compatibility" ? (
           <fieldset className="space-y-4">
             <legend className="text-sm font-semibold text-ink">
-              Your private constraints
+              What would make this worth a conversation?
             </legend>
+            <p className="text-xs leading-5 text-muted">
+              Answer only what matters. You decide below whether the recruiter
+              sees exact expectations or only which dimensions need work.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium text-ink">Interest in the company</span>
+                <select
+                  value={companyInterest}
+                  onChange={(event) => setCompanyInterest(event.target.value)}
+                  className="field"
+                >
+                  <option value="interested">Interested</option>
+                  <option value="open">Open if the terms fit</option>
+                  <option value="not_interested">Not interested</option>
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium text-ink">Interest in the role</span>
+                <select
+                  value={roleInterest}
+                  onChange={(event) => setRoleInterest(event.target.value)}
+                  className="field"
+                >
+                  <option value="interested">Interested</option>
+                  <option value="open">Open if the role changes</option>
+                  <option value="not_interested">Not interested</option>
+                </select>
+              </label>
+            </div>
+            <label className="grid gap-1.5 text-sm">
+              <span className="font-medium text-ink">Minimum annual base compensation</span>
+              <span className="grid grid-cols-[7rem_1fr] overflow-hidden rounded-xl border border-line bg-white focus-within:border-matcha-soft focus-within:ring-3 focus-within:ring-matcha/10">
+                <select
+                  aria-label="Compensation currency"
+                  value={compensationCurrency}
+                  onChange={(event) => setCompensationCurrency(event.target.value)}
+                  className="border-r border-line bg-mist/55 px-2 text-sm font-semibold outline-none"
+                >
+                  {HIRING_CURRENCIES.map((option) => (
+                    <option key={option.value} value={option.value}>{option.value}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min="1"
+                  max="10000000"
+                  step="1000"
+                  inputMode="numeric"
+                  value={compensationMinimum}
+                  onChange={(event) => setCompensationMinimum(event.target.value)}
+                  placeholder="150,000"
+                  className="min-h-11 min-w-0 px-3 outline-none"
+                />
+              </span>
+              <span className="text-xs text-muted">Annual base, before bonus or equity.</span>
+            </label>
             <label className="grid gap-1.5 text-sm">
               <span className="font-medium text-ink">
-                Minimum annual compensation
+                Minimum equity percentage
               </span>
               <input
                 type="number"
-                min="1"
-                max="10000000"
-                value={compensationMinimum}
-                onChange={(event) => setCompensationMinimum(event.target.value)}
-                placeholder="For example: 150000"
-                className="rounded-md border border-line bg-white px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
+                min="0"
+                max="100"
+                step="0.001"
+                value={equityMinimumPercent}
+                onChange={(event) => setEquityMinimumPercent(event.target.value)}
+                placeholder="For example: 0.25"
+                className="field"
               />
             </label>
-            <label className="grid gap-1.5 text-sm">
-              <span className="font-medium text-ink">
-                Locations that work
-              </span>
-              <input
-                value={locations}
-                onChange={(event) => setLocations(event.target.value)}
-                placeholder="New York, San Francisco"
-                className="rounded-md border border-line bg-white px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
-              />
-            </label>
-            <label className="grid gap-1.5 text-sm">
-              <span className="font-medium text-ink">Work modes</span>
-              <input
-                value={workModes}
-                onChange={(event) => setWorkModes(event.target.value)}
-                placeholder="Remote, Hybrid"
-                className="rounded-md border border-line bg-white px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
-              />
-            </label>
+            <div className="grid gap-4 rounded-2xl border border-line bg-white/55 p-4 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-end">
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium text-ink">Cities that work</span>
+                <LocationAutocomplete
+                  granularity="city"
+                  multiple
+                  label="Cities that work"
+                  selected={locations}
+                  onChange={setLocations}
+                  resolveEndpoint={`/api/guest/tasks/${encodeURIComponent(publicId)}/locations`}
+                  authorization={token ? `Guest ${token}` : undefined}
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium text-ink">Acceptable vicinity</span>
+                <select value={locationRadiusMiles} onChange={(event) => setLocationRadiusMiles(event.target.value)} className="field">
+                  {HIRING_RADIUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-xs leading-5 text-muted sm:col-span-2">
+                Choose a city anchor and how far around it works. Remote is selected separately.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium text-ink">Work mode</span>
+                <select value={workMode} onChange={(event) => setWorkMode(event.target.value)} className="field">
+                  <option value="">Choose a mode</option>
+                  {HIRING_WORK_MODES.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium text-ink">Employment type</span>
+                <select value={employmentType} onChange={(event) => setEmploymentType(event.target.value)} className="field">
+                  <option value="">Choose a type</option>
+                  {HIRING_EMPLOYMENT_TYPES.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <label className="grid gap-1.5 text-sm">
               <span className="font-medium text-ink">
                 Do you require sponsorship?
@@ -391,18 +648,107 @@ export function GuestTaskClient({ publicId }: { publicId: string }) {
                 className="rounded-md border border-line bg-white px-3 py-2.5"
               />
             </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium text-ink">Seniority</span>
+                <select value={level} onChange={(event) => setLevel(event.target.value)} className="field">
+                  <option value="">Choose a level</option>
+                  {HIRING_LEVELS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium text-ink">Role family</span>
+                <select value={roleFocus} onChange={(event) => setRoleFocus(event.target.value)} className="field">
+                  <option value="">Choose a function</option>
+                  {HIRING_ROLE_FAMILIES.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="rounded-xl border border-matcha-soft/35 bg-matcha-soft/8 p-4">
+              <p className="text-sm font-semibold text-matcha-deep">
+                What may HoneyMatcha tell the recruiter?
+              </p>
+              <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm">
+                <input
+                  type="radio"
+                  name="sharing-mode"
+                  value="gaps_only"
+                  checked={sharingMode === "gaps_only"}
+                  onChange={() => setSharingMode("gaps_only")}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block font-medium text-ink">Alignment gaps only</span>
+                  <span className="text-xs leading-5 text-muted">
+                    Say which areas do not align, without sharing your numbers or lists.
+                  </span>
+                </span>
+              </label>
+              <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm">
+                <input
+                  type="radio"
+                  name="sharing-mode"
+                  value="exact_expectations"
+                  checked={sharingMode === "exact_expectations"}
+                  onChange={() => setSharingMode("exact_expectations")}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block font-medium text-ink">My exact expectations</span>
+                  <span className="text-xs leading-5 text-muted">
+                    Share the values above so the recruiter can decide what they can change.
+                  </span>
+                </span>
+              </label>
+            </div>
+
             <label className="grid gap-1.5 text-sm">
-              <span className="font-medium text-ink">Levels you would accept</span>
-              <input
-                value={levels}
-                onChange={(event) => setLevels(event.target.value)}
-                placeholder="Senior, Staff"
-                className="rounded-md border border-line bg-white px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-matcha"
+              <span className="font-medium text-ink">Your signal</span>
+              <select
+                value={conversationSignal}
+                onChange={(event) => setConversationSignal(event.target.value)}
+                className="field"
+              >
+                <option value="ready_if_aligned">I am ready to talk if these align</option>
+                <option value="open_to_revision">I am open to a revised role</option>
+                <option value="not_interested">I do not want to pursue this</option>
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-sm">
+              <span className="font-medium text-ink">Approved note for the recruiter</span>
+              <textarea
+                rows={3}
+                maxLength={1_000}
+                value={approvedNote}
+                onChange={(event) => setApprovedNote(event.target.value)}
+                placeholder="Optional context your agent may pass along"
+                className="field"
               />
             </label>
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-white/60 p-3 text-sm">
+              <input
+                type="checkbox"
+                checked={recruiterMayRevise}
+                onChange={(event) => setRecruiterMayRevise(event.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-medium text-ink">
+                  The recruiter may revise the role and try again
+                </span>
+                <span className="text-xs leading-5 text-muted">
+                  A revision never accepts a call for you. You keep the final yes.
+                </span>
+              </span>
+            </label>
             <p className="text-xs leading-5 text-muted">
-              HoneyMatcha returns overlap by dimension. It does not rank or
-              automatically reject candidates.
+              HoneyMatcha compares expectations; it does not rank or automatically
+              reject candidates.
             </p>
           </fieldset>
         ) : null}

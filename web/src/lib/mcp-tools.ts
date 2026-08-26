@@ -50,18 +50,23 @@ import {
   patchLinkPolicy,
   postBoardMessage,
   proposeIntent,
+  proposeHiringRole,
+  notifyHiringCandidate,
+  readInboundHiring,
   readGuestTask,
   readBoard,
   requestScheduleMeeting,
   requestDiscoveryInterest,
   resolveDiscoveryLocation,
   respondConfirm,
+  respondInboundHiring,
   getAgentProfile,
   redeemPublicInvite,
   requestAgentConnection,
   revokeGuestTask,
   revokeLink,
   revokePublicInvite,
+  reviseHiringRequest,
   setAgentCallback,
   setDiscoveryCapabilityManifest,
   submitDiscoveryProfile,
@@ -120,7 +125,8 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   },
   {
     name: "ack_inbox",
-    description: "Mark an inbox item as handled after you have taken the next step.",
+    description:
+      "Mark an inbox item as handled after you have taken the next step.",
     inputSchema: {
       type: "object",
       properties: {
@@ -227,7 +233,8 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
       properties: {
         toEmail: {
           type: "string",
-          description: "Recipient email. Open network invitations are not supported.",
+          description:
+            "Recipient email. Open network invitations are not supported.",
         },
         toName: { type: "string", description: "Optional peer display name" },
         scopes: {
@@ -382,7 +389,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
       properties: {
         handle: {
           type: "string",
-          description: "The other person's handle, e.g. \"jai\".",
+          description: 'The other person\'s handle, e.g. "jai".',
         },
         intent: {
           type: "string",
@@ -402,7 +409,8 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   },
   {
     name: "list_sessions",
-    description: "List coordination sessions the authenticated user participates in.",
+    description:
+      "List coordination sessions the authenticated user participates in.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -471,7 +479,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
         supportedIntents: {
           type: "object",
           description:
-            'Map intent slugs to the exact versions returned by list_discovery_capabilities.',
+            "Map intent slugs to the exact versions returned by list_discovery_capabilities.",
           additionalProperties: true,
         },
         platforms: {
@@ -641,7 +649,8 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
         confirmId: { type: "string" },
         sessionId: {
           type: "string",
-          description: "Used when confirmId is omitted: the pending gate on this session.",
+          description:
+            "Used when confirmId is omitted: the pending gate on this session.",
         },
         action: {
           type: "string",
@@ -697,12 +706,157 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
     },
   },
   {
+    name: "propose_hiring_role",
+    description:
+      "Send one recruiter-approved role mandate to the candidate agent behind a shared HoneyMatcha handle. The candidate's private criteria are never returned; their agent can respond with approved gaps, invite revised terms, and require mutual approval before a call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        targetHandle: {
+          type: "string",
+          description:
+            "The handle from the candidate's HoneyMatcha recruiting link.",
+        },
+        title: { type: "string", description: "The real role title." },
+        description: {
+          type: "string",
+          description: "Candidate-facing context about the role and team.",
+        },
+        privateConfig: {
+          type: "object",
+          description:
+            "Recruiter-approved role terms: companyName, roleTitle, compensationMaximum and compensationCurrency, equityMaximumPercent, canonical locations, locationRadiusMiles, workModes, employmentTypes, sponsorshipAvailable, latestStart, levels, and roleFocus.",
+          additionalProperties: true,
+        },
+        idempotencyKey: { type: "string" },
+      },
+      required: ["targetHandle", "title", "privateConfig", "idempotencyKey"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "read_guest_task",
     description: "Read one guest request and its responses.",
     inputSchema: {
       type: "object",
       properties: { publicId: { type: "string" } },
       required: ["publicId"],
+    },
+  },
+  {
+    name: "notify_hiring_candidate",
+    description:
+      "Explicitly place a hiring alignment request in the candidate's HoneyMatcha agent inbox. If they are not on HoneyMatcha, returns instructions to share the private link manually.",
+    inputSchema: {
+      type: "object",
+      properties: { publicId: { type: "string" } },
+      required: ["publicId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "revise_hiring_request",
+    description:
+      "Revise employer-controlled role terms, re-run alignment against the encrypted candidate response, and notify the candidate's agent. Never invent revised terms: get recruiter approval first.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        publicId: { type: "string" },
+        privateConfig: {
+          type: "object",
+          description:
+            "Approved updates such as compensationMaximum, compensationCurrency, equityMaximumPercent, canonical locations, locationRadiusMiles, workModes, employmentTypes, sponsorshipAvailable, latestStart, levels, or roleFocus.",
+          additionalProperties: true,
+        },
+        candidateFacingUpdate: {
+          type: "string",
+          description:
+            "A short recruiter-approved note explaining the revision.",
+        },
+      },
+      required: ["publicId", "privateConfig"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "read_inbound_hiring_request",
+    description:
+      "Read a hiring alignment request addressed to this human, including the current role terms and any revision. Identity is verified from the paired HoneyMatcha account.",
+    inputSchema: {
+      type: "object",
+      properties: { publicId: { type: "string" } },
+      required: ["publicId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "respond_to_hiring_request",
+    description:
+      "Send human-approved candidate expectations to a recruiter agent. The human chooses gap-only or exact sharing. Never infer interest, compensation, equity, or other constraints.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        publicId: { type: "string" },
+        response: {
+          type: "object",
+          properties: {
+            companyInterest: {
+              type: "string",
+              enum: ["interested", "open", "not_interested"],
+            },
+            roleInterest: {
+              type: "string",
+              enum: ["interested", "open", "not_interested"],
+            },
+            compensationMinimum: { type: "number" },
+            compensationCurrency: {
+              type: "string",
+              enum: ["USD", "EUR", "GBP", "CAD", "AUD", "INR", "SGD", "CHF"],
+            },
+            equityMinimumPercent: { type: "number" },
+            locations: { type: "array", items: { type: "string" } },
+            locationRadiusMiles: { type: "number", minimum: 0, maximum: 500 },
+            workModes: { type: "array", items: { type: "string" } },
+            employmentTypes: { type: "array", items: { type: "string" } },
+            sponsorshipRequired: { type: "boolean" },
+            earliestStart: { type: "string" },
+            levels: { type: "array", items: { type: "string" } },
+            roleFocus: { type: "array", items: { type: "string" } },
+            priorityDimensions: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: [
+                  "company",
+                  "role",
+                  "compensation",
+                  "equity",
+                  "location",
+                  "workMode",
+                  "employmentType",
+                  "sponsorship",
+                  "timing",
+                  "level",
+                ],
+              },
+            },
+            sharingMode: {
+              type: "string",
+              enum: ["gaps_only", "exact_expectations"],
+            },
+            recruiterMayRevise: { type: "boolean" },
+            conversationSignal: {
+              type: "string",
+              enum: ["ready_if_aligned", "open_to_revision", "not_interested"],
+            },
+            approvedNote: { type: "string" },
+          },
+          additionalProperties: false,
+        },
+        idempotencyKey: { type: "string" },
+      },
+      required: ["publicId", "response", "idempotencyKey"],
+      additionalProperties: false,
     },
   },
   {
@@ -759,7 +913,8 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
       properties: {
         archived: {
           type: "boolean",
-          description: "When true, list archived events instead of the live list.",
+          description:
+            "When true, list archived events instead of the live list.",
         },
         limit: { type: "number", description: "Page size, 1–100." },
         offset: { type: "number" },
@@ -999,6 +1154,7 @@ const READ_ONLY_TOOLS = new Set([
   "list_confirms",
   "list_guest_tasks",
   "read_guest_task",
+  "read_inbound_hiring_request",
   "list_events",
   "get_event_board",
 ]);
@@ -1012,6 +1168,10 @@ const OPEN_WORLD_TOOLS = new Set([
   "request_schedule_meeting",
   "respond_confirm",
   "create_guest_task",
+  "propose_hiring_role",
+  "notify_hiring_candidate",
+  "revise_hiring_request",
+  "respond_to_hiring_request",
   "create_event",
   "join_event",
   "respond_to_event",
@@ -1036,6 +1196,10 @@ const DESTRUCTIVE_TOOLS = new Set([
   "request_schedule_meeting",
   "respond_confirm",
   "create_guest_task",
+  "propose_hiring_role",
+  "notify_hiring_candidate",
+  "revise_hiring_request",
+  "respond_to_hiring_request",
   "create_event",
   "archive_event",
   "join_event",
@@ -1064,9 +1228,7 @@ export const MCP_TOOLS: McpToolDef[] = BASE_MCP_TOOLS.map((tool) => ({
   ...tool,
   title: toolTitle(tool.name),
   outputSchema: { type: "object", additionalProperties: true },
-  securitySchemes: [
-    { type: "oauth2", scopes: [...MCP_OAUTH_SCOPES] },
-  ],
+  securitySchemes: [{ type: "oauth2", scopes: [...MCP_OAUTH_SCOPES] }],
   annotations: {
     readOnlyHint: READ_ONLY_TOOLS.has(tool.name),
     openWorldHint: OPEN_WORLD_TOOLS.has(tool.name),
@@ -1113,8 +1275,12 @@ export function getMcpTools(): McpToolDef[] {
 function baseUrlFromRequest(request?: Request): string | undefined {
   if (!request) return undefined;
   const url = new URL(request.url);
-  const proto = request.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "");
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? url.host;
+  const proto =
+    request.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "");
+  const host =
+    request.headers.get("x-forwarded-host") ??
+    request.headers.get("host") ??
+    url.host;
   return `${proto}://${host}`;
 }
 
@@ -1160,9 +1326,7 @@ export async function dispatchMcpTool(
           confirmRequired: args.confirmRequired as boolean | undefined,
           timezone: args.timezone as string | null | undefined,
           allowedHours: args.allowedHours as
-            | { start: string; end: string; days?: number[] }
-            | null
-            | undefined,
+            { start: string; end: string; days?: number[] } | null | undefined,
         },
         baseUrl,
       );
@@ -1176,8 +1340,7 @@ export async function dispatchMcpTool(
           confirmRequired: args.confirmRequired as boolean | undefined,
           timezone: args.timezone as string | undefined,
           allowedHours: args.allowedHours as
-            | { start: string; end: string; days?: number[] }
-            | undefined,
+            { start: string; end: string; days?: number[] } | undefined,
         },
         baseUrl,
       );
@@ -1309,16 +1472,44 @@ export async function dispatchMcpTool(
           targetEmail: args.targetEmail as string | undefined,
           config: args.config as Record<string, unknown> | undefined,
           privateConfig: args.privateConfig as
-            | Record<string, unknown>
-            | undefined,
+            Record<string, unknown> | undefined,
           expiresInMinutes: args.expiresInMinutes as number | undefined,
           maxResponses: args.maxResponses as number | undefined,
           sessionId: args.sessionId as string | undefined,
         },
         baseUrl,
       );
+    case "propose_hiring_role":
+      return proposeHiringRole(
+        auth,
+        {
+          targetHandle: args.targetHandle,
+          title: args.title,
+          description: args.description,
+          privateConfig: args.privateConfig,
+          idempotencyKey: args.idempotencyKey,
+        },
+        baseUrl,
+      );
     case "read_guest_task":
       return readGuestTask(auth, String(args.publicId ?? ""));
+    case "notify_hiring_candidate":
+      return notifyHiringCandidate(auth, String(args.publicId ?? ""));
+    case "revise_hiring_request":
+      return reviseHiringRequest(auth, {
+        publicId: String(args.publicId ?? ""),
+        privateConfig: args.privateConfig as
+          Record<string, unknown> | undefined,
+        candidateFacingUpdate: args.candidateFacingUpdate as string | undefined,
+      });
+    case "read_inbound_hiring_request":
+      return readInboundHiring(auth, String(args.publicId ?? ""));
+    case "respond_to_hiring_request":
+      return respondInboundHiring(auth, {
+        publicId: String(args.publicId ?? ""),
+        response: args.response as Record<string, unknown> | undefined,
+        idempotencyKey: args.idempotencyKey as string | undefined,
+      });
     case "create_event":
       return agentCreateEvent(auth, args, baseUrl);
     case "list_events":
@@ -1385,9 +1576,7 @@ export function mcpToolError(err: unknown, issuer?: string) {
           ),
         },
       ],
-      ...(challenge
-        ? { _meta: { "mcp/www_authenticate": [challenge] } }
-        : {}),
+      ...(challenge ? { _meta: { "mcp/www_authenticate": [challenge] } } : {}),
     };
   }
   const message = err instanceof Error ? err.message : "Unknown error";

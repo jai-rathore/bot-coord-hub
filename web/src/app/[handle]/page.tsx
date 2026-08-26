@@ -9,6 +9,7 @@ import { MeetCard } from "@/components/meet-card";
 import { MeetCode } from "@/components/meet-code";
 import { ProfileConnectForm } from "@/components/profile-connect-form";
 import { SiteHeader } from "@/components/site-header";
+import { SageGuestRequestForm } from "@/components/sage-guest-request-form";
 import {
   connectPromptForHandle,
   getProfileForUser,
@@ -25,9 +26,7 @@ export const dynamic = "force-dynamic";
 function originFromHeaders(headers: Headers) {
   const proto = headers.get("x-forwarded-proto") ?? "https";
   const host =
-    headers.get("x-forwarded-host") ??
-    headers.get("host") ??
-    "honeymatcha.io";
+    headers.get("x-forwarded-host") ?? headers.get("host") ?? "honeymatcha.io";
   return `${proto}://${host}`;
 }
 
@@ -39,7 +38,10 @@ export async function generateMetadata({
   const { handle } = await params;
   const profile = await getPublicAgentProfile(handle, PRODUCTION_ORIGIN);
   if (!profile) {
-    return { title: "Agent not found", robots: { index: false, follow: false } };
+    return {
+      title: "Agent not found",
+      robots: { index: false, follow: false },
+    };
   }
   return {
     title: `${profile.displayName} · HoneyMatcha`,
@@ -84,6 +86,8 @@ export default async function PublicAgentPage({
   // thing the person actually came here to do rather than on a bio.
   const query = await searchParams;
   const scanned = query.meet === "1" && !isOwner;
+  const hiringBrief =
+    query.hire === "1" && !isOwner && Boolean(profile.recruiting);
   const carriedIntent: MeetChoice | null = isMeetChoice(query.intent)
     ? query.intent
     : null;
@@ -139,6 +143,39 @@ export default async function PublicAgentPage({
                 Manage this page in <Link href="/app/settings">Settings</Link>.
               </p>
             </section>
+          ) : hiringBrief ? (
+            <section className="mt-8">
+              <Show when="signed-out">
+                <div className="lane-you rounded-2xl p-6 sm:p-7">
+                  <span className="lane-tag">Role brief</span>
+                  <h2 className="mt-3 font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
+                    Bring the role, not another cold message.
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-muted">
+                    Sign in as the recruiter or hiring manager. HoneyMatcha
+                    sends the role to {profile.displayName}&apos;s agent, which
+                    can return approved gaps without exposing private criteria.
+                  </p>
+                  <SignInButton
+                    mode="redirect"
+                    forceRedirectUrl={`/${profile.handle}?hire=1`}
+                  >
+                    <button
+                      type="button"
+                      className="button-primary mt-5 w-full cursor-pointer sm:w-auto"
+                    >
+                      Sign in to share the role
+                    </button>
+                  </SignInButton>
+                </div>
+              </Show>
+              <Show when="signed-in">
+                <SageGuestRequestForm
+                  targetHandle={profile.handle}
+                  targetName={profile.displayName}
+                />
+              </Show>
+            </section>
           ) : scanned && meetEnabled ? (
             <div className="mt-8">
               <MeetCard
@@ -192,7 +229,9 @@ export default async function PublicAgentPage({
               <span>
                 <span className="lane-tag">Agent mode</span>
                 <span className="mt-3 block font-[family-name:var(--font-fraunces)] text-xl font-semibold text-[#f4f8f4]">
-                  {isOwner ? "Hand this to an agent" : "Or let the agents do it"}
+                  {isOwner
+                    ? "Hand this to an agent"
+                    : "Or let the agents do it"}
                 </span>
               </span>
               <span
@@ -203,12 +242,20 @@ export default async function PublicAgentPage({
               </span>
             </summary>
             <p className="mt-4 text-sm leading-6 text-[#cfe0d3]">
-              {isOwner
-                ? "Anyone can give this prompt to their AI agent. It requests a connection with yours, and you still approve it."
-                : `Paste this into your agent. It asks ${profile.displayName} for a connection: nothing happens until both sides approve.`}
+              {hiringBrief
+                ? `Give your recruiting agent the prompt below. It can send approved role terms to ${profile.displayName}'s agent and wait for a private alignment signal.`
+                : isOwner
+                  ? "Anyone can give this prompt to their AI agent. It requests a connection with yours, and you still approve it."
+                  : `Paste this into your agent. It asks ${profile.displayName} for a connection: nothing happens until both sides approve.`}
             </p>
             <div className="mt-4">
-              <CopyBlock text={connectPromptForHandle(profile.handle, origin)} />
+              <CopyBlock
+                text={
+                  hiringBrief
+                    ? `Connect to ${origin}/api/mcp as my agent if needed. Read the recruiting profile at ${origin}/${profile.handle}?hire=1. Ask me for the approved role terms, then call propose_hiring_role with targetHandle "${profile.handle}". Do not invent compensation or other terms. Let the candidate's agent return the alignment signal and ask me before requesting an introduction or call.`
+                    : connectPromptForHandle(profile.handle, origin)
+                }
+              />
             </div>
             <p className="mt-4 text-sm text-[#cfe0d3]">
               {profile.agent.connected

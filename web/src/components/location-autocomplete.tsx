@@ -17,6 +17,8 @@ export type CanonicalLocationSuggestion = {
     region?: string;
     locality?: string;
     neighborhood?: string;
+    latitude?: number;
+    longitude?: number;
   };
 };
 
@@ -26,12 +28,16 @@ export function LocationAutocomplete({
   onChange,
   multiple = false,
   label,
+  resolveEndpoint = "/api/discovery",
+  authorization,
 }: {
   granularity: "country" | "region" | "city" | "neighborhood";
   selected: CanonicalLocationSuggestion[];
   onChange: (value: CanonicalLocationSuggestion[]) => void;
   multiple?: boolean;
   label: string;
+  resolveEndpoint?: string;
+  authorization?: string;
 }) {
   const listboxId = useId();
   const [query, setQuery] = useState("");
@@ -58,11 +64,16 @@ export function LocationAutocomplete({
       setBusy(true);
       setError(null);
       try {
-        const response = await fetch("/api/discovery", {
+        const response = await fetch(resolveEndpoint, {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            ...(authorization ? { Authorization: authorization } : {}),
+          },
           body: JSON.stringify({
-            action: "resolve_location",
+            ...(resolveEndpoint === "/api/discovery"
+              ? { action: "resolve_location" }
+              : {}),
             query: normalized,
             granularity,
             limit: 5,
@@ -104,7 +115,7 @@ export function LocationAutocomplete({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [granularity, multiple, query, selected]);
+  }, [authorization, granularity, multiple, query, resolveEndpoint, selected]);
 
   function select(suggestion: CanonicalLocationSuggestion) {
     requestSequence.current += 1;

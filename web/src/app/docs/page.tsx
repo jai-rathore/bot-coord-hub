@@ -671,17 +671,23 @@ curl -s "$BASE/api/mcp" \\
             id="hiring-title"
             className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
           >
-            Hiring compatibility
+            Recruiting alignment
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
             Use <code>create_guest_task</code> with{" "}
             <code>taskType: &quot;hiring_compatibility&quot;</code>, a target
-            email, and employer hard constraints in <code>privateConfig</code>.
-            The candidate submits private constraints through the expiring
-            guest link. HoneyMatcha returns only compatibility by dimension;
-            raw candidate values stay encrypted and are never returned to the
-            organizer. Results require human review and never rank or
-            automatically reject a candidate.
+            email, and employer terms in <code>privateConfig</code>. Then call{" "}
+            <code>notify_hiring_candidate</code> when the recruiter approves the
+            outreach. A paired candidate agent can read and answer through{" "}
+            <code>read_inbound_hiring_request</code> and{" "}
+            <code>respond_to_hiring_request</code>; otherwise the candidate uses
+            the expiring guest link. The candidate chooses gap-only or exact
+            approved sharing. Annual compensation must include an ISO currency;
+            work areas use canonical city choices plus an explicit vicinity,
+            with remote work modeled separately. Recruiters can call <code>revise_hiring_request</code>{" "}
+            to update adjustable terms and re-run alignment. Raw responses stay
+            encrypted, results never rank candidates, and a ready result still
+            requires both humans&apos; final yes.
           </p>
         </section>
 

@@ -6,6 +6,8 @@ import {
   LocationAutocomplete,
   type CanonicalLocationSuggestion,
 } from "@/components/location-autocomplete";
+import { CopyBlock } from "@/components/copy-block";
+import { HiringProfileForm } from "@/components/hiring-profile-form";
 import { SageDiscoveryConversation } from "@/components/sage-discovery-conversation";
 
 type Question = {
@@ -24,12 +26,7 @@ type Question = {
   sensitivity: "discoverable" | "private" | "disclose_after_match";
   sourcePolicy?: "human_only" | "human_or_agent_with_approval";
   options: string[] | null;
-  locationGranularity:
-    | "country"
-    | "region"
-    | "city"
-    | "neighborhood"
-    | null;
+  locationGranularity: "country" | "region" | "city" | "neighborhood" | null;
   retentionDays: number;
 };
 
@@ -143,12 +140,14 @@ function candidatesFromJob(
 ): SageCandidate[] {
   const candidates = job.result?.candidates;
   if (!Array.isArray(candidates)) return [];
-  return candidates.filter(
-    (candidate): candidate is SageCandidate =>
-      Boolean(candidate) &&
-      typeof candidate === "object" &&
-      typeof (candidate as SageCandidate).recommendationId === "string",
-  ).map((candidate) => ({ ...candidate, intentSlug }));
+  return candidates
+    .filter(
+      (candidate): candidate is SageCandidate =>
+        Boolean(candidate) &&
+        typeof candidate === "object" &&
+        typeof (candidate as SageCandidate).recommendationId === "string",
+    )
+    .map((candidate) => ({ ...candidate, intentSlug }));
 }
 
 function QuestionInput({
@@ -223,12 +222,14 @@ export function DiscoveryManager({
   initialRecommendations,
   initialCadences,
   initialAudit,
+  hideIntentSwitcher = false,
 }: {
   initialIntents: IntentItem[];
   initialInterests: InterestItem[];
   initialRecommendations: DiscoveryRecommendation[];
   initialCadences: DiscoveryCadence[];
   initialAudit: AuditItem[];
+  hideIntentSwitcher?: boolean;
 }) {
   const [intents, setIntents] = useState(initialIntents);
   const [interests, setInterests] = useState(initialInterests);
@@ -279,6 +280,21 @@ export function DiscoveryManager({
   const visibleCandidates = sageCandidates.filter(
     (candidate) => candidate.intentSlug === selectedSlug,
   );
+  const hiringSide = useMemo(() => {
+    if (selected?.slug !== "hiring_compatibility") return null;
+    const review = selected.currentEnrollment.ownerReview;
+    const participantType = review
+      ? {
+          ...review.claims.public,
+          ...review.claims.private,
+          ...review.claims.disclosureAfterMatch,
+        }.participantType
+      : null;
+    return participantType === "candidate" || participantType === "employer"
+      ? participantType
+      : null;
+  }, [selected]);
+  const hiringTarget = hiringSide === "candidate" ? "roles" : "candidates";
 
   useEffect(() => {
     if (!selectedSlug) return;
@@ -303,7 +319,9 @@ export function DiscoveryManager({
           (candidate) => new Date(candidate.expiresAt).getTime() > Date.now(),
         );
         setSageCandidates((current) => {
-          const byId = new Map(current.map((candidate) => [candidate.recommendationId, candidate]));
+          const byId = new Map(
+            current.map((candidate) => [candidate.recommendationId, candidate]),
+          );
           for (const candidate of latestCandidates) {
             byId.set(candidate.recommendationId, candidate);
           }
@@ -360,7 +378,9 @@ export function DiscoveryManager({
       if (next.state === "completed") {
         const candidates = candidatesFromJob(next, selectedSlug);
         setSageCandidates((current) => {
-          const byId = new Map(current.map((candidate) => [candidate.recommendationId, candidate]));
+          const byId = new Map(
+            current.map((candidate) => [candidate.recommendationId, candidate]),
+          );
           for (const candidate of candidates) {
             byId.set(candidate.recommendationId, candidate);
           }
@@ -444,7 +464,9 @@ export function DiscoveryManager({
         job?: SageDiscoveryJob;
       };
       if (!response.ok || !data.job) {
-        throw new Error(data.error ?? "Sage could not prepare this introduction");
+        throw new Error(
+          data.error ?? "Sage could not prepare this introduction",
+        );
       }
       for (let attempt = 0; attempt < 30; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1_500));
@@ -458,7 +480,9 @@ export function DiscoveryManager({
         const next = jobsData.jobs?.find((job) => job.id === data.job?.id);
         if (!next || ["pending", "running"].includes(next.state)) continue;
         if (["failed", "dead_letter"].includes(next.state)) {
-          throw new Error(next.lastError ?? "Sage could not prepare this introduction");
+          throw new Error(
+            next.lastError ?? "Sage could not prepare this introduction",
+          );
         }
         break;
       }
@@ -499,8 +523,7 @@ export function DiscoveryManager({
           action: "set_cadence",
           intentSlug: selected.slug,
           enabled: changes.enabled ?? selectedCadence.enabled,
-          intervalHours:
-            changes.intervalHours ?? selectedCadence.intervalHours,
+          intervalHours: changes.intervalHours ?? selectedCadence.intervalHours,
           maxRecommendations:
             changes.maxRecommendations ?? selectedCadence.maxRecommendations,
           notifyOnNew: changes.notifyOnNew ?? selectedCadence.notifyOnNew,
@@ -514,7 +537,9 @@ export function DiscoveryManager({
         throw new Error(data.error ?? "Could not save automatic discovery");
       }
       setCadences((current) => [
-        ...current.filter((item) => item.intentSlug !== data.cadence!.intentSlug),
+        ...current.filter(
+          (item) => item.intentSlug !== data.cadence!.intentSlug,
+        ),
         data.cadence!,
       ]);
       setMessage(
@@ -601,7 +626,10 @@ export function DiscoveryManager({
         }
         if (question.type === "number") {
           const parsed = Number(raw);
-          if (question.key === "age" && (!Number.isInteger(parsed) || parsed < 18)) {
+          if (
+            question.key === "age" &&
+            (!Number.isInteger(parsed) || parsed < 18)
+          ) {
             throw new Error("Dating requires a confirmed age of 18 or older.");
           }
           claims[question.key] = parsed;
@@ -611,8 +639,7 @@ export function DiscoveryManager({
           question.type === "boolean" ? raw === "true" : raw;
       }
       const locationBody =
-        selected.discovery.locationGranularity === "none" ||
-        !coarseLocation[0]
+        selected.discovery.locationGranularity === "none" || !coarseLocation[0]
           ? undefined
           : {
               resolutionToken: coarseLocation[0].resolutionToken,
@@ -666,7 +693,9 @@ export function DiscoveryManager({
             : intent,
         ),
       );
-      setMessage(`Enrollment ${decision === "approve" ? "approved" : decision}d.`);
+      setMessage(
+        `Enrollment ${decision === "approve" ? "approved" : decision}d.`,
+      );
     } catch (requestError) {
       setError(
         requestError instanceof Error ? requestError.message : "Request failed",
@@ -678,20 +707,15 @@ export function DiscoveryManager({
 
   async function interestAction(
     interestId: string,
-    action:
-      | "confirm_request"
-      | "accept"
-      | "decline"
-      | "block"
-      | "report",
+    action: "confirm_request" | "accept" | "decline" | "block" | "report",
   ) {
     setBusy(true);
     setError(null);
     try {
       await discoveryAction(
         action === "confirm_request" ||
-        action === "accept" ||
-        action === "decline"
+          action === "accept" ||
+          action === "decline"
           ? {
               action: "decide_interest",
               interestId,
@@ -736,10 +760,10 @@ export function DiscoveryManager({
         action === "confirm_request"
           ? "Your introduction request is approved. The anonymous participant has been notified."
           : action === "accept"
-          ? "Mutual interest confirmed. Only approved introduction fields were released."
-          : action === "report"
-            ? "Report submitted and participant blocked."
-            : `Participant ${action}ed.`,
+            ? "Mutual interest confirmed. Only approved introduction fields were released."
+            : action === "report"
+              ? "Report submitted and participant blocked."
+              : `Participant ${action}ed.`,
       );
       if (action === "accept") refresh();
     } catch (requestError) {
@@ -755,31 +779,33 @@ export function DiscoveryManager({
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)]">
       <div className="space-y-8">
         <section className="surface-card p-5 sm:p-7">
-          <div className="flex flex-wrap gap-2">
-            {intents.map((intent) => (
-              <button
-                key={intent.slug}
-                type="button"
-                onClick={() => {
-                  setSelectedSlug(intent.slug);
-                  setValues({});
-                  setLocationValues({});
-                  setCoarseLocation([]);
-                  setClearFields(new Set());
-                  setSageJob(null);
-                  setMessage(null);
-                  setError(null);
-                }}
-                className={`rounded-full px-3 py-2 text-sm font-semibold ${
-                  selectedSlug === intent.slug
-                    ? "bg-matcha-deep text-white"
-                    : "border border-line bg-white text-matcha-deep"
-                }`}
-              >
-                {intent.name}
-              </button>
-            ))}
-          </div>
+          {!hideIntentSwitcher ? (
+            <div className="flex flex-wrap gap-2">
+              {intents.map((intent) => (
+                <button
+                  key={intent.slug}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSlug(intent.slug);
+                    setValues({});
+                    setLocationValues({});
+                    setCoarseLocation([]);
+                    setClearFields(new Set());
+                    setSageJob(null);
+                    setMessage(null);
+                    setError(null);
+                  }}
+                  className={`rounded-full px-3 py-2 text-sm font-semibold ${
+                    selectedSlug === intent.slug
+                      ? "bg-matcha-deep text-white"
+                      : "border border-line bg-white text-matcha-deep"
+                  }`}
+                >
+                  {intent.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {selected ? (
             <div className="mt-6">
@@ -804,92 +830,100 @@ export function DiscoveryManager({
                 </span>
               </div>
 
-              <div className="mt-6 space-y-5">
-                <SageDiscoveryConversation
-                  key={selected.slug}
+              {selected.slug === "hiring_compatibility" ? (
+                <HiringProfileForm
                   intentSlug={selected.slug}
-                  intentName={selected.name}
-                  onEnrollmentPrepared={reloadDiscoveryState}
+                  enrollment={selected.currentEnrollment}
+                  onSaved={reloadDiscoveryState}
                 />
+              ) : (
+                <div className="mt-6 space-y-5">
+                  <SageDiscoveryConversation
+                    key={selected.slug}
+                    intentSlug={selected.slug}
+                    intentName={selected.name}
+                    onEnrollmentPrepared={reloadDiscoveryState}
+                  />
 
-                {selected.enrollment.questions.map((question) => (
-                  <label key={question.key} className="block">
-                    <span className="text-sm font-semibold text-ink">
-                      {question.prompt}
-                      {question.required ? " *" : ""}
-                    </span>
-                    {question.description ? (
-                      <span className="mt-1 block text-xs leading-5 text-muted">
-                        {question.description}
+                  {selected.enrollment.questions.map((question) => (
+                    <label key={question.key} className="block">
+                      <span className="text-sm font-semibold text-ink">
+                        {question.prompt}
+                        {question.required ? " *" : ""}
                       </span>
-                    ) : null}
-                    <span className="mt-1 block text-xs text-muted">
-                      {sensitivityLabel(question.sensitivity)}
-                      {question.sourcePolicy === "human_only"
-                        ? " · you must enter this yourself"
-                        : ""}{" "}
-                      · retained up to {question.retentionDays} days
-                    </span>
-                    {question.type === "location_list" ? (
-                      <div className="mt-2">
-                        <LocationAutocomplete
-                          key={`${selected.slug}:${question.key}`}
-                          granularity={question.locationGranularity ?? "city"}
-                          multiple
-                          label={question.prompt}
-                          selected={locationValues[question.key] ?? []}
-                          onChange={(locations) =>
-                            setLocationValues((current) => ({
+                      {question.description ? (
+                        <span className="mt-1 block text-xs leading-5 text-muted">
+                          {question.description}
+                        </span>
+                      ) : null}
+                      <span className="mt-1 block text-xs text-muted">
+                        {sensitivityLabel(question.sensitivity)}
+                        {question.sourcePolicy === "human_only"
+                          ? " · you must enter this yourself"
+                          : ""}{" "}
+                        · retained up to {question.retentionDays} days
+                      </span>
+                      {question.type === "location_list" ? (
+                        <div className="mt-2">
+                          <LocationAutocomplete
+                            key={`${selected.slug}:${question.key}`}
+                            granularity={question.locationGranularity ?? "city"}
+                            multiple
+                            label={question.prompt}
+                            selected={locationValues[question.key] ?? []}
+                            onChange={(locations) =>
+                              setLocationValues((current) => ({
+                                ...current,
+                                [question.key]: locations,
+                              }))
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <QuestionInput
+                          question={question}
+                          value={values[question.key] ?? ""}
+                          onChange={(value) =>
+                            setValues((current) => ({
                               ...current,
-                              [question.key]: locations,
+                              [question.key]: value,
                             }))
                           }
                         />
-                      </div>
-                    ) : (
-                      <QuestionInput
-                        question={question}
-                        value={values[question.key] ?? ""}
-                        onChange={(value) =>
-                          setValues((current) => ({
-                            ...current,
-                            [question.key]: value,
-                          }))
-                        }
-                      />
-                    )}
-                    {selected.currentEnrollment.ownerReview &&
-                    Object.values(
-                      selected.currentEnrollment.ownerReview.claims,
-                    ).some(
-                      (claims) => claims[question.key] !== undefined,
-                    ) ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setClearFields((current) => {
-                            const next = new Set(current);
-                            if (next.has(question.key)) next.delete(question.key);
-                            else next.add(question.key);
-                            return next;
-                          })
-                        }
-                        className={`mt-2 text-xs font-semibold ${
-                          clearFields.has(question.key)
-                            ? "text-danger"
-                            : "text-muted"
-                        }`}
-                      >
-                        {clearFields.has(question.key)
-                          ? "This saved value will be removed"
-                          : "Clear saved value"}
-                      </button>
-                    ) : null}
-                  </label>
-                ))}
-              </div>
+                      )}
+                      {selected.currentEnrollment.ownerReview &&
+                      Object.values(
+                        selected.currentEnrollment.ownerReview.claims,
+                      ).some((claims) => claims[question.key] !== undefined) ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setClearFields((current) => {
+                              const next = new Set(current);
+                              if (next.has(question.key))
+                                next.delete(question.key);
+                              else next.add(question.key);
+                              return next;
+                            })
+                          }
+                          className={`mt-2 text-xs font-semibold ${
+                            clearFields.has(question.key)
+                              ? "text-danger"
+                              : "text-muted"
+                          }`}
+                        >
+                          {clearFields.has(question.key)
+                            ? "This saved value will be removed"
+                            : "Clear saved value"}
+                        </button>
+                      ) : null}
+                    </label>
+                  ))}
+                </div>
+              )}
 
-              {selected.discovery.locationGranularity !== "none" ? (
+              {selected.slug !== "hiring_compatibility" &&
+              selected.discovery.locationGranularity !== "none" ? (
                 <fieldset className="mt-7 rounded-2xl border border-line bg-mist/40 p-4">
                   <legend className="px-1 text-sm font-semibold text-matcha-deep">
                     Coarse location for private matching
@@ -897,9 +931,9 @@ export function DiscoveryManager({
                   <p className="mb-4 text-xs leading-5 text-muted">
                     HoneyMatcha does not accept GPS coordinates. This location
                     remains private until your disclosure policy allows it.
-                    Choose a canonical suggestion so spelling and aliases do
-                    not create false mismatches. City and neighborhood search
-                    text is sent to Geoapify without your HoneyMatcha identity.
+                    Choose a canonical suggestion so spelling and aliases do not
+                    create false mismatches. City and neighborhood search text
+                    is sent to Geoapify without your HoneyMatcha identity.
                   </p>
                   {selected.currentEnrollment.ownerReview?.location &&
                   !coarseLocation.length ? (
@@ -940,10 +974,7 @@ export function DiscoveryManager({
                     key={`${selected.slug}:${selected.discovery.locationGranularity}`}
                     granularity={
                       selected.discovery.locationGranularity as
-                        | "country"
-                        | "region"
-                        | "city"
-                        | "neighborhood"
+                        "country" | "region" | "city" | "neighborhood"
                     }
                     label="Coarse location for private matching"
                     selected={coarseLocation}
@@ -1008,14 +1039,16 @@ export function DiscoveryManager({
               ) : null}
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={submitEnrollment}
-                  className="rounded-xl bg-matcha-deep px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                >
-                  Save and activate
-                </button>
+                {selected.slug !== "hiring_compatibility" ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={submitEnrollment}
+                    className="rounded-xl bg-matcha-deep px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    Save and activate
+                  </button>
+                ) : null}
                 {selected.currentEnrollment.status === "pending_approval" ? (
                   <button
                     type="button"
@@ -1049,27 +1082,59 @@ export function DiscoveryManager({
               </div>
 
               {selected.currentEnrollment.status === "active" ? (
-                <section className="mt-8 border-t border-line pt-6" aria-labelledby="sage-discovery-title">
+                <section
+                  className="mt-8 border-t border-line pt-6"
+                  aria-labelledby="sage-discovery-title"
+                >
                   <h3
                     id="sage-discovery-title"
                     className="font-[family-name:var(--font-fraunces)] text-xl font-semibold text-matcha-deep"
                   >
-                    Let Sage search
+                    {hiringSide
+                      ? `Let Sage search for aligned ${hiringTarget}`
+                      : "Let Sage search"}
                   </h3>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-                    Sage uses the enrollment you approved. Results stay anonymous,
-                    private answers remain hidden, and Sage cannot request an
-                    introduction without you.
+                    {hiringSide
+                      ? `This is an agent mandate, not a listing. Sage compares your approved constraints with private ${hiringTarget === "roles" ? "role" : "candidate"} mandates and brings you only credible reasons to talk.`
+                      : "Sage uses the enrollment you approved. Results stay anonymous, private answers remain hidden, and Sage cannot request an introduction without you."}
                   </p>
+                  {hiringSide ? (
+                    <ol className="mt-5 grid overflow-hidden rounded-2xl border border-line bg-white/70 sm:grid-cols-4">
+                      {[
+                        ["Mandate", "Your private criteria"],
+                        ["Scan", `Agent finds ${hiringTarget}`],
+                        ["Align", "Agents surface gaps"],
+                        ["Meet", "Humans approve a call"],
+                      ].map(([label, detail], index) => (
+                        <li
+                          key={label}
+                          className="border-b border-line p-3 last:border-b-0 sm:border-r sm:border-b-0 sm:last:border-r-0"
+                        >
+                          <span className="font-mono text-[0.65rem] font-bold text-matcha">
+                            {String(index + 1).padStart(2, "0")} · {label}
+                          </span>
+                          <span className="mt-1 block text-xs leading-5 text-muted">
+                            {detail}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : null}
                   <button
                     type="button"
-                    disabled={busy || ["pending", "running"].includes(sageJob?.state ?? "")}
+                    disabled={
+                      busy ||
+                      ["pending", "running"].includes(sageJob?.state ?? "")
+                    }
                     onClick={askSageToSearch}
                     className="mt-4 rounded-xl bg-matcha-deep px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                   >
                     {["pending", "running"].includes(sageJob?.state ?? "")
                       ? "Sage is searching…"
-                      : "Ask Sage to find possibilities"}
+                      : hiringSide
+                        ? `Ask Sage to find aligned ${hiringTarget}`
+                        : "Ask Sage to find possibilities"}
                   </button>
 
                   <div className="mt-5 rounded-2xl border border-matcha-soft/45 bg-matcha-soft/8 p-4">
@@ -1159,24 +1224,27 @@ export function DiscoveryManager({
                           className="rounded-2xl border border-line bg-white/70 p-4"
                         >
                           <p className="text-sm font-semibold text-ink">
-                            Anonymous possibility
+                            {hiringSide
+                              ? "Private fit signal"
+                              : "Anonymous possibility"}
                           </p>
-                          {Object.keys(candidate.untrustedParticipantData).length ? (
+                          {Object.keys(candidate.untrustedParticipantData)
+                            .length ? (
                             <dl className="mt-3 space-y-2 text-sm">
-                              {Object.entries(candidate.untrustedParticipantData).map(
-                                ([key, value]) => (
-                                  <div key={key}>
-                                    <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
-                                      {key.replaceAll("_", " ")}
-                                    </dt>
-                                    <dd className="mt-0.5 text-ink">
-                                      {Array.isArray(value)
-                                        ? value.join(", ")
-                                        : String(value)}
-                                    </dd>
-                                  </div>
-                                ),
-                              )}
+                              {Object.entries(
+                                candidate.untrustedParticipantData,
+                              ).map(([key, value]) => (
+                                <div key={key}>
+                                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+                                    {key.replaceAll("_", " ")}
+                                  </dt>
+                                  <dd className="mt-0.5 text-ink">
+                                    {Array.isArray(value)
+                                      ? value.join(", ")
+                                      : String(value)}
+                                  </dd>
+                                </div>
+                              ))}
                             </dl>
                           ) : (
                             <p className="mt-2 text-sm text-muted">
@@ -1209,7 +1277,13 @@ export function DiscoveryManager({
                         </article>
                       ))}
                     </div>
-                  ) : null}
+                  ) : (
+                    <p className="mt-5 rounded-2xl border border-dashed border-line px-4 py-5 text-sm leading-6 text-muted">
+                      {hiringSide
+                        ? `No ${hiringTarget} are waiting yet. Run a private scan now or let Sage keep looking on a cadence.`
+                        : "No anonymous possibilities are waiting right now."}
+                    </p>
+                  )}
                 </section>
               ) : null}
             </div>
@@ -1228,7 +1302,10 @@ export function DiscoveryManager({
             {interests.length ? (
               interests.map((interest) => (
                 <article
-                  key={interest.id ?? `${interest.intentSlug}-${interest.createdAt}`}
+                  key={
+                    interest.id ??
+                    `${interest.intentSlug}-${interest.createdAt}`
+                  }
                   className="rounded-2xl border border-line bg-white/70 p-4"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1257,7 +1334,9 @@ export function DiscoveryManager({
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() => interestAction(interest.id!, "decline")}
+                          onClick={() =>
+                            interestAction(interest.id!, "decline")
+                          }
                           className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-muted"
                         >
                           Decline
@@ -1280,15 +1359,66 @@ export function DiscoveryManager({
                       </button>
                     ) : null}
                   </div>
-                  <pre className="mt-3 overflow-x-auto rounded-xl bg-mist p-3 text-xs leading-5 text-muted">
-                    {JSON.stringify(
-                      interest.status === "accepted"
-                        ? interest.disclosure
-                        : interest.compatibility,
-                      null,
-                      2,
-                    )}
-                  </pre>
+                  {interest.intentSlug === "hiring_compatibility" ? (
+                    <div className="mt-3 rounded-xl bg-mist p-3 text-sm leading-6 text-muted">
+                      <p>
+                        {String(
+                          interest.compatibility.note ??
+                            "The private fit signal remains sealed until both people approve.",
+                        )}
+                      </p>
+                      {interest.status === "accepted" && interest.disclosure ? (
+                        <div className="mt-3 border-t border-line pt-3">
+                          <p className="text-xs font-bold tracking-[0.08em] text-matcha uppercase">
+                            Approved introduction details
+                          </p>
+                          <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                            {Object.entries(
+                              (interest.disclosure.untrustedParticipantData as
+                                Record<string, unknown> | undefined) ?? {},
+                            ).map(([key, value]) => (
+                              <div key={key}>
+                                <dt className="text-xs font-semibold text-muted">
+                                  {key.replaceAll("_", " ")}
+                                </dt>
+                                <dd className="text-ink">
+                                  {Array.isArray(value)
+                                    ? value.join(", ")
+                                    : String(value)}
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                          <div className="mt-4 rounded-xl border border-matcha-soft/35 bg-white/75 p-3">
+                            <p className="text-sm font-semibold text-matcha-deep">
+                              Ready for the agents to coordinate a call
+                            </p>
+                            <p className="mt-1 text-xs leading-5 text-muted">
+                              Your agent can compare free and busy time, propose
+                              a call, and pause for both people&apos;s final
+                              approval.
+                            </p>
+                            <div className="mt-3">
+                              <CopyBlock
+                                text="Review my accepted HoneyMatcha recruiting introduction, then use request_schedule_meeting to coordinate a call. Show me the proposed time and wait for my approval before anything is booked."
+                                label="Copy call handoff for my agent"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <pre className="mt-3 overflow-x-auto rounded-xl bg-mist p-3 text-xs leading-5 text-muted">
+                      {JSON.stringify(
+                        interest.status === "accepted"
+                          ? interest.disclosure
+                          : interest.compatibility,
+                        null,
+                        2,
+                      )}
+                    </pre>
+                  )}
                   {interest.id ? (
                     <div className="mt-3 flex gap-3 text-xs">
                       <button
@@ -1328,16 +1458,23 @@ export function DiscoveryManager({
           <ul className="mt-4 space-y-3 text-sm leading-6 text-muted">
             <li>Discoverable does not mean identifiable.</li>
             <li>Compatibility does not reveal private answers.</li>
-            <li>Both people approve before introduction fields are released.</li>
+            <li>
+              Both people approve before introduction fields are released.
+            </li>
             <li>Blocking overrides matching and revokes disclosure.</li>
           </ul>
         </section>
         <section className="surface-card p-5">
-          <h2 className="font-semibold text-matcha-deep">Recent privacy events</h2>
+          <h2 className="font-semibold text-matcha-deep">
+            Recent privacy events
+          </h2>
           <div className="mt-4 space-y-3">
             {audit.length ? (
               audit.slice(0, 12).map((item) => (
-                <div key={item.id} className="border-b border-line pb-3 text-xs">
+                <div
+                  key={item.id}
+                  className="border-b border-line pb-3 text-xs"
+                >
                   <p className="font-semibold text-ink">
                     {item.action.replaceAll("_", " ").replaceAll(".", " · ")}
                   </p>

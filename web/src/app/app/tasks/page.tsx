@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { PageHeading } from "@/components/page-heading";
 import { TaskRequestForm } from "@/components/task-request-form";
-import { SageGuestRequestForm } from "@/components/sage-guest-request-form";
 import { listRegistryIntents } from "@/lib/intents";
 import { intentLabel, taskStatusLabel } from "@/lib/intent-labels";
 import { isVisibleHomeTask } from "@/lib/home-status";
@@ -74,9 +73,21 @@ export default async function TasksPage() {
         )}
       </section>
 
-      <div className="mt-10">
-        <SageGuestRequestForm />
-      </div>
+      <section className="mt-10 rounded-2xl border border-matcha-soft/35 bg-matcha-soft/8 p-5 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:p-6">
+        <div>
+          <p className="section-kicker">Recruiting</p>
+          <h2 className="mt-1 font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-matcha-deep">
+            Align before the first call
+          </h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
+            Share role terms, learn candidate-approved expectations, and revise
+            the offer without another cold outreach loop.
+          </p>
+        </div>
+        <Link href="/app/recruiting" className="button-primary mt-4 shrink-0 sm:mt-0">
+          Open recruiting
+        </Link>
+      </section>
 
       <div className="mt-10">
         <TaskRequestForm supportedTasks={supportedTasks} />

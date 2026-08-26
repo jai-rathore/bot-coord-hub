@@ -65,6 +65,11 @@ export function MobileTabBar({
   ];
 
   const overflow: Destination[] = [];
+  overflow.push({
+    href: "/app/recruiting",
+    label: "Recruiting",
+    glyph: "briefcase",
+  });
   if (discoveryEnabled) {
     overflow.push({
       href: "/app/discovery",

@@ -86,6 +86,14 @@ export function AppNav({
       item: { href: "/app/people", label: "Connections", hint: "People and agents you know" },
       icon: "people",
     },
+    {
+      item: {
+        href: "/app/recruiting",
+        label: "Recruiting",
+        hint: "Align role and candidate expectations",
+      },
+      icon: "briefcase",
+    },
   ];
 
   if (discoveryEnabled) {

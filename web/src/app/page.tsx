@@ -5,6 +5,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { BrandAtmosphere } from "@/components/brand-atmosphere";
 import { CapabilityOverview } from "@/components/capability-overview";
 import { HomeHero } from "@/components/home-hero";
+import { RecruitingAlignmentSection } from "@/components/recruiting-alignment-section";
 import { SignedInHome } from "@/components/signed-in-home";
 import type { SageProactiveUpdate } from "@/components/sage-proactive-updates";
 import { SiteHeader } from "@/components/site-header";
@@ -168,7 +169,11 @@ export default async function HomePage() {
       </div>
 
       <main className="mx-auto w-full max-w-[72rem] flex-1 py-14 sm:py-20">
+        <RecruitingAlignmentSection />
+
+        <div className="mt-16 sm:mt-24">
         <CapabilityOverview />
+        </div>
 
         <section
           aria-labelledby="how-title"

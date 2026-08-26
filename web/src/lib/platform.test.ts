@@ -240,6 +240,121 @@ test("hiring compatibility returns dimensions without raw values", () => {
   assert.equal(review.verdict, "human_review");
 });
 
+test("recruiting alignment exposes approved gaps and supports revised terms", () => {
+  const candidate = {
+    companyInterest: "open" as const,
+    roleInterest: "interested" as const,
+    compensationMinimum: 210_000,
+    equityMinimumPercent: 0.3,
+    locations: ["New York"],
+    workModes: ["Remote"],
+    sponsorshipRequired: false,
+    earliestStart: "2026-10-01",
+    levels: ["Staff"],
+    roleFocus: ["AI infrastructure"],
+    sharingMode: "gaps_only" as const,
+    recruiterMayRevise: true,
+    conversationSignal: "ready_if_aligned" as const,
+  };
+  const first = matchHiringConstraints(
+    {
+      compensationMaximum: 190_000,
+      equityMaximumPercent: 0.2,
+      locations: ["New York"],
+      workModes: ["Remote"],
+      sponsorshipAvailable: true,
+      latestStart: "2026-11-01",
+      levels: ["Staff"],
+      roleFocus: ["AI infrastructure"],
+    },
+    candidate,
+  );
+  assert.equal(first.alignment, "revisable");
+  assert.deepEqual(
+    first.gaps.map((gap) => gap.dimension),
+    ["compensation", "equity"],
+  );
+  assert.equal(first.shareableExpectations, undefined);
+
+  const revised = matchHiringConstraints(
+    {
+      compensationMaximum: 220_000,
+      equityMaximumPercent: 0.4,
+      locations: ["New York"],
+      workModes: ["Remote"],
+      sponsorshipAvailable: true,
+      latestStart: "2026-11-01",
+      levels: ["Staff"],
+      roleFocus: ["AI infrastructure"],
+    },
+    { ...candidate, sharingMode: "exact_expectations" },
+  );
+  assert.equal(revised.alignment, "ready_for_intro");
+  assert.equal(revised.gaps.length, 0);
+  assert.equal(revised.shareableExpectations?.compensationMinimum, 210_000);
+  assert.equal("compensationMaximum" in revised, false);
+
+  const companyDeclined = matchHiringConstraints(
+    { compensationMaximum: 250_000 },
+    {
+      companyInterest: "not_interested",
+      compensationMinimum: 200_000,
+      recruiterMayRevise: true,
+      conversationSignal: "open_to_revision",
+    },
+  );
+  assert.equal(companyDeclined.alignment, "not_aligned");
+  assert.match(companyDeclined.nextStep, /Do not push/);
+});
+
+test("recruiting uses explicit currencies and city vicinity", () => {
+  const nearby = matchHiringConstraints(
+    {
+      compensationMaximum: 200_000,
+      compensationCurrency: "USD",
+      locations: [
+        {
+          canonicalKey: "city:seattle",
+          label: "Seattle, WA",
+          latitude: 47.6062,
+          longitude: -122.3321,
+        },
+      ],
+      locationRadiusMiles: 10,
+      employmentTypes: ["Full-time"],
+    },
+    {
+      compensationMinimum: 180_000,
+      compensationCurrency: "USD",
+      locations: [
+        {
+          canonicalKey: "city:tacoma",
+          label: "Tacoma, WA",
+          latitude: 47.2529,
+          longitude: -122.4443,
+        },
+      ],
+      locationRadiusMiles: 30,
+      employmentTypes: ["Full-time"],
+    },
+  );
+  assert.equal(nearby.dimensions.location, "compatible");
+  assert.equal(nearby.dimensions.compensation, "compatible");
+  assert.equal(nearby.dimensions.employmentType, "compatible");
+
+  const differentCurrency = matchHiringConstraints(
+    {
+      compensationMaximum: 200_000,
+      compensationCurrency: "USD",
+    },
+    {
+      compensationMinimum: 120_000,
+      compensationCurrency: "EUR",
+    },
+  );
+  assert.equal(differentCurrency.dimensions.compensation, "incompatible");
+});
+
 test("connect copy uses the production origin and never asks agents to sign in", () => {
   assert.equal(PRODUCTION_ORIGIN, "https://honeymatcha.io");
   assert.equal(GROK_BOT_URL, "https://x.ai/bot");

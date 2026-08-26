@@ -3,6 +3,7 @@ export type NavGlyph =
   | "events"
   | "people"
   | "discovery"
+  | "briefcase"
   | "code"
   | "approvals"
   | "agent"
@@ -28,6 +29,12 @@ const PATHS: Record<NavGlyph, React.ReactNode> = {
     <>
       <circle cx="11" cy="11" r="6" />
       <path d="m16 16 4 4M11 8v6M8 11h6" />
+    </>
+  ),
+  briefcase: (
+    <>
+      <rect x="3.5" y="7" width="17" height="12" rx="2" />
+      <path d="M9 7V5h6v2M3.5 12.5c4.8 2.1 12.2 2.1 17 0M10.5 13.5h3" />
     </>
   ),
   code: (

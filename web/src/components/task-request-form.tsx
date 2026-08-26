@@ -55,7 +55,7 @@ export function TaskRequestForm({
       task.slug === "schedule_meeting"
         ? "Use HoneyMatcha to schedule a meeting with [person] sometime next week."
         : task.slug === "hiring_compatibility"
-          ? "Use HoneyMatcha to privately check hiring compatibility with [candidate email]. Ask me for the role's compensation ceiling, locations, work modes, sponsorship availability, latest start date, and levels before creating the request."
+          ? "Use HoneyMatcha to align recruiting expectations with [candidate email]. Ask me for the company, role, compensation ceiling, equity, role scope, locations, work modes, sponsorship, timing, and level. Notify the candidate's agent only after I approve the outreach; if they share gaps, help me revise terms before asking for a call."
         : `Use HoneyMatcha to ${task.name.toLowerCase()}.`;
     await navigator.clipboard.writeText(prompt);
     setCopied(task.slug);

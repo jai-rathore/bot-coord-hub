@@ -8,11 +8,7 @@
 
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import {
-  confirms,
-  intentProposals,
-  type Confirm,
-} from "@/db/schema";
+import { confirms, intentProposals, type Confirm } from "@/db/schema";
 import {
   findDedupeHits,
   isExactDedupeConflict,
@@ -59,8 +55,13 @@ import {
 } from "@/lib/confirms";
 import {
   createGuestTask as createScopedGuestTask,
+  createHiringProposalForHandle,
   getGuestTaskForOrganizer,
   listGuestTasksForOrganizer,
+  notifyHiringCandidateAgent,
+  readInboundHiringRequest,
+  respondToInboundHiringRequest,
+  reviseHiringGuestTask,
   revokeGuestTask as revokeScopedGuestTask,
 } from "@/lib/guest-tasks";
 import {
@@ -97,16 +98,12 @@ async function assertDiscoveryRate(
 ) {
   let result: Awaited<ReturnType<typeof distributedRateLimit>>;
   try {
-    result = await distributedRateLimit(
-      `${action}:${auth.user.id}`,
-      limit,
-    );
+    result = await distributedRateLimit(`${action}:${auth.user.id}`, limit);
   } catch {
-    throw new AgentApiError(
-      503,
-      "Discovery is temporarily unavailable",
-      { code: "rate_limiter_unavailable", retryAfterSec: 5 },
-    );
+    throw new AgentApiError(503, "Discovery is temporarily unavailable", {
+      code: "rate_limiter_unavailable",
+      retryAfterSec: 5,
+    });
   }
   if (!result.ok) {
     throw new AgentApiError(429, "Discovery rate limit exceeded", {
@@ -122,11 +119,10 @@ async function assertDiscoveryRate(
       24 * 60 * 60 * 1000,
     );
   } catch {
-    throw new AgentApiError(
-      503,
-      "Discovery is temporarily unavailable",
-      { code: "rate_limiter_unavailable", retryAfterSec: 5 },
-    );
+    throw new AgentApiError(503, "Discovery is temporarily unavailable", {
+      code: "rate_limiter_unavailable",
+      retryAfterSec: 5,
+    });
   }
   if (!daily.ok) {
     throw new AgentApiError(429, "Daily discovery privacy budget exceeded", {
@@ -254,7 +250,10 @@ export async function approveConnection(
   assertAgentScope(auth, "people:write");
   const linkId = body.linkId?.trim();
   if (!linkId) {
-    throw new AgentApiError(400, "linkId is required: take it from list_links.");
+    throw new AgentApiError(
+      400,
+      "linkId is required: take it from list_links.",
+    );
   }
   try {
     const result = await approveConnectionRequest({
@@ -327,10 +326,7 @@ export async function createInvite(
   }
 }
 
-export async function listPublicInvites(
-  auth: AgentAuth,
-  baseUrl = "",
-) {
+export async function listPublicInvites(auth: AgentAuth, baseUrl = "") {
   assertAgentScope(auth, "people:read");
   try {
     return {
@@ -552,7 +548,10 @@ export async function ackInbox(auth: AgentAuth, inboxId: string) {
   return { ok: true, item: await ackInboxItem({ user: auth.user, inboxId }) };
 }
 
-export async function setAgentCallback(auth: AgentAuth, callbackUrl?: string | null) {
+export async function setAgentCallback(
+  auth: AgentAuth,
+  callbackUrl?: string | null,
+) {
   assertAgentScope(auth, "profile:read");
   return {
     ok: true,
@@ -606,10 +605,34 @@ export async function createGuestTask(
   };
 }
 
-export async function readGuestTask(
+export async function proposeHiringRole(
   auth: AgentAuth,
-  publicId: string,
+  body: {
+    targetHandle?: unknown;
+    title?: unknown;
+    description?: unknown;
+    privateConfig?: unknown;
+    idempotencyKey?: unknown;
+  },
+  baseUrl?: string,
 ) {
+  assertAgentScope(auth, "guest_tasks:write");
+  return {
+    ok: true,
+    ...(await createHiringProposalForHandle({
+      organizer: auth.user,
+      targetHandle: body.targetHandle,
+      title: body.title,
+      description: body.description,
+      privateConfig: body.privateConfig,
+      idempotencyKey: body.idempotencyKey,
+      origin: baseUrl ?? "",
+      actor: { kind: "agent", apiKeyId: auth.apiKey.id },
+    })),
+  };
+}
+
+export async function readGuestTask(auth: AgentAuth, publicId: string) {
   assertAgentScope(auth, "guest_tasks:read");
   return {
     ok: true,
@@ -617,10 +640,66 @@ export async function readGuestTask(
   };
 }
 
-export async function revokeGuestTask(
+export async function notifyHiringCandidate(auth: AgentAuth, publicId: string) {
+  assertAgentScope(auth, "guest_tasks:write");
+  return {
+    ok: true,
+    ...(await notifyHiringCandidateAgent({ organizer: auth.user, publicId })),
+  };
+}
+
+export async function reviseHiringRequest(
   auth: AgentAuth,
-  publicId: string,
+  body: {
+    publicId: string;
+    privateConfig?: Record<string, unknown>;
+    candidateFacingUpdate?: string;
+  },
 ) {
+  assertAgentScope(auth, "guest_tasks:write");
+  return {
+    ok: true,
+    ...(await reviseHiringGuestTask({
+      organizer: auth.user,
+      publicId: body.publicId,
+      privateConfig: body.privateConfig,
+      candidateFacingUpdate: body.candidateFacingUpdate,
+      actor: { kind: "agent", apiKeyId: auth.apiKey.id },
+    })),
+  };
+}
+
+export async function readInboundHiring(auth: AgentAuth, publicId: string) {
+  assertAgentScope(auth, "guest_tasks:read");
+  return {
+    ok: true,
+    request: await readInboundHiringRequest(auth.user, publicId),
+  };
+}
+
+export async function respondInboundHiring(
+  auth: AgentAuth,
+  body: {
+    publicId: string;
+    response?: Record<string, unknown>;
+    idempotencyKey?: string;
+  },
+) {
+  assertAgentScope(auth, "guest_tasks:write");
+  return respondToInboundHiringRequest({
+    user: auth.user,
+    publicId: body.publicId,
+    response: body.response,
+    idempotencyKey: body.idempotencyKey,
+    actor: {
+      userId: auth.user.id,
+      apiKeyId: auth.apiKey.id,
+      kind: "agent",
+    },
+  });
+}
+
+export async function revokeGuestTask(auth: AgentAuth, publicId: string) {
   assertAgentScope(auth, "guest_tasks:write");
   return {
     ok: true,
@@ -752,11 +831,10 @@ export async function listDiscoveryCapabilities(auth: AgentAuth) {
     agentAccess: {
       canSearch: enabled && hasAgentScope(auth, "discovery:read"),
       canEnrollOrRequest: enabled && hasAgentScope(auth, "discovery:write"),
-      instructions:
-        !enabled
-          ? "Secure discovery is currently disabled."
-          : hasAgentScope(auth, "discovery:read") &&
-        hasAgentScope(auth, "discovery:write")
+      instructions: !enabled
+        ? "Secure discovery is currently disabled."
+        : hasAgentScope(auth, "discovery:read") &&
+            hasAgentScope(auth, "discovery:write")
           ? "This agent connection can use discovery after declaring supported intent versions."
           : "This existing agent connection predates discovery scopes. Ask the human to re-pair the agent before using discovery.",
     },
@@ -871,9 +949,7 @@ export async function requestDiscoveryInterest(
   assertDiscoveryEnabled();
   await assertDiscoveryRate(auth, "interest", 10);
   const candidateHandle =
-    typeof body.candidateHandle === "string"
-      ? body.candidateHandle.trim()
-      : "";
+    typeof body.candidateHandle === "string" ? body.candidateHandle.trim() : "";
   if (!candidateHandle) {
     throw new AgentApiError(400, "candidateHandle is required");
   }
@@ -903,9 +979,7 @@ export async function listDiscoveryRequests(auth: AgentAuth) {
   const supported = manifest?.supportedIntents ?? {};
   const allowed = new Set(
     catalog
-      .filter(
-        (intent) => supported[intent.slug] === intent.definitionVersion,
-      )
+      .filter((intent) => supported[intent.slug] === intent.definitionVersion)
       .map((intent) => intent.slug),
   );
   return {
@@ -981,15 +1055,18 @@ export async function proposeIntent(
   }
   const description =
     boundedText(body.description, "description", 2_000) ?? null;
-  const category =
-    boundedText(body.category, "category", 60) ?? "coordination";
+  const category = boundedText(body.category, "category", 60) ?? "coordination";
   const hits = await findDedupeHits(name, slug);
   const exact = isExactDedupeConflict(hits, name, slug);
 
   if (exact) {
-    throw new AgentApiError(409, "An intent with this name or slug already exists", {
-      hits,
-    });
+    throw new AgentApiError(
+      409,
+      "An intent with this name or slug already exists",
+      {
+        hits,
+      },
+    );
   }
   if (hits.length > 0 && !body.force) {
     throw new AgentApiError(
@@ -1132,16 +1209,15 @@ export async function respondConfirm(
   }
 
   const db = getDb();
-  let confirmRow =
-    body.confirmId
-      ? (
-          await db
-            .select()
-            .from(confirms)
-            .where(eq(confirms.id, body.confirmId))
-            .limit(1)
-        )[0]
-      : undefined;
+  let confirmRow = body.confirmId
+    ? (
+        await db
+          .select()
+          .from(confirms)
+          .where(eq(confirms.id, body.confirmId))
+          .limit(1)
+      )[0]
+    : undefined;
 
   if (!confirmRow && body.sessionId) {
     const pending = await db

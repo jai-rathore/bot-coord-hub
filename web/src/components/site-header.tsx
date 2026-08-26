@@ -12,6 +12,7 @@ import { BrandLink } from "@/components/brand-link";
 /** The marketing pages are one scroll now, so the header carries the one link
  *  that leaves them rather than an anchor into a section that no longer exists. */
 const SECONDARY_LINKS = [
+  { href: "/#recruiting-loop", label: "How recruiting works" },
   { href: "/agents", label: "Bring your own agent" },
 ] as const;
 

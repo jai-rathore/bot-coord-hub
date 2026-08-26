@@ -26,6 +26,9 @@ export type CanonicalLocation = {
   region?: string;
   locality?: string;
   neighborhood?: string;
+  /** City-centroid coordinates used only for coarse distance matching. */
+  latitude?: number;
+  longitude?: number;
 };
 
 export type LocationSuggestion = {
@@ -47,6 +50,8 @@ type GeoapifyProperties = {
   suburb?: unknown;
   district?: unknown;
   address_line1?: unknown;
+  lat?: unknown;
+  lon?: unknown;
 };
 
 type GeoapifyResponse = {
@@ -269,6 +274,8 @@ export function canonicalLocationFromGeoapify(
     return null;
   }
   const formatted = propertyText(properties.formatted, 300);
+  const latitude = Number(properties.lat);
+  const longitude = Number(properties.lon);
   const label =
     formatted ??
     [neighborhood, locality, region, country.country]
@@ -288,6 +295,12 @@ export function canonicalLocationFromGeoapify(
     ...(region ? { region } : {}),
     locality,
     ...(neighborhood ? { neighborhood } : {}),
+    ...(Number.isFinite(latitude) && latitude >= -90 && latitude <= 90
+      ? { latitude }
+      : {}),
+    ...(Number.isFinite(longitude) && longitude >= -180 && longitude <= 180
+      ? { longitude }
+      : {}),
   };
 }
 
@@ -316,6 +329,20 @@ function validateCanonicalLocation(value: unknown): CanonicalLocation {
     !place.country
   ) {
     throw new AgentApiError(400, "Location resolution is malformed");
+  }
+  if (
+    (place.latitude != null &&
+      (typeof place.latitude !== "number" ||
+        !Number.isFinite(place.latitude) ||
+        place.latitude < -90 ||
+        place.latitude > 90)) ||
+    (place.longitude != null &&
+      (typeof place.longitude !== "number" ||
+        !Number.isFinite(place.longitude) ||
+        place.longitude < -180 ||
+        place.longitude > 180))
+  ) {
+    throw new AgentApiError(400, "Location coordinates are malformed");
   }
   return place as CanonicalLocation;
 }
@@ -509,9 +536,16 @@ export async function resolveLocationSuggestions(opts: {
       granularity === "country" || granularity === "region"
         ? "ISO 3166"
         : "Powered by Geoapify; © OpenStreetMap contributors",
-    suggestions: places.slice(0, limit).map((place) => ({
-      place,
-      resolutionToken: issueLocationResolutionToken(opts.userId, place),
-    })),
+    suggestions: places.slice(0, limit).map((place) => {
+      const publicPlace = { ...place };
+      delete publicPlace.latitude;
+      delete publicPlace.longitude;
+      return {
+        place: publicPlace,
+        // The signed token keeps only a city centroid for server-side vicinity
+        // matching. Coordinates are never returned to the browser.
+        resolutionToken: issueLocationResolutionToken(opts.userId, place),
+      };
+    }),
   };
 }

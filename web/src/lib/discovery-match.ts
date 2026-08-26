@@ -1,6 +1,7 @@
 import {
   matchHiringConstraints,
   type CandidateConstraints,
+  type HiringLocation,
   type RoleConstraints,
 } from "@/lib/hiring-match";
 import type {
@@ -39,23 +40,36 @@ function strings(value: unknown): string[] | undefined {
     : undefined;
 }
 
-function locationKeys(value: unknown): string[] | undefined {
+function hiringLocations(value: unknown): HiringLocation[] | undefined {
   if (!Array.isArray(value)) return undefined;
-  const keys = value
+  const locations = value
     .map((item) => {
       if (typeof item === "string") return item;
       if (
         item &&
         typeof item === "object" &&
         !Array.isArray(item) &&
-        typeof (item as Record<string, unknown>).canonicalKey === "string"
+        (typeof (item as Record<string, unknown>).canonicalKey === "string" ||
+          typeof (item as Record<string, unknown>).label === "string")
       ) {
-        return String((item as Record<string, unknown>).canonicalKey);
+        const location = item as Record<string, unknown>;
+        return {
+          ...(typeof location.canonicalKey === "string"
+            ? { canonicalKey: location.canonicalKey }
+            : {}),
+          ...(typeof location.label === "string" ? { label: location.label } : {}),
+          ...(typeof location.latitude === "number"
+            ? { latitude: location.latitude }
+            : {}),
+          ...(typeof location.longitude === "number"
+            ? { longitude: location.longitude }
+            : {}),
+        };
       }
       return null;
     })
-    .filter((item): item is string => Boolean(item));
-  return keys.length ? keys : undefined;
+    .filter((item): item is HiringLocation => Boolean(item));
+  return locations.length ? locations : undefined;
 }
 
 function numberValue(value: unknown): number | undefined {
@@ -73,11 +87,16 @@ function stringValue(value: unknown): string | undefined {
 function roleConstraints(claims: Record<string, unknown>): RoleConstraints {
   return {
     compensationMaximum: numberValue(claims.compensationMaximum),
-    locations: locationKeys(claims.locations),
+    compensationCurrency: stringValue(claims.compensationCurrency),
+    equityMaximumPercent: numberValue(claims.equityMaximumPercent),
+    locations: hiringLocations(claims.locations),
+    locationRadiusMiles: numberValue(claims.locationRadiusMiles),
     workModes: strings(claims.workModes),
+    employmentTypes: strings(claims.employmentTypes),
     sponsorshipAvailable: booleanValue(claims.sponsorshipAvailable),
     latestStart: stringValue(claims.latestStart),
     levels: strings(claims.levels),
+    roleFocus: strings(claims.roleFocus),
   };
 }
 
@@ -86,11 +105,16 @@ function candidateConstraints(
 ): CandidateConstraints {
   return {
     compensationMinimum: numberValue(claims.compensationMinimum),
-    locations: locationKeys(claims.locations),
+    compensationCurrency: stringValue(claims.compensationCurrency),
+    equityMinimumPercent: numberValue(claims.equityMinimumPercent),
+    locations: hiringLocations(claims.locations),
+    locationRadiusMiles: numberValue(claims.locationRadiusMiles),
     workModes: strings(claims.workModes),
+    employmentTypes: strings(claims.employmentTypes),
     sponsorshipRequired: booleanValue(claims.sponsorshipRequired),
     earliestStart: stringValue(claims.earliestStart),
     levels: strings(claims.levels),
+    roleFocus: strings(claims.roleFocus),
   };
 }
 

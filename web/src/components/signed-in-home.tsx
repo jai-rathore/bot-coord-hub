@@ -40,6 +40,13 @@ export function SignedInHome({
   const displayName = firstName ?? "there";
   const activeAgent = agentConnected ? "your connected agent" : sageName;
   const journeys = [
+    {
+      href: "/app/recruiting",
+      title: "Align a recruiting conversation",
+      body: "Let candidate and recruiter agents surface fit gaps before either person commits to a call.",
+      detail: "Company, role, compensation, equity",
+      glyph: "briefcase" as const,
+    },
     ...(eventsEnabled
       ? [
           {
@@ -104,7 +111,7 @@ export function SignedInHome({
             </h2>
             <p className="text-xs text-muted">Every panel below opens a workflow.</p>
           </div>
-          <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {journeys.map((journey) => (
               <Link
                 key={journey.href}

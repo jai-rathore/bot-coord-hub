@@ -34,7 +34,11 @@ dynamic  /api/google/callback
 dynamic  /api/google/disconnect
 dynamic  /api/google/start
 dynamic  /api/guest/tasks/[publicId]
+dynamic  /api/guest/tasks/[publicId]/locations
 dynamic  /api/guest/tasks/[publicId]/respond
+dynamic  /api/hiring/proposals
+dynamic  /api/hiring/tasks/[publicId]/notify
+dynamic  /api/hiring/tasks/[publicId]/revise
 dynamic  /api/intents
 dynamic  /api/intents/[id]/decide
 dynamic  /api/intents/dedupe
@@ -85,8 +89,13 @@ dynamic  /api/v1/events/[id]/subscribe
 dynamic  /api/v1/events/[id]/suggest-option
 dynamic  /api/v1/guest-tasks
 dynamic  /api/v1/guest-tasks/[publicId]
+dynamic  /api/v1/guest-tasks/[publicId]/notify
+dynamic  /api/v1/guest-tasks/[publicId]/revise
 dynamic  /api/v1/guest-tasks/[publicId]/revoke
 static   /api/v1/health
+dynamic  /api/v1/hiring/proposals
+dynamic  /api/v1/hiring/requests/[publicId]
+dynamic  /api/v1/hiring/requests/[publicId]/respond
 dynamic  /api/v1/inbox
 dynamic  /api/v1/inbox/[id]/ack
 dynamic  /api/v1/intents
@@ -133,6 +142,7 @@ dynamic  /app/intents
 dynamic  /app/keys
 dynamic  /app/links
 dynamic  /app/people
+dynamic  /app/recruiting
 dynamic  /app/settings
 dynamic  /app/tasks
 dynamic  /connect/[userCode]

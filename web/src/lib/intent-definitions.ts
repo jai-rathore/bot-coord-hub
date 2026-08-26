@@ -46,16 +46,16 @@ export const SCHEDULE_MEETING_DEFINITION = validateIntentDefinition({
 });
 
 export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
-  version: canonicalLocationContracts ? 2 : 1,
+  version: canonicalLocationContracts ? 4 : 3,
   agentPrompt:
-    "HoneyMatcha can privately look for recruiting compatibility without revealing compensation, sponsorship, or other raw constraints. Ask whether your human wants to enroll as a candidate or employer.",
+    "First ask whether the human is looking for work or hiring. HoneyMatcha privately compares recruiting expectations without revealing raw constraints. Pair annual compensation with an approved ISO currency, represent place as canonical city plus vicinity radius, and keep remote as a separate work mode. For a specific candidate, use a targeted hiring_compatibility guest request so approved fit gaps can be revised before an introduction.",
   enrollment: {
     summary:
-      "Privately compare role and candidate constraints before either side is identified.",
+      "Choose whether you are looking for a job or hiring, then privately compare only the relevant constraints.",
     fields: [
       {
         key: "participantType",
-        prompt: "Are you participating as a candidate or employer?",
+        prompt: "Are you looking for a job or hiring someone?",
         type: "enum",
         options: ["candidate", "employer"],
         required: true,
@@ -75,11 +75,11 @@ export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
       },
       {
         key: "locations",
-        prompt: "Which work locations are acceptable?",
+        prompt: "Which cities should anchor the acceptable work area?",
         ...(canonicalLocationContracts
           ? {
               description:
-                "Use HoneyMatcha canonical city suggestions. Search text is sent to Geoapify without your HoneyMatcha identity. Remote work is represented separately through work modes.",
+                "Choose canonical cities, then set a vicinity in miles. Search text is sent to Geoapify without your HoneyMatcha identity. Remote work is represented separately.",
               type: "location_list",
               locationGranularity: "city",
             }
@@ -90,8 +90,17 @@ export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
         retentionDays: 180,
       },
       {
+        key: "locationRadiusMiles",
+        prompt: "How far from each selected city is acceptable?",
+        type: "number",
+        required: false,
+        sensitivity: "private",
+        sourcePolicy: humanApprovedSource,
+        retentionDays: 180,
+      },
+      {
         key: "workModes",
-        prompt: "Which work modes are acceptable (remote, hybrid, or onsite)?",
+        prompt: "Which work mode is acceptable?",
         type: "string_list",
         required: false,
         sensitivity: "private",
@@ -99,8 +108,27 @@ export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
         retentionDays: 180,
       },
       {
+        key: "employmentTypes",
+        prompt: "Which employment type is relevant?",
+        type: "string_list",
+        required: false,
+        sensitivity: "private",
+        sourcePolicy: humanApprovedSource,
+        retentionDays: 180,
+      },
+      {
+        key: "compensationCurrency",
+        prompt: "Which currency applies to annual base compensation?",
+        type: "enum",
+        options: ["USD", "EUR", "GBP", "CAD", "AUD", "INR", "SGD", "CHF"],
+        required: false,
+        sensitivity: "private",
+        sourcePolicy: humanApprovedSource,
+        retentionDays: 90,
+      },
+      {
         key: "compensationMinimum",
-        prompt: "Candidate: what is the minimum acceptable compensation?",
+        prompt: "Candidate: what is the minimum annual base compensation?",
         type: "number",
         required: false,
         sensitivity: "private",
@@ -109,7 +137,25 @@ export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
       },
       {
         key: "compensationMaximum",
-        prompt: "Employer: what is the maximum compensation for the role?",
+        prompt: "Employer: what is the maximum annual base compensation?",
+        type: "number",
+        required: false,
+        sensitivity: "private",
+        sourcePolicy: humanApprovedSource,
+        retentionDays: 90,
+      },
+      {
+        key: "equityMinimumPercent",
+        prompt: "Candidate: what is the minimum acceptable equity percentage?",
+        type: "number",
+        required: false,
+        sensitivity: "private",
+        sourcePolicy: humanApprovedSource,
+        retentionDays: 90,
+      },
+      {
+        key: "equityMaximumPercent",
+        prompt: "Employer: what is the maximum equity percentage for the role?",
         type: "number",
         required: false,
         sensitivity: "private",
@@ -155,6 +201,15 @@ export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
       {
         key: "levels",
         prompt: "Which role levels are relevant?",
+        type: "string_list",
+        required: false,
+        sensitivity: "private",
+        sourcePolicy: humanApprovedSource,
+        retentionDays: 180,
+      },
+      {
+        key: "roleFocus",
+        prompt: "Which areas of responsibility or role scope are relevant?",
         type: "string_list",
         required: false,
         sensitivity: "private",

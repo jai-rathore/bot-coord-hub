@@ -1,7 +1,7 @@
 const LABELS: Record<string, string> = {
   schedule_meeting: "Schedule a meeting",
   coordinate_interviews: "Coordinate interviews",
-  hiring_compatibility: "Check hiring compatibility",
+  hiring_compatibility: "Find aligned roles or candidates",
   local_meetup: "Discover a local meetup",
   dating_introduction: "Dating introduction",
   group_event: "Group event",

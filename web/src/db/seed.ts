@@ -163,17 +163,24 @@ async function seed() {
   }
 
   const hiringDescription =
-    "Privately compare compensation, location, work mode, sponsorship, timing, and level before an introduction. No ranking or automatic rejection.";
+    "Choose whether you are looking for a job or hiring, then privately align role, currency-locked compensation, equity, city vicinity, work mode, sponsorship, timing, and level.";
   const hiringSchema = {
     taskType: "hiring_compatibility",
     targetEmail: "string",
     privateConfig: {
+      companyName: "string?",
+      roleTitle: "string?",
       compensationMaximum: "number?",
+      compensationCurrency: "ISO 4217 code?",
+      equityMaximumPercent: "number?",
       locations: "string[]?",
+      locationRadiusMiles: "number?",
       workModes: "string[]?",
+      employmentTypes: "string[]?",
       sponsorshipAvailable: "boolean?",
       latestStart: "ISO date?",
       levels: "string[]?",
+      roleFocus: "string[]?",
     },
   };
   const [existingHiring] = await db
@@ -183,7 +190,7 @@ async function seed() {
     .limit(1);
   if (existingHiring) {
     const hiringValues = {
-      name: "Check hiring compatibility",
+      name: "Find aligned roles or candidates",
       description: hiringDescription,
       status: "live" as const,
       category: "hiring",
@@ -227,7 +234,7 @@ async function seed() {
   } else {
     await db.insert(intentTypes).values({
       slug: "hiring_compatibility",
-      name: "Check hiring compatibility",
+      name: "Find aligned roles or candidates",
       description: hiringDescription,
       status: "live",
       category: "hiring",

@@ -29,7 +29,7 @@ const sora = Sora({
 const siteUrl = "https://honeymatcha.io";
 const siteTitle = "HoneyMatcha";
 const siteDescription =
-  "Use HoneyMatcha's Sage or bring your own agent to coordinate with other people's agents. Nothing is booked without your yes.";
+  "Let candidate and recruiter agents align on the company, role, compensation, equity, and work expectations before asking either person for a call.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

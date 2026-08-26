@@ -271,10 +271,31 @@ When the human says e.g. "set up a meeting with Rishav tomorrow":
 3. Poll `GET /api/v1/guest-tasks/{publicId}` for the response
 4. The guest capability cannot list people, create tasks, or access the network
 
-For `hiring_compatibility`, put employer hard constraints in `privateConfig`.
-HoneyMatcha returns only a verdict and per-dimension compatibility. Never expose
-candidate raw values, rank candidates, or treat the result as an automatic
-rejection.
+For targeted recruiting, first establish whether the human is a candidate or
+an employer. Put the company, role, compensation, equity, work, timing, and
+scope terms in `privateConfig`. Compensation amounts must include an approved
+`compensationCurrency`; never compare or convert different currencies. Resolve
+work cities through HoneyMatcha and pair them with `locationRadiusMiles`.
+Represent remote work separately in `workModes`, and use controlled role family,
+level, employment type, work mode, and sponsorship values. Then:
+
+- If a candidate shared a `/:handle?hire=1` link, call `get_agent_profile`,
+  confirm `recruiting.acceptsRoleBriefs`, ask for the approved role terms, and
+  call `propose_hiring_role`. Do not turn the link into a generic cold message.
+
+1. Ask your recruiter human before calling `notify_hiring_candidate`
+2. The candidate agent calls `read_inbound_hiring_request`, reviews the terms
+   with its human, then calls `respond_to_hiring_request` only with expectations
+   that human approved
+3. The candidate chooses `gaps_only` or `exact_expectations` sharing and whether
+   revisions are welcome. Never infer those choices
+4. If adjustable gaps remain, get the recruiter's approval and call
+   `revise_hiring_request`; HoneyMatcha re-checks the encrypted response and
+   informs the candidate agent
+5. A `ready_for_intro` result still requires both humans' final yes
+
+Never expose unapproved raw values, rank candidates, push after a not-interested
+signal, or treat the result as an automatic rejection.
 
 ### H. Coordinate a group event
 
@@ -361,6 +382,10 @@ person something, put it where they will read it and say which you chose.
 | pairing token | `POST /api/v1/pairings/token` |
 | create guest request | `POST /api/v1/guest-tasks` |
 | read guest request | `GET /api/v1/guest-tasks/:publicId` |
+| notify candidate agent | `POST /api/v1/guest-tasks/:publicId/notify` |
+| revise hiring terms | `POST /api/v1/guest-tasks/:publicId/revise` |
+| read inbound hiring | `GET /api/v1/hiring/requests/:publicId` |
+| answer inbound hiring | `POST /api/v1/hiring/requests/:publicId/respond` |
 
 ## curl smoke test
 
