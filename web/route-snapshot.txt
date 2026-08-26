@@ -37,6 +37,7 @@ dynamic  /api/guest/tasks/[publicId]
 dynamic  /api/guest/tasks/[publicId]/locations
 dynamic  /api/guest/tasks/[publicId]/respond
 dynamic  /api/hiring/proposals
+dynamic  /api/hiring/role-draft
 dynamic  /api/hiring/tasks/[publicId]/notify
 dynamic  /api/hiring/tasks/[publicId]/revise
 dynamic  /api/intents

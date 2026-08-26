@@ -30,6 +30,7 @@ export function LocationAutocomplete({
   label,
   resolveEndpoint = "/api/discovery",
   authorization,
+  initialQuery = "",
 }: {
   granularity: "country" | "region" | "city" | "neighborhood";
   selected: CanonicalLocationSuggestion[];
@@ -38,9 +39,11 @@ export function LocationAutocomplete({
   label: string;
   resolveEndpoint?: string;
   authorization?: string;
+  /** Prefill an agent-extracted place phrase, but never select it automatically. */
+  initialQuery?: string;
 }) {
   const listboxId = useId();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<
     CanonicalLocationSuggestion[]
   >([]);

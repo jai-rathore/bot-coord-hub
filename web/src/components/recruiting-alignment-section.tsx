@@ -1,8 +1,8 @@
 const STEPS = [
   {
     actor: "Recruiter agent",
-    title: "Share the real role",
-    body: "Company, position, compensation range, equity, work mode, location, level, sponsorship, and role scope.",
+    title: "Drop in the real role",
+    body: "Paste a job URL or description. Sage extracts the company, position, compensation, equity, work mode, city, level, sponsorship, and role scope for recruiter review.",
   },
   {
     actor: "Candidate agent",

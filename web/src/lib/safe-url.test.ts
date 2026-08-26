@@ -129,3 +129,32 @@ test("delivery POSTs to the resolved address, not a later DNS answer", async () 
     });
   }
 });
+
+test("resolved fetches can cap untrusted response bodies", async () => {
+  const server = http.createServer((_req, res) => {
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end("a response that is intentionally too large");
+  });
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const { port } = server.address() as AddressInfo;
+  try {
+    const resolved = await resolveSafeCallbackUrl(
+      `http://jobs.example.com:${port}/role`,
+      {
+        production: false,
+        resolve: async () => [{ address: "127.0.0.1" }],
+      },
+    );
+    assert.ok(resolved);
+    await assert.rejects(
+      () => fetchResolvedCallback(resolved, { maxResponseBytes: 8 }),
+      /Response exceeded 8 bytes/,
+    );
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()));
+    });
+  }
+});

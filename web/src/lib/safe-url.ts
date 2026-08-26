@@ -238,6 +238,8 @@ export async function fetchResolvedCallback(
     headers?: Record<string, string>;
     body?: string;
     signal?: AbortSignal;
+    /** Stop reading before an untrusted endpoint can fill process memory. */
+    maxResponseBytes?: number;
   } = {},
 ): Promise<Response> {
   const lib = resolved.url.protocol === "https:" ? https : http;
@@ -252,9 +254,24 @@ export async function fetchResolvedCallback(
       },
       (res) => {
         const chunks: Buffer[] = [];
+        let bytes = 0;
         res.on("data", (chunk) => {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          bytes += buffer.byteLength;
+          if (
+            init.maxResponseBytes !== undefined &&
+            bytes > init.maxResponseBytes
+          ) {
+            res.destroy(
+              new Error(
+                `Response exceeded ${init.maxResponseBytes} bytes`,
+              ),
+            );
+            return;
+          }
+          chunks.push(buffer);
         });
+        res.on("error", reject);
         res.on("end", () => {
           resolve(
             new Response(Buffer.concat(chunks), {

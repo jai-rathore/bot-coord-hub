@@ -6,6 +6,7 @@ import {
   LocationAutocomplete,
   type CanonicalLocationSuggestion,
 } from "@/components/location-autocomplete";
+import { RecruiterRoleImport } from "@/components/recruiter-role-import";
 import {
   HIRING_CURRENCIES,
   HIRING_EMPLOYMENT_TYPES,
@@ -14,6 +15,7 @@ import {
   HIRING_ROLE_FAMILIES,
   HIRING_WORK_MODES,
 } from "@/lib/hiring-options";
+import type { HiringRoleDraft } from "@/lib/hiring-role-draft";
 
 type EnrollmentReview = {
   claims: {
@@ -161,7 +163,7 @@ export function HiringProfileForm({
   );
   const [workMode, setWorkMode] = useState(firstString(saved.workModes));
   const [currency, setCurrency] = useState(
-    valueAsString(saved.compensationCurrency, "USD"),
+    valueAsString(saved.compensationCurrency),
   );
   const [compensation, setCompensation] = useState(
     valueAsString(
@@ -196,6 +198,7 @@ export function HiringProfileForm({
     valueAsString(saved.introductionSummary),
   );
   const [locations, setLocations] = useState<CanonicalLocationSuggestion[]>([]);
+  const [locationHints, setLocationHints] = useState<string[]>([]);
   const [clearExistingLocations, setClearExistingLocations] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -208,8 +211,51 @@ export function HiringProfileForm({
       setEquity("");
       setSponsorship("");
       setStartDate("");
+      setCurrency("");
+      setLocationHints([]);
     }
     setMode(next);
+    setMessage(null);
+    setError(null);
+  }
+
+  function applyRecruiterDraft(draft: HiringRoleDraft) {
+    setRoleFamily(draft.roleFocus ?? "");
+    setLevel(draft.level ?? "");
+    setEmploymentType(draft.employmentType ?? "");
+    setWorkMode(draft.workMode ?? "");
+    setCompensation(
+      draft.compensationMaximum === null
+        ? ""
+        : String(draft.compensationMaximum),
+    );
+    setCurrency(draft.compensationCurrency ?? "");
+    setEquity(
+      draft.equityMaximumPercent === null
+        ? ""
+        : String(draft.equityMaximumPercent),
+    );
+    setSponsorship(
+      draft.sponsorshipAvailable === null
+        ? ""
+        : String(draft.sponsorshipAvailable),
+    );
+    setStartDate(draft.latestStart ?? "");
+    setLocationHints(draft.locationQueries);
+    setLocations([]);
+    setClearExistingLocations(true);
+
+    const roleLabel = draft.roleTitle
+      ? `${draft.roleTitle}${draft.companyName ? ` at ${draft.companyName}` : ""}.`
+      : draft.companyName
+        ? `A role at ${draft.companyName}.`
+        : "";
+    setIntroductionSummary(
+      [roleLabel, draft.candidateFacingSummary]
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 1_000),
+    );
     setMessage(null);
     setError(null);
   }
@@ -222,6 +268,18 @@ export function HiringProfileForm({
     }
     if (!workMode) {
       setError("Choose a work mode.");
+      return;
+    }
+    if (mode === "employer" && !compensation) {
+      setError("Add the maximum annual base compensation for this role.");
+      return;
+    }
+    if (compensation && !currency) {
+      setError("Choose the compensation currency.");
+      return;
+    }
+    if (mode === "employer" && equity === "") {
+      setError("Add the equity ceiling, using 0 if this role has no equity.");
       return;
     }
     if (
@@ -338,6 +396,13 @@ export function HiringProfileForm({
 
       {mode ? (
         <div className="mt-7 space-y-7">
+          {mode === "employer" ? (
+            <RecruiterRoleImport
+              onApply={applyRecruiterDraft}
+              omitMissingFields={["companyName", "roleTitle"]}
+            />
+          ) : null}
+
           <section className="rounded-2xl border border-line bg-white/55 p-4 sm:p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -394,6 +459,12 @@ export function HiringProfileForm({
             <p className="mt-1 text-sm leading-6 text-muted">
               A city is an anchor, not a hard boundary. Remote work remains a separate choice.
             </p>
+            {locationHints.length ? (
+              <p className="mt-3 rounded-xl border border-honey/45 bg-honey-soft/20 px-3 py-2 text-xs font-medium leading-5 text-matcha-deep">
+                Sage found {locationHints.join(", ")}. Confirm the canonical
+                city below so vicinity matching stays precise.
+              </p>
+            ) : null}
             {existingLocations.length && !clearExistingLocations ? (
               <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
                 <span className="font-semibold text-muted">Saved:</span>
@@ -419,11 +490,13 @@ export function HiringProfileForm({
                     : "City or cities"}
                 </span>
                 <LocationAutocomplete
+                  key={locationHints[0] ?? "manual-location"}
                   granularity="city"
                   multiple
                   label="Work location cities"
                   selected={locations}
                   onChange={setLocations}
+                  initialQuery={locationHints[0]}
                 />
               </label>
               <label className="grid gap-1.5 text-sm">
@@ -461,7 +534,9 @@ export function HiringProfileForm({
                     value={currency}
                     onChange={(event) => setCurrency(event.target.value)}
                     className="border-r border-line bg-mist/55 px-2 text-sm font-semibold outline-none"
+                    required={Boolean(compensation)}
                   >
+                    <option value="">Currency</option>
                     {HIRING_CURRENCIES.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.value}

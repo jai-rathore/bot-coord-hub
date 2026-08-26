@@ -43,7 +43,7 @@ export function SignedInHome({
     {
       href: "/app/recruiting",
       title: "Align a recruiting conversation",
-      body: "Let candidate and recruiter agents surface fit gaps before either person commits to a call.",
+      body: "Paste a role, let the agents surface fit gaps, and bring people in only when a call is credible.",
       detail: "Company, role, compensation, equity",
       glyph: "briefcase" as const,
     },

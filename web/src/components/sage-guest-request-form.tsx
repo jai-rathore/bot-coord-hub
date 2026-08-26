@@ -6,6 +6,7 @@ import {
   LocationAutocomplete,
   type CanonicalLocationSuggestion,
 } from "@/components/location-autocomplete";
+import { RecruiterRoleImport } from "@/components/recruiter-role-import";
 import {
   HIRING_CURRENCIES,
   HIRING_EMPLOYMENT_TYPES,
@@ -14,6 +15,7 @@ import {
   HIRING_ROLE_FAMILIES,
   HIRING_WORK_MODES,
 } from "@/lib/hiring-options";
+import type { HiringRoleDraft } from "@/lib/hiring-role-draft";
 
 type SageJob = {
   id: string;
@@ -35,9 +37,10 @@ export function SageGuestRequestForm({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [compensationMaximum, setCompensationMaximum] = useState("");
-  const [compensationCurrency, setCompensationCurrency] = useState("USD");
+  const [compensationCurrency, setCompensationCurrency] = useState("");
   const [equityMaximumPercent, setEquityMaximumPercent] = useState("");
   const [locations, setLocations] = useState<CanonicalLocationSuggestion[]>([]);
+  const [locationHints, setLocationHints] = useState<string[]>([]);
   const [locationRadiusMiles, setLocationRadiusMiles] = useState("25");
   const [workMode, setWorkMode] = useState("");
   const [employmentType, setEmploymentType] = useState("");
@@ -52,6 +55,40 @@ export function SageGuestRequestForm({
   const [copied, setCopied] = useState(false);
   const [publicId, setPublicId] = useState<string | null>(null);
   const [notifying, setNotifying] = useState(false);
+
+  function applyRecruiterDraft(draft: HiringRoleDraft) {
+    setCompanyName(draft.companyName ?? "");
+    setTitle(draft.roleTitle ?? "");
+    setDescription(draft.candidateFacingSummary ?? "");
+    setCompensationMaximum(
+      draft.compensationMaximum === null
+        ? ""
+        : String(draft.compensationMaximum),
+    );
+    setCompensationCurrency(draft.compensationCurrency ?? "");
+    setEquityMaximumPercent(
+      draft.equityMaximumPercent === null
+        ? ""
+        : String(draft.equityMaximumPercent),
+    );
+    setWorkMode(draft.workMode ?? "");
+    setEmploymentType(draft.employmentType ?? "");
+    setSponsorship(
+      draft.sponsorshipAvailable === null
+        ? ""
+        : draft.sponsorshipAvailable
+          ? "yes"
+          : "no",
+    );
+    setLatestStart(draft.latestStart ?? "");
+    setLevel(draft.level ?? "");
+    setRoleFocus(draft.roleFocus ?? "");
+    setLocations([]);
+    setLocationHints(draft.locationQueries);
+    setGuestUrl(null);
+    setMessage(null);
+    setError(null);
+  }
 
   function finish(job: SageJob) {
     const url =
@@ -86,6 +123,24 @@ export function SageGuestRequestForm({
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (!compensationMaximum || !compensationCurrency) {
+      setError("Add the annual base ceiling and its currency.");
+      return;
+    }
+    if (equityMaximumPercent === "") {
+      setError("Add the equity ceiling, using 0 if this role has no equity.");
+      return;
+    }
+    if (!roleFocus || !level || !employmentType || !workMode) {
+      setError(
+        "Choose the role family, seniority, employment type, and work mode.",
+      );
+      return;
+    }
+    if (workMode !== "Remote" && !locations.length) {
+      setError("Choose at least one canonical city for hybrid or onsite work.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setGuestUrl(null);
@@ -249,6 +304,10 @@ export function SageGuestRequestForm({
           : "Share the role once. The candidate or their agent can return approved expectations, you can improve the terms, and HoneyMatcha re-checks alignment before either person commits to a call."}
       </p>
 
+      <div className="mt-5">
+        <RecruiterRoleImport onApply={applyRecruiterDraft} />
+      </div>
+
       <form onSubmit={submit} className="mt-5 grid gap-4 sm:grid-cols-2">
         {!targetHandle ? (
           <label className="grid gap-1.5 text-sm">
@@ -305,7 +364,9 @@ export function SageGuestRequestForm({
               value={compensationCurrency}
               onChange={(event) => setCompensationCurrency(event.target.value)}
               className="border-r border-line bg-mist/55 px-2 text-sm font-semibold outline-none"
+              required
             >
+              <option value="">Currency</option>
               {HIRING_CURRENCIES.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.value}
@@ -322,6 +383,7 @@ export function SageGuestRequestForm({
               onChange={(event) => setCompensationMaximum(event.target.value)}
               placeholder="200,000"
               className="min-h-11 min-w-0 px-3 outline-none"
+              required
             />
           </span>
           <span className="text-xs text-muted">
@@ -339,6 +401,7 @@ export function SageGuestRequestForm({
             onChange={(event) => setEquityMaximumPercent(event.target.value)}
             placeholder="0.25"
             className="field"
+            required
           />
         </label>
         <label className="grid gap-1.5 text-sm">
@@ -359,6 +422,7 @@ export function SageGuestRequestForm({
             value={roleFocus}
             onChange={(event) => setRoleFocus(event.target.value)}
             className="field"
+            required
           >
             <option value="">Choose a function</option>
             {HIRING_ROLE_FAMILIES.map((option) => (
@@ -374,6 +438,7 @@ export function SageGuestRequestForm({
             value={level}
             onChange={(event) => setLevel(event.target.value)}
             className="field"
+            required
           >
             <option value="">Choose a level</option>
             {HIRING_LEVELS.map((option) => (
@@ -389,6 +454,7 @@ export function SageGuestRequestForm({
             value={employmentType}
             onChange={(event) => setEmploymentType(event.target.value)}
             className="field"
+            required
           >
             <option value="">Choose a type</option>
             {HIRING_EMPLOYMENT_TYPES.map((option) => (
@@ -404,6 +470,7 @@ export function SageGuestRequestForm({
             value={workMode}
             onChange={(event) => setWorkMode(event.target.value)}
             className="field"
+            required
           >
             <option value="">Choose a mode</option>
             {HIRING_WORK_MODES.map((option) => (
@@ -423,14 +490,22 @@ export function SageGuestRequestForm({
           />
         </label>
         <div className="grid gap-4 rounded-2xl border border-line bg-white/55 p-4 sm:col-span-2 sm:grid-cols-[minmax(0,1fr)_13rem] sm:items-end">
+          {locationHints.length ? (
+            <p className="rounded-xl border border-honey/45 bg-honey-soft/20 px-3 py-2 text-xs font-medium leading-5 text-matcha-deep sm:col-span-2">
+              Sage found {locationHints.join(", ")}. Confirm the canonical city
+              below so vicinity matching stays precise.
+            </p>
+          ) : null}
           <label className="grid gap-1.5 text-sm">
             <span className="font-medium text-ink">Role location cities</span>
             <LocationAutocomplete
+              key={locationHints[0] ?? "manual-location"}
               granularity="city"
               multiple
               label="Role location cities"
               selected={locations}
               onChange={setLocations}
+              initialQuery={locationHints[0]}
             />
           </label>
           <label className="grid gap-1.5 text-sm">
