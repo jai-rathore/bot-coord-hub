@@ -492,13 +492,13 @@ function writeCards(
     const card = cards[i];
     const sway = Math.sin(time * 1.85 + card.phase) * 0.08 * wind;
     dummy.position.set(
-      card.x * (1 - pull * 0.38) + sway,
+      card.x * (1 - pull * 0.62) + sway,
       THREE.MathUtils.lerp(
         card.y + Math.sin(time * 2.35 + card.phase * 1.2) * 0.04 * wind,
-        0.16,
-        pull,
+        0.14,
+        Math.min(1, pull * 1.15),
       ),
-      card.z * (1 - pull * 0.38) + sway * 0.45,
+      card.z * (1 - pull * 0.62) + sway * 0.45,
     );
     if (card.billboard) {
       dummy.quaternion.copy(camera.quaternion);
@@ -721,7 +721,9 @@ export async function mountSakuraQrScene(
     color: rgbColor(SAKURA_QR.bark),
     roughness: 0.68,
     metalness: 0.04,
+    transparent: true,
   });
+  const branchBarkMat = barkMat.clone();
   const trunkMesh = new THREE.Mesh(trunk, barkMat);
   tree.add(trunkMesh);
   const roots = buildRoots(tiles, origin, rng);
@@ -736,7 +738,7 @@ export async function mountSakuraQrScene(
   tree.add(rootMesh);
   const crown = new THREE.Group();
   crown.position.y = crownY;
-  const branchMesh = new THREE.Mesh(branches, barkMat);
+  const branchMesh = new THREE.Mesh(branches, branchBarkMat);
   crown.add(branchMesh);
 
   const petalColors = [
@@ -857,7 +859,7 @@ export async function mountSakuraQrScene(
       rz: rng() * Math.PI,
       spin: (rng() - 0.5) * 2.4,
       phase: rng() * Math.PI * 2,
-      scale: 0.42 + rng() * 0.22,
+      scale: 0.52 + rng() * 0.2,
     };
     spawnFromBranch(petal);
     petal.y -= rng() * Math.max(1.2, petal.y * 0.45);
@@ -867,7 +869,7 @@ export async function mountSakuraQrScene(
   fallingMat.alphaTest = 0.02;
   fallingMat.depthWrite = false;
   const fallingMesh = new THREE.InstancedMesh(
-    new THREE.PlaneGeometry(0.62, 0.74),
+    new THREE.PlaneGeometry(0.72, 0.86),
     fallingMat,
     Math.max(1, petalCount),
   );
@@ -995,29 +997,59 @@ export async function mountSakuraQrScene(
     if (scan) {
       tree.visible = false;
     } else {
-      const canopyIn = 1 - stages.canopy;
-      crown.position.y = crownY * Math.max(0.04, 1 - stages.canopy * 0.96);
-      crown.scale.set(
-        Math.max(0.04, 1 - stages.canopy * 0.42),
-        Math.max(0.04, canopyIn),
-        Math.max(0.04, 1 - stages.canopy * 0.42),
-      );
-      const spread = 1 + stages.trunk * 0.28;
-      trunkMesh.scale.set(spread, Math.max(0.03, 1 - stages.trunk), spread);
-      trunkMesh.position.y = -stages.trunk * 0.35;
+      crown.position.y = crownY * Math.max(0.08, 1 - stages.canopy * 0.72);
+      crown.scale.setScalar(1);
+      branchMesh.visible = stages.canopy < 0.82;
+      branchBarkMat.opacity = Math.max(0, 1 - stages.canopy * 1.15);
+      const spread = 1 + stages.trunk * 0.55;
+      trunkMesh.scale.set(spread, Math.max(0.02, 1 - stages.trunk * 1.05), spread);
+      trunkMesh.position.y = -stages.trunk * 0.55;
+      barkMat.opacity = Math.max(0, 1 - stages.trunk * 1.25);
+      trunkMesh.visible = stages.trunk < 0.72;
       rootMesh.scale.set(
-        1 + stages.trunk * 0.45,
-        Math.max(0.03, 1 - stages.trunk),
-        1 + stages.trunk * 0.45,
+        1 + stages.trunk * 0.7,
+        Math.max(0.02, 1 - stages.trunk * 1.05),
+        1 + stages.trunk * 0.7,
       );
-      rootMesh.position.y = -stages.trunk * 0.22;
-      tree.visible = amount < 0.985;
+      rootMesh.position.y = -stages.trunk * 0.4;
+      rootMesh.visible = stages.trunk < 0.62;
+      tree.visible = stages.canopy < 0.98 || stages.trunk < 0.78;
     }
     shadow.scale.setScalar(Math.max(0.2, 1 - stages.trunk));
     shadow.visible = !scan && stages.trunk < 0.96;
-    writeCards(petalMesh, canopy.petals, dummy, camera, euler, time, 1, wind, stages.canopy);
-    writeCards(flowerMesh, canopy.flowers, dummy, camera, euler, time, 1, wind, stages.canopy);
-    writeCards(leafMesh, canopy.leaves, dummy, camera, euler, time, 1, wind, stages.canopy);
+    writeCards(
+      petalMesh,
+      canopy.petals,
+      dummy,
+      camera,
+      euler,
+      time,
+      Math.max(0, 1 - stages.canopy * 1.08),
+      wind,
+      stages.canopy,
+    );
+    writeCards(
+      flowerMesh,
+      canopy.flowers,
+      dummy,
+      camera,
+      euler,
+      time,
+      Math.max(0, 1 - stages.canopy * 1.08),
+      wind,
+      stages.canopy,
+    );
+    writeCards(
+      leafMesh,
+      canopy.leaves,
+      dummy,
+      camera,
+      euler,
+      time,
+      Math.max(0, 1 - stages.canopy * 1.08),
+      wind,
+      stages.canopy,
+    );
     writeCards(tuftMesh, tuftFlowers, dummy, camera, euler, time, Math.max(0.2, live), wind, stages.canopy);
     writeCards(groundMesh, groundPetals, dummy, camera, euler, time, Math.max(0.25, live), 0, stages.tiles);
     writePetals(delta, time, scan ? 1 : stages.canopy);
@@ -1115,6 +1147,7 @@ export async function mountSakuraQrScene(
       branches.dispose();
       roots.dispose();
       barkMat.dispose();
+      branchBarkMat.dispose();
       (rootMesh.material as THREE.Material).dispose();
       petalTex.dispose();
       flowerTex.dispose();
