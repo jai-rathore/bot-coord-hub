@@ -43,17 +43,13 @@ import {
   type CanonicalLocation,
 } from "@/lib/location-resolver";
 import { getActiveHiringParticipantType } from "@/lib/discovery-service";
-
-const HIRING_CURRENCY_CODES = [
-  "USD",
-  "EUR",
-  "GBP",
-  "CAD",
-  "AUD",
-  "INR",
-  "SGD",
-  "CHF",
-] as const;
+import {
+  HIRING_CURRENCY_CODES,
+  HIRING_EMPLOYMENT_TYPES,
+  HIRING_LEVELS,
+  HIRING_ROLE_FAMILIES,
+  HIRING_WORK_MODES,
+} from "@/lib/hiring-options";
 
 export type GuestTaskType =
   "binary_choice" | "text_response" | "availability" | "hiring_compatibility";
@@ -229,6 +225,20 @@ function normalizeHiringEnum<T extends string>(
   return value as T;
 }
 
+function normalizeHiringEnumList<T extends string>(
+  value: unknown,
+  field: string,
+  allowed: readonly T[],
+): T[] | undefined {
+  const values = normalizeStringList(value, field);
+  if (!values) return undefined;
+  const invalid = values.filter((item) => !allowed.includes(item as T));
+  if (invalid.length) {
+    throw new AgentApiError(400, `${field} is invalid`);
+  }
+  return values as T[];
+}
+
 function normalizeRoleConstraints(
   taskType: GuestTaskType,
   value: unknown,
@@ -312,24 +322,45 @@ function normalizeRoleConstraints(
         }
       : {}),
     ...(locationRadiusMiles == null ? {} : { locationRadiusMiles }),
-    ...(normalizeStringList(input.workModes, "workModes")
-      ? { workModes: normalizeStringList(input.workModes, "workModes") }
-      : {}),
-    ...(normalizeStringList(input.employmentTypes, "employmentTypes")
+    ...(normalizeHiringEnumList(input.workModes, "workModes", HIRING_WORK_MODES)
       ? {
-          employmentTypes: normalizeStringList(
+          workModes: normalizeHiringEnumList(
+            input.workModes,
+            "workModes",
+            HIRING_WORK_MODES,
+          ),
+        }
+      : {}),
+    ...(normalizeHiringEnumList(
+      input.employmentTypes,
+      "employmentTypes",
+      HIRING_EMPLOYMENT_TYPES,
+    )
+      ? {
+          employmentTypes: normalizeHiringEnumList(
             input.employmentTypes,
             "employmentTypes",
+            HIRING_EMPLOYMENT_TYPES,
           ),
         }
       : {}),
     ...(sponsorshipAvailable == null ? {} : { sponsorshipAvailable }),
     ...(latestStart ? { latestStart } : {}),
-    ...(normalizeStringList(input.levels, "levels")
-      ? { levels: normalizeStringList(input.levels, "levels") }
+    ...(normalizeHiringEnumList(input.levels, "levels", HIRING_LEVELS)
+      ? { levels: normalizeHiringEnumList(input.levels, "levels", HIRING_LEVELS) }
       : {}),
-    ...(normalizeStringList(input.roleFocus, "roleFocus")
-      ? { roleFocus: normalizeStringList(input.roleFocus, "roleFocus") }
+    ...(normalizeHiringEnumList(
+      input.roleFocus,
+      "roleFocus",
+      HIRING_ROLE_FAMILIES,
+    )
+      ? {
+          roleFocus: normalizeHiringEnumList(
+            input.roleFocus,
+            "roleFocus",
+            HIRING_ROLE_FAMILIES,
+          ),
+        }
       : {}),
   };
 }
@@ -703,6 +734,13 @@ export async function getGuestTaskForOrganizer(
     .orderBy(desc(guestResponses.createdAt));
   return {
     task: serializeTask(task),
+    ...(task.taskType === "hiring_compatibility"
+      ? {
+          offer: candidateFacingRoleTerms(
+            task.privateConfig as Record<string, unknown>,
+          ),
+        }
+      : {}),
     responses: responses.map((response) => ({
       ...response,
       createdAt: response.createdAt.toISOString(),
@@ -1248,14 +1286,29 @@ function validateResponse(
           }
         : {}),
       ...(locationRadiusMiles == null ? {} : { locationRadiusMiles }),
-      ...(normalizeStringList(response.workModes, "workModes")
-        ? { workModes: normalizeStringList(response.workModes, "workModes") }
-        : {}),
-      ...(normalizeStringList(response.employmentTypes, "employmentTypes")
+      ...(normalizeHiringEnumList(
+        response.workModes,
+        "workModes",
+        HIRING_WORK_MODES,
+      )
         ? {
-            employmentTypes: normalizeStringList(
+            workModes: normalizeHiringEnumList(
+              response.workModes,
+              "workModes",
+              HIRING_WORK_MODES,
+            ),
+          }
+        : {}),
+      ...(normalizeHiringEnumList(
+        response.employmentTypes,
+        "employmentTypes",
+        HIRING_EMPLOYMENT_TYPES,
+      )
+        ? {
+            employmentTypes: normalizeHiringEnumList(
               response.employmentTypes,
               "employmentTypes",
+              HIRING_EMPLOYMENT_TYPES,
             ),
           }
         : {}),
@@ -1263,11 +1316,27 @@ function validateResponse(
         ? { sponsorshipRequired: response.sponsorshipRequired }
         : {}),
       ...(earliestStart ? { earliestStart } : {}),
-      ...(normalizeStringList(response.levels, "levels")
-        ? { levels: normalizeStringList(response.levels, "levels") }
+      ...(normalizeHiringEnumList(response.levels, "levels", HIRING_LEVELS)
+        ? {
+            levels: normalizeHiringEnumList(
+              response.levels,
+              "levels",
+              HIRING_LEVELS,
+            ),
+          }
         : {}),
-      ...(normalizeStringList(response.roleFocus, "roleFocus")
-        ? { roleFocus: normalizeStringList(response.roleFocus, "roleFocus") }
+      ...(normalizeHiringEnumList(
+        response.roleFocus,
+        "roleFocus",
+        HIRING_ROLE_FAMILIES,
+      )
+        ? {
+            roleFocus: normalizeHiringEnumList(
+              response.roleFocus,
+              "roleFocus",
+              HIRING_ROLE_FAMILIES,
+            ),
+          }
         : {}),
       sharingMode,
       ...(normalizeStringList(response.priorityDimensions, "priorityDimensions")

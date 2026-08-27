@@ -3,6 +3,10 @@
  * Used by POST /api/mcp (JSON-RPC) and documented for the stdio MCP entry.
  */
 
+import {
+  HIRING_CANDIDATE_RESPONSE_SCHEMA,
+  HIRING_PRIVATE_CONFIG_SCHEMA,
+} from "@/lib/hiring-schema";
 import { SCHEDULE_MEETING_TOOL_DESCRIPTION } from "@/lib/schedule-copy";
 import type { AgentAuth } from "@/lib/agent-auth";
 import {
@@ -37,6 +41,7 @@ import {
   createGuestTask,
   createInvite,
   createPublicInvite,
+  draftHiringRole,
   listConfirms,
   listDiscoveryCapabilities,
   listDiscoveryRequests,
@@ -519,7 +524,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "submit_discovery_enrollment",
     description:
-      "Submit purpose-bound information for one discovery intent. Resolve every location first and send resolutionToken values. Agent-supplied fields require provenance and activation always waits for human approval.",
+      "Submit purpose-bound information for one discovery intent. Resolve every location first and send resolutionToken values. Agent-supplied fields require provenance and activation always waits for human approval. For hiring_compatibility, first ask whether the human is a candidate or employer, use the same controlled role/level/work-mode/employment/currency enums as draft_hiring_role, and send location resolution tokens rather than free-text cities.",
     inputSchema: {
       type: "object",
       properties: {
@@ -675,7 +680,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "create_guest_task",
     description:
-      "Create a targeted, expiring request for one no-account guest. The returned private URL grants access only to this task.",
+      "Create a targeted, expiring request for one no-account guest. The returned private URL grants access only to this task. For hiring_compatibility, prefer draft_hiring_role first, then send only recruiter-approved suggestedPrivateConfig.",
     inputSchema: {
       type: "object",
       properties: {
@@ -693,10 +698,9 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
         targetEmail: { type: "string" },
         config: { type: "object", additionalProperties: true },
         privateConfig: {
-          type: "object",
+          ...HIRING_PRIVATE_CONFIG_SCHEMA,
           description:
-            "Organizer-only constraints. Required for hiring_compatibility and never returned to the guest.",
-          additionalProperties: true,
+            "Organizer-only constraints. Required for hiring_compatibility and never returned to the guest. Use draft_hiring_role to extract a reviewable mandate from a job URL or description.",
         },
         expiresInMinutes: { type: "number" },
         maxResponses: { type: "number" },
@@ -706,9 +710,29 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
     },
   },
   {
+    name: "draft_hiring_role",
+    description:
+      "Turn a recruiter-provided job URL or description into a reviewable hiring mandate. Nothing is activated or sent. Show every extracted term to the human, resolve locationQueries with resolve_discovery_location, then use suggestedPrivateConfig with propose_hiring_role, create_guest_task, revise_hiring_request, or submit_discovery_enrollment only after they approve.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourceUrl: {
+          type: "string",
+          description: "Public HTTPS job posting URL.",
+        },
+        description: {
+          type: "string",
+          description:
+            "Pasted job description. Required if the URL is missing or unreadable.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: "propose_hiring_role",
     description:
-      "Send one recruiter-approved role mandate to the candidate agent behind a shared HoneyMatcha handle. The candidate's private criteria are never returned; their agent can respond with approved gaps, invite revised terms, and require mutual approval before a call.",
+      "Send one recruiter-approved role mandate to the candidate agent behind a shared HoneyMatcha handle. Prefer draft_hiring_role when the recruiter has a job URL or description. The candidate's private criteria are never returned; their agent can respond with approved gaps, invite revised terms, and require mutual approval before a call.",
     inputSchema: {
       type: "object",
       properties: {
@@ -722,12 +746,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
           type: "string",
           description: "Candidate-facing context about the role and team.",
         },
-        privateConfig: {
-          type: "object",
-          description:
-            "Recruiter-approved role terms: companyName, roleTitle, compensationMaximum and compensationCurrency, equityMaximumPercent, canonical locations, locationRadiusMiles, workModes, employmentTypes, sponsorshipAvailable, latestStart, levels, and roleFocus.",
-          additionalProperties: true,
-        },
+        privateConfig: HIRING_PRIVATE_CONFIG_SCHEMA,
         idempotencyKey: { type: "string" },
       },
       required: ["targetHandle", "title", "privateConfig", "idempotencyKey"],
@@ -763,10 +782,9 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
       properties: {
         publicId: { type: "string" },
         privateConfig: {
-          type: "object",
+          ...HIRING_PRIVATE_CONFIG_SCHEMA,
           description:
-            "Approved updates such as compensationMaximum, compensationCurrency, equityMaximumPercent, canonical locations, locationRadiusMiles, workModes, employmentTypes, sponsorshipAvailable, latestStart, levels, or roleFocus.",
-          additionalProperties: true,
+            "Approved updates only. Never invent revised terms: get recruiter approval first. Use draft_hiring_role when the recruiter supplies a new job source.",
         },
         candidateFacingUpdate: {
           type: "string",
@@ -797,62 +815,7 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
       type: "object",
       properties: {
         publicId: { type: "string" },
-        response: {
-          type: "object",
-          properties: {
-            companyInterest: {
-              type: "string",
-              enum: ["interested", "open", "not_interested"],
-            },
-            roleInterest: {
-              type: "string",
-              enum: ["interested", "open", "not_interested"],
-            },
-            compensationMinimum: { type: "number" },
-            compensationCurrency: {
-              type: "string",
-              enum: ["USD", "EUR", "GBP", "CAD", "AUD", "INR", "SGD", "CHF"],
-            },
-            equityMinimumPercent: { type: "number" },
-            locations: { type: "array", items: { type: "string" } },
-            locationRadiusMiles: { type: "number", minimum: 0, maximum: 500 },
-            workModes: { type: "array", items: { type: "string" } },
-            employmentTypes: { type: "array", items: { type: "string" } },
-            sponsorshipRequired: { type: "boolean" },
-            earliestStart: { type: "string" },
-            levels: { type: "array", items: { type: "string" } },
-            roleFocus: { type: "array", items: { type: "string" } },
-            priorityDimensions: {
-              type: "array",
-              items: {
-                type: "string",
-                enum: [
-                  "company",
-                  "role",
-                  "compensation",
-                  "equity",
-                  "location",
-                  "workMode",
-                  "employmentType",
-                  "sponsorship",
-                  "timing",
-                  "level",
-                ],
-              },
-            },
-            sharingMode: {
-              type: "string",
-              enum: ["gaps_only", "exact_expectations"],
-            },
-            recruiterMayRevise: { type: "boolean" },
-            conversationSignal: {
-              type: "string",
-              enum: ["ready_if_aligned", "open_to_revision", "not_interested"],
-            },
-            approvedNote: { type: "string" },
-          },
-          additionalProperties: false,
-        },
+        response: HIRING_CANDIDATE_RESPONSE_SCHEMA,
         idempotencyKey: { type: "string" },
       },
       required: ["publicId", "response", "idempotencyKey"],
@@ -1168,6 +1131,7 @@ const OPEN_WORLD_TOOLS = new Set([
   "request_schedule_meeting",
   "respond_confirm",
   "create_guest_task",
+  "draft_hiring_role",
   "propose_hiring_role",
   "notify_hiring_candidate",
   "revise_hiring_request",
@@ -1478,6 +1442,15 @@ export async function dispatchMcpTool(
           sessionId: args.sessionId as string | undefined,
         },
         baseUrl,
+      );
+    case "draft_hiring_role":
+      return draftHiringRole(
+        auth,
+        {
+          sourceUrl: args.sourceUrl,
+          description: args.description,
+        },
+        request?.signal,
       );
     case "propose_hiring_role":
       return proposeHiringRole(

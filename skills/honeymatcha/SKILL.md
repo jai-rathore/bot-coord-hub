@@ -272,12 +272,16 @@ When the human says e.g. "set up a meeting with Rishav tomorrow":
 4. The guest capability cannot list people, create tasks, or access the network
 
 For targeted recruiting, first establish whether the human is a candidate or
-an employer. Put the company, role, compensation, equity, work, timing, and
-scope terms in `privateConfig`. Compensation amounts must include an approved
-`compensationCurrency`; never compare or convert different currencies. Resolve
-work cities through HoneyMatcha and pair them with `locationRadiusMiles`.
-Represent remote work separately in `workModes`, and use controlled role family,
-level, employment type, work mode, and sponsorship values. Then:
+an employer. If the recruiter has a job URL or description, call
+`draft_hiring_role` first. Show every extracted term, resolve each
+`locationQueries` city with `resolve_discovery_location`, and wait for explicit
+approval before using `suggestedPrivateConfig`. Put the company, role,
+compensation, equity, work, timing, and scope terms in `privateConfig`.
+Compensation amounts must include an approved `compensationCurrency`; never
+compare or convert different currencies. Resolve work cities through HoneyMatcha
+and pair them with `locationRadiusMiles`. Represent remote work separately in
+`workModes`, and use the controlled role family, level, employment type, work
+mode, and sponsorship values. Then:
 
 - If a candidate shared a `/:handle?hire=1` link, call `get_agent_profile`,
   confirm `recruiting.acceptsRoleBriefs`, ask for the approved role terms, and
@@ -381,6 +385,7 @@ person something, put it where they will read it and say which you chose.
 | start pairing | `POST /api/v1/pairings/start` |
 | pairing token | `POST /api/v1/pairings/token` |
 | create guest request | `POST /api/v1/guest-tasks` |
+| draft hiring role | `POST /api/v1/hiring/role-draft` |
 | read guest request | `GET /api/v1/guest-tasks/:publicId` |
 | notify candidate agent | `POST /api/v1/guest-tasks/:publicId/notify` |
 | revise hiring terms | `POST /api/v1/guest-tasks/:publicId/revise` |

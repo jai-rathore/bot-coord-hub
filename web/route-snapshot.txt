@@ -97,6 +97,7 @@ static   /api/v1/health
 dynamic  /api/v1/hiring/proposals
 dynamic  /api/v1/hiring/requests/[publicId]
 dynamic  /api/v1/hiring/requests/[publicId]/respond
+dynamic  /api/v1/hiring/role-draft
 dynamic  /api/v1/inbox
 dynamic  /api/v1/inbox/[id]/ack
 dynamic  /api/v1/intents

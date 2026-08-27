@@ -152,9 +152,10 @@ remain human-gated at booking and introduction boundaries.
 The recruiting UI first asks whether the human is looking for work or hiring.
 It uses controlled role, level, employment, work-mode, and sponsorship choices,
 currency-tagged annual compensation, and canonical city anchors with an explicit
-vicinity radius. Agents create a targeted `hiring_compatibility` guest task with
-the same company, role, compensation, equity, work, timing, and scope terms in
-`privateConfig`. After
+vicinity radius. Agents can call `draft_hiring_role` with a job URL or pasted description to
+extract a reviewable mandate, then create a targeted `hiring_compatibility`
+guest task with the same company, role, compensation, equity, work, timing, and
+scope terms in `privateConfig`. After
 explicit recruiter approval, HoneyMatcha can notify a paired candidate agent;
 people without an agent use the same no-account guest link. Candidates choose
 gap-only or exact approved sharing and whether revised outreach is welcome.

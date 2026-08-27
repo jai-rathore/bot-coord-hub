@@ -64,6 +64,7 @@ import {
   reviseHiringGuestTask,
   revokeGuestTask as revokeScopedGuestTask,
 } from "@/lib/guest-tasks";
+import { draftHiringRoleForUser } from "@/lib/hiring-role-draft";
 import {
   createPublicInvite as createShareablePublicInvite,
   listPublicInvites as listShareablePublicInvites,
@@ -601,6 +602,33 @@ export async function createGuestTask(
       sessionId: body.sessionId,
       origin: baseUrl ?? "",
       actor: { kind: "agent", apiKeyId: auth.apiKey.id },
+    })),
+  };
+}
+
+export async function draftHiringRole(
+  auth: AgentAuth,
+  body: {
+    sourceUrl?: unknown;
+    description?: unknown;
+  },
+  signal?: AbortSignal,
+) {
+  if (
+    !hasAgentScope(auth, "guest_tasks:write") &&
+    !hasAgentScope(auth, "discovery:write")
+  ) {
+    assertAgentScope(auth, "guest_tasks:write");
+  }
+  return {
+    ok: true,
+    ...(await draftHiringRoleForUser({
+      userId: auth.user.id,
+      sourceUrl:
+        typeof body.sourceUrl === "string" ? body.sourceUrl : null,
+      description:
+        typeof body.description === "string" ? body.description : null,
+      signal,
     })),
   };
 }

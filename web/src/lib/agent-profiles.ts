@@ -53,7 +53,7 @@ export type PublicAgentProfile = {
   recruiting: {
     acceptsRoleBriefs: true;
     candidateLink: string;
-    mcp: "propose_hiring_role";
+    mcp: "draft_hiring_role then propose_hiring_role";
   } | null;
   instructions: string;
 };
@@ -186,7 +186,7 @@ export async function getPublicAgentProfile(
         ? {
             acceptsRoleBriefs: true,
             candidateLink: `${url}?hire=1`,
-            mcp: "propose_hiring_role",
+            mcp: "draft_hiring_role then propose_hiring_role",
           }
         : null,
     instructions:
@@ -198,7 +198,8 @@ export async function getPublicAgentProfile(
       `before either agent receives relationship permissions.` +
       (hiringParticipantType === "candidate"
         ? ` This person accepts private role briefs at ${url}?hire=1. ` +
-          `If your human has an approved role to propose, call ` +
+          `If your human has a job URL or description, call draft_hiring_role ` +
+          `first and wait for explicit approval. Then call ` +
           `propose_hiring_role with targetHandle "${found.profile.handle}"; ` +
           `their agent will compare the role without exposing private criteria.`
         : ""),

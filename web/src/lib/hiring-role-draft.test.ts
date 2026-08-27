@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { hostedAgentAvailable } from "./llm";
 import {
   buildHiringRoleDraftRequest,
+  draftHiringRoleForUser,
+  hiringDraftToPrivateConfig,
   hiringRoleDraftToolName,
   jobDocumentToText,
   parseHiringRoleDraft,
@@ -80,6 +83,57 @@ test("ambiguous dollar symbols never become an assumed currency", () => {
   assert.equal(draft.compensationMaximum, 220_000);
   assert.equal(draft.compensationCurrency, null);
   assert.ok(draft.missingFields.includes("compensationCurrency"));
+});
+
+test("role draft maps onto the recruiter privateConfig contract", () => {
+  const draft = parseHiringRoleDraft(
+    {
+      companyName: "Matcha Labs",
+      roleTitle: "Staff Product Engineer",
+      roleFocus: "Engineering",
+      level: "Staff / Principal",
+      employmentType: "Full-time",
+      workMode: "Hybrid",
+      compensationMaximum: 225_000,
+      compensationCurrency: "USD",
+      equityMaximumPercent: 0.4,
+      sponsorshipAvailable: false,
+      latestStart: "2027-01-15",
+    },
+    "Annual base compensation is USD 180000 to USD 225000.",
+  );
+  assert.deepEqual(hiringDraftToPrivateConfig(draft), {
+    companyName: "Matcha Labs",
+    roleTitle: "Staff Product Engineer",
+    compensationMaximum: 225_000,
+    compensationCurrency: "USD",
+    equityMaximumPercent: 0.4,
+    workModes: ["Hybrid"],
+    employmentTypes: ["Full-time"],
+    sponsorshipAvailable: false,
+    latestStart: "2027-01-15",
+    levels: ["Staff / Principal"],
+    roleFocus: ["Engineering"],
+  });
+});
+
+test("role drafting tells agents to extract terms when Sage is unavailable", async () => {
+  if (hostedAgentAvailable()) return;
+  await assert.rejects(
+    () =>
+      draftHiringRoleForUser({
+        userId: "user-1",
+        description: "Staff engineer in Brooklyn. USD 200000.",
+      }),
+    (error: unknown) => {
+      assert.equal((error as { status?: number }).status, 503);
+      assert.match(
+        (error as Error).message,
+        /extract the recruiter-approved terms yourself/i,
+      );
+      return true;
+    },
+  );
 });
 
 test("job document text keeps structured job data and removes executable markup", () => {

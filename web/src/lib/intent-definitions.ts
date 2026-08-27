@@ -48,7 +48,7 @@ export const SCHEDULE_MEETING_DEFINITION = validateIntentDefinition({
 export const HIRING_DISCOVERY_DEFINITION = validateIntentDefinition({
   version: canonicalLocationContracts ? 4 : 3,
   agentPrompt:
-    "First ask whether the human is looking for work or hiring. HoneyMatcha privately compares recruiting expectations without revealing raw constraints. Pair annual compensation with an approved ISO currency, represent place as canonical city plus vicinity radius, and keep remote as a separate work mode. For a specific candidate, use a targeted hiring_compatibility guest request so approved fit gaps can be revised before an introduction.",
+    "First ask whether the human is looking for work or hiring. HoneyMatcha privately compares recruiting expectations without revealing raw constraints. Pair annual compensation with an approved ISO currency, represent place as canonical city plus vicinity radius, and keep remote as a separate work mode. If the recruiter has a job URL or description, call draft_hiring_role and wait for approval before using suggestedPrivateConfig. For a specific candidate, use a targeted hiring_compatibility guest request so approved fit gaps can be revised before an introduction.",
   enrollment: {
     summary:
       "Choose whether you are looking for a job or hiring, then privately compare only the relevant constraints.",

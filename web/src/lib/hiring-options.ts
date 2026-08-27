@@ -9,6 +9,17 @@ export const HIRING_CURRENCIES = [
   { value: "CHF", label: "CHF: Swiss franc" },
 ] as const;
 
+export const HIRING_CURRENCY_CODES = [
+  "USD",
+  "EUR",
+  "GBP",
+  "CAD",
+  "AUD",
+  "INR",
+  "SGD",
+  "CHF",
+] as const;
+
 export const HIRING_ROLE_FAMILIES = [
   "Engineering",
   "Product",
