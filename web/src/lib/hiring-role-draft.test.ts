@@ -117,6 +117,17 @@ test("role draft maps onto the recruiter privateConfig contract", () => {
   });
 });
 
+test("empty role drafts fail before Sage availability", async () => {
+  await assert.rejects(
+    () => draftHiringRoleForUser({ userId: "user-1" }),
+    (error: unknown) => {
+      assert.equal((error as { status?: number }).status, 400);
+      assert.match((error as Error).message, /job URL or job description/i);
+      return true;
+    },
+  );
+});
+
 test("role drafting tells agents to extract terms when Sage is unavailable", async () => {
   if (hostedAgentAvailable()) return;
   await assert.rejects(

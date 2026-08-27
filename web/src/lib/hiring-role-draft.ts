@@ -462,6 +462,11 @@ export async function draftHiringRoleForUser(opts: {
   description?: string | null;
   signal?: AbortSignal;
 }) {
+  const sourceUrl = boundedText(opts.sourceUrl, "sourceUrl", 2_048);
+  const description = boundedText(opts.description, "description", 16_000);
+  if (!sourceUrl && !description) {
+    throw new AgentApiError(400, "Paste a job URL or job description.");
+  }
   if (!hostedAgentAvailable()) {
     throw new AgentApiError(
       503,
@@ -497,11 +502,6 @@ export async function draftHiringRoleForUser(opts: {
     });
   }
 
-  const sourceUrl = boundedText(opts.sourceUrl, "sourceUrl", 2_048);
-  const description = boundedText(opts.description, "description", 16_000);
-  if (!sourceUrl && !description) {
-    throw new AgentApiError(400, "Paste a job URL or job description.");
-  }
   const source = await prepareHiringRoleSource({ sourceUrl, description });
   const completion = await getLlmProvider().complete({
     ...buildHiringRoleDraftRequest(source),
