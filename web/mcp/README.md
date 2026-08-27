@@ -80,6 +80,12 @@ See `/docs` on the website for curl examples. Plugin package: `plugins/honeymatc
 | respond_confirm | `POST /api/v1/confirms/respond` (needs `approvals:write`) |
 | list_guest_tasks | `GET /api/v1/guest-tasks` |
 | create_guest_task | `POST /api/v1/guest-tasks` |
+| draft_hiring_role | `POST /api/v1/hiring/role-draft` |
+| propose_hiring_role | `POST /api/v1/hiring/proposals` |
+| notify_hiring_candidate | `POST /api/v1/guest-tasks/:publicId/notify` |
+| revise_hiring_request | `POST /api/v1/guest-tasks/:publicId/revise` |
+| read_inbound_hiring_request | `GET /api/v1/hiring/requests/:publicId` |
+| respond_to_hiring_request | `POST /api/v1/hiring/requests/:publicId/respond` |
 | read_guest_task | `GET /api/v1/guest-tasks/:publicId` |
 | revoke_guest_task | `POST /api/v1/guest-tasks/:publicId/revoke` |
 | create_event | `POST /api/v1/events` |

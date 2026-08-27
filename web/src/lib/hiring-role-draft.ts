@@ -1,16 +1,20 @@
 import { AgentApiError } from "@/lib/agent-errors";
+import { distributedRateLimit } from "@/lib/distributed-rate-limit";
 import {
-  HIRING_CURRENCIES,
+  HIRING_CURRENCY_CODES,
   HIRING_EMPLOYMENT_TYPES,
   HIRING_LEVELS,
   HIRING_ROLE_FAMILIES,
   HIRING_WORK_MODES,
 } from "@/lib/hiring-options";
+import { HIRING_DRAFT_NEXT_STEPS } from "@/lib/hiring-schema";
+import { getLlmProvider, hostedAgentAvailable } from "@/lib/llm";
 import type { LlmRequest, LlmToolDef } from "@/lib/llm";
 import {
   fetchResolvedCallback,
   resolveSafeCallbackUrl,
 } from "@/lib/safe-url";
+import { boundedText } from "@/lib/validation";
 
 const ROLE_DRAFT_TOOL_NAME = "draft_hiring_mandate";
 const MAX_SOURCE_BYTES = 256_000;
@@ -18,7 +22,7 @@ const MAX_SOURCE_CHARACTERS = 16_000;
 const MAX_REDIRECTS = 3;
 const SOURCE_TIMEOUT_MS = 8_000;
 
-const CURRENCIES = HIRING_CURRENCIES.map((option) => option.value);
+const CURRENCIES = [...HIRING_CURRENCY_CODES];
 
 export type HiringRoleDraft = {
   companyName: string | null;
@@ -423,6 +427,108 @@ export async function prepareHiringRoleSource(input: {
         ? "url"
         : "description",
     warning,
+  };
+}
+
+export function hiringDraftToPrivateConfig(draft: HiringRoleDraft) {
+  return {
+    ...(draft.companyName ? { companyName: draft.companyName } : {}),
+    ...(draft.roleTitle ? { roleTitle: draft.roleTitle } : {}),
+    ...(draft.compensationMaximum == null
+      ? {}
+      : { compensationMaximum: draft.compensationMaximum }),
+    ...(draft.compensationCurrency
+      ? { compensationCurrency: draft.compensationCurrency }
+      : {}),
+    ...(draft.equityMaximumPercent == null
+      ? {}
+      : { equityMaximumPercent: draft.equityMaximumPercent }),
+    ...(draft.workMode ? { workModes: [draft.workMode] } : {}),
+    ...(draft.employmentType
+      ? { employmentTypes: [draft.employmentType] }
+      : {}),
+    ...(draft.sponsorshipAvailable == null
+      ? {}
+      : { sponsorshipAvailable: draft.sponsorshipAvailable }),
+    ...(draft.latestStart ? { latestStart: draft.latestStart } : {}),
+    ...(draft.level ? { levels: [draft.level] } : {}),
+    ...(draft.roleFocus ? { roleFocus: [draft.roleFocus] } : {}),
+  };
+}
+
+export async function draftHiringRoleForUser(opts: {
+  userId: string;
+  sourceUrl?: string | null;
+  description?: string | null;
+  signal?: AbortSignal;
+}) {
+  const sourceUrl = boundedText(opts.sourceUrl, "sourceUrl", 2_048);
+  const description = boundedText(opts.description, "description", 16_000);
+  if (!sourceUrl && !description) {
+    throw new AgentApiError(400, "Paste a job URL or job description.");
+  }
+  if (!hostedAgentAvailable()) {
+    throw new AgentApiError(
+      503,
+      "Sage role drafting is temporarily unavailable. Extract the recruiter-approved terms yourself using the hiring enums, then ask the human to confirm them.",
+    );
+  }
+
+  let burst: Awaited<ReturnType<typeof distributedRateLimit>>;
+  let daily: Awaited<ReturnType<typeof distributedRateLimit>>;
+  try {
+    [burst, daily] = await Promise.all([
+      distributedRateLimit(`hiring-role-draft:${opts.userId}`, 12),
+      distributedRateLimit(
+        `hiring-role-draft:daily:${opts.userId}`,
+        60,
+        24 * 60 * 60 * 1_000,
+      ),
+    ]);
+  } catch {
+    throw new AgentApiError(
+      503,
+      "Sage role drafting is temporarily unavailable.",
+      { retryAfterSec: 5 },
+    );
+  }
+  if (!burst.ok || !daily.ok) {
+    const retryAfterSec = Math.max(
+      burst.ok ? 0 : burst.retryAfterSec,
+      daily.ok ? 0 : daily.retryAfterSec,
+    );
+    throw new AgentApiError(429, "Sage role drafting limit reached.", {
+      retryAfterSec,
+    });
+  }
+
+  const source = await prepareHiringRoleSource({ sourceUrl, description });
+  const completion = await getLlmProvider().complete({
+    ...buildHiringRoleDraftRequest(source),
+    budget: { userId: opts.userId },
+    signal: opts.signal,
+  });
+  const toolCall = completion.toolCalls[0];
+  if (
+    completion.toolCalls.length !== 1 ||
+    toolCall?.name !== hiringRoleDraftToolName()
+  ) {
+    throw new AgentApiError(
+      422,
+      "Sage could not turn that source into a structured role. Try pasting the description.",
+    );
+  }
+  const draft = parseHiringRoleDraft(toolCall.args, source.text);
+  return {
+    draft,
+    source: {
+      kind: source.kind,
+      label: source.label,
+      warning: source.warning,
+    },
+    suggestedPrivateConfig: hiringDraftToPrivateConfig(draft),
+    locationQueries: draft.locationQueries,
+    nextSteps: [...HIRING_DRAFT_NEXT_STEPS],
   };
 }
 

@@ -674,9 +674,11 @@ curl -s "$BASE/api/mcp" \\
             Recruiting alignment
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
-            Use <code>create_guest_task</code> with{" "}
+            If the recruiter has a job URL or description, call{" "}
+            <code>draft_hiring_role</code> first and wait for them to approve
+            the extracted terms. Then use <code>create_guest_task</code> with{" "}
             <code>taskType: &quot;hiring_compatibility&quot;</code>, a target
-            email, and employer terms in <code>privateConfig</code>. Then call{" "}
+            email, and those employer terms in <code>privateConfig</code>. Then call{" "}
             <code>notify_hiring_candidate</code> when the recruiter approves the
             outreach. A paired candidate agent can read and answer through{" "}
             <code>read_inbound_hiring_request</code> and{" "}

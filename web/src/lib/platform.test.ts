@@ -418,6 +418,11 @@ test("connect copy uses the production origin and never asks agents to sign in",
     discovery.endpoints.respond_confirm.path,
     "/api/v1/confirms/respond",
   );
+  assert.equal(
+    discovery.endpoints.draft_hiring_role.path,
+    "/api/v1/hiring/role-draft",
+  );
+  assert.match(discovery.recruiting_agent_instructions, /draft_hiring_role/);
 });
 
 test("schedule_meeting sessions require a counterparty; hiring does not", () => {

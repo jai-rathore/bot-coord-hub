@@ -252,7 +252,7 @@ export default async function PublicAgentPage({
               <CopyBlock
                 text={
                   hiringBrief
-                    ? `Connect to ${origin}/api/mcp as my agent if needed. Read the recruiting profile at ${origin}/${profile.handle}?hire=1. Ask me for the approved role terms, then call propose_hiring_role with targetHandle "${profile.handle}". Do not invent compensation or other terms. Let the candidate's agent return the alignment signal and ask me before requesting an introduction or call.`
+                    ? `Connect to ${origin}/api/mcp as my agent if needed. Read the recruiting profile at ${origin}/${profile.handle}?hire=1. If I give you a job URL or description, call draft_hiring_role first and show me the extracted terms. Resolve any cities with resolve_discovery_location. After I approve the terms, call propose_hiring_role with targetHandle "${profile.handle}". Do not invent compensation or other terms. Let the candidate's agent return the alignment signal and ask me before requesting an introduction or call.`
                     : connectPromptForHandle(profile.handle, origin)
                 }
               />

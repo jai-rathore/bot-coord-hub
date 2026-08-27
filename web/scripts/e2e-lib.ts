@@ -4,7 +4,7 @@ import { createHash, randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
 import { getDb } from "../src/db";
 import { apiKeys, guestTasks, sageJobs, users } from "../src/db/schema";
-import { createGuestTask } from "../src/lib/guest-tasks";
+import { createGuestTask, getGuestTaskForOrganizer } from "../src/lib/guest-tasks";
 import {
   acceptInviteLink,
   approveConnectionRequest,
@@ -198,6 +198,20 @@ async function main() {
     JSON.stringify(storedGuest).includes(firstGuest.rawToken),
     false,
     "guest token must never be persisted in plaintext",
+  );
+  const hiringRead = await getGuestTaskForOrganizer(
+    alice,
+    firstGuest.task.publicId,
+  );
+  assert.equal(hiringRead.offer?.compensationMaximum, 200_000);
+  await assert.rejects(
+    () =>
+      createGuestTask({
+        ...guestRequest,
+        idempotencyKey: `sage-guest-invalid-${suffix}`,
+        privateConfig: { workModes: ["Anywhere"] },
+      }),
+    /workModes is invalid/,
   );
 
   const capResults = await Promise.allSettled(

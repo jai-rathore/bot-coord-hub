@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AgentApiError } from "./agent-errors";
+import { HIRING_CURRENCY_CODES, HIRING_WORK_MODES } from "./hiring-options";
 import { MCP_TOOLS, mcpToolError } from "./mcp-tools";
 
 test("every MCP tool publishes ChatGPT and Claude safety metadata", () => {
@@ -43,6 +44,41 @@ test("representative MCP actions have conservative safety annotations", () => {
     openWorldHint: false,
     destructiveHint: true,
   });
+});
+
+test("recruiting MCP tools publish the same hiring contract as the UI", () => {
+  const byName = new Map(MCP_TOOLS.map((tool) => [tool.name, tool]));
+  const draft = byName.get("draft_hiring_role");
+  assert.ok(draft, "draft_hiring_role must be in the MCP catalog");
+  assert.deepEqual(draft?.annotations, {
+    readOnlyHint: false,
+    openWorldHint: true,
+    destructiveHint: false,
+  });
+
+  const privateConfig = byName.get("propose_hiring_role")?.inputSchema.properties
+    .privateConfig as { properties?: Record<string, { enum?: string[] }> };
+  assert.deepEqual(
+    privateConfig.properties?.compensationCurrency?.enum,
+    [...HIRING_CURRENCY_CODES],
+  );
+  assert.deepEqual(
+    (
+      privateConfig.properties?.workModes as {
+        items?: { enum?: string[] };
+      }
+    ).items?.enum,
+    [...HIRING_WORK_MODES],
+  );
+
+  const guestPrivate = byName.get("create_guest_task")?.inputSchema.properties
+    .privateConfig as { properties?: Record<string, unknown> };
+  assert.ok(guestPrivate.properties?.compensationCurrency);
+  assert.ok(
+    byName
+      .get("respond_to_hiring_request")
+      ?.inputSchema.properties.response,
+  );
 });
 
 test("insufficient scope tool errors carry ChatGPT's OAuth challenge metadata", () => {
