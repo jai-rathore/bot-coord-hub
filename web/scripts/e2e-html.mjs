@@ -47,9 +47,14 @@ function text(html) {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 }
 
-function bodyText(html) {
+function visibleCopy(html) {
   const match = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-  return text(match ? match[1] : html);
+  const body = match ? match[1] : html;
+  return text(
+    body
+      .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[\s\S]*?<\/style>/gi, " "),
+  );
 }
 
 function pageTitle(html) {
@@ -136,7 +141,7 @@ async function main() {
         "page still advertises the retired URL card",
       );
       assert.ok(
-        !bodyText(body).includes("\u2014"),
+        !visibleCopy(body).includes("\u2014"),
         "rendered copy contains an em dash",
       );
     });

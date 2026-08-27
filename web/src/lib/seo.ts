@@ -192,11 +192,20 @@ export function publicPageMetadata(page: PublicPageSeo): Metadata {
       url: canonical,
       siteName: "HoneyMatcha",
       type: "website",
+      images: [
+        {
+          url: "/og-agent-choice-v2.png",
+          width: 1200,
+          height: 630,
+          alt: "HoneyMatcha. Use Sage or bring your own agent to coordinate with other people's agents.",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: page.title,
       description: page.description,
+      images: ["/og-agent-choice-v2.png"],
     },
   };
 }

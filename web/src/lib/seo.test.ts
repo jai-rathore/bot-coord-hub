@@ -89,6 +89,12 @@ test("page metadata sets a canonical and matching social titles", () => {
   );
   assert.equal(metadata.openGraph?.title, PUBLIC_PAGE_SEO.howTo.title);
   assert.equal(metadata.twitter?.title, PUBLIC_PAGE_SEO.howTo.title);
+  const ogImages = metadata.openGraph?.images;
+  assert.ok(Array.isArray(ogImages) && ogImages.length > 0);
+  assert.equal(
+    (ogImages[0] as { url?: string }).url,
+    "/og-agent-choice-v2.png",
+  );
 });
 
 test("JSON-LD covers HowTo, FAQ, Organization, and WebApplication", () => {
