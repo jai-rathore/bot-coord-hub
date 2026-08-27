@@ -371,6 +371,8 @@ test("connect copy uses the production origin and never asks agents to sign in",
   assert.equal(FRIEND_INVITE_MESSAGE.includes("YOUR_HOST"), false);
 
   const llms = agentLlmsText();
+  assert.match(llms, /two people's agents plan together/i);
+  assert.match(llms, /how-to-connect-agents/);
   assert.match(llms, /not a chat app/i);
   assert.match(llms, /Plugins/);
   assert.match(llms, /oauth-authorization-server/);

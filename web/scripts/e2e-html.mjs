@@ -47,14 +47,47 @@ function text(html) {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 }
 
+function bodyText(html) {
+  const match = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  return text(match ? match[1] : html);
+}
+
+function pageTitle(html) {
+  const match = html.match(/<title>([^<]*)<\/title>/i);
+  return decodeEntities(match?.[1] ?? "");
+}
+
+function decodeEntities(value) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&mdash;/g, "\u2014")
+    .replace(/&#x2014;/g, "\u2014")
+    .replace(/&#8212;/g, "\u2014");
+}
+
 /** Public pages must render real server HTML, not a redirect or an error shell. */
 const PAGES = [
-  { path: "/", heading: "meets their agent" },
-  { path: "/docs", heading: "Connect the assistant you already have" },
-  { path: "/agents", heading: "Sage is ready." },
-  { path: "/agents/tasks", heading: "What agents can coordinate" },
-  { path: "/privacy", heading: "Privacy" },
-  { path: "/terms", heading: "Terms" },
+  { path: "/", heading: "meets their agent", title: "HoneyMatcha — Your agent, meets their agent" },
+  { path: "/docs", heading: "Connect the assistant you already have", title: "HoneyMatcha docs — connect calendar and assistant" },
+  { path: "/agents", heading: "Sage is ready.", title: "Connect your agent to HoneyMatcha" },
+  { path: "/agents/tasks", heading: "What agents can coordinate", title: "What HoneyMatcha agents can coordinate" },
+  { path: "/support", heading: "help you connect", title: "HoneyMatcha support" },
+  { path: "/privacy", heading: "Privacy", title: "HoneyMatcha privacy — free/busy only" },
+  { path: "/terms", heading: "Terms", title: "HoneyMatcha terms" },
+  {
+    path: "/how-to-connect-agents",
+    heading: "How to connect your agents so they can plan together",
+    title: "How to connect your agents so they can plan together",
+  },
+  {
+    path: "/connect-chatgpt-and-claude",
+    heading: "Connect ChatGPT and Claude so they can schedule together",
+    title: "Connect ChatGPT and Claude to schedule",
+  },
+  { path: "/faq", heading: "HoneyMatcha FAQ", title: "HoneyMatcha FAQ" },
 ];
 
 async function main() {
@@ -74,6 +107,24 @@ async function main() {
         text(body).includes(page.heading),
         `missing expected copy: ${page.heading}`,
       );
+      assert.equal(
+        pageTitle(body),
+        page.title,
+        `unexpected title for ${page.path}`,
+      );
+      const canonical =
+        page.path === "/"
+          ? "https://honeymatcha.io"
+          : `https://honeymatcha.io${page.path}`;
+      assert.match(body, /rel="canonical"/, `missing canonical rel on ${page.path}`);
+      assert.ok(
+        body.includes(canonical),
+        `missing canonical href ${canonical}`,
+      );
+      assert.ok(
+        body.includes("/how-to-connect-agents"),
+        `${page.path} is missing an internal link to /how-to-connect-agents`,
+      );
       assert.match(
         body,
         /og-agent-choice-v2\.png/,
@@ -85,7 +136,7 @@ async function main() {
         "page still advertises the retired URL card",
       );
       assert.ok(
-        !text(body).includes("\u2014"),
+        !bodyText(body).includes("\u2014"),
         "rendered copy contains an em dash",
       );
     });
@@ -138,10 +189,62 @@ async function main() {
     });
   }
 
-  await check("GET /llms.txt returns text", async () => {
+  await check("GET /llms.txt leads with the human how-to", async () => {
     const res = await fetch(`${BASE_URL}/llms.txt`);
     assert.equal(res.status, 200);
-    assert.ok((await res.text()).length > 0, "empty llms.txt");
+    const text = await res.text();
+    assert.match(text, /two people's agents plan together/i);
+    assert.ok(
+      text.indexOf("how-to-connect-agents") < text.indexOf("pairings/start"),
+      "human how-to must appear before pairing curl",
+    );
+  });
+
+  await check("GET /sitemap.xml lists the public AEO URLs", async () => {
+    const res = await fetch(`${BASE_URL}/sitemap.xml`);
+    assert.equal(res.status, 200);
+    const xml = await res.text();
+    assert.match(res.headers.get("content-type") ?? "", /xml/);
+    for (const path of [
+      "https://honeymatcha.io</loc>",
+      "https://honeymatcha.io/how-to-connect-agents",
+      "https://honeymatcha.io/connect-chatgpt-and-claude",
+      "https://honeymatcha.io/faq",
+      "https://honeymatcha.io/agents",
+    ]) {
+      assert.ok(xml.includes(path), `sitemap missing ${path}`);
+    }
+  });
+
+  await check("GET /robots.txt points at the sitemap", async () => {
+    const res = await fetch(`${BASE_URL}/robots.txt`);
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), /Sitemap:\s*https:\/\/honeymatcha\.io\/sitemap\.xml/);
+  });
+
+  await check("how-to page quotes the answer first and ships HowTo + FAQ schema", async () => {
+    const { res, body } = await getHtml("/how-to-connect-agents");
+    assert.equal(res.status, 200);
+    const lead =
+      "Two people can keep the assistants they already use";
+    const leadAt = body.indexOf(lead);
+    const h1At = body.indexOf("<h1");
+    assert.ok(leadAt >= 0, "missing how-to lead");
+    assert.ok(leadAt < h1At, "lead must appear before the H1 / hero");
+    assert.match(body, /"@type":"HowTo"/);
+    assert.match(body, /"@type":"FAQPage"/);
+    assert.match(body, /"@type":"Organization"/);
+    assert.ok(body.includes("/sign-up"), "how-to page needs a Sage CTA");
+    assert.ok(!body.includes("sign in to continue"), "how-to page must not be a sign-up wall");
+  });
+
+  await check("homepage and FAQ publish application schema", async () => {
+    const home = await getHtml("/");
+    assert.match(home.body, /"@type":"WebApplication"/);
+    assert.match(home.body, /"price":"0"/);
+    const faq = await getHtml("/faq");
+    assert.match(faq.body, /"@type":"FAQPage"/);
+    assert.match(faq.body, /privacy@honeymatcha\.io/);
   });
 
   for (const path of ["/app/people", "/app/events", "/app/activity", "/app/settings"]) {

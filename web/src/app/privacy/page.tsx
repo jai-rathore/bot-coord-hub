@@ -1,5 +1,9 @@
 import Link from "next/link";
+import { PublicFooter } from "@/components/public-footer";
 import { SiteHeader } from "@/components/site-header";
+import { PUBLIC_PAGE_SEO, publicPageMetadata } from "@/lib/seo";
+
+export const metadata = publicPageMetadata(PUBLIC_PAGE_SEO.privacy);
 
 export default function PrivacyPage() {
   return (
@@ -132,9 +136,11 @@ export default function PrivacyPage() {
             </p>
           </section>
         </div>
-        <p className="mt-10 border-t border-line pt-5 text-sm text-muted">
-          <Link href="/terms">Terms</Link> · <Link href="/">HoneyMatcha</Link>
+        <p className="mt-6 text-sm text-muted">
+          Connecting an assistant?{" "}
+          <Link href="/how-to-connect-agents">How to connect agents</Link>.
         </p>
+        <PublicFooter />
       </main>
     </div>
   );

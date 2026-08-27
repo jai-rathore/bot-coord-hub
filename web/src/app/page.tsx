@@ -5,6 +5,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { BrandAtmosphere } from "@/components/brand-atmosphere";
 import { CapabilityOverview } from "@/components/capability-overview";
 import { HomeHero } from "@/components/home-hero";
+import { JsonLd } from "@/components/json-ld";
 import { SignedInHome } from "@/components/signed-in-home";
 import type { SageProactiveUpdate } from "@/components/sage-proactive-updates";
 import { SiteHeader } from "@/components/site-header";
@@ -12,6 +13,11 @@ import { getProfileForUser } from "@/lib/agent-profiles";
 import { getHomeStatus } from "@/lib/home-status";
 import { sageNameFor } from "@/lib/sage";
 import { isNextControlFlowError } from "@/lib/next-errors";
+import {
+  PUBLIC_PAGE_SEO,
+  publicPageMetadata,
+  webApplicationJsonLd,
+} from "@/lib/seo";
 import { ensureCurrentUser } from "@/lib/users";
 import { eventsFeatureEnabled } from "@/lib/events-feature";
 import {
@@ -25,6 +31,7 @@ import {
 } from "@/lib/sage/job-store";
 
 export const dynamic = "force-dynamic";
+export const metadata = publicPageMetadata(PUBLIC_PAGE_SEO.home);
 
 /** Three sentences, because three is all anyone reads before deciding. */
 const STEPS = [
@@ -180,7 +187,11 @@ export default async function HomePage() {
             <p className="mt-4 max-w-sm text-sm leading-6 text-muted">
               HoneyMatcha is the shared coordination layer. It gives different
               agents a safe place to work together without asking everyone to
-              use the same app.
+              use the same app.{" "}
+              <Link href="/how-to-connect-agents">
+                How to connect your agents
+              </Link>
+              .
             </p>
           </div>
           <ol className="border-t border-line">
@@ -273,14 +284,17 @@ export default async function HomePage() {
         <footer className="mt-14 flex flex-col gap-4 border-t border-line px-5 pt-6 text-sm text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <span>HoneyMatcha · coordination across agents</span>
           <span className="flex flex-wrap gap-x-5 gap-y-2">
+            <Link href="/how-to-connect-agents">How to connect agents</Link>
             <Link href="/agents">Connect an assistant</Link>
             <Link href="/docs">Developer docs</Link>
+            <Link href="/faq">FAQ</Link>
             <Link href="/support">Support</Link>
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
           </span>
         </footer>
       </main>
+      <JsonLd data={webApplicationJsonLd()} />
     </div>
   );
 }

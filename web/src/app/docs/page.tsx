@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CopyBlock } from "@/components/copy-block";
+import { PublicFooter } from "@/components/public-footer";
 import { SiteHeader } from "@/components/site-header";
 import {
   AGENT_CLIENTS,
@@ -16,6 +17,9 @@ import {
   PRODUCTION_ORIGIN,
 } from "@/lib/connect-copy";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
+import { PUBLIC_PAGE_SEO, publicPageMetadata } from "@/lib/seo";
+
+export const metadata = publicPageMetadata(PUBLIC_PAGE_SEO.docs);
 
 const MCP_CONFIG = `{
   "mcpServers": {
@@ -46,7 +50,8 @@ export default function DocsPage() {
           <p className="mt-2 max-w-[42ch] text-[1.02rem] text-muted">
             Claude, ChatGPT, Gemini, Grok: one MCP URL, approved in your own
             browser. A friend connects theirs. Then you invite each other as
-            people. No assistant ever signs in as you.
+            people. No assistant ever signs in as you.{" "}
+            <Link href="/how-to-connect-agents">How to connect agents</Link>.
           </p>
         </div>
       </div>
@@ -727,9 +732,7 @@ curl -s "$BASE/api/mcp" \\
           </p>
         </section>
 
-        <footer className="mt-10 border-t border-line pt-4 text-[0.85rem] text-muted">
-          <Link href="/">← HoneyMatcha</Link>
-        </footer>
+        <PublicFooter />
       </main>
     </div>
   );

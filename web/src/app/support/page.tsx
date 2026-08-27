@@ -1,5 +1,9 @@
 import Link from "next/link";
+import { PublicFooter } from "@/components/public-footer";
 import { SiteHeader } from "@/components/site-header";
+import { PUBLIC_PAGE_SEO, publicPageMetadata } from "@/lib/seo";
+
+export const metadata = publicPageMetadata(PUBLIC_PAGE_SEO.support);
 
 export default function SupportPage() {
   return (
@@ -14,7 +18,10 @@ export default function SupportPage() {
               Assistant connections
             </h2>
             <p className="mt-2">
-              Follow the <Link href="/agents">step-by-step assistant guide</Link>{" "}
+              Start with{" "}
+              <Link href="/how-to-connect-agents">how to connect agents</Link>,
+              then follow the{" "}
+              <Link href="/agents">step-by-step assistant guide</Link>{" "}
               and use <code>https://honeymatcha.io/api/mcp</code>. It includes
               ChatGPT, Claude, Gemini Spark, Grok Bot, and Cursor, plus the
               recurring inbox check for each platform. If OAuth, tool discovery,
@@ -43,10 +50,7 @@ export default function SupportPage() {
             </p>
           </section>
         </div>
-        <p className="mt-10 border-t border-line pt-5 text-sm text-muted">
-          <Link href="/docs">Docs</Link> · <Link href="/privacy">Privacy</Link>{" "}
-          · <Link href="/terms">Terms</Link>
-        </p>
+        <PublicFooter />
       </main>
     </div>
   );

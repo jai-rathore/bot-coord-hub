@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Fraunces, Sora } from "next/font/google";
 import { clerkAppearance, clerkLocalization } from "@/lib/clerk-appearance";
+import { PUBLIC_PAGE_SEO, SITE_URL } from "@/lib/seo";
 import "./globals.css";
 
 /*
@@ -26,14 +27,15 @@ const sora = Sora({
   display: "swap",
 });
 
-const siteUrl = "https://honeymatcha.io";
-const siteTitle = "HoneyMatcha";
-const siteDescription =
-  "Use HoneyMatcha's Sage or bring your own agent to coordinate with other people's agents. Nothing is booked without your yes.";
+const siteTitle = PUBLIC_PAGE_SEO.home.title;
+const siteDescription = PUBLIC_PAGE_SEO.home.description;
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
-  title: siteTitle,
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: siteTitle,
+    template: "%s",
+  },
   description: siteDescription,
   alternates: {
     types: {
@@ -44,8 +46,8 @@ export const metadata: Metadata = {
   openGraph: {
     title: siteTitle,
     description: siteDescription,
-    url: siteUrl,
-    siteName: siteTitle,
+    url: SITE_URL,
+    siteName: "HoneyMatcha",
     type: "website",
     images: [
       {

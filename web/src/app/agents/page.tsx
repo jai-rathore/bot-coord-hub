@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AssistantSetupGuide } from "@/components/assistant-setup-guide";
 import { BrandAtmosphere } from "@/components/brand-atmosphere";
 import { CopyBlock } from "@/components/copy-block";
+import { PublicFooter } from "@/components/public-footer";
 import { SiteHeader } from "@/components/site-header";
 import {
   ASK_AGENT_PROMPT,
@@ -9,6 +10,9 @@ import {
   MCP_URL,
 } from "@/lib/connect-copy";
 import { discoveryFeatureEnabled } from "@/lib/discovery-feature";
+import { PUBLIC_PAGE_SEO, publicPageMetadata } from "@/lib/seo";
+
+export const metadata = publicPageMetadata(PUBLIC_PAGE_SEO.agents);
 
 export default function AgentsPage() {
   const discoveryEnabled = discoveryFeatureEnabled();
@@ -164,6 +168,14 @@ export default function AgentsPage() {
           Already using a manual key? Manage fallback credentials in{" "}
           <Link href="/app/keys">advanced connection settings</Link>.
         </p>
+        <p className="mt-4 text-sm text-muted">
+          New to HoneyMatcha?{" "}
+          <Link href="/how-to-connect-agents">
+            How to connect your agents so they can plan together
+          </Link>
+          .
+        </p>
+        <PublicFooter />
       </main>
     </div>
   );
