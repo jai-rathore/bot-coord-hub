@@ -10,6 +10,7 @@ import {
   sakuraDisplayScale,
   sakuraFlattenStages,
   SAKURA_QR,
+  SAKURA_SCAN,
 } from "./sakura-qr";
 
 test("meet links encode as a high-redundancy matrix with intact finders", () => {
@@ -71,14 +72,21 @@ test("flatten pours the canopy in before the trunk and the overhead camera", () 
   assert.equal(rest.trunk, 0);
   assert.equal(rest.camera, 0);
   assert.equal(rest.tiles, 0);
+  assert.equal(rest.scan, 0);
   const early = sakuraFlattenStages(0.28);
   assert.ok(early.canopy > early.trunk);
-  assert.ok(early.tiles > early.camera);
+  assert.ok(early.camera > early.tiles);
+  assert.equal(early.scan, 0);
   const done = sakuraFlattenStages(1);
   assert.equal(done.canopy, 1);
   assert.equal(done.trunk, 1);
   assert.equal(done.camera, 1);
   assert.equal(done.tiles, 1);
+  assert.equal(done.scan, 1);
+});
+
+test("the exact scan plate keeps the standards-sized quiet zone", () => {
+  assert.ok(SAKURA_SCAN.quietModules >= 4);
 });
 
 test("display scale stays finite and supersamples the full-size garden", () => {

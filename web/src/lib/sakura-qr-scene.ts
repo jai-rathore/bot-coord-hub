@@ -10,13 +10,14 @@ import {
   sakuraDisplayScale,
   sakuraFlattenStages,
   SAKURA_QR,
+  SAKURA_SCAN,
   type SakuraQrMatrix,
   type SakuraQrMount,
   type SakuraQrMountOptions,
   type SakuraTileKind,
 } from "./sakura-qr";
 
-const QUIET = 2.4;
+const QUIET = SAKURA_SCAN.quietModules + 0.45;
 const ISO_YAW = Math.PI / 4;
 const ISO_ELEV = Math.atan(1 / Math.sqrt(2));
 
@@ -46,13 +47,18 @@ type Card = {
   rz: number;
   billboard: boolean;
   color: THREE.Color;
+  targetX: number;
+  targetZ: number;
+  mergeDelay: number;
 };
 
 type Petal = {
   x: number;
   y: number;
   z: number;
+  bornX: number;
   bornY: number;
+  bornZ: number;
   speed: number;
   drift: number;
   rx: number;
@@ -62,6 +68,11 @@ type Petal = {
   phase: number;
   scale: number;
 };
+
+function smoothstep(value: number): number {
+  const t = THREE.MathUtils.clamp(value, 0, 1);
+  return t * t * (3 - 2 * t);
+}
 
 function rgbColor(hex: string): THREE.Color {
   const [r, g, b] = hexToRgb(hex);
@@ -219,6 +230,9 @@ function addCard(
     rz: (rng() - 0.5) * 1.2,
     billboard: rng() > 0.72,
     color,
+    targetX: x,
+    targetZ: z,
+    mergeDelay: 0,
   });
 }
 
@@ -256,18 +270,39 @@ function sampleCanopy(
   }
 
   for (let i = 0; i < counts.petals; i += 1) {
-    const p = place(i % 5 === 0 ? along : ends, 0.12 + rng() * 0.16);
+    const p = place(i % 5 === 0 ? along : ends, 0.16 + rng() * 0.22);
     addCard(petals, p.x, p.y, p.z, rng, varyColor(petalColors[i % petalColors.length], 0.07, rng));
   }
   for (let i = 0; i < counts.flowers; i += 1) {
-    const p = place(ends, 0.06 + rng() * 0.1);
+    const p = place(ends, 0.08 + rng() * 0.14);
     addCard(flowers, p.x, p.y, p.z, rng, varyColor(petalColors[(i + 2) % petalColors.length], 0.05, rng));
   }
   for (let i = 0; i < counts.leaves; i += 1) {
-    const p = place(along, 0.05 + rng() * 0.1);
+    const p = place(along, 0.07 + rng() * 0.13);
     addCard(leaves, p.x, p.y, p.z, rng, varyColor(leafColors[i % leafColors.length], 0.08, rng));
   }
   return { petals, flowers, leaves };
+}
+
+function assignMergeTargets(
+  cards: Card[],
+  tiles: Tile[],
+  origin: number,
+  treeScale: number,
+  rng: () => number,
+): void {
+  const targets = tiles.filter((tile) => tile.dark && !tile.finder);
+  if (targets.length === 0) return;
+  const offset = Math.floor(rng() * targets.length);
+  for (let i = 0; i < cards.length; i += 1) {
+    const card = cards[i];
+    const tile = targets[(i * 37 + offset) % targets.length];
+    card.targetX = (origin + tile.col) / treeScale;
+    card.targetZ = (origin + tile.row) / treeScale;
+    // A small deterministic stagger turns the crown into streams instead of
+    // shrinking every blossom in a single mechanical pulse.
+    card.mergeDelay = rng() * 0.22;
+  }
 }
 
 function buildTrunk(
@@ -486,19 +521,23 @@ function writeCards(
   live: number,
   wind: number,
   sink = 0,
+  targetY = 0.14,
 ) {
-  const pull = sink * sink;
   for (let i = 0; i < cards.length; i += 1) {
     const card = cards[i];
-    const sway = Math.sin(time * 1.85 + card.phase) * 0.08 * wind;
+    const staggered = smoothstep(
+      (sink - card.mergeDelay) / Math.max(0.01, 1 - card.mergeDelay),
+    );
+    const sway =
+      Math.sin(time * 1.85 + card.phase) * 0.08 * wind * (1 - staggered);
     dummy.position.set(
-      card.x * (1 - pull * 0.62) + sway,
+      THREE.MathUtils.lerp(card.x, card.targetX, staggered) + sway,
       THREE.MathUtils.lerp(
         card.y + Math.sin(time * 2.35 + card.phase * 1.2) * 0.04 * wind,
-        0.14,
-        Math.min(1, pull * 1.15),
+        targetY,
+        staggered,
       ),
-      card.z * (1 - pull * 0.62) + sway * 0.45,
+      THREE.MathUtils.lerp(card.z, card.targetZ, staggered) + sway * 0.45,
     );
     if (card.billboard) {
       dummy.quaternion.copy(camera.quaternion);
@@ -511,7 +550,7 @@ function writeCards(
       );
       dummy.quaternion.setFromEuler(euler);
     }
-    const shrink = live * (1 - pull * 0.72);
+    const shrink = live * THREE.MathUtils.lerp(1, 0.16, staggered);
     dummy.scale.set(card.sx * shrink, card.sy * shrink, 1);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
@@ -549,7 +588,7 @@ export async function mountSakuraQrScene(
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.18;
-  renderer.setClearColor(0x000000, 0);
+  renderer.setClearColor(rgbColor(SAKURA_QR.sky), 1);
   renderer.shadowMap.enabled = false;
 
   const scene = new THREE.Scene();
@@ -570,6 +609,37 @@ export async function mountSakuraQrScene(
   fill.position.set(-n * 0.6, n * 0.35, -n * 0.25);
   scene.add(fill);
   scene.add(new THREE.AmbientLight(0xf7f1e6, 0.22));
+
+  // A restrained set of stepped garden terraces gives the tree a world to
+  // inhabit without competing with the matrix. Every plane follows the same
+  // isometric ground axis and fades away before the exact scan plate appears.
+  const backdrop = new THREE.Group();
+  const backdropGeometries: THREE.BufferGeometry[] = [];
+  const backdropMaterials: THREE.MeshStandardMaterial[] = [];
+  const addTerrace = (
+    width: number,
+    height: number,
+    y: number,
+    color: string,
+    roughness: number,
+  ) => {
+    const geometry = new RoundedBoxGeometry(width, height, width, high ? 3 : 1, 0.42);
+    const material = new THREE.MeshStandardMaterial({
+      color: rgbColor(color),
+      roughness,
+      metalness: 0,
+      transparent: true,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.y = y;
+    backdrop.add(mesh);
+    backdropGeometries.push(geometry);
+    backdropMaterials.push(material);
+  };
+  addTerrace(n + 12, 0.34, -1.12, SAKURA_QR.water, 0.48);
+  addTerrace(n + 8.5, 0.5, -0.78, SAKURA_QR.terraceEdge, 0.76);
+  addTerrace(n + 6.5, 0.54, -0.4, SAKURA_QR.terrace, 0.88);
+  scene.add(backdrop);
 
   const shadow = new THREE.Mesh(
     new THREE.CircleGeometry(n * 0.32, 24),
@@ -596,6 +666,61 @@ export async function mountSakuraQrScene(
 
   const dummy = new THREE.Object3D();
   const mix = new THREE.Color();
+  const clearColor = rgbColor(SAKURA_QR.sky);
+  const scanClearColor = rgbColor(SAKURA_QR.lightPure);
+  const clearMix = new THREE.Color();
+
+  // Decorative rounded modules are allowed during the garden view. The final
+  // frame swaps to a separate, perfectly square matrix with an opaque four-
+  // module quiet zone, so low-end cameras do not have to interpret the art.
+  const scanPlateGeo = new THREE.PlaneGeometry(
+    n + SAKURA_SCAN.quietModules * 2,
+    n + SAKURA_SCAN.quietModules * 2,
+  );
+  const scanPlateMat = new THREE.MeshBasicMaterial({
+    color: rgbColor(SAKURA_QR.lightPure),
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const scanPlate = new THREE.Mesh(scanPlateGeo, scanPlateMat);
+  scanPlate.rotation.x = -Math.PI / 2;
+  scanPlate.position.y = 1.02;
+  scanPlate.renderOrder = 20;
+  scanPlate.visible = false;
+  scene.add(scanPlate);
+
+  const scanModuleGeo = new THREE.PlaneGeometry(1.002, 1.002);
+  const scanModuleMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const scanModuleMesh = new THREE.InstancedMesh(
+    scanModuleGeo,
+    scanModuleMat,
+    tiles.length,
+  );
+  scanModuleMesh.renderOrder = 21;
+  scanModuleMesh.visible = false;
+  for (const tile of tiles) {
+    dummy.position.set(origin + tile.col, 1.04, origin + tile.row);
+    dummy.rotation.set(-Math.PI / 2, 0, 0);
+    dummy.scale.setScalar(1);
+    dummy.updateMatrix();
+    scanModuleMesh.setMatrixAt(tile.index, dummy.matrix);
+    scanModuleMesh.setColorAt(tile.index, tile.scanColor);
+  }
+  scanModuleMesh.instanceMatrix.needsUpdate = true;
+  if (scanModuleMesh.instanceColor) {
+    scanModuleMesh.instanceColor.needsUpdate = true;
+  }
+  scene.add(scanModuleMesh);
   const stackGeo = new RoundedBoxGeometry(0.86, 1, 0.86, high ? 2 : 1, 0.12);
   const stackMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -674,6 +799,23 @@ export async function mountSakuraQrScene(
     stackMesh.instanceMatrix.needsUpdate = true;
   }
 
+  function writeScan(amount: number, force: boolean) {
+    const scanAmount = force ? 1 : THREE.MathUtils.clamp(amount, 0, 1);
+    const artAmount = 1 - scanAmount;
+    scanPlate.visible = scanAmount > 0.002;
+    scanModuleMesh.visible = scanAmount > 0.002;
+    scanPlateMat.opacity = scanAmount;
+    scanModuleMat.opacity = scanAmount;
+    tileMesh.visible = !force && scanAmount < 0.999;
+    backdrop.visible = artAmount > 0.002;
+    backdrop.scale.setScalar(0.985 + artAmount * 0.015);
+    for (const material of backdropMaterials) {
+      material.opacity = artAmount;
+    }
+    clearMix.copy(clearColor).lerp(scanClearColor, scanAmount);
+    renderer.setClearColor(clearMix, 1);
+  }
+
   const blades: { x: number; z: number; sx: number; sy: number; rot: number; tilt: number; phase: number }[] = [];
   const tuftFlowers: Card[] = [];
   const flowerColors = [
@@ -729,14 +871,13 @@ export async function mountSakuraQrScene(
   const trunkMesh = new THREE.Mesh(trunk, barkMat);
   tree.add(trunkMesh);
   const roots = buildRoots(tiles, origin, rng);
-  const rootMesh = new THREE.Mesh(
-    roots,
-    new THREE.MeshStandardMaterial({
-      color: rgbColor(SAKURA_QR.barkDeep),
-      roughness: 0.74,
-      metalness: 0.03,
-    }),
-  );
+  const rootMat = new THREE.MeshStandardMaterial({
+    color: rgbColor(SAKURA_QR.barkDeep),
+    roughness: 0.74,
+    metalness: 0.03,
+    transparent: true,
+  });
+  const rootMesh = new THREE.Mesh(roots, rootMat);
   tree.add(rootMesh);
   const crown = new THREE.Group();
   crown.position.y = crownY;
@@ -752,8 +893,8 @@ export async function mountSakuraQrScene(
   ];
   const leafColors = [rgbColor(SAKURA_QR.matcha), rgbColor(SAKURA_QR.matchaSoft), rgbColor("#5c8f68")];
   const counts = compact
-    ? { petals: 1100, flowers: 280, leaves: 200 }
-    : { petals: 2400, flowers: 520, leaves: 380 };
+    ? { petals: 1550, flowers: 420, leaves: 240 }
+    : { petals: 3200, flowers: 760, leaves: 480 };
   const crownSites = sites.filter((site) => site.y > treeHeight * 0.16);
   const canopy = sampleCanopy(
     rng,
@@ -766,6 +907,9 @@ export async function mountSakuraQrScene(
   for (const card of [...canopy.petals, ...canopy.flowers, ...canopy.leaves]) {
     card.y -= crownY;
   }
+  assignMergeTargets(canopy.petals, tiles, origin, treeScale, rng);
+  assignMergeTargets(canopy.flowers, tiles, origin, treeScale, rng);
+  assignMergeTargets(canopy.leaves, tiles, origin, treeScale, rng);
 
   const petalTex = makeTexture(paintPetal, high ? 1024 : 128);
   const flowerTex = makeTexture(paintFlower, high ? 1024 : 128);
@@ -844,24 +988,28 @@ export async function mountSakuraQrScene(
     petal.x = spawnScratch.x + (rng() - 0.5) * out;
     petal.z = spawnScratch.z + (rng() - 0.5) * out;
     petal.y = spawnScratch.y - 0.08 - rng() * 0.22;
+    petal.bornX = petal.x;
     petal.bornY = petal.y;
+    petal.bornZ = petal.z;
   }
 
-  const petalCount = reduced ? 0 : compact ? 10 : 16;
+  const petalCount = reduced ? 0 : compact ? 24 : 42;
   const petals: Petal[] = Array.from({ length: petalCount }, () => {
     const petal: Petal = {
       x: 0,
       y: 0,
       z: 0,
+      bornX: 0,
       bornY: 0,
+      bornZ: 0,
       speed: 0.28 + rng() * 0.32,
-      drift: 0.22 + rng() * 0.28,
+      drift: 0.34 + rng() * 0.42,
       rx: rng() * Math.PI,
       ry: rng() * Math.PI,
       rz: rng() * Math.PI,
       spin: (rng() - 0.5) * 2.4,
       phase: rng() * Math.PI * 2,
-      scale: 0.52 + rng() * 0.2,
+      scale: 0.7 + rng() * 0.34,
     };
     spawnFromBranch(petal);
     petal.y -= rng() * Math.max(1.2, petal.y * 0.45);
@@ -870,8 +1018,10 @@ export async function mountSakuraQrScene(
   const fallingMat = spriteMaterial(petalTex);
   fallingMat.alphaTest = 0.02;
   fallingMat.depthWrite = false;
+  fallingMat.depthTest = false;
+  fallingMat.opacity = 0.96;
   const fallingMesh = new THREE.InstancedMesh(
-    new THREE.PlaneGeometry(0.72, 0.86),
+    new THREE.PlaneGeometry(0.92, 1.08),
     fallingMat,
     Math.max(1, petalCount),
   );
@@ -882,6 +1032,54 @@ export async function mountSakuraQrScene(
   if (fallingMesh.instanceColor) fallingMesh.instanceColor.needsUpdate = true;
   fallingMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(fallingMesh);
+
+  const fallingLeafCount = reduced ? 0 : compact ? 8 : 14;
+  const fallingLeaves: Petal[] = Array.from(
+    { length: fallingLeafCount },
+    () => {
+      const leaf: Petal = {
+        x: 0,
+        y: 0,
+        z: 0,
+        bornX: 0,
+        bornY: 0,
+        bornZ: 0,
+        speed: 0.2 + rng() * 0.22,
+        drift: 0.42 + rng() * 0.48,
+        rx: rng() * Math.PI,
+        ry: rng() * Math.PI,
+        rz: rng() * Math.PI,
+        spin: (rng() - 0.5) * 3.2,
+        phase: rng() * Math.PI * 2,
+        scale: 0.72 + rng() * 0.32,
+      };
+      spawnFromBranch(leaf);
+      leaf.y -= rng() * Math.max(1.2, leaf.y * 0.45);
+      return leaf;
+    },
+  );
+  const fallingLeafMat = spriteMaterial(leafTex);
+  fallingLeafMat.alphaTest = 0.03;
+  fallingLeafMat.depthWrite = false;
+  fallingLeafMat.depthTest = false;
+  fallingLeafMat.opacity = 0.94;
+  const fallingLeafMesh = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(0.86, 1.18),
+    fallingLeafMat,
+    Math.max(1, fallingLeafCount),
+  );
+  fallingLeafMesh.renderOrder = 5;
+  fallingLeaves.forEach((_, i) =>
+    fallingLeafMesh.setColorAt(
+      i,
+      varyColor(leafColors[i % leafColors.length], 0.06, rng),
+    ),
+  );
+  if (fallingLeafMesh.instanceColor) {
+    fallingLeafMesh.instanceColor.needsUpdate = true;
+  }
+  fallingLeafMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(fallingLeafMesh);
 
   let targetReveal = options.reveal ? 1 : 0;
   let reveal = targetReveal;
@@ -920,6 +1118,7 @@ export async function mountSakuraQrScene(
   function writeGrass(time: number, amount: number) {
     const live = 1 - amount;
     const wind = reduced ? 0 : live;
+    grassMesh.visible = live > 0.01;
     for (let i = 0; i < blades.length; i += 1) {
       const blade = blades[i];
       dummy.position.set(blade.x, 0.12, blade.z);
@@ -928,7 +1127,7 @@ export async function mountSakuraQrScene(
         blade.rot,
         Math.sin(time * 2.8 + blade.phase) * 0.18 * wind,
       );
-      dummy.scale.set(blade.sx, blade.sy * Math.max(0.12, live), 1);
+      dummy.scale.set(blade.sx, blade.sy * Math.max(0, live), 1);
       dummy.updateMatrix();
       grassMesh.setMatrixAt(i, dummy.matrix);
     }
@@ -940,48 +1139,72 @@ export async function mountSakuraQrScene(
     grassMesh.instanceMatrix.needsUpdate = true;
   }
 
-  function writePetals(delta: number, time: number, amount: number) {
+  function writeFallingPool(
+    mesh: THREE.InstancedMesh,
+    pool: Petal[],
+    delta: number,
+    time: number,
+    amount: number,
+    leafMotion = false,
+  ) {
     const live = 1 - amount;
-    if (petalCount === 0 || live < 0.06) {
+    if (pool.length === 0 || live < 0.06) {
       dummy.scale.setScalar(0);
       dummy.updateMatrix();
-      fallingMesh.setMatrixAt(0, dummy.matrix);
-      fallingMesh.instanceMatrix.needsUpdate = true;
-      fallingMesh.visible = false;
+      mesh.setMatrixAt(0, dummy.matrix);
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.visible = false;
       return;
     }
-    fallingMesh.visible = true;
-    for (let i = 0; i < petals.length; i += 1) {
-      const petal = petals[i];
+    mesh.visible = true;
+    for (let i = 0; i < pool.length; i += 1) {
+      const petal = pool[i];
       if (amount < 0.18) {
         petal.y -= petal.speed * delta;
-        petal.x += Math.sin(time * 0.9 + petal.phase) * petal.drift * delta;
-        petal.z += Math.cos(time * 0.75 + petal.phase) * petal.drift * 0.75 * delta;
       } else {
         petal.y -= petal.speed * delta * live;
       }
       const range = Math.max(2.2, petal.bornY * 0.82);
       const travel = (petal.bornY - petal.y) / range;
-      let fade = travel < 0.55 ? 1 : Math.max(0, 1 - (travel - 0.55) / 0.45);
+      const sweep = petal.drift * (0.45 + travel * 0.9);
+      petal.x =
+        petal.bornX +
+        Math.sin(time * 1.18 + petal.phase + travel * 4.2) * sweep;
+      petal.z =
+        petal.bornZ +
+        Math.cos(time * 0.84 + petal.phase + travel * 3.1) * sweep * 0.72;
+      let fade = travel < 0.68 ? 1 : Math.max(0, 1 - (travel - 0.68) / 0.32);
       if (fade <= 0.03 || petal.y < 0.18) {
         spawnFromBranch(petal);
         fade = 1;
       }
       petal.rx += delta * 1.8 * live;
       petal.ry += delta * petal.spin * live;
-      petal.rz += delta * 2.4 * live;
+      petal.rz += delta * (leafMotion ? 3.2 : 2.4) * live;
       dummy.position.set(petal.x, petal.y, petal.z);
       euler.set(petal.rx, petal.ry, petal.rz);
       dummy.quaternion.setFromEuler(euler);
       dummy.scale.set(
-        petal.scale * Math.max(0.55, fade) * Math.max(0.4, live),
+        petal.scale * Math.max(leafMotion ? 0.7 : 0.55, fade) * Math.max(0.4, live),
         petal.scale * fade * Math.max(0.4, live),
         1,
       );
       dummy.updateMatrix();
-      fallingMesh.setMatrixAt(i, dummy.matrix);
+      mesh.setMatrixAt(i, dummy.matrix);
     }
-    fallingMesh.instanceMatrix.needsUpdate = true;
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  function writePetals(delta: number, time: number, amount: number) {
+    writeFallingPool(fallingMesh, petals, delta, time, amount);
+    writeFallingPool(
+      fallingLeafMesh,
+      fallingLeaves,
+      delta,
+      time,
+      amount,
+      true,
+    );
   }
 
   function applyPose(time: number, amount: number, delta: number, scan = false) {
@@ -990,6 +1213,7 @@ export async function mountSakuraQrScene(
     writeStacks(stages.trunk, scan);
     writeGrass(time, scan ? 1 : stages.canopy);
     placeCamera(stages.camera);
+    writeScan(stages.scan, scan);
     const live = 1 - amount;
     const wind = reduced || scan ? 0 : 1 - stages.canopy;
     tree.rotation.set(0, 0, 0);
@@ -999,26 +1223,35 @@ export async function mountSakuraQrScene(
     if (scan) {
       tree.visible = false;
     } else {
-      crown.position.y = crownY * Math.max(0.08, 1 - stages.canopy * 0.72);
+      crown.position.y = crownY * (1 - stages.canopy);
       crown.scale.setScalar(1);
-      branchMesh.visible = stages.canopy < 0.82;
-      branchBarkMat.opacity = Math.max(0, 1 - stages.canopy * 1.15);
-      const spread = 1 + stages.trunk * 0.55;
-      trunkMesh.scale.set(spread, Math.max(0.02, 1 - stages.trunk * 1.05), spread);
-      trunkMesh.position.y = -stages.trunk * 0.55;
-      barkMat.opacity = Math.max(0, 1 - stages.trunk * 1.25);
-      trunkMesh.visible = stages.trunk < 0.72;
-      rootMesh.scale.set(
-        1 + stages.trunk * 0.7,
-        Math.max(0.02, 1 - stages.trunk * 1.05),
-        1 + stages.trunk * 0.7,
+      const branchFade = 1 - smoothstep((stages.canopy - 0.58) / 0.42);
+      branchMesh.scale.set(
+        THREE.MathUtils.lerp(1, 0.72, stages.canopy),
+        Math.max(0.02, 1 - stages.canopy),
+        THREE.MathUtils.lerp(1, 0.72, stages.canopy),
       );
-      rootMesh.position.y = -stages.trunk * 0.4;
-      rootMesh.visible = stages.trunk < 0.62;
-      tree.visible = stages.canopy < 0.9 && stages.trunk < 0.58;
+      branchMesh.visible = branchFade > 0.01;
+      branchBarkMat.opacity = branchFade;
+      const trunkFade = 1 - smoothstep((stages.trunk - 0.62) / 0.38);
+      const spread = THREE.MathUtils.lerp(1, 0.54, stages.trunk);
+      trunkMesh.scale.set(spread, Math.max(0.015, 1 - stages.trunk), spread);
+      trunkMesh.position.y = 0;
+      barkMat.opacity = trunkFade;
+      trunkMesh.visible = trunkFade > 0.01;
+      rootMesh.scale.set(
+        THREE.MathUtils.lerp(1, 0.72, stages.trunk),
+        Math.max(0.015, 1 - stages.trunk),
+        THREE.MathUtils.lerp(1, 0.72, stages.trunk),
+      );
+      rootMesh.position.y = 0;
+      rootMat.opacity = trunkFade;
+      rootMesh.visible = trunkFade > 0.01;
+      tree.visible = stages.scan < 0.995;
     }
-    shadow.scale.setScalar(Math.max(0.2, 1 - stages.trunk));
-    shadow.visible = !scan && stages.trunk < 0.96;
+    const canopyPresence = 1 - smoothstep((stages.canopy - 0.82) / 0.18);
+    shadow.scale.setScalar(Math.max(0.12, 1 - stages.trunk * 0.88));
+    shadow.visible = !scan && stages.scan < 0.98;
     writeCards(
       petalMesh,
       canopy.petals,
@@ -1026,9 +1259,10 @@ export async function mountSakuraQrScene(
       camera,
       euler,
       time,
-      Math.max(0, 1 - stages.canopy * 1.08),
+      canopyPresence,
       wind,
       stages.canopy,
+      0.18 / treeScale,
     );
     writeCards(
       flowerMesh,
@@ -1037,9 +1271,10 @@ export async function mountSakuraQrScene(
       camera,
       euler,
       time,
-      Math.max(0, 1 - stages.canopy * 1.08),
+      canopyPresence,
       wind,
       stages.canopy,
+      0.18 / treeScale,
     );
     writeCards(
       leafMesh,
@@ -1048,12 +1283,16 @@ export async function mountSakuraQrScene(
       camera,
       euler,
       time,
-      Math.max(0, 1 - stages.canopy * 1.08),
+      canopyPresence,
       wind,
       stages.canopy,
+      0.18 / treeScale,
     );
-    writeCards(tuftMesh, tuftFlowers, dummy, camera, euler, time, Math.max(0.2, live), wind, stages.canopy);
-    writeCards(groundMesh, groundPetals, dummy, camera, euler, time, Math.max(0.25, live), 0, stages.tiles);
+    writeCards(tuftMesh, tuftFlowers, dummy, camera, euler, time, live, wind, stages.canopy);
+    writeCards(groundMesh, groundPetals, dummy, camera, euler, time, live, 0, stages.tiles);
+    const smallArtVisible = !scan && stages.scan < 0.995;
+    tuftMesh.visible = smallArtVisible;
+    groundMesh.visible = smallArtVisible;
     writePetals(delta, time, scan ? 1 : stages.canopy);
   }
 
@@ -1076,8 +1315,9 @@ export async function mountSakuraQrScene(
     lastTick = now;
     elapsed += delta;
     const time = elapsed;
-    const ease = reduced ? 1 : 0.04;
-    reveal += (targetReveal - reveal) * ease;
+    reveal = reduced
+      ? targetReveal
+      : THREE.MathUtils.damp(reveal, targetReveal, 3.6, delta);
     if (Math.abs(targetReveal - reveal) < 0.002) reveal = targetReveal;
     applyPose(time, reveal, reduced ? 0 : delta);
     renderer.render(scene, camera);
@@ -1150,7 +1390,13 @@ export async function mountSakuraQrScene(
       roots.dispose();
       barkMat.dispose();
       branchBarkMat.dispose();
-      (rootMesh.material as THREE.Material).dispose();
+      rootMat.dispose();
+      for (const geometry of backdropGeometries) geometry.dispose();
+      for (const material of backdropMaterials) material.dispose();
+      scanPlateGeo.dispose();
+      scanPlateMat.dispose();
+      scanModuleGeo.dispose();
+      scanModuleMat.dispose();
       petalTex.dispose();
       flowerTex.dispose();
       leafTex.dispose();
@@ -1169,9 +1415,12 @@ export async function mountSakuraQrScene(
       tuftMesh.dispose();
       groundMesh.dispose();
       fallingMesh.dispose();
+      fallingLeafMesh.dispose();
+      scanModuleMesh.dispose();
       (tuftMesh.material as THREE.Material).dispose();
       (groundMesh.material as THREE.Material).dispose();
       (fallingMesh.material as THREE.Material).dispose();
+      fallingLeafMat.dispose();
     },
   };
 }

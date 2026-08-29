@@ -25,6 +25,20 @@ export const SAKURA_QR = {
   blossomDeep: "#e8899e",
   blossomWhite: "#fff1f4",
   stamen: "#f3e0b8",
+  sky: "#f8eee9",
+  mist: "#fff9f5",
+  water: "#dce9df",
+  terrace: "#ead8b5",
+  terraceEdge: "#d9aab2",
+} as const;
+
+/**
+ * ISO/IEC 18004 calls for four clear modules around a QR matrix. The art view
+ * can spill beyond this boundary, but the final scan plate and downloaded PNG
+ * always reserve the full quiet zone.
+ */
+export const SAKURA_SCAN = {
+  quietModules: 4,
 } as const;
 
 /**
@@ -88,6 +102,7 @@ export function sakuraFlattenStages(amount: number): {
   trunk: number;
   camera: number;
   tiles: number;
+  scan: number;
 } {
   const t = Math.min(1, Math.max(0, amount));
   const smooth = (start: number, end: number) => {
@@ -95,10 +110,14 @@ export function sakuraFlattenStages(amount: number): {
     return u * u * (3 - 2 * u);
   };
   return {
-    canopy: smooth(0, 0.55),
-    trunk: smooth(0.1, 0.82),
-    camera: smooth(0.12, 1),
-    tiles: smooth(0.05, 0.72),
+    // Blossom streams lead, the woody structure follows, and the exact code
+    // only takes over once the camera is nearly overhead. This avoids the old
+    // mid-animation pop where the whole tree vanished at once.
+    canopy: smooth(0.02, 0.74),
+    trunk: smooth(0.16, 0.9),
+    camera: smooth(0.08, 1),
+    tiles: smooth(0.26, 0.94),
+    scan: smooth(0.76, 1),
   };
 }
 

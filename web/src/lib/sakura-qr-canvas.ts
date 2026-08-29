@@ -6,6 +6,7 @@ import {
   sakuraDisplayScale,
   sakuraFlattenStages,
   SAKURA_QR,
+  SAKURA_SCAN,
   type SakuraQrMatrix,
   type SakuraQrMount,
   type SakuraQrMountOptions,
@@ -39,6 +40,29 @@ function drawBlossom(
   ctx.arc(0, 0, radius * 0.16, 0, Math.PI * 2);
   ctx.fillStyle = dark ? SAKURA_QR.honey : SAKURA_QR.stamen;
   ctx.fill();
+  ctx.restore();
+}
+
+function drawFallingLeaf(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  rotation: number,
+) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.fillStyle = SAKURA_QR.matchaSoft;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, radius * 0.48, radius, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = SAKURA_QR.matcha;
+  ctx.lineWidth = Math.max(0.7, radius * 0.08);
+  ctx.beginPath();
+  ctx.moveTo(0, -radius * 0.78);
+  ctx.lineTo(0, radius * 0.8);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -87,7 +111,7 @@ function drawTree(
     ctx.stroke();
 
     if (depth >= 6 || length < size * 0.035) {
-      const count = 3 + Math.floor(rng() * 4);
+      const count = 5 + Math.floor(rng() * 5);
       for (let i = 0; i < count; i += 1) {
         drawBlossom(
           ctx,
@@ -98,7 +122,7 @@ function drawTree(
           false,
         );
       }
-      if (rng() > 0.72) {
+      if (rng() > 0.6) {
         ctx.fillStyle = SAKURA_QR.matcha;
         ctx.beginPath();
         ctx.ellipse(
@@ -203,6 +227,34 @@ function paint(
   reducedMotion: boolean,
 ) {
   ctx.clearRect(0, 0, cssWidth, cssHeight);
+  const stages = sakuraFlattenStages(reveal);
+  const scanFade = stages.scan;
+  ctx.fillStyle = SAKURA_QR.lightPure;
+  ctx.fillRect(0, 0, cssWidth, cssHeight);
+  if (scanFade < 0.999) {
+    ctx.save();
+    ctx.globalAlpha = 1 - scanFade;
+    const sky = ctx.createLinearGradient(0, 0, 0, cssHeight);
+    sky.addColorStop(0, SAKURA_QR.sky);
+    sky.addColorStop(0.56, "#f8eee3");
+    sky.addColorStop(1, SAKURA_QR.water);
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, cssWidth, cssHeight);
+    const sun = ctx.createRadialGradient(
+      cssWidth * 0.72,
+      cssHeight * 0.18,
+      1,
+      cssWidth * 0.72,
+      cssHeight * 0.18,
+      cssWidth * 0.18,
+    );
+    sun.addColorStop(0, "rgba(255, 245, 210, 0.92)");
+    sun.addColorStop(0.42, "rgba(246, 193, 186, 0.32)");
+    sun.addColorStop(1, "rgba(246, 193, 186, 0)");
+    ctx.fillStyle = sun;
+    ctx.fillRect(0, 0, cssWidth, cssHeight * 0.55);
+    ctx.restore();
+  }
   const rng = mulberry32(matrix.seed);
   const n = matrix.size;
   const art = 1 - reveal;
@@ -211,6 +263,39 @@ function paint(
   const th = cell * (0.52 + reveal * 0.48);
   const originX = cssWidth / 2;
   const originY = cssHeight * (0.46 + reveal * 0.08);
+
+  if (art > 0.02) {
+    ctx.save();
+    ctx.globalAlpha = art;
+    drawIsoTile(
+      ctx,
+      originX,
+      originY - th * 4.8,
+      tw * (n + 10),
+      th * (n + 10),
+      cell * 1.1,
+      SAKURA_QR.water,
+    );
+    drawIsoTile(
+      ctx,
+      originX,
+      originY - th * 3.8,
+      tw * (n + 8),
+      th * (n + 8),
+      cell * 0.86,
+      SAKURA_QR.terraceEdge,
+    );
+    drawIsoTile(
+      ctx,
+      originX,
+      originY - th * 3,
+      tw * (n + 6),
+      th * (n + 6),
+      cell * 0.7,
+      SAKURA_QR.terrace,
+    );
+    ctx.restore();
+  }
 
   const order: Array<[number, number]> = [];
   for (let row = 0; row < n; row += 1) {
@@ -263,7 +348,6 @@ function paint(
     }
   }
 
-  const stages = sakuraFlattenStages(reveal);
   const treeX = originX;
   const treeY = originY + ((n * th) / 2) * 0.38;
   const treeSize = n * cell * 0.52;
@@ -282,18 +366,69 @@ function paint(
   }
 
   if (!reducedMotion && stages.canopy < 0.72) {
-    for (let i = 0; i < 12; i += 1) {
+    for (let i = 0; i < 24; i += 1) {
       const seed = mulberry32(matrix.seed + i * 97)();
       const span = treeSize * 0.72;
       const fall = (timeMs * (0.022 + seed * 0.018) + seed * 400) % span;
       const progress = fall / span;
       const fade = progress < 0.58 ? 1 : Math.max(0, 1 - (progress - 0.58) / 0.42);
-      const x = treeX + (seed - 0.5) * treeSize * 0.34 + Math.sin(timeMs * 0.0012 + i) * 12;
+      const x =
+        treeX +
+        (seed - 0.5) * treeSize * 0.5 +
+        Math.sin(timeMs * 0.0012 + i) * (16 + seed * 8);
       const y = treeY - treeSize * 0.18 + fall;
-      ctx.globalAlpha = 0.9 * (1 - stages.canopy) * fade;
-      drawBlossom(ctx, x, y, 3.4 + seed * 2.4, timeMs * 0.002 + i, false);
+      ctx.globalAlpha = 0.96 * (1 - stages.canopy) * fade;
+      if (i % 5 === 0) {
+        drawFallingLeaf(
+          ctx,
+          x,
+          y,
+          5 + seed * 2.8,
+          timeMs * 0.0026 + i,
+        );
+      } else {
+        drawBlossom(
+          ctx,
+          x,
+          y,
+          4.4 + seed * 3.2,
+          timeMs * 0.002 + i,
+          false,
+        );
+      }
       ctx.globalAlpha = 1;
     }
+  }
+
+  if (scanFade > 0.001) {
+    const quiet = SAKURA_SCAN.quietModules;
+    const moduleSize = Math.max(
+      1,
+      Math.floor(Math.min(cssWidth, cssHeight) / (n + quiet * 2)),
+    );
+    const plateSize = (n + quiet * 2) * moduleSize;
+    const plateX = Math.round((cssWidth - plateSize) / 2);
+    const plateY = Math.round((cssHeight - plateSize) / 2);
+    const codeX = plateX + quiet * moduleSize;
+    const codeY = plateY + quiet * moduleSize;
+    ctx.save();
+    ctx.globalAlpha = scanFade;
+    ctx.fillStyle = SAKURA_QR.lightPure;
+    ctx.fillRect(0, 0, cssWidth, cssHeight);
+    ctx.fillRect(plateX, plateY, plateSize, plateSize);
+    ctx.fillStyle = SAKURA_QR.darkDeep;
+    for (let row = 0; row < n; row += 1) {
+      for (let col = 0; col < n; col += 1) {
+        if (!matrix.dark[row][col]) continue;
+        ctx.fillRect(
+          codeX + col * moduleSize,
+          codeY + row * moduleSize,
+          moduleSize,
+          moduleSize,
+        );
+      }
+    }
+    ctx.restore();
   }
 }
 
@@ -312,6 +447,7 @@ export async function mountSakuraQrCanvas(
   let disposed = false;
   let cssWidth = 240;
   let cssHeight = 300;
+  let lastTime = 0;
 
   function resize() {
     const parent = canvas.parentElement;
@@ -329,7 +465,12 @@ export async function mountSakuraQrCanvas(
   }
 
   function render(timeMs: number) {
-    reveal += (targetReveal - reveal) * (options.reducedMotion ? 1 : 0.08);
+    const delta = lastTime
+      ? Math.min(0.05, Math.max(0, (timeMs - lastTime) / 1000))
+      : 1 / 60;
+    lastTime = timeMs;
+    const ease = options.reducedMotion ? 1 : 1 - Math.exp(-4.4 * delta);
+    reveal += (targetReveal - reveal) * ease;
     if (Math.abs(targetReveal - reveal) < 0.002) reveal = targetReveal;
     paint(ctx, matrix, cssWidth, cssHeight, reveal, timeMs, options.reducedMotion);
   }
