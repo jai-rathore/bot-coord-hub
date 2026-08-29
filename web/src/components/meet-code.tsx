@@ -121,7 +121,6 @@ export function MeetCode({
         alt={`QR code to meet ${displayName} on HoneyMatcha`}
         size={420}
         showDownload={false}
-        autoReveal
         className="w-full max-w-[min(26rem,90vw)]"
       />
 
