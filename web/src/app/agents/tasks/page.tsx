@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
+import { PublicFooter } from "@/components/public-footer";
 import { SiteHeader } from "@/components/site-header";
 import { IntentsRegistry } from "@/components/intents-registry";
 import { intentsForViewer, listRegistryIntents } from "@/lib/intents";
 import { isIntentAdmin } from "@/lib/intent-moderation";
+import { PUBLIC_PAGE_SEO, publicPageMetadata } from "@/lib/seo";
 import { ensureCurrentUser } from "@/lib/users";
+
+export const metadata = publicPageMetadata(PUBLIC_PAGE_SEO.tasks);
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +40,9 @@ export default async function AgentTasksPage() {
         <p className="mt-3 max-w-2xl text-muted">
           Supported tasks are versioned, permissioned capabilities. Anyone can
           request a new one; HoneyMatcha reviews safety and repeated demand
-          before publishing it to agents.
+          before publishing it to agents.{" "}
+          <Link href="/how-to-connect-agents">How to connect agents</Link>{" "}
+          before you ask them to start one of these.
         </p>
         <div className="mt-8">
           <IntentsRegistry
@@ -44,6 +50,7 @@ export default async function AgentTasksPage() {
             canPropose={Boolean(userId)}
           />
         </div>
+        <PublicFooter />
       </main>
     </div>
   );

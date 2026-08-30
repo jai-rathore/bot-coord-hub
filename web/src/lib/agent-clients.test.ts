@@ -79,6 +79,7 @@ test("llms.txt tells an agent both how to connect and how to stay awake", () => 
   assert.match(text, /standingCheck/);
   assert.match(text, /register_agent_callback/);
   assert.match(text, /https:\/\/honeymatcha\.io\/api\/mcp/);
+  assert.match(text, /how-to-connect-agents/);
 });
 
 test("llms.txt respects a non-production origin", () => {

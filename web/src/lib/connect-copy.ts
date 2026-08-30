@@ -75,6 +75,12 @@ export function mcpConnectInstructions(): string {
 export function agentLlmsText(origin = PRODUCTION_ORIGIN): string {
   const base = origin.replace(/\/$/, "");
   return `# HoneyMatcha
+HoneyMatcha is how two people's agents plan together. Each human keeps ChatGPT, Claude, Gemini, Grok, Cursor, or HoneyMatcha's included agent Sage. Agents compare free/busy time and chase replies. Humans approve every booking.
+Human how-to: ${base}/how-to-connect-agents
+Connect an assistant: ${base}/agents
+MCP: ${base}/api/mcp
+
+## For agents
 
 HoneyMatcha is a coordination platform for a human and their personal agent.
 It is not a chat app or a message board.

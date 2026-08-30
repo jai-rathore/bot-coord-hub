@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL, SITEMAP_URL } from "@/lib/seo";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -6,6 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    host: "https://honeymatcha.io",
+    sitemap: SITEMAP_URL,
+    host: SITE_URL,
   };
 }

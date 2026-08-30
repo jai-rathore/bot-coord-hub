@@ -25,7 +25,12 @@ test("product routes cannot be claimed as handles", () => {
   assert.equal(isReservedHandle("docs"), true);
   assert.equal(isReservedHandle("setup"), true);
   assert.equal(isReservedHandle("oauth"), true);
+  assert.equal(isReservedHandle("faq"), true);
+  assert.equal(isReservedHandle("how-to-connect-agents"), true);
+  assert.equal(isReservedHandle("connect-chatgpt-and-claude"), true);
+  assert.equal(isReservedHandle("sitemap"), true);
   assert.equal(parseHandle("app"), null);
+  assert.equal(parseHandle("faq"), null);
   assert.equal(handleError("app"), "That handle is reserved by HoneyMatcha");
 });
 

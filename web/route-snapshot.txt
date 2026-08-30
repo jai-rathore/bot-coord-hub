@@ -147,11 +147,14 @@ dynamic  /app/people
 dynamic  /app/recruiting
 dynamic  /app/settings
 dynamic  /app/tasks
+static   /connect-chatgpt-and-claude
 dynamic  /connect/[userCode]
 static   /docs
 dynamic  /e/[slug]
+static   /faq
 static   /favicon.ico
 dynamic  /guest/[publicId]
+static   /how-to-connect-agents
 static   /intents
 dynamic  /invite/[code]
 dynamic  /join/[token]
@@ -165,5 +168,6 @@ static   /robots.txt
 dynamic  /setup
 dynamic  /sign-in/[[...sign-in]]
 dynamic  /sign-up/[[...sign-up]]
+static   /sitemap.xml
 static   /support
 static   /terms
