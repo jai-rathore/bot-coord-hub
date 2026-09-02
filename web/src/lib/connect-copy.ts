@@ -146,7 +146,7 @@ and coordination is mostly the rest of the day: someone else's agent proposes
 a time, an event deadline closes, an introduction lands. HoneyMatcha cannot
 interrupt Claude, ChatGPT, or Gemini: there is no open stream to push down,
 and those hosts cannot receive an inbound webhook. Grok Bot can, via a
-webhook routine — see standingCheck.webhook.
+webhook routine: see standingCheck.webhook.
 
 So schedule the check yourself, the first time you connect, unless you
 register a callback. Every assistant listed above can run a saved prompt on

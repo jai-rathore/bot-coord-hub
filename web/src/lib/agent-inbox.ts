@@ -143,7 +143,7 @@ export function normalizeCallbackAuthorization(
   }
   let text = value.trim();
   if (!text) return null;
-  text = text.replace(/^Bearer\s+/i, "").trim();
+  text = text.replace(/^Bearer(\s+|$)/i, "").trim();
   if (!text) return null;
   if (text.length > CALLBACK_AUTHORIZATION_MAX) {
     throw new AgentApiError(

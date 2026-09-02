@@ -75,7 +75,7 @@ HoneyMatcha is at ${base}.`;
 export function standingCheckInstruction(
   intervalMinutes: number = STANDING_CHECK_INTERVAL_MINUTES,
 ): string {
-  return `Calling get_inbox only when your human is typing means inbound work waits for them. If you can run a prompt on a schedule: a task, routine, or scheduled action: set one up now that calls get_inbox every ${intervalMinutes} minutes and stays silent when nothing is pending. If you can receive inbound HTTPS instead — including a Grok Bot webhook routine — call register_agent_callback with callbackUrl and, when the host requires a sender key, callbackAuthorization.`;
+  return `Calling get_inbox only when your human is typing means inbound work waits for them. If you can run a prompt on a schedule: a task, routine, or scheduled action: set one up now that calls get_inbox every ${intervalMinutes} minutes and stays silent when nothing is pending. If you can receive inbound HTTPS instead, including a Grok Bot webhook routine, call register_agent_callback with callbackUrl and, when the host requires a sender key, callbackAuthorization.`;
 }
 
 /**
