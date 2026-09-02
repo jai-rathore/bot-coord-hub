@@ -4,6 +4,8 @@ import { agentInbox, apiKeys, type User } from "@/db/schema";
 import { AgentApiError } from "@/lib/agent-errors";
 import {
   STANDING_CHECK_INTERVAL_MINUTES,
+  grokWebhookInstruction,
+  grokWebhookPrompt,
   standingCheckInstruction,
   standingCheckPrompt,
 } from "@/lib/agent-clients";
@@ -125,10 +127,62 @@ export async function ackInboxItem(opts: {
   };
 }
 
+export const CALLBACK_AUTHORIZATION_MAX = 400;
+
+/**
+ * Store the raw sender key / bearer token. Accepts `Bearer …` from a copied
+ * auth header and strips the prefix so delivery can add it back.
+ */
+export function normalizeCallbackAuthorization(
+  value: unknown,
+): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== "string") {
+    throw new AgentApiError(400, "callbackAuthorization must be text");
+  }
+  let text = value.trim();
+  if (!text) return null;
+  text = text.replace(/^Bearer(\s+|$)/i, "").trim();
+  if (!text) return null;
+  if (text.length > CALLBACK_AUTHORIZATION_MAX) {
+    throw new AgentApiError(
+      400,
+      `callbackAuthorization must be ${CALLBACK_AUTHORIZATION_MAX} characters or fewer`,
+    );
+  }
+  if (/[\r\n\0]/.test(text)) {
+    throw new AgentApiError(
+      400,
+      "callbackAuthorization contains invalid characters",
+    );
+  }
+  return text;
+}
+
+/** Headers HoneyMatcha sends on every inbox callback POST. */
+export function callbackDeliveryHeaders(
+  authorization: string | null | undefined,
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    "x-honeymatcha-event": "agent_inbox",
+  };
+  if (authorization) {
+    headers.authorization = `Bearer ${authorization}`;
+    headers["x-automation-key"] = authorization;
+  }
+  return headers;
+}
+
 export async function registerAgentCallback(opts: {
   apiKeyId: string;
   callbackUrl: string | null;
-}): Promise<{ callbackUrl: string | null }> {
+  callbackAuthorization?: string | null;
+}): Promise<{
+  callbackUrl: string | null;
+  callbackAuthorizationRegistered: boolean;
+}> {
   const url: string | null =
     opts.callbackUrl === null
       ? null
@@ -139,12 +193,31 @@ export async function registerAgentCallback(opts: {
       "callbackUrl must be a public http(s) URL",
     );
   }
+  const authorization = normalizeCallbackAuthorization(
+    opts.callbackAuthorization,
+  );
   const db = getDb();
-  await db
+  const patch: {
+    callbackUrl: string | null;
+    callbackAuthorization?: string | null;
+  } = { callbackUrl: url };
+  if (!url) {
+    patch.callbackAuthorization = null;
+  } else if (authorization !== undefined) {
+    patch.callbackAuthorization = authorization;
+  }
+  const [updated] = await db
     .update(apiKeys)
-    .set({ callbackUrl: url })
-    .where(eq(apiKeys.id, opts.apiKeyId));
-  return { callbackUrl: url };
+    .set(patch)
+    .where(eq(apiKeys.id, opts.apiKeyId))
+    .returning({
+      callbackUrl: apiKeys.callbackUrl,
+      callbackAuthorization: apiKeys.callbackAuthorization,
+    });
+  return {
+    callbackUrl: updated?.callbackUrl ?? url,
+    callbackAuthorizationRegistered: Boolean(updated?.callbackAuthorization),
+  };
 }
 
 /** schedule_meeting reuses schedule.requested so an unacked schedule notify is not doubled. */
@@ -484,19 +557,29 @@ async function postAgentCallbacks(opts: {
   const keys = await db
     .select({
       callbackUrl: apiKeys.callbackUrl,
+      callbackAuthorization: apiKeys.callbackAuthorization,
     })
     .from(apiKeys)
     .where(and(eq(apiKeys.userId, opts.userId), isNull(apiKeys.revokedAt)));
-  const candidates = [
-    ...new Set(
-      keys
-        .map((key) => key.callbackUrl)
-        .filter((url): url is string => Boolean(url)),
-    ),
-  ];
+  const candidates = keys.filter(
+    (key): key is typeof key & { callbackUrl: string } =>
+      Boolean(key.callbackUrl),
+  );
+  const seen = new Set<string>();
+  const unique = candidates.filter((key) => {
+    const id = `${key.callbackUrl}\0${key.callbackAuthorization ?? ""}`;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
   const targets = (
     await Promise.all(
-      candidates.map((url) => resolveSafeCallbackUrl(url)),
+      unique.map(async (key) => {
+        const resolved = await resolveSafeCallbackUrl(key.callbackUrl);
+        return resolved
+          ? { resolved, authorization: key.callbackAuthorization }
+          : null;
+      }),
     )
   ).filter((row): row is NonNullable<typeof row> => row !== null);
   if (targets.length === 0) return "none";
@@ -523,12 +606,9 @@ async function postAgentCallbacks(opts: {
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 4_000);
-        const response = await fetchResolvedCallback(target, {
+        const response = await fetchResolvedCallback(target.resolved, {
           method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-honeymatcha-event": "agent_inbox",
-          },
+          headers: callbackDeliveryHeaders(target.authorization),
           body: payload,
           signal: controller.signal,
         });
@@ -555,11 +635,12 @@ export function inboxInstructions(pending: number): string {
 /**
  * What this agent should do so inbound work does not wait for its human.
  *
- * HoneyMatcha has no way to interrupt a hosted assistant: there is no open MCP
- * stream to push down, and Claude, ChatGPT, Gemini and Grok cannot receive an
- * inbound webhook. So the answer is a standing check the agent schedules for
- * itself. This ships in whoami and get_inbox rather than only in the connect
- * docs, because the agent: not the human: is the one that can create it.
+ * HoneyMatcha has no open MCP stream to push down. Claude, ChatGPT, and Gemini
+ * still cannot receive an inbound webhook, so they schedule a standing check.
+ * Grok Bot webhook routines can: register_agent_callback POSTs to that URL
+ * with the sender key. This ships in whoami and get_inbox rather than only in
+ * the connect docs, because the agent: not the human: is the one that can
+ * create it.
  */
 export function standingCheckStatus(opts: {
   callbackRegistered: boolean;
@@ -571,6 +652,11 @@ export function standingCheckStatus(opts: {
   /** Paste-ready text for a scheduler that only stores a prompt string. */
   prompt: string;
   setupUrl: string;
+  webhook: {
+    instructions: string;
+    prompt: string;
+    setupUrl: string;
+  };
 } {
   const origin = appOrigin();
   return {
@@ -581,5 +667,10 @@ export function standingCheckStatus(opts: {
       : standingCheckInstruction(),
     prompt: standingCheckPrompt(origin),
     setupUrl: `${origin}/docs#standing-check`,
+    webhook: {
+      instructions: grokWebhookInstruction(),
+      prompt: grokWebhookPrompt(origin),
+      setupUrl: `${origin}/docs#grok-bot-webhook`,
+    },
   };
 }

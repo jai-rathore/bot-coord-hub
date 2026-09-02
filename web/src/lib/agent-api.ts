@@ -539,7 +539,7 @@ export async function listInbox(auth: AgentAuth) {
             "No inbound work right now.",
             standingCheck.satisfied
               ? "Call get_inbox at the start of every turn."
-              : `Schedule a recurring get_inbox every ${standingCheck.intervalMinutes} minutes so the next one does not wait for your human.`,
+              : `If you can receive a webhook (Grok Bot routine or any public HTTPS URL), call register_agent_callback. Otherwise schedule a recurring get_inbox every ${standingCheck.intervalMinutes} minutes so the next one does not wait for your human.`,
           ],
   };
 }
@@ -552,6 +552,7 @@ export async function ackInbox(auth: AgentAuth, inboxId: string) {
 export async function setAgentCallback(
   auth: AgentAuth,
   callbackUrl?: string | null,
+  callbackAuthorization?: string | null,
 ) {
   assertAgentScope(auth, "profile:read");
   return {
@@ -559,6 +560,7 @@ export async function setAgentCallback(
     ...(await registerAgentCallback({
       apiKeyId: auth.apiKey.id,
       callbackUrl: callbackUrl ?? null,
+      callbackAuthorization,
     })),
   };
 }

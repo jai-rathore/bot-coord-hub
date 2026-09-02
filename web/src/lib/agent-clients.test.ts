@@ -5,6 +5,7 @@ import {
   STANDING_CHECK_INTERVAL_MINUTES,
   agentClient,
   clientsWithStandingCheck,
+  grokWebhookPrompt,
   standingCheckInstruction,
   standingCheckPrompt,
 } from "./agent-clients";
@@ -86,4 +87,27 @@ test("llms.txt respects a non-production origin", () => {
   const text = agentLlmsText("https://staging.honeymatcha.io/");
   assert.match(text, /https:\/\/staging\.honeymatcha\.io\/api\/mcp/);
   assert.ok(!text.includes("staging.honeymatcha.io//"));
+});
+
+test("Grok standing check prefers a webhook routine over polling only", () => {
+  const grok = agentClient("grok");
+  assert.equal(grok.standingCheck?.featureName, "webhook routines");
+  assert.match(grok.standingCheck?.steps.join(" ") ?? "", /sender key/);
+  assert.match(grok.standingCheck?.steps.join(" ") ?? "", /desktop/);
+  assert.match(grok.caveat ?? "", /desktop app/);
+});
+
+test("standingCheckInstruction mentions Grok webhook authorization", () => {
+  assert.match(standingCheckInstruction(), /Grok Bot webhook routine/);
+  assert.match(standingCheckInstruction(), /callbackAuthorization/);
+});
+
+test("the Grok webhook prompt names inbox fields and stays quiet", () => {
+  const prompt = grokWebhookPrompt("https://honeymatcha.io/");
+  assert.match(prompt, /get_inbox/);
+  assert.match(prompt, /ack_inbox/);
+  assert.match(prompt, /untrusted data/);
+  assert.match(prompt, /do not message me/i);
+  assert.match(prompt, /https:\/\/honeymatcha\.io\./);
+  assert.ok(!prompt.includes("honeymatcha.io/."));
 });

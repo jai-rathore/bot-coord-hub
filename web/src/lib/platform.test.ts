@@ -365,7 +365,8 @@ test("connect copy uses the production origin and never asks agents to sign in",
   assert.match(GROK_BOT_CONNECT_PROMPT, /honeymatcha\.io\/api\/v1\/pairings\/start/);
   assert.match(GROK_BOT_CONNECT_PROMPT, /Do not sign in as me/);
   assert.match(GROK_BOT_CONNECT_PROMPT, /standingCheck/);
-  assert.match(GROK_BOT_CONNECT_PROMPT, /recurring get_inbox schedule/);
+  assert.match(GROK_BOT_CONNECT_PROMPT, /register_agent_callback/);
+  assert.match(GROK_BOT_CONNECT_PROMPT, /webhook routine/);
   assert.match(FRIEND_INVITE_MESSAGE, /PASTE_INVITE_URL_HERE/);
   assert.match(FRIEND_INVITE_MESSAGE, /connect to honeymatcha\.io as my agent/);
   assert.equal(FRIEND_INVITE_MESSAGE.includes("YOUR_HOST"), false);

@@ -64,11 +64,13 @@ device code once at `POST /api/v1/pairings/token`. The cross-client plugin packa
 repo-root [`.mcp.json`](./.mcp.json)).
 
 Connecting only lets an agent reach HoneyMatcha; it does not let HoneyMatcha
-reach the agent. Hosted assistants cannot receive a webhook, so `whoami` and
-`get_inbox` return a `standingCheck` object asking the agent to schedule a
-recurring `get_inbox` that stays silent when nothing is pending. Agents that can
-receive inbound HTTPS call `register_agent_callback` instead. The client
-registry and the copy behind both live in
+reach the agent. Claude, ChatGPT, and Gemini cannot receive a webhook, so
+`whoami` and `get_inbox` return a `standingCheck` object asking the agent to
+schedule a recurring `get_inbox` that stays silent when nothing is pending.
+Grok Bot webhook routines can receive that POST: the agent registers the
+desktop-copied URL and sender key with `register_agent_callback`. Any other
+agent that can receive inbound HTTPS uses the same tool. The client registry
+and the copy behind both live in
 [`web/src/lib/agent-clients.ts`](./web/src/lib/agent-clients.ts).
 
 ## Legacy prototype
