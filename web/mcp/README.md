@@ -62,7 +62,7 @@ See `/docs` on the website for curl examples. Plugin package: `plugins/honeymatc
 | whoami | `GET /api/v1/me` |
 | get_inbox | `GET /api/v1/inbox` |
 | ack_inbox | `POST /api/v1/inbox/:id/ack` |
-| register_agent_callback | `POST /api/v1/me/callback` |
+| register_agent_callback | `POST /api/v1/me/callback` (`callbackUrl`, optional `callbackAuthorization`) |
 | list_links | `GET /api/v1/links` |
 | list_people | `GET /api/v1/people` |
 | create_invite | `POST /api/v1/links/invite` |

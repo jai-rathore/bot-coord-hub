@@ -143,13 +143,18 @@ const BASE_MCP_TOOLS: McpBaseToolDef[] = [
   {
     name: "register_agent_callback",
     description:
-      "Register an HTTPS URL HoneyMatcha will POST when you have new inbox work. Hosted assistants (Claude, ChatGPT, Gemini, Grok) cannot receive inbound HTTP: they schedule a recurring get_inbox instead. See standingCheck in the whoami response.",
+      "Register an HTTPS URL HoneyMatcha will POST when you have new inbox work. Grok Bot webhook routines use this: pass the desktop-copied POST URL as callbackUrl and the sender key as callbackAuthorization. Claude, ChatGPT, and Gemini cannot receive inbound HTTP — they schedule a recurring get_inbox instead. See standingCheck in the whoami response.",
     inputSchema: {
       type: "object",
       properties: {
         callbackUrl: {
           type: "string",
           description: "HTTPS URL, or empty to clear",
+        },
+        callbackAuthorization: {
+          type: "string",
+          description:
+            "Optional bearer token or sender key. Required for Grok Bot webhook routines. Empty to clear.",
         },
       },
     },
@@ -1269,6 +1274,11 @@ export async function dispatchMcpTool(
       return setAgentCallback(
         auth,
         typeof args.callbackUrl === "string" ? args.callbackUrl : null,
+        typeof args.callbackAuthorization === "string"
+          ? args.callbackAuthorization
+          : args.callbackAuthorization === null
+            ? null
+            : undefined,
       );
     case "list_links":
       return listLinks(auth, baseUrl);

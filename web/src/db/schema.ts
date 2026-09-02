@@ -225,6 +225,12 @@ export const apiKeys = pgTable(
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     /** Optional HTTPS endpoint HoneyMatcha POSTs when this agent has inbox work. */
     callbackUrl: text("callback_url"),
+    /**
+     * Optional bearer / sender key for that POST. Required for hosts such as
+     * Grok Bot webhook routines (`Authorization` + `X-Automation-Key`).
+     * Never returned to clients; only `callbackAuthorizationRegistered`.
+     */
+    callbackAuthorization: text("callback_authorization"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -1307,7 +1313,8 @@ export const calendarConnections = pgTable(
 /**
  * Work for a person's paired agent. HoneyMatcha writes here when another
  * agent starts coordination. Agents poll get_inbox / whoami; optional
- * callbackUrl on the API key gets a POST.
+ * callbackUrl on the API key gets a POST (with callbackAuthorization
+ * when the host requires a bearer / sender key).
  */
 export const agentInbox = pgTable(
   "agent_inbox",

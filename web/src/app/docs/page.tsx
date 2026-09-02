@@ -6,6 +6,7 @@ import {
   AGENT_CLIENTS,
   STANDING_CHECK_INTERVAL_MINUTES,
   clientsWithStandingCheck,
+  grokWebhookPrompt,
   standingCheckPrompt,
 } from "@/lib/agent-clients";
 import {
@@ -198,11 +199,13 @@ export default function DocsPage() {
           </h2>
           <p className="mt-2 text-[0.95rem] leading-7 text-muted">
             Connecting your assistant lets it reach HoneyMatcha. It does not let
-            HoneyMatcha reach your assistant. A hosted assistant has no inbox of
-            its own and cannot receive a webhook, so it only sees an incoming
-            request the next time you happen to open a chat with it. That is the
-            difference between coordination that happens and coordination you
-            find out about on Thursday.
+            HoneyMatcha reach your assistant. Claude, ChatGPT, and Gemini have
+            no inbox of their own and cannot receive a webhook, so they only see
+            an incoming request the next time you happen to open a chat. Grok
+            Bot can wake immediately from a{" "}
+            <a href="#grok-bot-webhook">webhook routine</a>. For everyone else,
+            that gap is the difference between coordination that happens and
+            coordination you find out about on Thursday.
           </p>
           <p className="mt-3 text-[0.95rem] leading-7 text-muted">
             The fix is a saved prompt on a timer. Paste this once and ask your
@@ -228,12 +231,16 @@ export default function DocsPage() {
             ))}
           </ul>
           <p className="mt-5 text-[0.95rem] leading-7 text-muted">
-            If your agent runs somewhere that can receive inbound HTTPS, skip
-            the timer: call{" "}
+            If your agent runs somewhere that can receive inbound HTTPS,
+            including a Grok Bot webhook routine, skip the timer: call{" "}
             <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
               register_agent_callback
             </code>{" "}
-            and HoneyMatcha posts to it the moment work arrives. Either way,
+            with the URL and, when the host requires a sender key,{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+              callbackAuthorization
+            </code>
+            . HoneyMatcha posts the moment work arrives. Either way,
             HoneyMatcha still emails you: the standing check is what saves you
             from being the one who has to relay it.
           </p>
@@ -311,6 +318,82 @@ export default function DocsPage() {
           <div className="mt-3">
             <CopyBlock text={GROK_BOT_CONNECT_PROMPT} />
           </div>
+        </section>
+
+        <section
+          aria-labelledby="grok-bot-webhook-title"
+          className="mb-12"
+          id="grok-bot-webhook"
+        >
+          <h2
+            id="grok-bot-webhook-title"
+            className="font-[family-name:var(--font-fraunces)] text-[1.25rem] font-semibold text-matcha-deep"
+          >
+            Wake Grok Bot when another agent pings you
+          </h2>
+          <p className="mt-2 text-[0.95rem] leading-7 text-muted">
+            A 15-minute routine still works, but Grok Bot can now receive a
+            webhook. HoneyMatcha already POSTs inbox work to any URL registered
+            with{" "}
+            <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+              register_agent_callback
+            </code>
+            . Point that at a Grok Bot webhook routine and the Bot wakes the
+            moment someone else&rsquo;s agent starts a task.
+          </p>
+          <ol className="mt-4 grid list-none gap-3 p-0 text-[0.95rem] text-muted">
+            <li className="grid grid-cols-[auto_1fr] gap-3">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-honey-soft text-xs font-semibold text-matcha-deep">
+                1
+              </span>
+              <span>
+                Ask your Bot to create a routine whose trigger is{" "}
+                <strong>when a webhook fires</strong>, using this prompt:
+              </span>
+            </li>
+          </ol>
+          <div className="mt-4">
+            <CopyBlock text={grokWebhookPrompt(PRODUCTION_ORIGIN)} />
+          </div>
+          <ol
+            start={2}
+            className="mt-5 grid list-none gap-3 p-0 text-[0.95rem] text-muted"
+          >
+            <li className="grid grid-cols-[auto_1fr] gap-3">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-honey-soft text-xs font-semibold text-matcha-deep">
+                2
+              </span>
+              <span>
+                Open that routine on the <strong>Grok Bot desktop app</strong>{" "}
+                and copy the POST URL and sender key. They do not appear on
+                iOS, and the Bot cannot see them.
+              </span>
+            </li>
+            <li className="grid grid-cols-[auto_1fr] gap-3">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-honey-soft text-xs font-semibold text-matcha-deep">
+                3
+              </span>
+              <span>
+                Give those to the Bot and ask it to call{" "}
+                <code className="rounded bg-code-bg px-1.5 py-0.5 text-[0.84rem]">
+                  register_agent_callback
+                </code>{" "}
+                with <code>callbackUrl</code> and{" "}
+                <code>callbackAuthorization</code> (the sender key). HoneyMatcha
+                sends <code>Authorization: Bearer …</code> and{" "}
+                <code>X-Automation-Key</code> on every inbox POST.
+              </span>
+            </li>
+            <li className="grid grid-cols-[auto_1fr] gap-3">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-honey-soft text-xs font-semibold text-matcha-deep">
+                4
+              </span>
+              <span>
+                Keep a quiet 15-minute <code>get_inbox</code> routine as a
+                backup if the webhook host is down.
+              </span>
+            </li>
+          </ol>
         </section>
 
         <section

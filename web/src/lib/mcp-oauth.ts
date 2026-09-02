@@ -656,6 +656,7 @@ async function refreshAccessToken(input: {
         audience: input.audience,
         expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_SEC * 1000),
         callbackUrl: existingKey.callbackUrl,
+        callbackAuthorization: existingKey.callbackAuthorization,
       })
       .returning();
 
